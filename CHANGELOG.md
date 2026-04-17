@@ -5,7 +5,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [0.1.1] - 2026-04-17
+
+### Fixed
+
+- **`robot-md validate` could not find the JSON schema when installed as a wheel.** `validate.py` computed `_SCHEMA_PATH` relative to `__file__` using a four-level `parent` walk that only resolved correctly in the source tree — once `pip install`'d, the path pointed outside `site-packages` and every `validate` call raised `FileNotFoundError`. Fixed by bundling `schema/v1/robot.schema.json` as a package resource under `robot_md/schemas/v1/` and loading it via `importlib.resources.files()`. Canonical schema source remains `schema/v1/robot.schema.json` at the repo root; CI keeps the bundled copy in sync.
 
 ### Changed
 

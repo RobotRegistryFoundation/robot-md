@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
+from importlib.resources import files as _files
 from typing import Any
 
 import jsonschema
@@ -24,9 +24,6 @@ REQUIRED_BODY_SECTIONS = ["## Identity", "## Safety Gates"]
 # Also required: H1 matching robot_name; "## What <name> Can Do" header
 
 
-_SCHEMA_PATH = Path(__file__).parent.parent.parent.parent / "schema" / "v1" / "robot.schema.json"
-
-
 @dataclass
 class ValidationResult:
     code: int
@@ -35,7 +32,9 @@ class ValidationResult:
 
 
 def _load_schema() -> dict[str, Any]:
-    with _SCHEMA_PATH.open() as f:
+    # Schema is bundled as a package resource — works in wheel, sdist, and editable installs.
+    # Canonical source: robot-md repo schema/v1/robot.schema.json; CI keeps this copy in sync.
+    with (_files("robot_md").joinpath("schemas/v1/robot.schema.json")).open("r") as f:
         return json.load(f)
 
 
