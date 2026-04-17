@@ -27,7 +27,7 @@ Click **Add**.
 ### 2. GitHub `pypi` environment
 
 ```bash
-gh api repos/craigm26/robot-md/environments/pypi -X PUT --silent
+gh api repos/continuonai/robot-md/environments/pypi -X PUT --silent
 ```
 
 (No protection rules needed for a first release. Optional: require manual approval to publish.)
@@ -37,7 +37,7 @@ gh api repos/craigm26/robot-md/environments/pypi -X PUT --silent
 The `v0.1.0` tag already exists but was pushed while the repo was private and PyPI wasn't configured. Push a fresh patch tag to trigger the workflow:
 
 ```bash
-cd /home/craigm26/robot-md
+cd /home/continuonai/robot-md
 git tag -a v0.1.1 -m "robot-md v0.1.1 — initial PyPI publish
 
 Same code as v0.1.0. Patch bump to trigger first PyPI publish after
@@ -50,7 +50,7 @@ Bump `cli/pyproject.toml` version to `0.1.1` first and commit it so the build pr
 ## Watching the release
 
 ```bash
-gh run watch --repo craigm26/robot-md $(gh run list --repo craigm26/robot-md --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')
+gh run watch --repo continuonai/robot-md $(gh run list --repo continuonai/robot-md --workflow=release.yml --limit 1 --json databaseId --jq '.[0].databaseId')
 ```
 
 The workflow:
@@ -73,7 +73,7 @@ source /tmp/pypi-smoke/bin/activate
 pip install robot-md
 robot-md --version                      # robot-md 0.1.1
 curl -fsSL https://robotmd.dev/examples/bob.ROBOT.md -o /tmp/bob.ROBOT.md \
-  || curl -fsSL https://raw.githubusercontent.com/craigm26/robot-md/main/examples/bob.ROBOT.md -o /tmp/bob.ROBOT.md
+  || curl -fsSL https://raw.githubusercontent.com/continuonai/robot-md/main/examples/bob.ROBOT.md -o /tmp/bob.ROBOT.md
 robot-md validate /tmp/bob.ROBOT.md     # ✓ bob (arm+camera, 6 DoF, 5 capabilities)
 deactivate
 ```
@@ -83,7 +83,7 @@ deactivate
 Bump `cli/pyproject.toml`, commit, tag, push. That's it.
 
 ```bash
-cd /home/craigm26/robot-md
+cd /home/continuonai/robot-md
 # edit cli/pyproject.toml → version = "0.1.2"
 git commit -am "chore(release): v0.1.2"
 git tag -a v0.1.2 -m "robot-md v0.1.2 — <short reason>"

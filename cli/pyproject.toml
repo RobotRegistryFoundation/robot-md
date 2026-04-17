@@ -42,8 +42,8 @@ robot-md = "robot_md.__main__:app"
 
 [project.urls]
 Homepage = "https://robotmd.dev"
-Repository = "https://github.com/craigm26/robot-md"
-Issues = "https://github.com/craigm26/robot-md/issues"
+Repository = "https://github.com/continuonai/robot-md"
+Issues = "https://github.com/continuonai/robot-md/issues"
 Spec = "https://robotmd.dev/spec/v1"
 
 [tool.hatch.build.targets.wheel]
