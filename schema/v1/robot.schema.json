@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://robotmd.dev/schema/v1/robot.schema.json",
+  "title": "ROBOT.md frontmatter — v1",
+  "description": "JSON Schema for the YAML frontmatter block of a ROBOT.md file.",
+  "type": "object",
+  "required": ["rcan_version", "metadata", "physics", "drivers", "safety"],
+  "properties": {
+    "rcan_version": {
+      "type": "string",
+      "pattern": "^(2\\.1|2\\.1\\.0|2\\.2|2\\.2\\.0|2\\.2\\.1|3\\.[0-9]+|3\\.[0-9]+\\.[0-9]+)$",
+      "description": "RCAN protocol version. Must be 2.1+; 3.0+ recommended."
+    },
+    "schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional self-reference to the JSON schema this file conforms to."
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["robot_name"],
+      "properties": {
+        "robot_name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "rrn": { "type": "string", "pattern": "^(RRN-[0-9]{12}|)$" },
+        "rrn_uri": { "type": "string", "pattern": "^rrn://.+" },
+        "ruri": { "type": "string", "pattern": "^rcan://.+" },
+        "manufacturer": { "type": "string" },
+        "model": { "type": "string" },
+        "version": { "type": "string" },
+        "license": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "physics": {
+      "type": "object",
+      "required": ["type", "dof"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["arm", "wheeled", "tracked", "legged", "arm+camera", "humanoid", "sensor", "other"]
+        },
+        "dof": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "kinematics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "properties": {
+              "id": { "type": "string" },
+              "axis": { "type": "string", "enum": ["x", "y", "z"] },
+              "limits_deg": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "limits_mm": {
+                "type": "array",
+                "items": { "type": "number" },
+                "minItems": 2,
+                "maxItems": 2
+              },
+              "length_mm": { "type": "number", "minimum": 0 }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "drivers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "protocol"],
+        "properties": {
+          "id": { "type": "string" },
+          "protocol": { "type": "string" },
+          "port": { "type": "string" },
+          "baud_rate": { "type": "integer" },
+          "model": { "type": "string" },
+          "count": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": true
+      }
+    },
+    "safety": {
+      "type": "object",
+      "required": ["estop"],
+      "properties": {
+        "p66_enabled": { "type": "boolean" },
+        "loa_enforcement": { "type": "boolean" },
+        "max_joint_velocity_dps": { "type": "number", "minimum": 0 },
+        "max_linear_velocity_ms": { "type": "number", "minimum": 0 },
+        "payload_kg": { "type": "number", "minimum": 0 },
+        "estop": {
+          "type": "object",
+          "required": ["software", "response_ms"],
+          "properties": {
+            "hardware": { "type": "boolean" },
+            "software": { "type": "boolean", "const": true },
+            "response_ms": { "type": "integer", "minimum": 0, "maximum": 10000 }
+          },
+          "additionalProperties": true
+        },
+        "hitl_gates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+              "scope": { "type": "string" },
+              "require_auth": { "type": "boolean" }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]*\\.[a-z][a-z0-9_-]*(\\.[a-z][a-z0-9_-]*)?$"
+      }
+    },
+    "network": {
+      "type": "object",
+      "properties": {
+        "rrf_endpoint": { "type": "string", "format": "uri" },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "signing_alg": {
+          "type": "string",
+          "enum": ["ed25519", "ml-dsa-65", "pqc-hybrid-v1"]
+        },
+        "transports": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["http", "https", "mqtt", "ws", "wss", "coap"] }
+        }
+      },
+      "additionalProperties": true
+    },
+    "brain": {
+      "type": "object",
+      "properties": {
+        "planning": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string" },
+            "model": { "type": "string" },
+            "confidence_gate": { "type": "number", "minimum": 0, "maximum": 1 }
+          },
+          "additionalProperties": true
+        },
+        "reactive": {
+          "type": "object",
+          "properties": {
+            "provider": { "type": "string" },
+            "model": { "type": "string" }
+          },
+          "additionalProperties": true
+        },
+        "task_routing": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "compliance": {
+      "type": "object",
+      "properties": {
+        "fria_ref": {
+          "oneOf": [
+            { "type": "string", "format": "uri" },
+            { "type": "null" }
+          ]
+        },
+        "iso_42001": {
+          "type": "object",
+          "properties": {
+            "self_assessed": { "type": "boolean" },
+            "level": { "type": "integer", "minimum": 1, "maximum": 5 }
+          },
+          "additionalProperties": true
+        },
+        "eu_ai_act": {
+          "type": "object",
+          "properties": {
+            "audit_retention_days": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "federation": {
+      "type": "object",
+      "properties": {
+        "peer_rrns": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^(RRN-[0-9]{12}|rrn://.+)$" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "extensions": {
+      "type": "object",
+      "patternProperties": {
+        "^x-[a-z0-9_-]+$": { "type": "object" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}
