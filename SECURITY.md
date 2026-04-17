@@ -31,7 +31,7 @@ Include in your report:
 - **Triage + initial severity call**: within 7 days
 - **Fix + coordinated disclosure**: typically within 30 days for high/critical severity; longer for lower severity or if upstream coordination is needed
 
-## In-Scope
+## In Scope
 
 - Schema bypass — a ROBOT.md that passes `robot-md validate` but violates the documented format invariants
 - CLI vulnerabilities — code execution, path traversal, privilege escalation via malformed input
