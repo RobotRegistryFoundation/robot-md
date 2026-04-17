@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.1.3] - 2026-04-17
+
+### Added
+
+- **Autodetect hardware DB expansion.** Eight additional device families,
+  each tagged with provenance in-source and covered by synthetic-fixture
+  tests:
+  - **Cameras:** Intel RealSense D435i, D455, L515; Stereolabs ZED 2.
+  - **MCUs:** Arduino Uno R1/R3, Arduino Mega 2560, Arduino Leonardo,
+    Raspberry Pi RP2040 (including BOOTSEL), PJRC Teensy.
+  - **Motor control:** ODrive V3 BLDC controller.
+- Introduces two new device roles in the autodetect schema: `mcu` and
+  `motor-controller`. Existing `npu`, `camera`, `serial-bus`, and
+  `serial-port` roles unchanged.
+
+### Internal
+
+- Test suite expanded from 13 → 17 autodetect cases; total CLI suite now
+  59 tests.
+
 ## [0.1.2] - 2026-04-17
 
 ### Added

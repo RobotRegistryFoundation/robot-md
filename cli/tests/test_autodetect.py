@@ -160,3 +160,71 @@ def test_cli_autodetect_write_flag_creates_file(tmp_path):
 def test_cli_help_mentions_autodetect():
     result = runner.invoke(app, ["--help"])
     assert "autodetect" in result.stdout
+
+
+# --- Extended hardware DB coverage (synthetic fixtures, not box-dependent) ---
+
+
+def _synthetic_lsusb(entries: list[tuple[str, str, str]]) -> str:
+    # entries: list of (vid, pid, label_suffix)
+    return "\n".join(
+        f"Bus 001 Device 00{i + 2}: ID {vid}:{pid} {label}"
+        for i, (vid, pid, label) in enumerate(entries)
+    )
+
+
+def test_parse_usb_detects_arduino_family():
+    out = _synthetic_lsusb(
+        [
+            ("2341", "0043", "Arduino Uno"),
+            ("2341", "0042", "Arduino Mega 2560"),
+            ("2341", "8036", "Arduino Leonardo"),
+        ]
+    )
+    devs = parse_usb(out)
+    ids = {d.driver_id for d in devs}
+    assert "mcu-arduino-uno" in ids
+    assert "mcu-arduino-mega2560" in ids
+    assert "mcu-arduino-leonardo" in ids
+    for d in devs:
+        assert d.role == "mcu"
+
+
+def test_parse_usb_detects_rp2040_and_teensy():
+    out = _synthetic_lsusb(
+        [
+            ("2e8a", "000a", "RP2040"),
+            ("16c0", "0483", "Teensy"),
+        ]
+    )
+    devs = parse_usb(out)
+    ids = {d.driver_id for d in devs}
+    assert {"mcu-rp2040", "mcu-teensy"} <= ids
+
+
+def test_parse_usb_detects_realsense_variants():
+    out = _synthetic_lsusb(
+        [
+            ("8086", "0b07", "RealSense D435"),
+            ("8086", "0b3a", "RealSense D435i"),
+            ("8086", "0b5c", "RealSense D455"),
+            ("8086", "0b64", "RealSense L515"),
+        ]
+    )
+    devs = parse_usb(out)
+    assert len(devs) == 4
+    for d in devs:
+        assert d.role == "camera"
+        assert d.protocol == "librealsense"
+
+
+def test_parse_usb_detects_odrive_and_zed():
+    out = _synthetic_lsusb(
+        [
+            ("1209", "0d32", "ODrive"),
+            ("2b03", "f580", "ZED 2"),
+        ]
+    )
+    devs = parse_usb(out)
+    roles = {d.role for d in devs}
+    assert roles == {"motor-controller", "camera"}

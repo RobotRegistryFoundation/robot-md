@@ -109,13 +109,31 @@ USB_DB: dict[tuple[str, str], dict[str, str]] = {
         "role": "camera",
         "label": "Luxonis OAK-D (bootloader)",
     },
-    # Intel RealSense D435/D455 family (common wrist/world cam).
-    # Provenance: Intel RealSense docs.
+    # Intel RealSense family (common wrist/world cam).
+    # Provenance: Intel RealSense docs + librealsense2 udev rules.
     ("8086", "0b07"): {
         "driver_id": "cam-realsense-d435",
         "protocol": "librealsense",
         "role": "camera",
         "label": "Intel RealSense D435",
+    },
+    ("8086", "0b3a"): {
+        "driver_id": "cam-realsense-d435i",
+        "protocol": "librealsense",
+        "role": "camera",
+        "label": "Intel RealSense D435i",
+    },
+    ("8086", "0b5c"): {
+        "driver_id": "cam-realsense-d455",
+        "protocol": "librealsense",
+        "role": "camera",
+        "label": "Intel RealSense D455",
+    },
+    ("8086", "0b64"): {
+        "driver_id": "cam-realsense-l515",
+        "protocol": "librealsense",
+        "role": "camera",
+        "label": "Intel RealSense L515 (LiDAR camera)",
     },
     # Google Coral USB Accelerator (EdgeTPU). Provenance: Coral docs.
     ("1a6e", "089a"): {
@@ -129,6 +147,67 @@ USB_DB: dict[tuple[str, str], dict[str, str]] = {
         "protocol": "edgetpu",
         "role": "npu",
         "label": "Google Coral USB (bootloader)",
+    },
+    # Arduino family — frequently wired as a motor-driver / sensor-interface
+    # co-processor. Provenance: official Arduino USB VID:PID list.
+    ("2341", "0043"): {
+        "driver_id": "mcu-arduino-uno",
+        "protocol": "serial",
+        "role": "mcu",
+        "label": "Arduino Uno R3 (ATmega328P)",
+    },
+    ("2341", "0001"): {
+        "driver_id": "mcu-arduino-uno-r1",
+        "protocol": "serial",
+        "role": "mcu",
+        "label": "Arduino Uno (original FTDI)",
+    },
+    ("2341", "0042"): {
+        "driver_id": "mcu-arduino-mega2560",
+        "protocol": "serial",
+        "role": "mcu",
+        "label": "Arduino Mega 2560 R3",
+    },
+    ("2341", "8036"): {
+        "driver_id": "mcu-arduino-leonardo",
+        "protocol": "serial",
+        "role": "mcu",
+        "label": "Arduino Leonardo (native USB)",
+    },
+    # Raspberry Pi RP2040 / Pico. Provenance: rpi-pico docs.
+    ("2e8a", "000a"): {
+        "driver_id": "mcu-rp2040",
+        "protocol": "serial",
+        "role": "mcu",
+        "label": "Raspberry Pi RP2040 (Pico)",
+    },
+    ("2e8a", "0003"): {
+        "driver_id": "mcu-rp2040-boot",
+        "protocol": "serial",
+        "role": "mcu",
+        "label": "Raspberry Pi RP2040 (BOOTSEL)",
+    },
+    # Teensy 4.x family — common for high-rate servo/ESC control.
+    # Provenance: PJRC usb_desc.h.
+    ("16c0", "0483"): {
+        "driver_id": "mcu-teensy",
+        "protocol": "serial",
+        "role": "mcu",
+        "label": "PJRC Teensy (HID serial)",
+    },
+    # ODrive V3.x BLDC motor controller. Provenance: ODrive docs.
+    ("1209", "0d32"): {
+        "driver_id": "motor-odrive-v3",
+        "protocol": "odrive",
+        "role": "motor-controller",
+        "label": "ODrive V3 BLDC controller",
+    },
+    # Stereolabs ZED / ZED 2 camera. Provenance: ZED SDK udev rules.
+    ("2b03", "f580"): {
+        "driver_id": "cam-zed2",
+        "protocol": "zed-sdk",
+        "role": "camera",
+        "label": "Stereolabs ZED 2 stereo camera",
     },
 }
 
