@@ -91,16 +91,48 @@
       "properties": {
         "p66_enabled": { "type": "boolean" },
         "loa_enforcement": { "type": "boolean" },
-        "max_joint_velocity_dps": { "type": "number", "minimum": 0 },
-        "max_linear_velocity_ms": { "type": "number", "minimum": 0 },
-        "payload_kg": { "type": "number", "minimum": 0 },
+        "max_joint_velocity_dps": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 36000,
+          "description": "Sanity bound: 36000 dps = 100 RPS. Physically absurd values above this are rejected at validation time so a malformed or hostile manifest can't declare 'unlimited' and slip past the planner."
+        },
+        "max_linear_velocity_ms": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Sanity bound: 100 m/s = 360 km/h. Anything faster is not a robot."
+        },
+        "payload_kg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10000,
+          "description": "Sanity bound: 10000 kg. Anything heavier is industrial/construction class — use a vertical-specific spec rather than ROBOT.md v1."
+        },
+        "workspace_bounds_m": {
+          "type": "array",
+          "items": { "type": "number", "minimum": 0, "maximum": 1000 },
+          "minItems": 3,
+          "maxItems": 3,
+          "description": "Optional [x, y, z] workspace envelope in meters. Planner must not command beyond these bounds."
+        },
+        "failsafe_behavior": {
+          "type": "string",
+          "enum": ["stop", "hold", "home", "custom"],
+          "description": "What the robot does when control comms are lost. 'stop' is safest for most physical systems; 'hold' preserves position for stateful tasks; 'home' returns to a declared safe pose; 'custom' requires explicit prose in the body."
+        },
         "estop": {
           "type": "object",
           "required": ["software", "response_ms"],
           "properties": {
             "hardware": { "type": "boolean" },
             "software": { "type": "boolean", "const": true },
-            "response_ms": { "type": "integer", "minimum": 0, "maximum": 10000 }
+            "response_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5000,
+              "description": "Bound tightened to 5000 ms (was 10000). A responsible robot E-stop should complete in well under 1 second; 5s is the outer envelope, anything higher is suspect."
+            }
           },
           "additionalProperties": true
         },
