@@ -71,18 +71,42 @@ pip install robot-md
 
 Requires Python 3.10+.
 
-## Try it (60 seconds)
+## Adopt it for your robot (60 seconds)
+
+The Tier 0 flow — Claude Code alone as the runtime, no OpenCastor:
 
 ```bash
-# 1. Validate a ROBOT.md
+# 1. Install the SessionStart hook (CLI installed above).
+mkdir -p ~/.claude/hooks
+curl -fsSL https://robotmd.dev/hook > ~/.claude/hooks/robot-md.sh
+chmod +x ~/.claude/hooks/robot-md.sh
+# Add one entry to ~/.claude/settings.json — see integrations/claude-code/settings.template.json.
+
+# 2. cd to your robot's repo. Start Claude. Ask it to write your ROBOT.md.
+cd ~/my-robot
+claude
+#  > Scan the hardware connected to this machine (lsusb, i2cdetect, dmesg,
+#  > ls /dev/tty*) and write a ROBOT.md per https://robotmd.dev/spec/v1.
+#  > Validate it when done.
+```
+
+Claude's Bash tool does the hardware discovery and writes the manifest. From there, the planner and the executor are one process — no gateway, no runtime to stand up.
+
+**Want a public identity?** `robot-md register ROBOT.md` (shipping in v0.2) posts to the Robot Registry Foundation, writes the assigned `RRN-XXXXXXXXXXXX` into your manifest, and anchors your robot's signing key.
+
+**Want fleet-grade orchestration, P66 hardware interlocks, reactive VLA control, or EU AI Act audit?** Add [OpenCastor](https://github.com/craigm26/OpenCastor) when the time comes. Until then, ROBOT.md + Claude Code is all you need.
+
+## Inspect a ROBOT.md (CLI)
+
+```bash
 robot-md validate examples/bob.ROBOT.md
 # → ✓ bob (arm+camera, 6 DoF, 5 capabilities)
 
-# 2. Render the machine-readable YAML (feed to OpenCastor, etc.)
 robot-md render examples/bob.ROBOT.md | head -5
+# strips prose, emits pure YAML for runtime tooling
 
-# 3. Emit the Claude context block
 robot-md context examples/bob.ROBOT.md | head -10
+# emits the Claude-ready '# Robot context' block
 ```
 
 ## Claude integration
