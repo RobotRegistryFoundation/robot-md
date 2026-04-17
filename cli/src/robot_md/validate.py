@@ -1,0 +1,106 @@
+"""Validate a parsed ROBOT.md against schema, RCAN rules, and body requirements."""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import jsonschema
+
+from robot_md.parser import ParsedRobotMd
+
+
+# Exit codes (matches spec §8)
+VALID = 0
+FILE_ERROR = 1
+SCHEMA_VIOLATION = 2
+RCAN_CONFORMANCE_VIOLATION = 3
+MISSING_BODY_SECTION = 4
+
+
+REQUIRED_BODY_SECTIONS = ["## Identity", "## Safety Gates"]
+# Also required: H1 matching robot_name; "## What <name> Can Do" header
+
+
+_SCHEMA_PATH = (
+    Path(__file__).parent.parent.parent.parent / "schema" / "v1" / "robot.schema.json"
+)
+
+
+@dataclass
+class ValidationResult:
+    code: int
+    errors: list[str] = field(default_factory=list)
+    summary: str = ""
+
+
+def _load_schema() -> dict[str, Any]:
+    with _SCHEMA_PATH.open() as f:
+        return json.load(f)
+
+
+def validate(parsed: ParsedRobotMd) -> ValidationResult:
+    """Validate a parsed ROBOT.md. Return a ValidationResult.
+
+    Order: schema first, then body-section checks. RCAN conformance is folded
+    into the schema via regex patterns on rcan_version and signing_alg.
+    """
+    fm = parsed.frontmatter
+    body = parsed.body or ""
+    errors: list[str] = []
+
+    # 1. Schema validation
+    schema = _load_schema()
+    validator = jsonschema.Draft202012Validator(schema)
+    schema_errors = sorted(validator.iter_errors(fm), key=lambda e: e.path)
+    if schema_errors:
+        for err in schema_errors:
+            path = ".".join(str(p) for p in err.absolute_path) or "<root>"
+            errors.append(f"schema: {path}: {err.message}")
+        return ValidationResult(code=SCHEMA_VIOLATION, errors=errors)
+
+    # 2. Body-section checks
+    robot_name = fm.get("metadata", {}).get("robot_name", "")
+    if not _has_matching_h1(body, robot_name):
+        errors.append(
+            f"body: missing H1 matching robot_name '{robot_name}' "
+            f"(first line after blank should be '# {robot_name}')"
+        )
+    for section in REQUIRED_BODY_SECTIONS:
+        if section not in body:
+            errors.append(f"body: missing required section '{section}'")
+    # "## What <name> Can Do" check
+    what_pattern = rf"^## What {re.escape(robot_name)} Can Do\s*$"
+    if not re.search(what_pattern, body, re.MULTILINE | re.IGNORECASE):
+        errors.append(
+            f"body: missing required section '## What {robot_name} Can Do' "
+            f"(case-insensitive)"
+        )
+
+    if errors:
+        return ValidationResult(code=MISSING_BODY_SECTION, errors=errors)
+
+    # 3. Valid — build summary
+    summary = _build_summary(fm)
+    return ValidationResult(code=VALID, errors=[], summary=summary)
+
+
+def _has_matching_h1(body: str, robot_name: str) -> bool:
+    """Check if the body has an H1 matching robot_name (case-insensitive)."""
+    if not robot_name:
+        return False
+    pattern = rf"^# {re.escape(robot_name)}\s*$"
+    return bool(re.search(pattern, body, re.MULTILINE | re.IGNORECASE))
+
+
+def _build_summary(fm: dict[str, Any]) -> str:
+    """Build a one-line summary of a valid ROBOT.md."""
+    name = fm.get("metadata", {}).get("robot_name", "?")
+    ptype = fm.get("physics", {}).get("type", "?")
+    dof = fm.get("physics", {}).get("dof", "?")
+    caps = fm.get("capabilities", [])
+    cap_count = len(caps) if isinstance(caps, list) else 0
+    return f"{name} ({ptype}, {dof} DoF, {cap_count} capabilities)"
