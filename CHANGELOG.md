@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.1.2] - 2026-04-17
+
+### Added
+
+- **`robot-md autodetect`** — scan visible hardware and emit a draft
+  `ROBOT.md`. Detects Hailo-8 / Hailo-10H (PCI), Intel Movidius NCS 1/2 (USB),
+  Luxonis OAK-D (USB), Google Coral USB Accelerator (USB), Intel RealSense
+  D435 (USB), and common USB-serial bridges (CH340, CH341, CP210x, FTDI
+  FT232R). Also probes `/dev/ttyACM*` / `/dev/ttyUSB*` and common
+  robot-stack tools (`claude`, `opencastor`, `castor`, `rcan-validate`,
+  `hailortcli`, `i2cdetect`). Linux-only in this release.
+  - Default emits draft to stdout. `--write PATH` writes to a file and
+    refuses to overwrite.
+  - Emitted draft uses `"CHANGE-ME"` / `"other"` placeholders for identity
+    fields and schema-validates — but will not claim to know actuator count
+    or physics type without operator review.
+  - Hardware DB lives in `robot_md/autodetect.py` with VID:PID provenance
+    comments on every entry. PRs to extend it are welcome.
+- **v0.2 design document** at `spec/v0.2-design.md` (published at
+  `robotmd.dev/spec/v0.2-design.md`): signing, registry ingestion, and
+  tamper-evidence plan. Design-only; no code. Evaluates blockchain
+  options and recommends centralized D1 baseline for v0.2 (cheapest,
+  simplest) with Merkle transparency log as a documented v0.3+ upgrade
+  path. §13 collects four Decision Required items gating implementation.
+
+### Changed
+
+- README: added v0.2 design link to Spec + docs. Removed broken
+  proposal link (outreach materials live in the private repo).
+
 ## [0.1.1] - 2026-04-17
 
 ### Fixed

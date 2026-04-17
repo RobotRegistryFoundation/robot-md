@@ -9,6 +9,7 @@ import typer
 from rich.console import Console
 
 from robot_md import __version__
+from robot_md.autodetect import emit_draft, scan_system
 from robot_md.context import emit_context
 from robot_md.parser import ParseError, parse_file
 from robot_md.render import render_yaml
@@ -98,6 +99,34 @@ def context(path: Path = typer.Argument(..., help="Path to a ROBOT.md file.")) -
         err_console.print(f"[red]✗[/red] {e}")
         raise typer.Exit(code=FILE_ERROR) from None
     sys.stdout.write(emit_context(parsed))
+
+
+@app.command()
+def autodetect(
+    write: Path | None = typer.Option(
+        None,
+        "--write",
+        "-w",
+        help="Write draft to this path (refuses to overwrite). If omitted, prints to stdout.",
+    ),
+) -> None:
+    """Scan visible hardware and emit a draft ROBOT.md.
+
+    Linux-only. Covers PCI (via lspci), USB (via lsusb), /dev/tty[ACM|USB]*,
+    and runtime info. Emitted draft has TODO markers for identity fields —
+    review before committing. Always run `robot-md validate` afterwards.
+    """
+    scan = scan_system()
+    draft = emit_draft(scan)
+    if write is None:
+        sys.stdout.write(draft)
+        return
+    if write.exists():
+        err_console.print(f"[red]✗[/red] {write} already exists — refusing to overwrite")
+        raise typer.Exit(code=FILE_ERROR)
+    write.write_text(draft)
+    out_console.print(f"[green]✓[/green] wrote draft to {write}")
+    out_console.print(f"  next: edit the TODOs, then `robot-md validate {write}`")
 
 
 if __name__ == "__main__":

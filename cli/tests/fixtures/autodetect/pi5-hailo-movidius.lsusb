@@ -1,0 +1,8 @@
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 001 Device 003: ID 08bb:2902 Texas Instruments PCM2902 Audio Codec
+Bus 002 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+Bus 002 Device 004: ID 03e7:f63b Intel Myriad VPU [Movidius Neural Compute Stick]
+Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+Bus 003 Device 002: ID 1a86:55d3 QinHeng Electronics USB Single Serial
+Bus 003 Device 003: ID 1908:2070 GEMBIRD Honk HK-5002 USB Speaker
+Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub

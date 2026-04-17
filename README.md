@@ -82,15 +82,16 @@ curl -fsSL https://robotmd.dev/hook > ~/.claude/hooks/robot-md.sh
 chmod +x ~/.claude/hooks/robot-md.sh
 # Add one entry to ~/.claude/settings.json — see integrations/claude-code/settings.template.json.
 
-# 2. cd to your robot's repo. Start Claude. Ask it to write your ROBOT.md.
+# 2. cd to your robot's repo. Generate a draft with autodetect, then edit.
 cd ~/my-robot
-claude
-#  > Scan the hardware connected to this machine (lsusb, i2cdetect, dmesg,
-#  > ls /dev/tty*) and write a ROBOT.md per https://robotmd.dev/spec/v1.
-#  > Validate it when done.
+robot-md autodetect --write ROBOT.md   # detects Hailo, Movidius, OAK-D,
+                                       # Coral, CH340/CP210x/FTDI, tty*
+# Fill in the TODOs (robot name, physics type, DoF, capabilities), then:
+robot-md validate ROBOT.md
+claude                                 # Claude reads ROBOT.md automatically
 ```
 
-Claude's Bash tool does the hardware discovery and writes the manifest. From there, the planner and the executor are one process — no gateway, no runtime to stand up.
+`robot-md autodetect` scans PCI + USB + `/dev/tty*` and emits a draft that validates against the v1 schema but deliberately marks identity fields (`robot_name`, `physics.type`, `dof`) as TODO — the operator is the authority on what the robot *is*. From there, Claude Code is the planner and the executor: no gateway, no runtime to stand up.
 
 **Want a public identity?** `robot-md register ROBOT.md` (shipping in v0.2) posts to the Robot Registry Foundation, writes the assigned `RRN-XXXXXXXXXXXX` into your manifest, and anchors your robot's signing key.
 
@@ -99,6 +100,9 @@ Claude's Bash tool does the hardware discovery and writes the manifest. From the
 ## Inspect a ROBOT.md (CLI)
 
 ```bash
+robot-md autodetect                      # print a draft ROBOT.md to stdout
+robot-md autodetect --write ROBOT.md     # write it (refuses to overwrite)
+
 robot-md validate examples/bob.ROBOT.md
 # → ✓ bob (arm+camera, 6 DoF, 5 capabilities)
 
