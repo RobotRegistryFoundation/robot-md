@@ -734,7 +734,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <div class="sec-num">§ 02 — The stack</div>
       <div>
         <h2 class="sec-title">Four layers. Each independent. Each composable.</h2>
-        <p class="sec-lede">ROBOT.md declares what the robot <em>is</em>. RCAN is how it <em>speaks</em>. The Registry is where it <em>lives</em>. The runtime is what it <em>runs</em>. Adopt any one without the others — or all four together and get a fleet.</p>
+        <p class="sec-lede">ROBOT.md declares what the robot <em>is</em>. RCAN is how fleets <em>speak</em>. The Registry is where robots <em>live</em>. The runtime is whatever <em>executes</em> — and for Tier 0, that's Claude Code itself. Adopt one layer or all four.</p>
       </div>
     </div>
 
@@ -761,10 +761,10 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       </div>
 
       <div class="stack-row" role="row">
-        <div class="layer"><span>Layer 1 · Runtime</span><b>OpenCastor + any compatible runtime</b></div>
-        <div class="cell"><span class="tag on">Reference</span>OpenCastor — open‑source agent editor and robotics runtime. 7,800+ tests, Claude Opus 4.7 as planner, OpenVLA‑7B reactive.</div>
-        <div class="cell"><span class="tag">Portable</span>ROS 2, Spot SDK, HuggingFace LeRobot, Pollen Reachy — any of them can ship a ROBOT.md.</div>
-        <div class="cell"><span class="tag">Bring‑your‑own</span>The spec depends on no runtime. Export a ROBOT.md from your existing stack in an afternoon.</div>
+        <div class="layer"><span>Layer 1 · Runtime</span><b>Claude Code is enough. OpenCastor for production.</b></div>
+        <div class="cell"><span class="tag on">Tier 0</span><b>Claude Code is already a runtime.</b> Drop <code>ROBOT.md</code> in a repo with shell access to your robot — USB, serial, HTTP, MQTT — and the Bash tool dispatches. No SDK to install.</div>
+        <div class="cell"><span class="tag">Tier 1</span>Add your own driver scripts for sub‑second loops. Still no "runtime" in the traditional sense — just Claude plus the scripts you'd write anyway.</div>
+        <div class="cell"><span class="tag">Tier 2</span>Production: OpenCastor adds a reactive VLA layer, P66 hardware interlocks, fleet scale, EU AI Act audit. Opt‑in when you need it.</div>
       </div>
     </div>
 
@@ -800,7 +800,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     </div>
 
     <div style="margin-top:48px">
-      <p class="pull">If a robot can describe itself in one file, every tool in the agentic stack — <b>planner, validator, registry, gateway</b> — can meet it halfway.</p>
+      <p class="pull">Claude Code is already a runtime. <b>ROBOT.md</b> is the file that makes it a <b>robot</b> runtime.</p>
     </div>
   </div>
 </section>
@@ -820,8 +820,8 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <article class="surface">
         <div class="st ship">● Shipping v0.1</div>
         <h3>Claude Code</h3>
-        <div class="mech">SessionStart hook → <code>robot-md context</code> → session context</div>
-        <p>A drop‑in hook at <code>~/.claude/hooks/robot-md.sh</code>. Reads <code>./ROBOT.md</code> from cwd and injects the context block — same mechanism that orients Claude around a codebase via CLAUDE.md today.</p>
+        <div class="mech">SessionStart hook → context · Bash tool → dispatch · <b>Claude Code IS the runtime.</b></div>
+        <p>A drop‑in hook at <code>~/.claude/hooks/robot-md.sh</code> reads <code>./ROBOT.md</code> and injects the context block. From there, Claude's Bash tool talks directly to your robot — serial, HTTP, MQTT, whatever the drivers are. No separate runtime process. No gateway to stand up. The planner and the executor are one.</p>
         <div class="mock" aria-hidden="true">
           <div class="bar"><i></i><i></i><i></i></div>
           <div><span class="k">⏵ claude</span> <span style="color:var(--ink-4)">--continue</span></div>
@@ -829,7 +829,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
           <div style="color:var(--ink-4)">· loaded ROBOT.md (bob, 6‑DOF, 5 caps)</div>
           <div style="color:var(--accent-ink)">→ ready. ask bob to do something.</div>
         </div>
-        <div class="cta">pip install robot-md  →  claude ./</div>
+        <div class="cta">pip install robot-md  →  claude ./  →  ship.</div>
       </article>
 
       <article class="surface">
@@ -1057,9 +1057,9 @@ metadata:
         <a href="https://robotregistryfoundation.org">robotregistryfoundation.org →</a>
       </div>
       <div class="eco">
-        <h5>Runtime · opencastor.com</h5>
+        <h5>Production runtime · opencastor.com</h5>
         <b>OpenCastor</b>
-        <p>What a robot <em>runs</em>. An open‑source agent editor and robotics runtime: community contributions, 7,800+ tests, Claude Opus 4.7 as the reference planner. Not required.</p>
+        <p>Optional — for fleets, regulated deployments, and real-time reactive control. Open‑source, community‑driven, 7,800+ tests, Claude Opus 4.7 as reference planner, OpenVLA‑7B reactive. Single‑robot setups don't need it — Claude Code alone is Tier 0.</p>
         <a href="https://github.com/craigm26/OpenCastor">github.com/craigm26/OpenCastor →</a>
       </div>
     </div>
