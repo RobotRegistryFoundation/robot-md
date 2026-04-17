@@ -15,3 +15,23 @@
 
 /robots.txt
   Cache-Control: public, max-age=3600
+
+/schema/*
+  Content-Type: application/schema+json
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+
+/examples/*
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+
+/spec/*
+  Content-Type: text/markdown; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+
+/hook
+  Content-Type: text/x-shellscript; charset=utf-8
+  Content-Disposition: attachment; filename="robot-md.sh"
+  Cache-Control: public, max-age=300
