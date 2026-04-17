@@ -70,3 +70,22 @@ jobs:
           jsonschema.Draft202012Validator.check_schema(schema)
           print('schema is valid draft 2020-12')
           "
+
+  schema-sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify schema copies are in sync
+        run: |
+          canon=$(md5sum schema/v1/robot.schema.json | awk '{print $1}')
+          pkg=$(md5sum cli/src/robot_md/schemas/v1/robot.schema.json | awk '{print $1}')
+          site=$(md5sum site/schema/v1/robot.schema.json | awk '{print $1}')
+          echo "canonical:    schema/v1/robot.schema.json               $canon"
+          echo "bundled CLI:  cli/src/robot_md/schemas/v1/robot.schema.json  $pkg"
+          echo "site-served:  site/schema/v1/robot.schema.json          $site"
+          if [ "$canon" != "$pkg" ] || [ "$canon" != "$site" ]; then
+            echo ""
+            echo "::error::Schema copies have drifted. After editing schema/v1/robot.schema.json, run: scripts/sync-schema.sh"
+            exit 1
+          fi
+          echo "✓ All three schema copies match"
