@@ -915,37 +915,43 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <div class="sec-head">
       <div class="sec-num">§ 05 — Try it in sixty seconds</div>
       <div>
-        <h2 class="sec-title">Install, validate, render, hand it to Claude.</h2>
-        <p class="sec-lede">The reference CLI is a small Python package. It validates against the schema, renders the machine‑readable block, and emits a context block ready for a Claude Code SessionStart hook.</p>
+        <h2 class="sec-title">Autodetect your hardware. Edit the TODOs. Hand it to Claude.</h2>
+        <p class="sec-lede">The reference CLI is a small Python package. <code>robot-md autodetect</code> scans PCI, USB, and <code>/dev/tty*</code> and emits a draft that already validates against the v1 schema — with identity fields deliberately marked TODO so the operator fills them in.</p>
       </div>
     </div>
 
     <div class="try-grid">
       <div class="terminal" aria-label="Terminal session">
         <div class="top"><i></i><i></i><i></i><span>~/projects/bob · zsh</span></div>
-<pre class="body"><span class="p">$</span> pip install robot-md
-<span class="c">Successfully installed robot-md-0.1.0</span>
+<pre class="body"><span class="p">$</span> pip install git+https://github.com/RobotRegistryFoundation/robot-md.git@v0.1.2#subdirectory=cli
 
-<span class="p">$</span> robot-md validate bob.ROBOT.md
-<span class="ok">✓ bob (arm+camera, 6 DoF, 5 capabilities)</span>
-<span class="ok">✓ rcan_version 3.0  ·  schema v1 OK</span>
-<span class="ok">✓ body sections present</span>
+<span class="p">$</span> robot-md autodetect --write ROBOT.md
+<span class="ok">✓ wrote draft to ROBOT.md</span>
+  next: edit the TODOs, then <span class="c">robot-md validate ROBOT.md</span>
 
-<span class="p">$</span> robot-md render bob.ROBOT.md | head -5
+<span class="p">$</span> head -24 ROBOT.md
+---
+<span class="c"># TODO: review this draft before committing.</span>
 rcan_version: "3.0"
 metadata:
-  robot_name: bob
-  rrn: RRN-000000000001
-  manufacturer: craigm26
+  robot_name: "CHANGE-ME"  <span class="c"># TODO</span>
+physics:
+  type: "other"            <span class="c"># TODO: arm | wheeled | legged ...</span>
+  dof: 0                   <span class="c"># TODO</span>
+drivers:
+  - { id: npu-hailo8,        protocol: hailo-rt, port: /dev/hailo0 }
+  - { id: npu-movidius-ncs2, protocol: openvino }
+  - { id: serial-ch340,      protocol: serial   }   <span class="c"># servo bus candidate</span>
+  - { id: tty-ttyACM0,       protocol: serial,  port: /dev/ttyACM0 }
+...
 
-<span class="p">$</span> robot-md context bob.ROBOT.md \
-    &gt; ~/.claude/sessions/robot-context.md
-<span class="c"># now Claude Code loads it on every session.</span>
+<span class="p">$</span> robot-md validate ROBOT.md
+<span class="ok">✓ CHANGE-ME (other, 0 DoF, 1 capabilities)</span>
 
 <span class="p">$</span> claude .
 <span class="c">· loaded CLAUDE.md</span>
-<span class="c">· loaded ROBOT.md → bob</span>
-<span class="w">→ hi. bob is online. ask me to pick something.</span>
+<span class="c">· loaded ROBOT.md</span>
+<span class="w">→ Claude sees the hardware. You fill in the identity. Ship.</span>
 </pre>
       </div>
 
