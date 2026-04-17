@@ -50,6 +50,9 @@ def test_cli_context_emits_markdown(fixtures_dir):
 
 
 def test_cli_version_flag():
+    from robot_md import __version__
+
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "0.1.0" in result.stdout
+    assert __version__ in result.stdout
+    assert "robot-md" in result.stdout
