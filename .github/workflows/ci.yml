@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        working-directory: cli
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Lint (ruff check)
+        working-directory: cli
+        run: ruff check src tests
+      - name: Format check (ruff format)
+        working-directory: cli
+        run: ruff format --check src tests
+      - name: Test
+        working-directory: cli
+        run: python -m pytest -v
+
+  validate-examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        working-directory: cli
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      - name: Validate every example
+        run: |
+          for f in examples/*.ROBOT.md ROBOT.md; do
+            echo "=== $f ==="
+            robot-md validate "$f"
+          done
+
+  schema-selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install jsonschema
+        run: pip install jsonschema
+      - name: Validate schema against meta-schema
+        run: |
+          python -c "
+          import json, jsonschema
+          with open('schema/v1/robot.schema.json') as f:
+              schema = json.load(f)
+          jsonschema.Draft202012Validator.check_schema(schema)
+          print('schema is valid draft 2020-12')
+          "

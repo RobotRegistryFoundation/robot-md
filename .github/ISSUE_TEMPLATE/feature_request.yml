@@ -1,0 +1,34 @@
+name: Feature request
+description: Propose a new feature or spec addition.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the use case and why the current format/CLI falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: If it's a spec change, show the before/after YAML. If it's a CLI change, show the new invocation.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Breaking change?
+      options:
+        - "No"
+        - "Yes (requires v2 schema)"
+        - "Unsure"
+    validations:
+      required: true
