@@ -52,7 +52,9 @@ def emit_context(parsed: ParsedRobotMd) -> str:
     if gates:
         lines.append("- Human-in-the-loop gates:")
         for g in gates:
-            lines.append(f"  - `{g.get('scope', '?')}` (auth_required={g.get('require_auth', True)})")
+            lines.append(
+                f"  - `{g.get('scope', '?')}` (auth_required={g.get('require_auth', True)})"
+            )
     lines.append("")
 
     lines.append("## Operator prose (from ROBOT.md body)")

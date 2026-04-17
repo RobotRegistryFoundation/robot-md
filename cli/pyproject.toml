@@ -55,7 +55,10 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
-ignore = []
+ignore = [
+  # Typer defines args via call-in-default (B008). This is idiomatic, not a bug.
+  "B008",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

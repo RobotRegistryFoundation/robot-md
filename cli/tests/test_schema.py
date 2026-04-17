@@ -7,7 +7,6 @@ from pathlib import Path
 
 import jsonschema
 
-
 SCHEMA_PATH = Path(__file__).parent.parent.parent / "schema" / "v1" / "robot.schema.json"
 
 

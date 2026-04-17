@@ -9,7 +9,6 @@ import pytest
 from robot_md.parser import parse_file
 from robot_md.validate import VALID, validate
 
-
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 REPO_ROOT = Path(__file__).parent.parent.parent
 
@@ -25,6 +24,4 @@ def _example_files():
 def test_example_validates(example):
     parsed = parse_file(example)
     result = validate(parsed)
-    assert result.code == VALID, (
-        f"{example.name} failed validation: errors={result.errors}"
-    )
+    assert result.code == VALID, f"{example.name} failed validation: errors={result.errors}"

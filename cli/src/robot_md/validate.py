@@ -12,7 +12,6 @@ import jsonschema
 
 from robot_md.parser import ParsedRobotMd
 
-
 # Exit codes (matches spec §8)
 VALID = 0
 FILE_ERROR = 1
@@ -25,9 +24,7 @@ REQUIRED_BODY_SECTIONS = ["## Identity", "## Safety Gates"]
 # Also required: H1 matching robot_name; "## What <name> Can Do" header
 
 
-_SCHEMA_PATH = (
-    Path(__file__).parent.parent.parent.parent / "schema" / "v1" / "robot.schema.json"
-)
+_SCHEMA_PATH = Path(__file__).parent.parent.parent.parent / "schema" / "v1" / "robot.schema.json"
 
 
 @dataclass
@@ -76,8 +73,7 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
     what_pattern = rf"^## What {re.escape(robot_name)} Can Do\s*$"
     if not re.search(what_pattern, body, re.MULTILINE | re.IGNORECASE):
         errors.append(
-            f"body: missing required section '## What {robot_name} Can Do' "
-            f"(case-insensitive)"
+            f"body: missing required section '## What {robot_name} Can Do' (case-insensitive)"
         )
 
     if errors:

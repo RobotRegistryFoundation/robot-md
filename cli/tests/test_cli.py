@@ -6,7 +6,6 @@ from typer.testing import CliRunner
 
 from robot_md.__main__ import app
 
-
 runner = CliRunner()
 
 

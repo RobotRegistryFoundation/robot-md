@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from robot_md.parser import parse_file
 from robot_md.validate import (
     MISSING_BODY_SECTION,
@@ -48,17 +46,17 @@ def test_h1_must_match_robot_name(fixtures_dir, tmp_path):
     # Build a file where H1 disagrees with metadata.robot_name
     bad = tmp_path / "bad-h1.ROBOT.md"
     bad.write_text(
-        '---\n'
+        "---\n"
         'rcan_version: "3.0"\n'
-        'metadata:\n  robot_name: alice\n'
-        'physics:\n  type: wheeled\n  dof: 2\n'
-        'drivers:\n  - id: wheels\n    protocol: pca9685\n'
-        'safety:\n  estop:\n    software: true\n    response_ms: 200\n'
-        '---\n\n'
-        '# bob\n\n'
-        '## Identity\nMismatched name.\n\n'
-        '## What bob Can Do\nNothing.\n\n'
-        '## Safety Gates\nPresent.\n'
+        "metadata:\n  robot_name: alice\n"
+        "physics:\n  type: wheeled\n  dof: 2\n"
+        "drivers:\n  - id: wheels\n    protocol: pca9685\n"
+        "safety:\n  estop:\n    software: true\n    response_ms: 200\n"
+        "---\n\n"
+        "# bob\n\n"
+        "## Identity\nMismatched name.\n\n"
+        "## What bob Can Do\nNothing.\n\n"
+        "## Safety Gates\nPresent.\n"
     )
     parsed = parse_file(bad)
     result = validate(parsed)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import frontmatter
 import yaml
@@ -18,7 +18,7 @@ class ParseError(Exception):
 class ParsedRobotMd:
     frontmatter: dict[str, Any]
     body: str
-    source_path: Optional[Path] = None
+    source_path: Path | None = None
 
 
 def parse_file(path: Path | str) -> ParsedRobotMd:

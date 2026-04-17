@@ -18,9 +18,10 @@ from robot_md.validate import (
     RCAN_CONFORMANCE_VIOLATION,
     SCHEMA_VIOLATION,
     VALID,
+)
+from robot_md.validate import (
     validate as validate_parsed,
 )
-
 
 app = typer.Typer(
     name="robot-md",
@@ -58,7 +59,7 @@ def validate(path: Path = typer.Argument(..., help="Path to a ROBOT.md file.")) 
         parsed = parse_file(path)
     except ParseError as e:
         err_console.print(f"[red]✗[/red] {e}")
-        raise typer.Exit(code=FILE_ERROR)
+        raise typer.Exit(code=FILE_ERROR) from None
 
     result = validate_parsed(parsed)
     if result.code == VALID:
@@ -84,7 +85,7 @@ def render(path: Path = typer.Argument(..., help="Path to a ROBOT.md file.")) ->
         parsed = parse_file(path)
     except ParseError as e:
         err_console.print(f"[red]✗[/red] {e}")
-        raise typer.Exit(code=FILE_ERROR)
+        raise typer.Exit(code=FILE_ERROR) from None
     sys.stdout.write(render_yaml(parsed))
 
 
@@ -95,7 +96,7 @@ def context(path: Path = typer.Argument(..., help="Path to a ROBOT.md file.")) -
         parsed = parse_file(path)
     except ParseError as e:
         err_console.print(f"[red]✗[/red] {e}")
-        raise typer.Exit(code=FILE_ERROR)
+        raise typer.Exit(code=FILE_ERROR) from None
     sys.stdout.write(emit_context(parsed))
 
 
