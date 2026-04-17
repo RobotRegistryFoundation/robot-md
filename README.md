@@ -136,7 +136,7 @@ Each layer is independent. Use ROBOT.md without OpenCastor (just for Claude cont
 - **[Rationale](spec/rationale.md)** — design decisions + why.
 - **[JSON Schema](schema/v1/robot.schema.json)** — draft 2020-12.
 - **[Examples](examples/)** — 4 worked ROBOT.md files (Bob, so-arm101, TurtleBot 4, minimal).
-- **[Anthropic adoption proposal](proposal/anthropic-adoption-proposal.md)** — the pitch.
+- **[v0.2 design (draft)](spec/v0.2-design.md)** — signing, registry ingestion, tamper-evidence. Design only; no code yet. Feedback welcome.
 
 ## Scope
 
