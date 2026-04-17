@@ -11,7 +11,7 @@ Thanks for your interest. This guide covers how to land a PR.
 ## Setup
 
 ```bash
-git clone https://github.com/continuonai/robot-md.git
+git clone https://github.com/RobotRegistryFoundation/robot-md.git
 cd robot-md/cli
 python -m venv .venv
 source .venv/bin/activate

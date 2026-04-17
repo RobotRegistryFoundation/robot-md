@@ -19,7 +19,7 @@ Three options.
 ### 1. Cloudflare Pages dashboard (simplest)
 
 1. Go to <https://dash.cloudflare.com/> → Pages → Create project → Connect to Git
-2. Select the `continuonai/robot-md` repository
+2. Select the `RobotRegistryFoundation/robot-md` repository
 3. Configure:
    - **Production branch**: `main`
    - **Build command**: (leave empty — static site)

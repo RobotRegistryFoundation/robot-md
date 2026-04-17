@@ -3,7 +3,7 @@
 # Deploy options:
 #
 #   1. Cloudflare Dashboard (recommended for first setup):
-#      - Pages > Create project > Connect to Git > continuonai/robot-md
+#      - Pages > Create project > Connect to Git > RobotRegistryFoundation/robot-md
 #      - Build command: (none)
 #      - Output directory: site
 #      - Root directory: (none)
