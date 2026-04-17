@@ -2,7 +2,7 @@
 rcan_version: "3.0"
 metadata:
   robot_name: robot-md
-  manufacturer: craigm26
+  manufacturer: RobotRegistryFoundation
   model: spec+tooling
   version: "0.1.0"
   license: Apache-2.0
