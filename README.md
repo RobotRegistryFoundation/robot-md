@@ -57,6 +57,14 @@ Now Claude — in Code, Desktop, or Mobile — knows your robot.
 
 ## Install
 
+PyPI publish is imminent; until then, install from the repo:
+
+```bash
+pip install git+https://github.com/RobotRegistryFoundation/robot-md.git#subdirectory=cli
+```
+
+Once `robot-md` lands on PyPI:
+
 ```bash
 pip install robot-md
 ```
