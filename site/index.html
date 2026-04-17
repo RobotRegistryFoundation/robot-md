@@ -1,0 +1,1076 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ROBOT.md — the one-file declaration for agentic robots</title>
+<meta name="description" content="ROBOT.md is to a robot what CLAUDE.md is to a codebase. One file — YAML + markdown — so a planning LLM can safely operate your robot. Part of the OpenCastor ecosystem. Supports the RCAN 3.0 wire protocol and the Robot Registry Foundation.">
+<meta name="theme-color" content="#F4EFE6">
+
+<meta property="og:title" content="ROBOT.md — one-file declaration for agentic robots">
+<meta property="og:description" content="The CLAUDE.md of physical machines. One file so the same agent that ships your code can safely drive your arm, your rover, your humanoid.">
+<meta property="og:url" content="https://robotmd.dev">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="canonical" href="https://robotmd.dev/">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper:#F4EFE6;
+    --paper-2:#ECE5D6;
+    --paper-3:#DFD5BF;
+    --ink:#111110;
+    --ink-2:#2A2825;
+    --ink-3:#5A574F;
+    --ink-4:#8A8578;
+    --rule:#1d1c1a;
+    --accent:#B34A2A;        /* terracotta */
+    --accent-ink:#5A1F0E;
+    --accent-wash:#EBD9C9;
+    --ok:#2F6B3E;
+    --danger:#9B2D20;
+
+    --sans:'Inter Tight', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif:'Fraunces', Georgia, serif;
+
+    --col: 72px;
+    --gutter: 24px;
+    --maxw: 1240px;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  html{background:var(--paper); color:var(--ink); -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility}
+  body{
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.5;
+    font-feature-settings:"ss01","cv11";
+    background:
+      linear-gradient(var(--paper), var(--paper));
+    min-height:100vh;
+  }
+  /* subtle paper grain */
+  body::before{
+    content:"";
+    position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:
+      radial-gradient(rgba(0,0,0,.035) 1px, transparent 1px),
+      radial-gradient(rgba(0,0,0,.025) 1px, transparent 1px);
+    background-size: 3px 3px, 7px 7px;
+    background-position: 0 0, 1px 2px;
+    mix-blend-mode:multiply;
+    opacity:.55;
+  }
+
+  a{color:inherit; text-decoration:none; border-bottom:1px solid currentColor}
+  a:hover{color:var(--accent); border-color:var(--accent)}
+
+  .wrap{max-width:var(--maxw); margin:0 auto; padding: 0 32px; position:relative; z-index:1}
+
+  /* ============ Top rail ============ */
+  .rail{
+    border-bottom:1px solid var(--rule);
+    font-family:var(--mono);
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+  }
+  .rail-inner{display:flex; justify-content:space-between; align-items:center; padding:10px 0; gap:24px; flex-wrap:wrap}
+  .rail .dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ok); vertical-align:middle; margin-right:6px; box-shadow:0 0 0 2px rgba(47,107,62,.18)}
+  .rail nav{display:flex; gap:22px; flex-wrap:wrap}
+  .rail nav a{border:none; opacity:.8}
+  .rail nav a:hover{opacity:1}
+
+  /* ============ Masthead ============ */
+  .masthead{
+    padding: 36px 0 22px;
+    border-bottom:3px double var(--rule);
+    position:relative;
+  }
+  .mast-meta{
+    display:grid;
+    grid-template-columns: 1fr auto 1fr;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--ink-3);
+    gap:16px;
+    align-items:baseline;
+  }
+  .mast-meta .c{text-align:center}
+  .mast-meta .r{text-align:right}
+  .nameplate{
+    font-family:var(--sans);
+    font-weight:700;
+    font-size: clamp(72px, 13vw, 184px);
+    line-height:.86;
+    letter-spacing:-0.045em;
+    margin: 20px 0 14px;
+    display:flex; align-items:baseline; gap:.05em;
+    font-feature-settings:"ss01","cv11";
+  }
+  .nameplate .dot-glyph{
+    color:var(--accent);
+    font-family:var(--serif);
+    font-style:italic;
+    font-weight:600;
+    font-size:.88em;
+    line-height:1;
+    padding: 0 .03em;
+    transform:translateY(-.02em);
+  }
+  .nameplate .md{
+    font-family:var(--mono);
+    font-weight:500;
+    font-size:.52em;
+    letter-spacing:-0.02em;
+    background:var(--ink);
+    color:var(--paper);
+    padding:.08em .28em .12em;
+    align-self:flex-end;
+    margin-bottom:.18em;
+    margin-left:.12em;
+  }
+  .deck{
+    font-family:var(--serif);
+    font-style:italic;
+    font-weight:400;
+    font-size: clamp(22px, 2.4vw, 32px);
+    line-height:1.3;
+    color:var(--ink-2);
+    max-width: 880px;
+    margin: 8px 0 10px;
+    text-wrap:pretty;
+  }
+  .deck em{color:var(--accent); font-style:italic}
+  .sub-deck{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-3);
+    display:flex; gap:18px; flex-wrap:wrap;
+    border-top:1px solid var(--rule);
+    padding-top:14px; margin-top:20px;
+  }
+  .sub-deck b{color:var(--ink); font-weight:600}
+
+  /* ============ Section header ============ */
+  .sec{
+    padding: 64px 0;
+    border-bottom:1px solid var(--rule);
+    position:relative;
+  }
+  .sec-head{
+    display:grid;
+    grid-template-columns: 88px 1fr;
+    gap:24px;
+    align-items:baseline;
+    margin-bottom:36px;
+  }
+  .sec-num{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--accent);
+    padding-top:8px;
+    border-top:2px solid var(--accent);
+    align-self:start;
+  }
+  .sec-title{
+    font-family:var(--sans);
+    font-weight:600;
+    font-size: clamp(30px, 4vw, 52px);
+    letter-spacing:-0.02em;
+    line-height:1.02;
+    margin:0 0 10px;
+    text-wrap:balance;
+  }
+  .sec-lede{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size:20px;
+    color:var(--ink-2);
+    max-width:720px;
+    margin:0;
+    text-wrap:pretty;
+  }
+
+  /* ============ §01 The file ============ */
+  .file-grid{
+    display:grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap:40px;
+    align-items:start;
+  }
+  @media (max-width: 900px){ .file-grid{grid-template-columns:1fr} }
+
+  .code-card{
+    background: var(--ink);
+    color: var(--paper);
+    border-radius:2px;
+    font-family:var(--mono);
+    font-size: 12.5px;
+    line-height:1.55;
+    overflow:hidden;
+    box-shadow: 12px 12px 0 var(--ink), 12px 12px 0 1px var(--rule);
+    position:relative;
+  }
+  .code-head{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 14px;
+    border-bottom:1px solid #2a2826;
+    font-size:11px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:#b8b3a7;
+  }
+  .code-head .pill{
+    background:var(--accent); color:var(--paper);
+    padding:2px 8px; border-radius:2px; font-size:10px; letter-spacing:.1em;
+  }
+  .code-body{
+    padding: 18px 20px 22px;
+    overflow-x:auto;
+    white-space:pre;
+    scrollbar-width:thin;
+  }
+  .code-body .fm{color:#e8c9a5}
+  .code-body .k{color:#a7c8ff}
+  .code-body .v{color:#ecdfcb}
+  .code-body .s{color:#d6b982}
+  .code-body .c{color:#6a665d; font-style:italic}
+  .code-body .h{color:var(--paper); font-weight:600}
+  .code-body .accent{color:#ff9b76}
+  .code-body .rule{color:#3a3834; letter-spacing:0}
+
+  .file-side h3{
+    font-family:var(--sans); font-weight:600; font-size:22px; letter-spacing:-0.01em; margin:0 0 8px;
+  }
+  .defs{display:flex; flex-direction:column; gap:24px; margin-top:8px}
+  .def{
+    border-top:1px solid var(--rule);
+    padding-top:16px;
+    display:grid;
+    grid-template-columns: 28px 1fr;
+    gap:14px;
+  }
+  .def .n{font-family:var(--mono); font-size:11px; letter-spacing:.1em; color:var(--ink-3); padding-top:3px}
+  .def h4{margin:0 0 4px; font-size:18px; font-weight:600}
+  .def p{margin:0; color:var(--ink-2); font-size:15px; line-height:1.55}
+  .def p code{font-family:var(--mono); background:var(--paper-2); padding:1px 5px; border-radius:2px; font-size:13px}
+
+  /* ============ §02 Stack diagram ============ */
+  .stack{
+    border:1px solid var(--rule);
+    background:var(--paper-2);
+    padding:0;
+  }
+  .stack-row{
+    display:grid;
+    grid-template-columns: 240px 1fr 1fr 1fr;
+    border-top:1px solid var(--rule);
+  }
+  .stack-row:first-child{border-top:none}
+  .stack-row > div{padding:20px; border-right:1px solid var(--rule)}
+  .stack-row > div:last-child{border-right:none}
+  .stack-row .layer{
+    background:var(--paper-3);
+    font-family:var(--mono);
+    font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-2);
+    display:flex; flex-direction:column; justify-content:center;
+    gap:4px;
+  }
+  .stack-row .layer b{display:block; font-family:var(--sans); font-size:20px; letter-spacing:-0.01em; text-transform:none; color:var(--ink); font-weight:600}
+  .stack-row .cell{font-size:14px; color:var(--ink-2); line-height:1.45}
+  .stack-row .cell .tag{
+    display:inline-block; font-family:var(--mono); font-size:10px;
+    letter-spacing:.08em; text-transform:uppercase;
+    background:var(--paper); border:1px solid var(--rule); padding:2px 6px; margin-bottom:8px;
+  }
+  .stack-row .cell .tag.on{background:var(--accent); color:var(--paper); border-color:var(--accent)}
+  .stack-row.primary{background:var(--paper)}
+  .stack-row.primary .layer{background:var(--ink); color:var(--paper)}
+  .stack-row.primary .layer b{color:var(--paper)}
+  .stack-row.primary .cell{background:var(--accent-wash)}
+  @media (max-width: 900px){
+    .stack-row{grid-template-columns: 1fr}
+    .stack-row > div{border-right:none; border-bottom:1px solid var(--rule)}
+  }
+
+  /* ============ companion standards blocks ============ */
+  .companions{
+    display:grid; grid-template-columns: 1fr 1fr; gap: 0;
+    margin-top: 32px;
+    border: 1px solid var(--rule);
+  }
+  @media (max-width: 900px){ .companions{grid-template-columns:1fr} }
+  .companion{
+    padding: 28px 28px 24px;
+    border-right:1px solid var(--rule);
+    display:flex; flex-direction:column; gap:14px;
+    background: var(--paper);
+  }
+  .companion:last-child{border-right:none}
+  @media (max-width: 900px){
+    .companion{border-right:none; border-bottom:1px solid var(--rule)}
+    .companion:last-child{border-bottom:none}
+  }
+  .companion h5{
+    font-family:var(--mono); font-size:11px; letter-spacing:.12em;
+    text-transform:uppercase; color:var(--ink-3); margin:0; font-weight:500;
+  }
+  .companion h4{
+    font-family:var(--sans); font-weight:600; font-size:26px;
+    letter-spacing:-0.015em; margin:0; color:var(--ink);
+  }
+  .companion .lede{
+    font-family:var(--serif); font-style:italic; font-size:18px;
+    color:var(--ink-2); margin:0; line-height:1.45;
+  }
+  .companion ul{
+    margin: 8px 0 0; padding: 0; list-style: none;
+    display: flex; flex-direction: column; gap: 8px;
+    font-size: 14.5px; color: var(--ink-2);
+  }
+  .companion ul li{
+    padding-left: 18px; position: relative;
+  }
+  .companion ul li::before{
+    content: "→"; position: absolute; left: 0; top: 0;
+    color: var(--accent); font-family: var(--mono); font-size: 12px;
+    top: 2px;
+  }
+  .companion ul li code{
+    font-family:var(--mono); font-size:13px; color:var(--accent-ink);
+    background:var(--paper-2); padding:1px 5px; border-radius:2px;
+  }
+  .companion .site-link{
+    margin-top: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .06em;
+    color: var(--accent);
+    padding-top: 14px;
+    border-top: 1px dashed var(--rule);
+  }
+
+  /* ============ §03 surfaces ============ */
+  .surfaces{
+    display:grid; grid-template-columns: repeat(3, 1fr); gap: 0;
+    border:1px solid var(--rule);
+  }
+  @media (max-width: 900px){ .surfaces{grid-template-columns:1fr} }
+  .surface{
+    padding: 28px 26px;
+    border-right:1px solid var(--rule);
+    display:flex; flex-direction:column; gap:14px;
+    min-height: 360px;
+    position:relative;
+    background:var(--paper);
+  }
+  .surface:last-child{border-right:none}
+  .surface .st{
+    font-family:var(--mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase;
+    display:inline-flex; gap:6px; align-items:center; width:max-content;
+    padding:3px 8px; border-radius:2px;
+  }
+  .surface .st.ship{background:var(--ok); color:var(--paper)}
+  .surface .st.wip{background:var(--paper-3); color:var(--ink-2); border:1px solid var(--rule)}
+  .surface h3{font-size:22px; font-weight:600; margin:0; letter-spacing:-0.01em}
+  .surface .mech{
+    font-family:var(--mono); font-size:12px; color:var(--ink-3);
+    padding:10px 0; border-top:1px dashed var(--rule); border-bottom:1px dashed var(--rule);
+  }
+  .surface p{margin:0; color:var(--ink-2); font-size:14.5px; line-height:1.55}
+  .surface .cta{margin-top:auto; font-family:var(--mono); font-size:12px; letter-spacing:.06em}
+
+  /* mock windows inside the surfaces */
+  .mock{
+    border:1px solid var(--rule); background:var(--paper-2);
+    font-family:var(--mono); font-size:11px; line-height:1.5;
+    padding:10px 12px; color:var(--ink-2);
+    border-radius:2px;
+  }
+  .mock .bar{display:flex; gap:4px; margin-bottom:8px}
+  .mock .bar i{width:8px; height:8px; border-radius:50%; background:var(--paper-3); display:inline-block}
+  .mock .k{color:var(--accent-ink); font-weight:600}
+
+  /* ============ §04 field table ============ */
+  .spec-table{width:100%; border-collapse:collapse; font-size:14.5px}
+  .spec-table th, .spec-table td{
+    text-align:left;
+    padding:14px 16px;
+    border-bottom:1px solid var(--rule);
+    vertical-align:top;
+  }
+  .spec-table thead th{
+    font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--ink-3); font-weight:500;
+    border-bottom:2px solid var(--rule);
+  }
+  .spec-table code{font-family:var(--mono); font-size:13px; color:var(--accent-ink)}
+  .spec-table .req{
+    display:inline-block; width:22px; text-align:center;
+    font-family:var(--mono); font-size:11px;
+    padding:1px 0;
+  }
+  .spec-table .req.yes{background:var(--ink); color:var(--paper)}
+  .spec-table .req.rec{background:var(--paper-3); color:var(--ink-2); border:1px solid var(--rule)}
+  .spec-table .req.opt{color:var(--ink-4)}
+
+  /* ============ §05 try-it ============ */
+  .try-grid{display:grid; grid-template-columns: 1fr 1fr; gap:32px; align-items:stretch}
+  @media (max-width: 900px){ .try-grid{grid-template-columns:1fr} }
+  .terminal{
+    background:var(--ink); color:#e8e4d8;
+    border-radius:4px; overflow:hidden;
+    font-family:var(--mono); font-size:13px; line-height:1.65;
+    box-shadow: 8px 8px 0 var(--rule);
+  }
+  .terminal .top{display:flex; align-items:center; gap:6px; padding:10px 14px; border-bottom:1px solid #262421; background:#1a1917}
+  .terminal .top i{width:10px; height:10px; border-radius:50%; background:#34322e; display:inline-block}
+  .terminal .top span{margin-left:12px; font-size:11px; color:#8a857a; letter-spacing:.1em; text-transform:uppercase}
+  .terminal .body{padding:18px 20px 24px; white-space:pre; overflow-x:auto}
+  .terminal .p{color:#ff9b76}
+  .terminal .c{color:#8a857a}
+  .terminal .ok{color:#9cc9a6}
+  .terminal .w{color:#e8c9a5}
+
+  .examples{display:flex; flex-direction:column; gap:14px}
+  .example{
+    display:grid; grid-template-columns: 48px 1fr auto; gap:14px;
+    padding:18px 20px; border:1px solid var(--rule); background:var(--paper);
+    align-items:center;
+    transition: background .15s, border-color .15s;
+  }
+  .example:hover{background:var(--paper-2); border-color:var(--ink)}
+  .example .n{font-family:var(--mono); font-size:12px; color:var(--accent)}
+  .example h4{margin:0 0 2px; font-size:17px; font-weight:600; letter-spacing:-0.005em}
+  .example p{margin:0; font-size:13.5px; color:var(--ink-3)}
+  .example .arrow{font-family:var(--mono); font-size:18px; color:var(--ink-4)}
+  .example:hover .arrow{color:var(--accent)}
+
+  /* ============ §06 letter ============ */
+  .letter{
+    background:var(--paper-2);
+    border:1px solid var(--rule);
+    padding: 48px clamp(32px, 6vw, 72px);
+    position:relative;
+    font-family:var(--serif);
+    font-size: 19px;
+    line-height: 1.65;
+    color:var(--ink-2);
+    text-wrap:pretty;
+  }
+  .letter::before, .letter::after{
+    content:""; position:absolute; top:14px; bottom:14px; width:1px; background:var(--rule);
+  }
+  .letter::before{left:14px}
+  .letter::after{right:14px}
+  .letter h4{
+    font-family:var(--sans);
+    font-weight:500;
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--ink-3);
+    margin:0 0 22px;
+    display:flex; justify-content:space-between; gap:16px;
+  }
+  .letter p{margin:0 0 14px}
+  .letter p em{color:var(--accent)}
+  .letter .sign{
+    margin-top:28px;
+    font-family:var(--mono);
+    font-style:normal;
+    font-size:12px;
+    letter-spacing:.06em;
+    color:var(--ink-3);
+  }
+  .letter .stamp{
+    position:absolute; top:28px; right:28px;
+    border:2px solid var(--accent);
+    color:var(--accent);
+    padding:8px 14px;
+    font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase;
+    transform: rotate(-6deg);
+    font-weight:600;
+    line-height:1.2;
+    text-align:center;
+    opacity:.9;
+  }
+  .letter .stamp span{display:block; font-size:8px; letter-spacing:.14em; opacity:.7; margin-top:2px}
+
+  /* ============ §07 ecosystem / footer ============ */
+  .ecosystem{
+    display:grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule);
+  }
+  @media (max-width:900px){ .ecosystem{grid-template-columns: repeat(2, 1fr)} }
+  .eco{
+    padding: 28px 24px;
+    border-right:1px solid var(--rule);
+    display:flex; flex-direction:column; gap:10px; min-height:210px;
+  }
+  .eco:last-child{border-right:none}
+  @media (max-width:900px){ .eco:nth-child(2){border-right:none} .eco:nth-child(-n+2){border-bottom:1px solid var(--rule)} }
+  .eco h5{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-3); margin:0; font-weight:500}
+  .eco b{font-size:20px; letter-spacing:-0.01em; font-weight:600; margin-top:2px}
+  .eco p{margin:0; font-size:13.5px; color:var(--ink-3); line-height:1.5}
+  .eco a{font-family:var(--mono); font-size:12px; letter-spacing:.04em; margin-top:auto; border:none; color:var(--accent)}
+
+  footer.foot{
+    padding:28px 0 48px;
+    font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-3);
+    display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  }
+
+  /* ============ pull quote ============ */
+  .pull{
+    font-family:var(--serif);
+    font-style:italic;
+    font-size: clamp(32px, 4.2vw, 54px);
+    line-height:1.18;
+    color:var(--ink);
+    text-wrap:balance;
+    max-width: 980px;
+  }
+  .pull b{font-style:normal; font-family:var(--sans); font-weight:600; color:var(--accent)}
+
+  /* ============ marquee ============ */
+  .marquee{
+    border-top:1px solid var(--rule);
+    border-bottom:1px solid var(--rule);
+    overflow:hidden;
+    font-family:var(--mono);
+    font-size:13px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--ink-2);
+    padding: 10px 0;
+    background: var(--paper-2);
+  }
+  .marquee .track{display:flex; gap:48px; white-space:nowrap; animation: slide 60s linear infinite}
+  .marquee .track span{opacity:.6}
+  .marquee .track b{color:var(--accent); font-weight:600}
+  @keyframes slide{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+</style>
+</head>
+<body>
+
+<!-- ================= TOP RAIL ================= -->
+<div class="rail">
+  <div class="wrap rail-inner">
+    <div><span class="dot"></span>Spec v1 · draft 0.1 · live</div>
+    <nav>
+      <a href="#spec">Spec</a>
+      <a href="#stack">Stack</a>
+      <a href="#surfaces">Integrations</a>
+      <a href="#fields">Fields</a>
+      <a href="#try">Try it</a>
+      <a href="#anthropic">Anthropic</a>
+      <a href="https://github.com/craigm26/robot-md">GitHub</a>
+    </nav>
+    <div>part of the OpenCastor ecosystem</div>
+  </div>
+</div>
+
+<!-- ================= MASTHEAD ================= -->
+<header class="wrap masthead">
+  <div class="mast-meta">
+    <div>VOL. 1 · NO. 1</div>
+    <div class="c">An open declaration format for agentic robots</div>
+    <div class="r">APRIL 17, 2026 · OPENCASTOR ECOSYSTEM</div>
+  </div>
+
+  <h1 class="nameplate">
+    <span>ROBOT</span><span class="dot-glyph">.</span><span class="md">md</span>
+  </h1>
+
+  <p class="deck">
+    One file at the root of your robot. YAML frontmatter a schema can trust, markdown prose a planner can read. <em>The CLAUDE.md of physical machines</em> — so the same agent that ships your code can safely drive your arm, your rover, your humanoid.
+  </p>
+
+  <div class="sub-deck">
+    <span><b>RCAN 3.0</b> wire protocol, native</span>
+    <span><b>RRF</b> registry-compatible</span>
+    <span><b>JSON Schema</b> draft 2020‑12</span>
+    <span><b>Designed for</b> Claude Code · Desktop · Mobile</span>
+  </div>
+</header>
+
+<!-- ================= MARQUEE ================= -->
+<div class="marquee" aria-hidden="true">
+  <div class="track">
+    <span>One file per robot</span><b>✦</b>
+    <span>Frontmatter the validator trusts</span><b>✦</b>
+    <span>Prose the planner reads</span><b>✦</b>
+    <span>RCAN 3.0 conformant</span><b>✦</b>
+    <span>EU AI Act compliance blocks</span><b>✦</b>
+    <span>Registry‑resolvable via RRN</span><b>✦</b>
+    <span>Zero runtime lock‑in</span><b>✦</b>
+    <!-- duplicate for loop -->
+    <span>One file per robot</span><b>✦</b>
+    <span>Frontmatter the validator trusts</span><b>✦</b>
+    <span>Prose the planner reads</span><b>✦</b>
+    <span>RCAN 3.0 conformant</span><b>✦</b>
+    <span>EU AI Act compliance blocks</span><b>✦</b>
+    <span>Registry‑resolvable via RRN</span><b>✦</b>
+    <span>Zero runtime lock‑in</span><b>✦</b>
+  </div>
+</div>
+
+<!-- ================= §01 THE FILE ================= -->
+<section class="sec" id="spec">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">§ 01 — The file itself</div>
+      <div>
+        <h2 class="sec-title">A robot is what its <code style="font-family:var(--mono);font-weight:500;color:var(--accent)">ROBOT.md</code> says it is.</h2>
+        <p class="sec-lede">Every robot today drifts across five files — a YAML config, a P66 manifest, a CLAUDE.md, a firmware manifest, a README. Add a joint, update three. Miss one, ship a lie. ROBOT.md collapses the stack into a single source of truth.</p>
+      </div>
+    </div>
+
+    <div class="file-grid">
+      <div class="code-card" aria-label="Example ROBOT.md file">
+        <div class="code-head">
+          <span>bob.ROBOT.md</span>
+          <span class="pill">VALID · RCAN 3.0</span>
+        </div>
+<pre class="code-body"><span class="rule">---</span>
+<span class="k">rcan_version</span><span class="c">:</span> <span class="s">"3.0"</span>
+<span class="k">metadata</span><span class="c">:</span>
+  <span class="k">robot_name</span><span class="c">:</span> <span class="accent">bob</span>
+  <span class="k">rrn</span><span class="c">:</span>        <span class="s">RRN-000000000001</span>
+  <span class="k">manufacturer</span><span class="c">:</span> craigm26
+<span class="k">physics</span><span class="c">:</span>
+  <span class="k">type</span><span class="c">:</span> arm+camera
+  <span class="k">dof</span><span class="c">:</span>  <span class="v">6</span>
+<span class="k">drivers</span><span class="c">:</span>
+  - { id: arm,    protocol: feetech, port: /dev/ttyUSB0 }
+  - { id: camera, protocol: depthai, model: OAK-D       }
+<span class="k">capabilities</span><span class="c">:</span>
+  - arm.pick
+  - arm.place
+  - vision.describe
+  - status.report
+<span class="k">safety</span><span class="c">:</span>
+  <span class="k">payload_kg</span><span class="c">:</span> <span class="v">0.5</span>
+  <span class="k">estop</span><span class="c">:</span>      { software: true, response_ms: <span class="v">100</span> }
+  <span class="k">hitl_gates</span><span class="c">:</span>
+    - { scope: destructive, require_auth: true }
+<span class="k">brain</span><span class="c">:</span>
+  <span class="k">planning</span><span class="c">:</span>  { provider: anthropic, model: claude-opus-4-7 }
+  <span class="k">reactive</span><span class="c">:</span>  { provider: local,     model: openvla-7b     }
+<span class="rule">---</span>
+
+<span class="h"># bob</span>
+
+<span class="h">## Identity</span>
+Bob is a 6‑DOF SO‑ARM101 arm with an OAK‑D camera. Stationary,
+reach ≈ 60 cm, payload ≤ 0.5 kg. RRN‑000000000001.
+
+<span class="h">## What bob Can Do</span>
+Pick, place, describe what the camera sees. Arm only — no
+navigation. Inverse kinematics handled by the runtime.
+
+<span class="h">## Safety Gates</span>
+Software E‑stop, 100 ms. Destructive actions route through
+RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
+      </div>
+
+      <aside class="file-side">
+        <h3>What you get from one file.</h3>
+        <div class="defs">
+          <div class="def">
+            <div class="n">01</div>
+            <div>
+              <h4>Machine‑readable frontmatter.</h4>
+              <p>Validates against <code>schema/v1/robot.schema.json</code>. Feed it straight to a runtime, a gateway, a registry.</p>
+            </div>
+          </div>
+          <div class="def">
+            <div class="n">02</div>
+            <div>
+              <h4>LLM‑readable prose.</h4>
+              <p>The body tells the planner <em>why</em>: what's dangerous, what needs a human, how capabilities map to real tasks.</p>
+            </div>
+          </div>
+          <div class="def">
+            <div class="n">03</div>
+            <div>
+              <h4>One file. No drift.</h4>
+              <p>Edit one block when you add a joint. No more <code>config.yaml</code> disagreeing with <code>README.md</code> disagreeing with reality.</p>
+            </div>
+          </div>
+          <div class="def">
+            <div class="n">04</div>
+            <div>
+              <h4>Runtime‑agnostic.</h4>
+              <p>The spec imports nothing. <a href="https://github.com/craigm26/OpenCastor">OpenCastor</a>, ROS 2, LeRobot, Spot SDK — any runtime can read it; any planner can consume it.</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ================= §02 STACK DIAGRAM ================= -->
+<section class="sec" id="stack">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">§ 02 — The stack</div>
+      <div>
+        <h2 class="sec-title">Four layers. Each independent. Each composable.</h2>
+        <p class="sec-lede">ROBOT.md declares what the robot <em>is</em>. RCAN is how it <em>speaks</em>. The Registry is where it <em>lives</em>. The runtime is what it <em>runs</em>. Adopt any one without the others — or all four together and get a fleet.</p>
+      </div>
+    </div>
+
+    <div class="stack" role="table">
+      <div class="stack-row" role="row">
+        <div class="layer"><span>Layer 4 · Declaration</span><b>ROBOT.md</b></div>
+        <div class="cell"><span class="tag on">This spec</span>YAML + markdown. One file at the robot's root. Read at session start by the planner; consumed by every layer below.</div>
+        <div class="cell"><span class="tag">Format</span>Frontmatter validated by JSON Schema draft 2020‑12. Body read by Claude Code, Desktop, Mobile.</div>
+        <div class="cell"><span class="tag">Status</span>Draft v1 shipped 2026‑04‑17. v1.0 frozen spec targeted Q3 2026.</div>
+      </div>
+
+      <div class="stack-row primary" role="row">
+        <div class="layer"><span>Layer 3 · Protocol</span><b>RCAN 3.0</b></div>
+        <div class="cell"><span class="tag on">Wire</span>Signed envelopes between planner, gateway, and driver. Level‑of‑Assurance enforcement on every call.</div>
+        <div class="cell"><span class="tag">Crypto</span>PQC‑hybrid‑v1 at L2+. ML‑DSA‑65. Ed25519 accepted at L1 only, sunset mid‑cycle.</div>
+        <div class="cell"><span class="tag">Compliance</span>§23–§27 cover EU AI Act Annex III audit trails, FRIA refs, ISO 42001 self‑assessment.</div>
+      </div>
+
+      <div class="stack-row" role="row">
+        <div class="layer"><span>Layer 2 · Registry</span><b>Robot Registry Foundation</b></div>
+        <div class="cell"><span class="tag">Identity</span>Assigns an RRN — a permanent, globally‑unique robot identifier. Resolvable via <code style="font-family:var(--mono)">rrn://</code> URIs.</div>
+        <div class="cell"><span class="tag">Neutral</span>A foundation, not a vendor. Cloudflare Pages + Workers + D1. No seat fees, no per‑robot tax.</div>
+        <div class="cell"><span class="tag">Public</span>Public endpoint at <code style="font-family:var(--mono)">robotregistryfoundation.org/r/&lt;rrn&gt;</code>. Self‑hosted mode supported.</div>
+      </div>
+
+      <div class="stack-row" role="row">
+        <div class="layer"><span>Layer 1 · Runtime</span><b>OpenCastor + any compatible runtime</b></div>
+        <div class="cell"><span class="tag on">Reference</span>OpenCastor — open‑source agent editor and robotics runtime. 7,800+ tests, Claude Opus 4.7 as planner, OpenVLA‑7B reactive.</div>
+        <div class="cell"><span class="tag">Portable</span>ROS 2, Spot SDK, HuggingFace LeRobot, Pollen Reachy — any of them can ship a ROBOT.md.</div>
+        <div class="cell"><span class="tag">Bring‑your‑own</span>The spec depends on no runtime. Export a ROBOT.md from your existing stack in an afternoon.</div>
+      </div>
+    </div>
+
+    <!-- Dedicated callouts for the two companion standards the user is most curious about -->
+    <div class="companions" aria-label="Companion standards">
+      <article class="companion">
+        <h5>Layer 3 · Wire protocol</h5>
+        <h4>RCAN 3.0 — Robot Communication &amp; Addressing Network</h4>
+        <p class="lede">An open protocol that lets robots, gateways, and planners exchange signed, authority‑aware messages without vendor coupling.</p>
+        <ul>
+          <li>Signed envelopes with <code>ML‑DSA‑65</code> primary + Ed25519 legacy (L1 only, sunset mid‑cycle).</li>
+          <li>Level‑of‑Assurance ladder — every call is classified L0 / L1 / L2, enforced gateway‑side.</li>
+          <li>Section 8: <code>AUTHORIZE</code> message for human‑in‑the‑loop gates declared in ROBOT.md.</li>
+          <li>Sections 23–27: EU AI Act Annex III audit trails, FRIA URI binding, ISO 42001 self‑assessment.</li>
+          <li>Published and version‑tagged at <b>rcan.dev</b>. Apache‑2.0. Governed by the RCAN working group.</li>
+        </ul>
+        <a class="site-link" href="https://rcan.dev">rcan.dev → read the protocol spec</a>
+      </article>
+
+      <article class="companion">
+        <h5>Layer 2 · Registry</h5>
+        <h4>Robot Registry Foundation — permanent, neutral robot identity</h4>
+        <p class="lede">RRF issues an <b>RRN</b> (Robot Registration Number) the same way a VIN identifies a car — one robot, one number, forever.</p>
+        <ul>
+          <li>RRN format: <code>RRN‑000000000001</code> (12‑digit numeric) and <code>rrn://org/category/model/id</code> URI form.</li>
+          <li>Public resolver at <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code> — returns the robot's ROBOT.md, its compliance block, its registry metadata.</li>
+          <li>Edge‑served via Cloudflare Pages + Workers + D1. Zero downtime at the identifier layer.</li>
+          <li>Foundation‑governed, not vendor‑owned. Self‑hosted mode for private fleets.</li>
+          <li>RRF is the authority ROBOT.md points at when <code>metadata.rrn_uri</code> is populated.</li>
+        </ul>
+        <a class="site-link" href="https://robotregistryfoundation.org">robotregistryfoundation.org → register a robot</a>
+      </article>
+    </div>
+
+    <div style="margin-top:48px">
+      <p class="pull">If a robot can describe itself in one file, every tool in the agentic stack — <b>planner, validator, registry, gateway</b> — can meet it halfway.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= §03 INTEGRATION SURFACES ================= -->
+<section class="sec" id="surfaces">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">§ 03 — Claude, three surfaces</div>
+      <div>
+        <h2 class="sec-title">Wherever the planner runs, the robot is legible.</h2>
+        <p class="sec-lede">A ROBOT.md is meant to be picked up by a planning LLM at the start of every session — from a developer's terminal, from a desktop chat, from a phone in the field.</p>
+      </div>
+    </div>
+
+    <div class="surfaces">
+      <article class="surface">
+        <div class="st ship">● Shipping v0.1</div>
+        <h3>Claude Code</h3>
+        <div class="mech">SessionStart hook → <code>robot-md context</code> → session context</div>
+        <p>A drop‑in hook at <code>~/.claude/hooks/robot-md.sh</code>. Reads <code>./ROBOT.md</code> from cwd and injects the context block — same mechanism that orients Claude around a codebase via CLAUDE.md today.</p>
+        <div class="mock" aria-hidden="true">
+          <div class="bar"><i></i><i></i><i></i></div>
+          <div><span class="k">⏵ claude</span> <span style="color:var(--ink-4)">--continue</span></div>
+          <div style="color:var(--ink-4)">· loaded CLAUDE.md</div>
+          <div style="color:var(--ink-4)">· loaded ROBOT.md (bob, 6‑DOF, 5 caps)</div>
+          <div style="color:var(--accent-ink)">→ ready. ask bob to do something.</div>
+        </div>
+        <div class="cta">pip install robot-md  →  claude ./</div>
+      </article>
+
+      <article class="surface">
+        <div class="st wip">◑ Shipping v0.2</div>
+        <h3>Claude Desktop</h3>
+        <div class="mech">MCP server <code>robot-md-mcp</code> — resources + tools</div>
+        <p>Exposes frontmatter, capabilities, and safety as MCP resources. Tools: <code>validate</code>, <code>render</code>, <code>query_status</code>, <code>invoke_skill</code>. The invoke tool bridges to the gateway via RCAN, respecting every HITL gate declared in the file.</p>
+        <div class="mock" aria-hidden="true">
+          <div class="bar"><i></i><i></i><i></i></div>
+          <div><span class="k">MCP</span> robot-md-mcp</div>
+          <div>  resources: frontmatter, capabilities, safety</div>
+          <div>  tools: validate · render · invoke_skill</div>
+          <div style="color:var(--accent-ink)">→ bob.arm.pick( "the red cube" )</div>
+        </div>
+        <div class="cta">Recommended MCP · listed like filesystem, github</div>
+      </article>
+
+      <article class="surface">
+        <div class="st wip">◑ Shipping v0.2</div>
+        <h3>Claude Mobile · iOS</h3>
+        <div class="mech">URL fetch → <code>robotmd.dev/r/&lt;rrn&gt;</code></div>
+        <p>Operators host their ROBOT.md at a stable URL (or via the Registry). Claude on a phone fetches it, reasons about what the robot can do, and dispatches commands through the copy‑paste or invoke‑bridge pattern. No new SDK needed on Anthropic's side.</p>
+        <div class="mock" aria-hidden="true">
+          <div class="bar"><i></i><i></i><i></i></div>
+          <div>GET <span class="k">robotmd.dev/r/RRN-000000000001</span></div>
+          <div>← ROBOT.md · 200 OK · 4.8 KB</div>
+          <div style="color:var(--accent-ink)">→ "describe what bob's camera sees."</div>
+        </div>
+        <div class="cta">Works today. No Anthropic change required.</div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ================= §04 FIELDS ================= -->
+<section class="sec" id="fields">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">§ 04 — Field reference</div>
+      <div>
+        <h2 class="sec-title">The frontmatter, in one table.</h2>
+        <p class="sec-lede">Excerpted from <a href="https://github.com/craigm26/robot-md/blob/main/spec/robot-md-v1.md">spec v1 §3</a>. Full normative text, JSON Schema, and extension rules live in the repo.</p>
+      </div>
+    </div>
+
+    <table class="spec-table">
+      <thead>
+        <tr>
+          <th style="width:22%">Field</th>
+          <th style="width:12%">Type</th>
+          <th style="width:12%">Required</th>
+          <th>Purpose</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>rcan_version</code></td><td>string</td><td><span class="req yes">✓</span></td><td>Protocol version — <code>"3.0"</code> recommended. 2.1+ accepted; 1.x rejected for EU AI Act gap.</td></tr>
+        <tr><td><code>metadata.robot_name</code></td><td>string</td><td><span class="req yes">✓</span></td><td>Short display name. Must match the body H1. Used in every planner citation.</td></tr>
+        <tr><td><code>metadata.rrn</code></td><td>string</td><td><span class="req rec">★</span></td><td>Robot Registry Foundation identifier. Empty string allowed until registered.</td></tr>
+        <tr><td><code>physics.type</code></td><td>enum</td><td><span class="req yes">✓</span></td><td><code>arm</code> · <code>wheeled</code> · <code>tracked</code> · <code>legged</code> · <code>arm+camera</code> · <code>humanoid</code> · <code>other</code></td></tr>
+        <tr><td><code>physics.dof</code></td><td>int</td><td><span class="req yes">✓</span></td><td>Degrees of freedom. <code>0</code> permitted for purely sensory nodes.</td></tr>
+        <tr><td><code>drivers[]</code></td><td>array</td><td><span class="req yes">✓</span></td><td>At least one. Each declares <code>id</code> + <code>protocol</code> (feetech, dynamixel, depthai, ros2, …).</td></tr>
+        <tr><td><code>capabilities[]</code></td><td>array</td><td><span class="req yes">✓*</span></td><td>Required when <code>dof &gt; 0</code>. Namespaces: <code>nav.*</code>, <code>arm.*</code>, <code>vision.*</code>, <code>status.*</code>, <code>system.*</code>, vendor <code>&lt;prefix&gt;.*</code>.</td></tr>
+        <tr><td><code>safety.estop</code></td><td>map</td><td><span class="req yes">✓</span></td><td>At minimum: <code>software: true</code> + <code>response_ms</code>. Hardware button recommended for Annex III systems.</td></tr>
+        <tr><td><code>safety.hitl_gates</code></td><td>array</td><td><span class="req rec">★</span></td><td>Scopes (<code>destructive</code>, <code>system</code>, …) that require human authorization via RCAN §8 <code>AUTHORIZE</code>.</td></tr>
+        <tr><td><code>brain</code></td><td>map</td><td><span class="req rec">★</span></td><td>Planner + reactive model declaration. Task‑routing overrides. Required if the robot uses an LLM in the loop.</td></tr>
+        <tr><td><code>network</code></td><td>map</td><td><span class="req rec">★</span></td><td>RRF endpoint, gateway port, signing algorithm, transports. Required for network‑addressable robots.</td></tr>
+        <tr><td><code>compliance</code></td><td>map</td><td><span class="req rec">★</span></td><td>FRIA URI, ISO 42001 self‑assessment, EU AI Act audit retention. Required for EU deployments.</td></tr>
+        <tr><td><code>extensions.x-*</code></td><td>map</td><td><span class="req opt">—</span></td><td>Vendor‑specific. Unknown <code>x-*</code> keys must NOT fail validation.</td></tr>
+      </tbody>
+    </table>
+
+    <div style="margin-top:20px; font-family:var(--mono); font-size:11px; letter-spacing:.06em; color:var(--ink-3); display:flex; gap:20px; flex-wrap:wrap">
+      <span><span class="req yes" style="display:inline-block;width:22px;text-align:center;background:var(--ink);color:var(--paper);padding:1px 0">✓</span> required</span>
+      <span><span class="req rec" style="display:inline-block;width:22px;text-align:center;background:var(--paper-3);border:1px solid var(--rule);padding:1px 0">★</span> recommended</span>
+      <span><span class="req opt" style="display:inline-block;width:22px;text-align:center;color:var(--ink-4);padding:1px 0">—</span> optional</span>
+    </div>
+  </div>
+</section>
+
+<!-- ================= §05 TRY IT ================= -->
+<section class="sec" id="try">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">§ 05 — Try it in sixty seconds</div>
+      <div>
+        <h2 class="sec-title">Install, validate, render, hand it to Claude.</h2>
+        <p class="sec-lede">The reference CLI is a small Python package. It validates against the schema, renders the machine‑readable block, and emits a context block ready for a Claude Code SessionStart hook.</p>
+      </div>
+    </div>
+
+    <div class="try-grid">
+      <div class="terminal" aria-label="Terminal session">
+        <div class="top"><i></i><i></i><i></i><span>~/projects/bob · zsh</span></div>
+<pre class="body"><span class="p">$</span> pip install robot-md
+<span class="c">Successfully installed robot-md-0.1.0</span>
+
+<span class="p">$</span> robot-md validate bob.ROBOT.md
+<span class="ok">✓ bob (arm+camera, 6 DoF, 5 capabilities)</span>
+<span class="ok">✓ rcan_version 3.0  ·  schema v1 OK</span>
+<span class="ok">✓ body sections present</span>
+
+<span class="p">$</span> robot-md render bob.ROBOT.md | head -5
+rcan_version: "3.0"
+metadata:
+  robot_name: bob
+  rrn: RRN-000000000001
+  manufacturer: craigm26
+
+<span class="p">$</span> robot-md context bob.ROBOT.md \
+    &gt; ~/.claude/sessions/robot-context.md
+<span class="c"># now Claude Code loads it on every session.</span>
+
+<span class="p">$</span> claude .
+<span class="c">· loaded CLAUDE.md</span>
+<span class="c">· loaded ROBOT.md → bob</span>
+<span class="w">→ hi. bob is online. ask me to pick something.</span>
+</pre>
+      </div>
+
+      <div class="examples">
+        <a class="example" href="https://github.com/craigm26/robot-md/blob/main/examples/bob.ROBOT.md">
+          <div class="n">01</div>
+          <div>
+            <h4>bob — SO‑ARM101 + OAK‑D</h4>
+            <p>6‑DOF arm + stereo camera, 0.5 kg payload, Opus 4.7 planner, OpenVLA reactive.</p>
+          </div>
+          <div class="arrow">→</div>
+        </a>
+        <a class="example" href="https://github.com/craigm26/robot-md/blob/main/examples/turtlebot4.ROBOT.md">
+          <div class="n">02</div>
+          <div>
+            <h4>turtlebot4 — wheeled base</h4>
+            <p>Differential drive, ROS 2 driver, nav.* capabilities, SLAM‑gated HITL.</p>
+          </div>
+          <div class="arrow">→</div>
+        </a>
+        <a class="example" href="https://github.com/craigm26/robot-md/blob/main/examples/so-arm101.ROBOT.md">
+          <div class="n">03</div>
+          <div>
+            <h4>so‑arm101 — bare arm</h4>
+            <p>A vendor‑canonical ROBOT.md for the SO‑ARM101 kit. Drop in, add brand.</p>
+          </div>
+          <div class="arrow">→</div>
+        </a>
+        <a class="example" href="https://github.com/craigm26/robot-md/blob/main/examples/minimal.ROBOT.md">
+          <div class="n">04</div>
+          <div>
+            <h4>minimal — zero‑DoF sensor</h4>
+            <p>The smallest valid file. Proves the spec covers the degenerate case.</p>
+          </div>
+          <div class="arrow">→</div>
+        </a>
+
+        <div style="font-family:var(--mono); font-size:12px; color:var(--ink-3); padding:14px 4px; letter-spacing:.04em">
+          All four live in the repo under <code style="color:var(--accent-ink)">examples/</code>. Fork the one closest to your robot and edit.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= §06 LETTER TO ANTHROPIC ================= -->
+<section class="sec" id="anthropic">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">§ 06 — An open letter</div>
+      <div>
+        <h2 class="sec-title">A proposal — not a pitch — for Anthropic.</h2>
+        <p class="sec-lede">ROBOT.md is drafted for review so readers can inspect the full context. The ask is narrow. The adoption cost is small. The cost of silence is structural.</p>
+      </div>
+    </div>
+
+    <article class="letter">
+      <div class="stamp">Draft v0.1<span>open for review</span></div>
+      <h4>
+        <span>To: Product · DevRel · Applied, Anthropic</span>
+        <span>From: craigm26 · OpenCastor maintainer</span>
+      </h4>
+
+      <p>The best planner on the market for physical robots is already yours. The reference arm we run — a 6‑DOF SO‑ARM101 we call <em>bob</em> — routes its reasoning through Claude Opus 4.7 with a local VLA model for sub‑second reflexes. It works. Dozens of community robots now do the same.</p>
+
+      <p>The physical‑AI market in 2026 is in flight, and configuration‑format lock‑in determines which planner adopters default to. <em>CLAUDE.md</em> won the developer's root directory. <em>ROBOT.md</em> is the same move, one layer out — the file a robot ships at its root so any agent can pick it up and be useful in the first second of the first session.</p>
+
+      <p>What we're asking for is small. Endorse the pattern in Claude Code docs the way CLAUDE.md is endorsed. List <code style="font-family:var(--mono); background:var(--paper); padding:1px 6px">robot-md-mcp</code> beside filesystem and github in your recommended MCPs when v0.2 ships. Document the URL‑fetch pattern on Claude Mobile — the phones already do the work. If the repo should live at <code style="font-family:var(--mono); background:var(--paper); padding:1px 6px">Anthropic/robot-md</code>, we will transfer it; committer status retained, governance open.</p>
+
+      <p>Not asked: code contributions, exclusivity, or IP up‑front. ROBOT.md is designed to work best with the provider's agent harnesses — Claude Code, Desktop, Mobile — but other planners (GPT, Gemini) are welcome to read the file too. We would simply prefer the operator's default, on day one, to be the planner that already drives our robot.</p>
+
+      <p>The full proposal — integration surface, timing, evidence, commitments — lives at <a href="https://github.com/craigm26/robot-md/blob/main/proposal/anthropic-adoption-proposal.md">proposal/anthropic-adoption-proposal.md</a> in the repo. Feedback via GitHub issues. Coffee via email.</p>
+
+      <div class="sign">
+        — craigm26 · craigm26@gmail.com · April 17, 2026
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- ================= §07 ECOSYSTEM ================= -->
+<section class="sec" id="eco" style="border-bottom:none; padding-bottom:24px">
+  <div class="wrap">
+    <div class="sec-head">
+      <div class="sec-num">§ 07 — The rest of the ecosystem</div>
+      <div>
+        <h2 class="sec-title">The OpenCastor ecosystem, at a glance.</h2>
+        <p class="sec-lede">ROBOT.md sits alongside three sibling projects. Each is independent; together they give a robot an identity, a voice, a registry, and a runtime. All four can be adopted à la carte.</p>
+      </div>
+    </div>
+
+    <div class="ecosystem">
+      <div class="eco">
+        <h5>Declaration · this site</h5>
+        <b>ROBOT.md</b>
+        <p>What a robot <em>is</em>. A single file, YAML + markdown. Designed for Claude's agent harnesses (Code / Desktop / Mobile) but readable by any planner.</p>
+        <a href="https://github.com/craigm26/robot-md">github.com/craigm26/robot-md →</a>
+      </div>
+      <div class="eco">
+        <h5>Wire protocol · rcan.dev</h5>
+        <b>RCAN 3.0</b>
+        <p>What a robot <em>speaks</em>. Signed envelopes, LoA enforcement, PQC‑hybrid crypto, EU AI Act compliance blocks (§23–§27). Open, Apache‑2.0, community‑governed.</p>
+        <a href="https://rcan.dev">rcan.dev →</a>
+      </div>
+      <div class="eco">
+        <h5>Registry · robotregistryfoundation.org</h5>
+        <b>Robot Registry Foundation</b>
+        <p>Where a robot <em>lives</em>. Permanent, globally‑unique RRNs. Resolvable <code>rrn://</code> URIs. Neutral foundation; Cloudflare Pages + Workers + D1.</p>
+        <a href="https://robotregistryfoundation.org">robotregistryfoundation.org →</a>
+      </div>
+      <div class="eco">
+        <h5>Runtime · opencastor.com</h5>
+        <b>OpenCastor</b>
+        <p>What a robot <em>runs</em>. An open‑source agent editor and robotics runtime: community contributions, 7,800+ tests, Claude Opus 4.7 as the reference planner. Not required.</p>
+        <a href="https://github.com/craigm26/OpenCastor">github.com/craigm26/OpenCastor →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap foot">
+  <div>ROBOT.md · © 2026 craigm26 · Part of the OpenCastor ecosystem</div>
+  <div>Hosted on Cloudflare Pages · Edge‑served · No cookies, no trackers</div>
+  <div>robotmd.dev · v0.1 · built 2026‑04‑17</div>
+</footer>
+
+</body>
+</html>

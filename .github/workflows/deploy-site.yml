@@ -1,0 +1,41 @@
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "wrangler.toml"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://robotmd.dev
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy site --project-name=robotmd-dev --branch=main
+
+      - name: Smoke test
+        run: |
+          set -e
+          sleep 10
+          curl -sfI https://robotmd.dev/ | head -5
+          curl -sf https://robotmd.dev/ | grep -q "ROBOT.md" || { echo "landing page missing keyword"; exit 1; }
+          echo "site live at https://robotmd.dev/"

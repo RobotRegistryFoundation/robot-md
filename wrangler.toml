@@ -1,0 +1,23 @@
+# Cloudflare Pages configuration for robotmd.dev
+#
+# Deploy options:
+#
+#   1. Cloudflare Dashboard (recommended for first setup):
+#      - Pages > Create project > Connect to Git > craigm26/robot-md
+#      - Build command: (none)
+#      - Output directory: site
+#      - Root directory: (none)
+#      - Custom domain: robotmd.dev
+#
+#   2. Wrangler CLI (requires CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID):
+#      npx wrangler pages deploy site --project-name=robotmd-dev
+#
+#   3. GitHub Actions (auto-deploys on push to main):
+#      See .github/workflows/deploy-site.yml
+#      Requires repo secrets:
+#        - CLOUDFLARE_API_TOKEN (Pages edit scope)
+#        - CLOUDFLARE_ACCOUNT_ID
+
+name = "robotmd-dev"
+compatibility_date = "2024-10-01"
+pages_build_output_dir = "site"
