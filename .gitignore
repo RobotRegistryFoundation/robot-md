@@ -25,3 +25,6 @@ Thumbs.db
 # Project
 .env
 .env.local
+
+# Wrangler local cache
+.wrangler/
