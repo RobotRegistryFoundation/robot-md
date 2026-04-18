@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.6] - 2026-04-18
+
+### Changed
+
+- **Refreshed bundled `using-robot-md` skill** to reference the MCP
+  prompts (slash commands) that ship in `robot-md-mcp` v0.2.1+:
+  `/brief-me`, `/check-safety action=<text>`, `/explain-capability
+  capability=<name>`, `/manifest-status`. The skill now tells Claude:
+  when an operator's intent matches a slash command, mention the
+  command exists so the operator can invoke it explicitly next time.
+  Upgrade via `pip install --upgrade robot-md && robot-md install-skill --force`.
+
+---
+
 ## [0.2.5] - 2026-04-18
 
 Zero-touch agent-path release. Install robot-md → run init → Claude

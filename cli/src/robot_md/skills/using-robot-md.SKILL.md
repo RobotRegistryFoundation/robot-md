@@ -70,6 +70,19 @@ If `robot-md-mcp` is registered in this session (look for `robot-md://` resource
 
 Check with `/mcp` in Claude Code. If no MCP server is live, fall back to `robot-md <verb>` via the Bash tool.
 
+## Slash commands (MCP prompts, v0.2.1+)
+
+If `robot-md-mcp >= 0.2.1` is registered, these prompts are available as slash commands — **prefer them** when they match the operator's intent, since they're explicit operator invocations with curated instructions:
+
+| Slash command | When to expect it |
+|---|---|
+| `/brief-me` | Operator wants an at-a-glance summary of the robot. Invoke when first orienting in a session, or when the operator says "remind me what this robot is". |
+| `/check-safety action="<text>"` | **Invoke before any physical motion.** Operator describes the action; the prompt cross-references declared `hitl_gates[]` and returns one of "✓ safe", "⚠ auth required — <gate>", or "⚠ gate gap". |
+| `/explain-capability capability="<name>"` | Operator asks about a specific capability like `arm.pick` or `nav.go_to`. Returns what it does, hardware path, and gates that apply. |
+| `/manifest-status` | Operator asks for a quick health check. Wraps the `doctor_summary` tool in a human-readable report. |
+
+If the operator hasn't invoked a prompt, you can still proceed via the matching resource/tool — but if a prompt exists for the intent, mention it exists so the operator can invoke it next time.
+
 ## Common Mistakes
 
 **Answering from general robotics knowledge**
