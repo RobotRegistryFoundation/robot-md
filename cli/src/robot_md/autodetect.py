@@ -243,6 +243,7 @@ class Scan:
     devices: list[Device] = field(default_factory=list)
     runtime: Runtime | None = None
     warnings: list[str] = field(default_factory=list)
+    cameras: list[dict] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -434,6 +435,7 @@ def scan_system() -> Scan:
         scan.devices.extend(parse_usb(lsusb_out))
 
     scan.devices.extend(scan_tty())
+    scan.cameras = probe_cameras()                 # Tier A camera probe
     scan.runtime = detect_runtime()
     return scan
 
@@ -465,6 +467,37 @@ def _physics_type(devices: list[Device]) -> str:
     return "other"
 
 
+# Driver-type profile table — per-protocol defaults autodetect can pre-fill
+# into the manifest. Each entry is a best-effort baseline; operators override
+# per-deployment. Tier A per spec/autodetect-prefill-roadmap.md.
+#
+# `steps_per_rev`: encoder resolution per 360° at the servo output shaft —
+#   feeds physics.solver.encoder.steps_per_rev.
+# `default_baud`: bus baud rate — feeds drivers[].baud_rate when the
+#   detected device exposes a serial port.
+# `protocol_version`: sub-protocol selector (Feetech=0 SCServo, Dynamixel=2).
+DRIVER_PROFILES: dict[str, dict] = {
+    "feetech":   {"steps_per_rev": 4096, "default_baud": 1_000_000, "protocol_version": 0},
+    "scservo":   {"steps_per_rev": 4096, "default_baud": 1_000_000, "protocol_version": 0},
+    "dynamixel": {"steps_per_rev": 4096, "default_baud": 57_600,    "protocol_version": 2},
+    "odrive":    {"steps_per_rev": 8192, "default_baud": 115_200,   "protocol_version": 0},
+    # Buses / transports with no single "canonical" baud/encoder:
+    "ros2":      {},
+    "can":       {},
+    "i2c":       {},
+    # Cameras / compute — no servo semantics, but known for symmetry:
+    "depthai":   {},
+    "picamera2": {},
+    "hailo-rt":  {},
+    "openvino":  {},
+}
+
+
+def driver_profile(protocol: str) -> dict:
+    """Return the profile for `protocol`, empty dict if unknown."""
+    return DRIVER_PROFILES.get(protocol, {})
+
+
 def _drivers_from_devices(devices: list[Device]) -> list[dict]:
     out: list[dict] = []
     seen_ids: set[str] = set()
@@ -477,8 +510,60 @@ def _drivers_from_devices(devices: list[Device]) -> list[dict]:
             entry["port"] = d.path
         if d.vid and d.pid:
             entry["usb_id" if d.bus == "usb" else "pci_id"] = f"{d.vid}:{d.pid}"
+        # Apply driver profile: prefill baud if known and a port is present.
+        prof = driver_profile(d.protocol)
+        if prof.get("default_baud") and d.path:
+            entry.setdefault("baud_rate", prof["default_baud"])
         out.append(entry)
     return out
+
+
+# Camera probe — queries depthai + v4l2 for visible cameras. Emits a
+# cameras[] block in the draft when any are found. Tier A polish.
+def probe_cameras() -> list[dict]:
+    cameras: list[dict] = []
+    # depthai (OAK-D family)
+    try:
+        import depthai as dai  # type: ignore[import-not-found]
+        for d in dai.Device.getAllAvailableDevices():
+            cameras.append({
+                "id": f"depthai-{getattr(d, 'getDeviceId', lambda: '?')()}",
+                "protocol": "depthai",
+                "model": "OAK (auto)",
+                "streams": ["rgb", "depth"],
+            })
+    except ImportError:
+        pass
+    except Exception:
+        pass  # device busy / connection error — don't fail the whole scan
+
+    # v4l2 — only include /dev/video* devices that look like real capture devices.
+    # (Raspberry Pi ISP pipelines enumerate many /dev/video* that aren't user cameras.)
+    seen_cards: set[str] = set()
+    for path in sorted(Path("/dev").glob("video*")):
+        info = _run(["v4l2-ctl", "-d", str(path), "--info"])
+        if not info:
+            continue
+        card = None
+        for line in info.splitlines():
+            line = line.strip()
+            if line.startswith("Card type"):
+                card = line.split(":", 1)[1].strip()
+                break
+        if not card or card in seen_cards:
+            continue
+        # Skip Pi ISP plumbing and codec devices
+        skip_patterns = ("bcm2835-codec", "rpi-hevc-dec", "pispbe", "bcm2835-isp")
+        if any(sp in card.lower() for sp in skip_patterns):
+            continue
+        seen_cards.add(card)
+        cameras.append({
+            "id": f"v4l2-{path.name}",
+            "protocol": "v4l2",
+            "port": str(path),
+            "model": card,
+        })
+    return cameras
 
 
 def _capabilities_from_devices(devices: list[Device]) -> list[str]:
@@ -526,6 +611,14 @@ def emit_draft(scan: Scan) -> str:
         lines.append(
             "  - { id: change-me, protocol: change-me }  # TODO: no drivers detected; add yours"
         )
+    if scan.cameras:
+        lines.append("cameras:")
+        for c in scan.cameras:
+            flat = ", ".join(
+                f"{k}: {v!r}" if isinstance(v, str) else f"{k}: {v}"
+                for k, v in c.items() if k != "streams"
+            )
+            lines.append(f"  - {{ {flat} }}")
     if caps:
         lines.append("capabilities:")
         for c in caps:
