@@ -626,10 +626,10 @@
   </div>
 
   <div class="sub-deck">
+    <span><b>Claude Code · Desktop · Mobile</b> all three, one install path each</span>
     <span><b>RCAN 3.0+</b> wire protocol, native</span>
-    <span><b>RRF</b> registry-compatible · <code style="font-family:var(--mono); font-size:11px">rcan.dev</code></span>
-    <span><b>JSON Schema</b> draft 2020‑12</span>
-    <span><b>Any MCP-aware agent</b> Claude Code · Cursor · Zed · Gemini CLI</span>
+    <span><b>RRF</b> registry · <code style="font-family:var(--mono); font-size:11px">rcan.dev</code></span>
+    <span><b>Any MCP-aware agent</b> Cursor · Zed · Gemini CLI · Codex</span>
   </div>
 </header>
 
@@ -842,48 +842,51 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
 
     <div class="surfaces">
       <article class="surface">
-        <div class="st ship">● Shipping v0.1</div>
-        <h3>Claude Code</h3>
-        <div class="mech"><b>One command.</b> <code>claude mcp add</code> → Claude Code IS the runtime.</div>
-        <p>Built for operators who don't want to mess with agent‑harness configs. One line — <code>claude mcp add robot-md -- npx -y robot-md-mcp ./ROBOT.md</code> — and Claude Code reads your robot's frontmatter, capabilities, safety gates, and prose body as MCP resources. From there Claude's Bash tool talks directly to your robot over serial, HTTP, MQTT. No settings.json editing. No gateway to stand up. The planner and the executor are one.</p>
+        <div class="st ship">● Shipping</div>
+        <h3>Claude Code · CLI</h3>
+        <div class="mech"><b>Zero-touch.</b> <code>robot-md init</code> prints the <code>claude mcp add</code> line for you.</div>
+        <p>Built for operators at a terminal. <code>pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 --register</code> scans hardware, writes <code>ROBOT.md</code>, mints an RRN, generates <code>CLAUDE.md</code>, and prints the <code>claude mcp add</code> one-liner. Paste it, open Claude Code, and the planner reads your robot's frontmatter, capabilities, safety gates, and prose body as MCP resources. From there Claude's Bash tool talks directly to your robot over serial, HTTP, MQTT.</p>
         <div class="mock" aria-hidden="true">
           <div class="bar"><i></i><i></i><i></i></div>
+          <div><span class="k">⏵ robot-md init my-bob --preset so-arm101 --register</span></div>
+          <div style="color:var(--ink-4)">✓ ROBOT.md · CLAUDE.md · RRN-…042 · next: claude mcp add …</div>
           <div><span class="k">⏵ claude mcp add robot-md</span> <span style="color:var(--ink-4)">-- npx -y robot-md-mcp ./ROBOT.md</span></div>
-          <div style="color:var(--ink-4)">· Added stdio MCP server robot-md</div>
-          <div><span class="k">⏵ claude</span></div>
-          <div style="color:var(--ink-4)">· loaded robot-md://bob/{frontmatter, capabilities, safety, body}</div>
-          <div style="color:var(--accent-ink)">→ ready. ask bob to do something.</div>
+          <div style="color:var(--ink-4)">· 6 resources · 3 tools · 4 slash commands loaded</div>
+          <div style="color:var(--accent-ink)">→ /brief-me · /check-safety · /explain-capability</div>
         </div>
-        <div class="cta">one command → Claude knows your robot. (Also: SessionStart hook alt.)</div>
+        <div class="cta">One terminal. Two commands. Claude Code recognizes the robot.</div>
       </article>
 
       <article class="surface">
-        <div class="st ship">● Shipping v0.1 (read-only)</div>
-        <h3>Claude Desktop</h3>
-        <div class="mech">MCP server <code>robot-md-mcp</code> — resources + tools</div>
-        <p>Exposes frontmatter, capabilities, and safety as MCP resources. Tools: <code>validate</code>, <code>render</code>, <code>query_status</code>, <code>invoke_skill</code>. The invoke tool bridges to the gateway via RCAN, respecting every HITL gate declared in the file.</p>
+        <div class="st ship">● Shipping</div>
+        <h3>Claude Desktop · macOS / Windows</h3>
+        <div class="mech"><b>One command.</b> <code>robot-md install-desktop ROBOT.md</code></div>
+        <p>Merges a <code>robot-md</code> entry into <code>claude_desktop_config.json</code> on the right OS path (macOS: <code>~/Library/Application Support/Claude/</code>, Windows: <code>%APPDATA%/Claude/</code>), preserving any other MCP servers. Restart Claude Desktop and the full MCP surface loads: the same 6 resources, 3 tools (<code>validate</code>, <code>render</code>, <code>doctor_summary</code>), and 4 slash commands — <code>/check-safety action="…"</code> gates motion before a driver ever moves.</p>
         <div class="mock" aria-hidden="true">
           <div class="bar"><i></i><i></i><i></i></div>
-          <div><span class="k">MCP</span> robot-md-mcp</div>
-          <div>  resources: frontmatter, capabilities, safety</div>
-          <div>  tools: validate · render · invoke_skill</div>
-          <div style="color:var(--accent-ink)">→ bob.arm.pick( "the red cube" )</div>
+          <div><span class="k">⏵ robot-md install-desktop ./ROBOT.md</span></div>
+          <div style="color:var(--ink-4)">✓ added robot-md entry to ~/Library/.../claude_desktop_config.json</div>
+          <div style="color:var(--ink-4)">  restart Claude Desktop.</div>
+          <div style="color:var(--accent-ink)">→ /check-safety action="pick up the red cup"</div>
+          <div style="color:var(--ink-4)">← ⚠ authorization required — scope: destructive</div>
         </div>
-        <div class="cta"><a href="https://github.com/RobotRegistryFoundation/robot-md-mcp" style="color:inherit;text-decoration:underline">npm i robot-md-mcp</a> · read-only · Node 18.20+</div>
+        <div class="cta">Idempotent · <code>--force</code> to replace · safe with existing servers</div>
       </article>
 
       <article class="surface">
-        <div class="st wip">◑ Shipping v0.2</div>
-        <h3>Claude Mobile · iOS</h3>
-        <div class="mech">URL fetch → <code>robotmd.dev/r/&lt;rrn&gt;</code></div>
-        <p>Operators host their ROBOT.md at a stable URL (or via the Registry). Claude on a phone fetches it, reasons about what the robot can do, and dispatches commands through the copy‑paste or invoke‑bridge pattern. No new SDK needed on Anthropic's side.</p>
+        <div class="st ship">● Shipping</div>
+        <h3>Claude Mobile · iOS / Android</h3>
+        <div class="mech">URL fetch. Paste the manifest URL into the chat.</div>
+        <p>iOS has no local MCP, but it fetches URLs and reasons over what it finds. Host <code>ROBOT.md</code> + <code>.well-known/robot-md.json</code> at any public HTTPS URL (GitHub Pages works today), paste the link, and Claude Mobile answers from the manifest. The auto-generated <code>CLAUDE.md</code> makes the safety posture explicit so the gate-check logic survives the trip to mobile. Use <code>robot-md publish-discovery ROBOT.md --url &lt;URL&gt;</code> to emit the discovery doc.</p>
         <div class="mock" aria-hidden="true">
           <div class="bar"><i></i><i></i><i></i></div>
-          <div>GET <span class="k">robotmd.dev/r/RRN-000000000001</span></div>
-          <div>← ROBOT.md · 200 OK · 4.8 KB</div>
-          <div style="color:var(--accent-ink)">→ "describe what bob's camera sees."</div>
+          <div>GET <span class="k">my-robot.example.com/ROBOT.md</span></div>
+          <div style="color:var(--ink-4)">← 200 OK · text/markdown · 4.8 KB</div>
+          <div>GET <span class="k">my-robot.example.com/.well-known/robot-md.json</span></div>
+          <div style="color:var(--ink-4)">← 200 OK · rrn · sha256 · public resolver</div>
+          <div style="color:var(--accent-ink)">→ "what are bob's safety gates?"</div>
         </div>
-        <div class="cta">Works today. No Anthropic change required.</div>
+        <div class="cta">Works today · no native app · no Anthropic change</div>
       </article>
     </div>
   </div>
@@ -975,24 +978,30 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
   RRN: RRN-000000000042
   RCAN URI: rcan://rcan.dev/acme/so-arm101/1-0/my-bob
   API key saved to ~/.robot-md/keys/RRN-000000000042.apikey (mode 600)
-  manifest ROBOT.md updated with metadata.rrn
   Public resolver: <span class="w">https://rcan.dev/r/RRN-000000000042</span>
+<span class="ok">✓ wrote CLAUDE.md</span>                     <span class="c"># agent reads it at session start</span>
 
 Next — hand your manifest to Claude Code:
   claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 
+<span class="c"># Or wire Claude Desktop in one shot (macOS/Windows):</span>
+<span class="p">$</span> robot-md install-desktop ROBOT.md
+<span class="ok">✓ added `robot-md` entry to ~/Library/…/claude_desktop_config.json</span>
+
+<span class="c"># Optional: drop the superpowers skill so any skill-aware harness</span>
+<span class="c"># auto-invokes robot-md on the operator's first robot-related message.</span>
+<span class="p">$</span> robot-md install-skill
+<span class="ok">✓ installed ~/.claude/skills/using-robot-md/SKILL.md</span>
+
 <span class="c"># (Optional) Physical calibration — only if your robot has an arm:</span>
 <span class="p">$</span> robot-md calibrate <span class="c">--zero</span> ROBOT.md
-<span class="p">$</span> robot-md calibrate <span class="c">--sign</span> ROBOT.md
 <span class="p">$</span> robot-md calibrate <span class="c">--hand-eye --marker-pos 300,0,0</span> ROBOT.md
 
 <span class="p">$</span> claude
-<span class="c">· loaded robot-md://my-bob/{frontmatter, capabilities, safety, body}</span>
-<span class="w">→ Claude knows your robot. Ship.</span>
-<span class="ok">✓ Added stdio MCP server robot-md</span>
-
-<span class="p">$</span> claude
-<span class="c">· loaded robot-md://my-bob/{frontmatter, capabilities, safety, body}</span>
+<span class="c">· 6 resources loaded: robot-md://my-bob/{identity, context, frontmatter,</span>
+<span class="c">                                           capabilities, safety, body}</span>
+<span class="c">· 3 tools: validate, render, doctor_summary</span>
+<span class="c">· 4 slash commands: /brief-me  /check-safety  /explain-capability  /manifest-status</span>
 <span class="w">→ Claude knows your robot. Ship.</span>
 </pre>
       </div>
@@ -1039,8 +1048,14 @@ Next — hand your manifest to Claude Code:
 
     <!-- agent-affordances callout: what happens AFTER the manifest lands -->
     <div style="margin-top:28px; padding:20px 24px; border:2px solid var(--accent); background:var(--paper-2); font-family:var(--sans); font-size:14.5px; color:var(--ink-2); line-height:1.55">
-      <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; margin-bottom:10px; font-size:11px; text-transform:uppercase; font-family:var(--mono)">After init · Claude Code recognizes the robot</div>
-      <p style="margin:0 0 12px"><code>robot-md init</code> writes <code>CLAUDE.md</code> next to the manifest. Add <code>robot-md-mcp</code> via <code>claude mcp add</code> (the one-liner init prints) and every MCP-aware agent gets <b>six live resources</b> + <b>three tools</b> + <b>four slash commands</b>:</p>
+      <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; margin-bottom:10px; font-size:11px; text-transform:uppercase; font-family:var(--mono)">After init · Every Claude surface recognizes the robot</div>
+      <p style="margin:0 0 12px"><code>robot-md init</code> writes both <code>ROBOT.md</code> and <code>CLAUDE.md</code>. From there, three one-command paths to each Claude surface:</p>
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-bottom:14px; font-family:var(--mono); font-size:12px">
+        <div style="padding:10px 12px; background:var(--paper); border-left:3px solid var(--accent)"><b style="color:var(--ink); font-family:var(--sans); font-size:11px; letter-spacing:.1em; text-transform:uppercase">Claude Code</b><br><code style="color:var(--accent-ink)">claude mcp add robot-md …</code></div>
+        <div style="padding:10px 12px; background:var(--paper); border-left:3px solid var(--accent)"><b style="color:var(--ink); font-family:var(--sans); font-size:11px; letter-spacing:.1em; text-transform:uppercase">Claude Desktop</b><br><code style="color:var(--accent-ink)">robot-md install-desktop ROBOT.md</code></div>
+        <div style="padding:10px 12px; background:var(--paper); border-left:3px solid var(--accent)"><b style="color:var(--ink); font-family:var(--sans); font-size:11px; letter-spacing:.1em; text-transform:uppercase">Claude Mobile</b><br><code style="color:var(--accent-ink)">paste manifest URL into chat</code></div>
+      </div>
+      <p style="margin:0 0 12px">All three give Claude <b>six live resources</b> + <b>three tools</b> + <b>four slash commands</b> (Mobile gets the resources as a static URL fetch instead of live MCP):</p>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-family:var(--mono); font-size:13px">
         <div>
           <div style="color:var(--ink); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.1em; margin-bottom:6px">Slash commands</div>
