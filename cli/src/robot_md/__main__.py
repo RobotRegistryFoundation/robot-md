@@ -109,13 +109,49 @@ def autodetect(
         "-w",
         help="Write draft to this path (refuses to overwrite). If omitted, prints to stdout.",
     ),
+    bus: str | None = typer.Option(
+        None,
+        "--bus",
+        help="Scan a servo bus for responding IDs + limits. Format: "
+             "`<protocol>:<port>[:<baud>]` (e.g. `feetech:/dev/ttyACM0` or "
+             "`feetech:/dev/ttyACM0:1000000`). Emits a kinematics[] block "
+             "to stdout. Requires the port to be free.",
+    ),
 ) -> None:
     """Scan visible hardware and emit a draft ROBOT.md.
 
     Linux-only. Covers PCI (via lspci), USB (via lsusb), /dev/tty[ACM|USB]*,
-    and runtime info. Emitted draft has TODO markers for identity fields —
-    review before committing. Always run `robot-md validate` afterwards.
+    cameras (depthai + v4l2), and runtime info. Emitted draft has TODO
+    markers for identity fields — review before committing. Always run
+    `robot-md validate` afterwards.
+
+    With `--bus <protocol>:<port>`, also pings every ID on a servo bus
+    (Tier B) and emits a populated `physics.kinematics[]` block with
+    discovered servo IDs + limits. Today: `feetech` only.
     """
+    if bus:
+        parts = bus.split(":", 2)
+        if len(parts) < 2 or parts[0] != "feetech":
+            err_console.print(
+                "[red]✗[/red] --bus requires format `feetech:<port>[:<baud>]`; "
+                f"got {bus!r}. Only `feetech` is supported today."
+            )
+            raise typer.Exit(code=2)
+        port = parts[1]
+        baud = int(parts[2]) if len(parts) == 3 else 1_000_000
+
+        try:
+            from robot_md.bus_scan import render_bus_scan_as_yaml, scan_feetech
+            servos = scan_feetech(port, baud=baud)
+        except RuntimeError as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=2) from None
+        out_console.print(
+            f"[green]✓[/green] {len(servos)} servo(s) responding on {port} @ {baud} baud"
+        )
+        sys.stdout.write(render_bus_scan_as_yaml(servos))
+        return
+
     scan = scan_system()
     draft = emit_draft(scan)
     if write is None:
