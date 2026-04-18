@@ -106,6 +106,16 @@ What it does:
 claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 ```
 
+> **Two MCP implementations, same protocol.** The default `npx -y
+> robot-md-mcp` pulls the TypeScript server from npm (published from
+> this repo's TS source). If you'd rather keep everything Python, the
+> same CLI is bundled with the pip package — replace the line above
+> with `claude mcp add robot-md -- robot-md-mcp "$(pwd)/ROBOT.md"`.
+> The TS version exposes `render` + `validate`; the Python version
+> (v0.3+) adds `estop`, `execute_capability`, and `execute_task` for
+> in-process actuation via a pluggable backend. See
+> `docs/mcp-server-options.md` for the full comparison.
+
 6. (Optional) Drop the agent skill into `~/.claude/skills/` so superpowers-aware harnesses auto-invoke robot-md on the operator's first robot-related message:
 
 ```bash

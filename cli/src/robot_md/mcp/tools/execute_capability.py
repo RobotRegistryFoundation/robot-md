@@ -24,6 +24,13 @@ def execute_capability_tool(
     if capability not in ctx.backend.capabilities():
         return _error("not_implemented", f"backend does not implement '{capability}'")
 
+    # Safety short-circuits come first — E-stop is a hard stop that should
+    # outrank any consent workflow. A HITL gate satisfied between estop-set
+    # and command-dispatch must not race past a stopped server.
+    if ctx.estop.is_set():
+        return {"status": "blocked", "trajectory": None, "events": [],
+                "error": {"reason": "estop_set"}}
+
     gate = _match_hitl_gate(ctx, capability)
     if gate and not _gate_satisfied(gate, confirm_token):
         return {
@@ -32,10 +39,6 @@ def execute_capability_tool(
             "events": [],
             "error": {"reason": "hitl_gate", "scope": gate.get("scope")},
         }
-
-    if ctx.estop.is_set():
-        return {"status": "blocked", "trajectory": None, "events": [],
-                "error": {"reason": "estop_set"}}
 
     if not ctx.exec_lock.acquire(blocking=False):
         return {"status": "blocked", "trajectory": None, "events": [],
@@ -76,6 +79,17 @@ def _match_hitl_gate(ctx: McpContext, capability: str) -> dict | None:
 
 
 def _gate_satisfied(gate: dict, token: str | None) -> bool:
+    """Gate check — v0.3 uses opaque stub tokens.
+
+    Any truthy token value satisfies `require_auth: true`. Tokens are NOT
+    cryptographically verified, NOT single-use, and NOT bound to a gate
+    scope. A caller can legitimately re-use the same string for every
+    step of a multi-step `execute_task`. Signed/bound tokens are a v0.4+
+    feature (tracked in the v0.3.0 spec "Out of scope" list).
+
+    If you need authority in your deployment today, enforce it at the
+    MCP-client tier (whatever proxies tool calls to this server).
+    """
     if gate.get("require_auth") is False:
         return True
     return bool(token)

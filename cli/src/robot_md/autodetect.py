@@ -547,59 +547,6 @@ def _drivers_from_devices(devices: list[Device]) -> list[dict]:
     return out
 
 
-# Camera probe — queries depthai + v4l2 for visible cameras. Emits a
-# cameras[] block in the draft when any are found. Tier A polish.
-def probe_cameras() -> list[dict]:
-    cameras: list[dict] = []
-    # depthai (OAK-D family)
-    try:
-        import depthai as dai  # type: ignore[import-not-found]
-
-        for d in dai.Device.getAllAvailableDevices():
-            cameras.append(
-                {
-                    "id": f"depthai-{getattr(d, 'getDeviceId', lambda: '?')()}",
-                    "protocol": "depthai",
-                    "model": "OAK (auto)",
-                    "streams": ["rgb", "depth"],
-                }
-            )
-    except ImportError:
-        pass
-    except Exception:
-        pass  # device busy / connection error — don't fail the whole scan
-
-    # v4l2 — only include /dev/video* devices that look like real capture devices.
-    # (Raspberry Pi ISP pipelines enumerate many /dev/video* that aren't user cameras.)
-    seen_cards: set[str] = set()
-    for path in sorted(Path("/dev").glob("video*")):
-        info = _run(["v4l2-ctl", "-d", str(path), "--info"])
-        if not info:
-            continue
-        card = None
-        for line in info.splitlines():
-            line = line.strip()
-            if line.startswith("Card type"):
-                card = line.split(":", 1)[1].strip()
-                break
-        if not card or card in seen_cards:
-            continue
-        # Skip Pi ISP plumbing and codec devices
-        skip_patterns = ("bcm2835-codec", "rpi-hevc-dec", "pispbe", "bcm2835-isp")
-        if any(sp in card.lower() for sp in skip_patterns):
-            continue
-        seen_cards.add(card)
-        cameras.append(
-            {
-                "id": f"v4l2-{path.name}",
-                "protocol": "v4l2",
-                "port": str(path),
-                "model": card,
-            }
-        )
-    return cameras
-
-
 def probe_depthai_cameras(
     *, default_width: int = 1280, default_height: int = 720
 ) -> list[DetectedCamera]:

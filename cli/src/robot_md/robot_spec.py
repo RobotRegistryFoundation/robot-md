@@ -65,6 +65,7 @@ class SolverCamera:
 class MetadataBlock:
     robot_name: str
     rrn: str | None
+    device_id: str | None
     manufacturer: str | None
     model: str | None
     version: str | None
@@ -184,6 +185,7 @@ class RobotSpec:
             metadata=MetadataBlock(
                 robot_name=meta.get("robot_name", ""),
                 rrn=meta.get("rrn"),
+                device_id=meta.get("device_id"),
                 manufacturer=meta.get("manufacturer"),
                 model=meta.get("model"),
                 version=meta.get("version"),

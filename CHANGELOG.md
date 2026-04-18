@@ -5,6 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.1] - 2026-04-18
+
+Follow-up patches from the v0.3.0 final review.
+
+### Changed
+
+- **Safety ordering.** `execute_capability_tool` now checks the
+  process-wide E-stop before evaluating the HITL gate. E-stop is a
+  hard-stop signal that should outrank any consent workflow; this
+  matches the spec's intent and eliminates a theoretical race where a
+  gate satisfied between estop-set and dispatch could slip through.
+- **`RobotSpec.MetadataBlock`** gains a `device_id: str | None` field.
+  Backends that want to log or report a robot's per-unit identity no
+  longer need to re-parse `raw_yaml`.
+- **Documented token semantics.** `_gate_satisfied`'s docstring now
+  states plainly that v0.3's `confirm_token` is an opaque stub — not
+  verified, not single-use, not scope-bound. Cryptographic tokens
+  land in v0.4 per the original spec's out-of-scope list.
+
+### Removed
+
+- **Dead `probe_cameras()` in `autodetect.py`.** Replaced by the typed
+  `probe_depthai_cameras` / `probe_realsense_cameras` /
+  `probe_v4l2_cameras` probes in v0.3.0; the legacy function was left
+  defined but uncallable. Gone now.
+
+### Docs
+
+- **`docs/mcp-server-options.md`** — side-by-side comparison of the
+  npm TypeScript MCP and the Python MCP, with registration snippets
+  for each. README points at it.
+
+---
+
 ## [0.3.0] - 2026-04-18
 
 Camera intrinsics, Python MCP server (as an alternative to the TypeScript
