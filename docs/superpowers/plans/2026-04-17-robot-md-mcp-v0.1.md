@@ -56,9 +56,8 @@ git init -b main
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.mjs" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
     }
   },
   "files": ["dist", "README.md", "LICENSE"],
@@ -133,6 +132,15 @@ export default defineConfig({
   clean: true,
   target: "node18",
   outDir: "dist",
+  // Force .mjs/.cjs extensions so they match package.json's
+  // "bin": "dist/bin.mjs" and "exports" entries. Without this, tsup
+  // emits dist/bin.js for ESM (because package.json has
+  // "type": "module"), and the bin entry 404s.
+  outExtension: ({ format }) => ({
+    js: format === "esm" ? ".mjs" : ".cjs",
+  }),
+  // NOTE: Task 6 replaces this banner with a literal shebang at the top of
+  // src/bin.ts so the shebang only lands on bin, not on dist/index.mjs.
   banner: ({ format }) =>
     format === "esm" ? { js: "#!/usr/bin/env node" } : {},
 });
@@ -1073,7 +1081,20 @@ npx vitest run tests/bin.test.ts 2>&1 | tail -10
 
 Expected: FAIL (the bin still has the scaffold stub from Task 0).
 
-- [ ] **Step 4: Implement the bin**
+- [ ] **Step 4: Remove the tsup banner (shebang now lives in src/bin.ts)**
+
+Edit `/home/craigm26/robot-md-mcp/tsup.config.ts` to delete the `banner:` callback added in Task 0. The shebang lives in `src/bin.ts` instead (Step 5 below), so the banner would otherwise prepend `#!/usr/bin/env node` to `dist/index.mjs` too — noise on a library entry.
+
+Remove these lines:
+
+```ts
+  banner: ({ format }) =>
+    format === "esm" ? { js: "#!/usr/bin/env node" } : {},
+```
+
+Keep the `outExtension` callback above them.
+
+- [ ] **Step 5: Implement the bin**
 
 `/home/craigm26/robot-md-mcp/src/bin.ts`:
 
@@ -1112,7 +1133,7 @@ async function main() {
 main();
 ```
 
-- [ ] **Step 5: Run tests to verify they pass**
+- [ ] **Step 6: Run tests to verify they pass**
 
 ```bash
 npx vitest run tests/bin.test.ts 2>&1 | tail -10
@@ -1120,7 +1141,7 @@ npx vitest run tests/bin.test.ts 2>&1 | tail -10
 
 Expected: `Tests  2 passed (2)`.
 
-- [ ] **Step 6: Run the full suite**
+- [ ] **Step 7: Run the full suite**
 
 ```bash
 npx vitest run 2>&1 | tail -10
@@ -1128,10 +1149,13 @@ npx vitest run 2>&1 | tail -10
 
 Expected: all tests across parser, validate, render, server, bin pass.
 
-- [ ] **Step 7: Build and smoke-test the compiled bin**
+- [ ] **Step 8: Build and smoke-test the compiled bin**
 
 ```bash
 npm run build 2>&1 | tail -5
+# Verify the shebang only lands on bin, not on index (Task 0 follow-up):
+head -1 dist/bin.mjs    # expect: #!/usr/bin/env node
+head -1 dist/index.mjs  # expect: (no shebang — library entry)
 node dist/bin.mjs 2>&1 | head -3; echo "exit: $?"
 node dist/bin.mjs tests/fixtures/minimal.ROBOT.md </dev/null 2>&1 | head -5 &
 PID=$!
@@ -1143,16 +1167,18 @@ echo "(forked-and-killed — stdio server starts cleanly)"
 
 Expected: no-arg run prints Usage + exit 2. Happy path prints `robot-md-mcp: serving …` to stderr and waits for stdin.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/bin.ts tests/bin.test.ts package.json package-lock.json
+git add src/bin.ts tests/bin.test.ts tsup.config.ts package.json package-lock.json
 git commit -m "feat(bin): CLI entrypoint with stdio MCP transport
 
 Required positional arg for the manifest path; no auto-discovery.
 Fails with exit 2 on missing arg, exit 1 on unreadable file, else
 starts the MCP server over stdio. tsx added as devDependency for
-running the TS entry directly from tests."
+running the TS entry directly from tests. Also removes the tsup
+banner (shebang now lives as bin.ts's first line) so dist/index.mjs
+stays clean for library consumers."
 git push
 ```
 
