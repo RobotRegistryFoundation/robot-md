@@ -495,7 +495,12 @@ def claude_md_cmd(
         "-o",
         help="Output path for the generated CLAUDE.md.",
     ),
-    force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing CLAUDE.md."),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Overwrite the entire file (default is to append/update in place).",
+    ),
     stdout: bool = typer.Option(
         False, "--stdout", help="Print to stdout instead of writing a file."
     ),
@@ -511,13 +516,24 @@ def claude_md_cmd(
     HITL gates, primary driver. Operator-specific TODOs remain for you
     to customize (host machine notes, project conventions).
 
+    Merge semantics (default):
+
+    \b
+      - CLAUDE.md does not exist       → write it with sentinels.
+      - CLAUDE.md exists, no sentinels → APPEND our block at the end.
+      - CLAUDE.md exists, has sentinels → UPDATE the delimited block in place
+                                           (operator content above/below is
+                                           preserved).
+      - --force                        → overwrite the entire file.
+
     Examples:
 
       robot-md claude-md ROBOT.md                    # writes ./CLAUDE.md
-      robot-md claude-md ROBOT.md --out docs/CLAUDE.md --force
+      robot-md claude-md ROBOT.md --out docs/CLAUDE.md
       robot-md claude-md ROBOT.md --stdout | less    # preview only
+      robot-md claude-md ROBOT.md --force            # blow away existing content
     """
-    from robot_md.claude_md import render_claude_md
+    from robot_md.claude_md import apply_to_file, render_claude_md
 
     try:
         rendered = render_claude_md(path)
@@ -532,12 +548,14 @@ def claude_md_cmd(
         sys.stdout.write(rendered)
         return
 
-    if out.exists() and not force:
-        err_console.print(f"[red]✗[/red] {out} already exists — pass --force to overwrite")
-        raise typer.Exit(code=FILE_ERROR)
-
-    out.write_text(rendered)
-    out_console.print(f"[green]✓[/green] wrote {out}")
+    action = apply_to_file(rendered, out, force=force)
+    verb = {
+        "wrote": "wrote",
+        "appended": "appended robot-md block to",
+        "updated": "updated robot-md block in",
+        "overwrote": "overwrote",
+    }.get(action, action)
+    out_console.print(f"[green]✓[/green] {verb} {out}")
     out_console.print(
         "  Claude Code will read this file at session start. Review the TODOs "
         "and customize per-project conventions."

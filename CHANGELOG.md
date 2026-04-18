@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.4] - 2026-04-18
+
+### Changed
+
+- **`robot-md claude-md` now preserves existing `CLAUDE.md` content.**
+  Old behavior was to refuse writing unless `--force` was passed, which
+  destroyed any operator-authored notes. New behavior:
+    - File does not exist → write it (with sentinel comments around
+      the robot-md block).
+    - File exists, has our sentinels → **update the delimited block in
+      place.** Operator content above AND below the block is preserved.
+    - File exists, no sentinels → **append our block at the end** (with
+      sentinels). Operator's original content stays at the top.
+    - `--force` → overwrite the entire file (unchanged).
+  The sentinel markers are `<!-- BEGIN robot-md ... -->` /
+  `<!-- END robot-md -->`; re-running the command multiple times is
+  idempotent (file size stabilizes, exactly one delimited region).
+
+---
+
 ## [0.2.3] - 2026-04-17
 
 Agent-affordances release — ships tooling explicitly designed for

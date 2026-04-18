@@ -150,3 +150,64 @@ def render_claude_md(manifest_path: Path) -> str:
     text = text.replace("{{TESTS_DIR}}", "tests/")
     text = text.replace("{{DATE}}", date.today().isoformat())
     return text
+
+
+# Sentinels used to delimit our block inside an existing CLAUDE.md so re-runs
+# can update in place without touching operator-authored content above/below.
+BEGIN_MARKER = (
+    "<!-- BEGIN robot-md — auto-generated; edit ROBOT.md then re-run "
+    "`robot-md claude-md` to refresh -->"
+)
+END_MARKER = "<!-- END robot-md -->"
+
+
+def wrap_block(rendered: str) -> str:
+    """Wrap a rendered block in the robot-md sentinels for idempotent merging."""
+    return f"{BEGIN_MARKER}\n{rendered.rstrip()}\n{END_MARKER}\n"
+
+
+def apply_to_file(
+    rendered: str,
+    out_path: Path,
+    *,
+    force: bool = False,
+) -> str:
+    """Write `rendered` to `out_path`, preserving existing operator content.
+
+    Returns a short status word: "wrote" (new file), "updated" (in-place
+    replacement inside our sentinels), "appended" (sentinels added below
+    existing content), or "overwrote" (--force, full replacement).
+    """
+    block = wrap_block(rendered)
+    pre_existed = out_path.exists()
+
+    if not pre_existed:
+        out_path.write_text(block)
+        return "wrote"
+
+    if force:
+        out_path.write_text(block)
+        return "overwrote"
+
+    existing = out_path.read_text()
+    if BEGIN_MARKER in existing and END_MARKER in existing:
+        # Replace the delimited region in place.
+        import re
+
+        pattern = re.compile(
+            re.escape(BEGIN_MARKER) + r".*?" + re.escape(END_MARKER) + r"\n?",
+            re.DOTALL,
+        )
+        new_text = pattern.sub(block, existing, count=1)
+        out_path.write_text(new_text)
+        return "updated"
+
+    # No sentinels yet — append our block below the operator's content.
+    if existing.endswith("\n\n"):
+        sep = ""
+    elif existing.endswith("\n"):
+        sep = "\n"
+    else:
+        sep = "\n\n"
+    out_path.write_text(existing + sep + block)
+    return "appended"

@@ -117,3 +117,120 @@ def test_render_summarizes_primary_driver(tmp_path):
     text = render_claude_md(p)
     assert "feetech" in text
     assert "/dev/ttyACM0" in text
+
+
+# ---------------------------------------------------------------- apply_to_file
+
+
+def test_apply_writes_new_file(tmp_path):
+    from robot_md.claude_md import BEGIN_MARKER, END_MARKER, apply_to_file
+
+    out = tmp_path / "CLAUDE.md"
+    action = apply_to_file("# hello\n", out)
+    assert action == "wrote"
+    assert out.exists()
+    text = out.read_text()
+    # Sentinels must be present on fresh writes so future runs can update in place.
+    assert BEGIN_MARKER in text
+    assert END_MARKER in text
+    assert "# hello" in text
+
+
+def test_apply_appends_when_file_exists_without_sentinels(tmp_path):
+    from robot_md.claude_md import BEGIN_MARKER, apply_to_file
+
+    out = tmp_path / "CLAUDE.md"
+    existing = "# Operator's existing CLAUDE.md\n\nKeep this.\n"
+    out.write_text(existing)
+
+    action = apply_to_file("# robot block\n", out)
+    assert action == "appended"
+
+    text = out.read_text()
+    # Operator's original content must be intact at the top.
+    assert text.startswith("# Operator's existing CLAUDE.md")
+    assert "Keep this." in text
+    # Our block appears below with sentinels.
+    assert BEGIN_MARKER in text
+    assert "# robot block" in text
+    # Appended content must come AFTER the operator's content.
+    assert text.index("Keep this.") < text.index(BEGIN_MARKER)
+
+
+def test_apply_updates_in_place_when_sentinels_present(tmp_path):
+    from robot_md.claude_md import apply_to_file
+
+    out = tmp_path / "CLAUDE.md"
+    # First run — creates file with sentinels around "# v1".
+    apply_to_file("# v1\n", out)
+    first = out.read_text()
+    assert "# v1" in first
+
+    # Second run — block body changes, sentinels stay, operator content unchanged.
+    action = apply_to_file("# v2\n", out)
+    assert action == "updated"
+    second = out.read_text()
+    assert "# v1" not in second
+    assert "# v2" in second
+    # File didn't grow unboundedly.
+    assert second.count("BEGIN robot-md") == 1
+    assert second.count("END robot-md") == 1
+
+
+def test_apply_preserves_operator_content_across_updates(tmp_path):
+    from robot_md.claude_md import apply_to_file
+
+    out = tmp_path / "CLAUDE.md"
+    # Operator writes their own header first.
+    operator_header = "# My project CLAUDE.md\n\n## My conventions\n\n- Use 4-space indent\n"
+    out.write_text(operator_header)
+
+    # First robot-md run appends.
+    apply_to_file("# robot v1\n", out)
+    # Operator adds MORE content BELOW the sentinels afterwards.
+    current = out.read_text()
+    out.write_text(current + "\n## My follow-up notes\n\nSomething below.\n")
+
+    # Second run updates the sentinel block, leaving everything else intact.
+    action = apply_to_file("# robot v2\n", out)
+    assert action == "updated"
+    final = out.read_text()
+    assert "# My project CLAUDE.md" in final
+    assert "- Use 4-space indent" in final
+    assert "## My follow-up notes" in final
+    assert "Something below." in final
+    assert "# robot v1" not in final
+    assert "# robot v2" in final
+
+
+def test_apply_force_overwrites_everything(tmp_path):
+    from robot_md.claude_md import apply_to_file
+
+    out = tmp_path / "CLAUDE.md"
+    out.write_text("# operator content that should be destroyed\n\nlots of stuff.\n")
+    action = apply_to_file("# fresh\n", out, force=True)
+    assert action == "overwrote"
+    text = out.read_text()
+    assert "operator content" not in text
+    assert "# fresh" in text
+
+
+def test_apply_is_idempotent_on_bob(tmp_path):
+    """Running claude-md twice on a real manifest should not keep growing the file."""
+    from robot_md.claude_md import apply_to_file
+
+    manifest = _write(tmp_path, BOB)
+    out = tmp_path / "CLAUDE.md"
+
+    rendered = render_claude_md(manifest)
+    apply_to_file(rendered, out)
+    size_after_first = out.stat().st_size
+
+    apply_to_file(rendered, out)  # second run
+    size_after_second = out.stat().st_size
+
+    assert size_after_first == size_after_second
+    # Exactly one sentinel pair.
+    text = out.read_text()
+    assert text.count("BEGIN robot-md") == 1
+    assert text.count("END robot-md") == 1
