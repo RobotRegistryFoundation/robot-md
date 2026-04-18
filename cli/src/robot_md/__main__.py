@@ -596,6 +596,81 @@ def claude_md_cmd(
     )
 
 
+@app.command("install-desktop")
+def install_desktop_cmd(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    config: Path | None = typer.Option(
+        None,
+        "--config",
+        help=(
+            "Override the Claude Desktop config path (default: the OS-appropriate "
+            "`claude_desktop_config.json` — macOS ~/Library/Application Support/"
+            "Claude/, Windows %APPDATA%/Claude/, Linux ~/.config/Claude/)."
+        ),
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Replace an existing robot-md entry if it differs from the computed one.",
+    ),
+) -> None:
+    """Wire ROBOT.md into the Claude Desktop (macOS/Windows) app.
+
+    Merge-adds a `robot-md` entry under `mcpServers` in the Claude
+    Desktop config file, preserving any other servers already declared
+    (filesystem, github, etc.). The entry runs:
+
+    \b
+      npx -y robot-md-mcp <absolute-path-to-ROBOT.md>
+
+    via stdio. No global install needed — npx pulls the latest
+    `robot-md-mcp` wheel on first launch and caches it.
+
+    After install, restart Claude Desktop. Then ask Claude: "What can
+    this robot do?" — it'll route to `robot-md://<name>/capabilities`
+    via the server's intent-matchable descriptions.
+
+    Examples:
+
+    \b
+      robot-md install-desktop ROBOT.md                 # merge into default config
+      robot-md install-desktop ROBOT.md --force         # replace existing robot-md entry
+      robot-md install-desktop ROBOT.md --config ./cfg  # custom config path (testing)
+    """
+    from robot_md.install_desktop import default_config_path, install
+
+    try:
+        result = install(path, config_path=config, force=force)
+    except FileNotFoundError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+    except ValueError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+
+    cfg_path = config or default_config_path()
+    if result.status == "conflict":
+        err_console.print(
+            f"[yellow]⚠[/yellow] {cfg_path} already has a `robot-md` entry that differs "
+            f"from what I would write. Pass --force to overwrite.\n"
+            f"  existing: {result.prior_entry}"
+        )
+        raise typer.Exit(code=1)
+
+    verb = {
+        "wrote": "wrote new config",
+        "added": "added `robot-md` entry to",
+        "updated": "updated `robot-md` entry in",
+        "unchanged": "already up to date in",
+    }.get(result.status, result.status)
+    out_console.print(f"[green]✓[/green] {verb} {result.path}")
+    out_console.print(
+        "  Restart Claude Desktop for the change to take effect. Then ask "
+        'Claude: "What can this robot do?"'
+    )
+
+
 @app.command("install-skill")
 def install_skill_cmd(
     dest: Path | None = typer.Option(
