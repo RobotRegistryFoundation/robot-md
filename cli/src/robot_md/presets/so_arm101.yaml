@@ -1,0 +1,126 @@
+# robot-md preset — SO-ARM101 follower arm (6-DoF, Feetech STS3215 × 6).
+# Apply with: robot-md init --preset so-arm101
+# Ported from the OpenCastor so_arm101_leader preset with DH params added.
+#
+# Operator still fills in: metadata.robot_name, metadata.rrn, physical calibration
+# (zero_pose_steps, encoder_sign — run `robot-md calibrate --zero` / `--sign`).
+
+match:
+  # Matched when autodetect sees a Feetech-class serial bus with 6 servos.
+  drivers:
+    protocol: feetech
+    count: 6
+  # Negative hint: "leader" in the hardware description flips to so_arm101_leader.
+
+physics:
+  type: arm
+  dof: 6
+  solver:
+    convention: DH
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 4096        # Feetech STS3215 native
+    camera:
+      mount: world               # default — operator overrides if eye-in-hand
+      extrinsic: null
+    gripper:
+      joint_id: gripper
+      tip_offset_mm: [30, 0, 0]  # tool-frame +x (becomes -z when wrist points down)
+      open_steps: 1700
+      close_steps: 1200
+  kinematics:
+    - id: shoulder_pan
+      axis: z
+      limits_deg: [-180, 180]
+      length_mm: 60              # legacy scalar — mirrors d_mm
+      a_mm: 0
+      d_mm: 60                   # vertical riser from base to shoulder_lift
+      servo_id: 1
+      encoder_sign: 1            # TODO verify via `robot-md calibrate --sign`
+      zero_pose_steps: 2048      # TODO replace via `robot-md calibrate --zero`
+    - id: shoulder_lift
+      axis: y
+      limits_deg: [-90, 90]
+      length_mm: 125
+      a_mm: 125
+      d_mm: 0
+      servo_id: 2
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: elbow_flex
+      axis: y
+      limits_deg: [-90, 90]
+      length_mm: 125
+      a_mm: 125
+      d_mm: 0
+      servo_id: 3
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: wrist_flex
+      axis: y
+      limits_deg: [-90, 90]
+      length_mm: 60
+      a_mm: 60
+      d_mm: 0
+      servo_id: 4
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: wrist_roll
+      axis: x
+      limits_deg: [-180, 180]
+      length_mm: 30
+      a_mm: 30
+      d_mm: 0
+      servo_id: 5
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: gripper
+      axis: y
+      limits_deg: [0, 90]
+      length_mm: 40
+      a_mm: 0
+      d_mm: 0
+      servo_id: 6
+      encoder_sign: 1
+      zero_pose_steps: 1200      # close position default
+
+drivers:
+  - id: arm_servos
+    protocol: feetech
+    port: /dev/ttyACM0           # autodetect overrides if different
+    baud_rate: 1000000
+    model: STS3215
+    count: 6
+
+capabilities:
+  - arm.pick
+  - arm.place
+  - arm.reach
+  - arm.home
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_joint_velocity_dps: 180
+  payload_kg: 0.5
+  estop:
+    hardware: false
+    software: true
+    response_ms: 100
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+    - scope: system
+      require_auth: true
+
+body_hints:
+  identity: |
+    A 6-DoF SO-ARM101 follower arm with Feetech STS3215 servos. Stationary,
+    workspace roughly 340 mm radius, payload ≤ 0.5 kg.
+  capabilities: |
+    Pick, place, and reach within the arm's workspace. Gripper is joint 6;
+    servos numbered 1-6 along the kinematic chain.
+  safety: |
+    Software E-stop at 100 ms. Destructive actions require human-in-the-loop
+    approval via the RCAN AUTHORIZE flow. Joint velocity capped at 180 dps.

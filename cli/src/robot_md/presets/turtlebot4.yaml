@@ -1,0 +1,71 @@
+# robot-md preset — TurtleBot 4 (differential-drive mobile base, ROS 2).
+# Ported from OpenCastor's turtlebot4.rcan.yaml. Adjust mount patterns per-deployment.
+
+match:
+  drivers:
+    protocol: ros2
+  pci_hints: ["OAK-D"]              # common sensor for TurtleBot 4
+
+physics:
+  type: wheeled
+  dof: 2
+  solver:
+    convention: custom               # differential drive — not a DH chain
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 2048            # Create 3 wheel encoders
+    camera:
+      mount: world
+      extrinsic: null
+  kinematics:
+    - id: left_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: right_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+
+drivers:
+  - id: base
+    protocol: ros2
+    topic: /cmd_vel
+  - id: camera
+    protocol: depthai
+    model: OAK-D
+
+capabilities:
+  - nav.go_to
+  - nav.stop
+  - nav.rotate
+  - vision.describe
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_linear_velocity_ms: 0.5
+  max_joint_velocity_dps: 180
+  workspace_bounds_m: [5, 5, 2]
+  estop:
+    hardware: true                   # TB4 has a physical e-stop
+    software: true
+    response_ms: 50
+  failsafe_behavior: stop
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+
+body_hints:
+  identity: |
+    TurtleBot 4 differential-drive research base running ROS 2. Wheel radius,
+    base diameter, and sensor stack are standard iRobot Create 3 + payload.
+  capabilities: |
+    Navigate within a 2D SLAM map, rotate in place, stop. Vision via OAK-D
+    (RGB + depth).
+  safety: |
+    Physical E-stop on the platform. Linear velocity capped at 0.5 m/s. Loss
+    of comms triggers a full stop.

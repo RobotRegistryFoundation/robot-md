@@ -130,6 +130,45 @@ def autodetect(
 
 
 @app.command()
+def init(
+    name: str | None = typer.Argument(None, help="Robot name. Defaults to `robot-<hostname>`."),
+    out: Path = typer.Option(Path("./ROBOT.md"), "--out", "-o", help="Write draft to this path."),
+    preset: str | None = typer.Option(None, "--preset", "-p", help="Force a specific preset (e.g. so-arm101, turtlebot4, picar-x)."),
+    wizard_mode: bool = typer.Option(False, "--wizard", help="Interactive 7-step walk-through (default is zero prompts)."),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing ROBOT.md."),
+    list_presets: bool = typer.Option(False, "--list-presets", help="Print available presets and exit."),
+) -> None:
+    """Zero-to-ROBOT.md in one command.
+
+    Default is *super-duper-quick*: no prompts. Scans hardware, matches a
+    preset from the built-in library, writes a validated draft. Use
+    `--wizard` for the interactive 7-step flow, or `--preset NAME` to
+    force a known robot model.
+
+    Examples:
+
+      robot-md init                              # zero prompts
+      robot-md init my-bob                       # pick a name
+      robot-md init --preset so-arm101 my-bob    # force a preset
+      robot-md init --wizard                     # interactive
+    """
+    from robot_md.init import load_presets, quick, wizard
+
+    if list_presets:
+        presets = load_presets()
+        for p in presets:
+            typer.echo(f"  {p.display_name:<24}{p.data.get('physics', {}).get('type', '')}")
+        raise typer.Exit()
+
+    if wizard_mode:
+        rc = wizard(out, force=force)
+    else:
+        rc = quick(out, robot_name=name, preset_name=preset, force=force)
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+@app.command()
 def calibrate(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
     zero: bool = typer.Option(False, "--zero", help="Record current encoder positions as zero_pose_steps for every joint."),

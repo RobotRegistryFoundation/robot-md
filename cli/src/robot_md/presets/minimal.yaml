@@ -1,0 +1,32 @@
+# robot-md preset — minimal sensor-only node (zero-DoF).
+# Matches any host with no motion-capable driver. Useful for purely sensory
+# robots (weather stations, indoor cameras, compute-only edge nodes).
+
+match: {}                             # always matchable as fallback
+
+physics:
+  type: sensor
+  dof: 0
+
+drivers:
+  - id: host
+    protocol: local                    # the host itself — for compute-only nodes
+    model: cpu
+
+capabilities:
+  - status.report
+  - vision.describe
+
+safety:
+  estop:
+    software: true
+    response_ms: 0
+  failsafe_behavior: stop
+
+body_hints:
+  identity: |
+    Sensor-only node with no motion capability.
+  capabilities: |
+    Reports status and observations. No actuation.
+  safety: |
+    No physical safety concerns — this node doesn't move.

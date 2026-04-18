@@ -1,0 +1,61 @@
+# robot-md preset — SunFounder PiCar-X (beginner 4-wheel + camera).
+# Ported from OpenCastor's sunfounder_picar_x.rcan.yaml.
+
+match:
+  drivers:
+    protocol: pca9685
+  usb_hints: ["picar", "sunfounder"]
+
+physics:
+  type: wheeled
+  dof: 2
+  solver:
+    convention: custom
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 0              # PWM motors — no encoders
+  kinematics:
+    - id: drive
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: steer
+      axis: z
+      limits_deg: [-30, 30]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+
+drivers:
+  - id: motor
+    protocol: pca9685
+    channel: 0
+  - id: camera
+    protocol: picamera2
+
+capabilities:
+  - nav.drive
+  - nav.steer
+  - nav.stop
+  - vision.describe
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_linear_velocity_ms: 0.5
+  estop:
+    hardware: false
+    software: true
+    response_ms: 100
+  failsafe_behavior: stop
+
+body_hints:
+  identity: |
+    SunFounder PiCar-X beginner platform — Raspberry Pi + Pi Camera + PCA9685
+    PWM driver + 4-wheel drive with steering servo.
+  capabilities: |
+    Drive forward/backward, steer within ±30°, stop, describe camera scene.
+  safety: |
+    Software E-stop only. Low-speed platform (≤0.5 m/s). Intended for
+    tabletop / indoor experimentation.
