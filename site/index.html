@@ -1009,9 +1009,10 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <!-- custom hardware / no preset callout, spans full width below the try-grid -->
     <div style="margin-top:28px; padding:20px 24px; border:1px dashed var(--rule); background:var(--paper-2); font-family:var(--sans); font-size:14.5px; color:var(--ink-2); line-height:1.55">
       <div style="color:var(--ink); font-weight:600; letter-spacing:.06em; margin-bottom:8px; font-size:11px; text-transform:uppercase; font-family:var(--mono)">Custom hardware? (no preset yet)</div>
-      Two escape hatches:
+      Three escape hatches:
       <ul style="margin:8px 0 0; padding-left:20px">
         <li style="margin-bottom:6px"><code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink); background:var(--paper); padding:1px 5px">robot-md autodetect --bus feetech:/dev/ttyACM0</code> — pings every ID on a Feetech servo bus and emits a <code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink)">physics.kinematics[]</code> block with real angle limits + present positions, ready to paste into a draft.</li>
+        <li style="margin-bottom:6px"><code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink); background:var(--paper); padding:1px 5px">robot-md calibrate --hand-eye --marker-pos 300,0,0 ROBOT.md</code> — prints one ArUco marker on paper, places it at a known spot on the table, and solves the OAK-D↔arm-base extrinsic via solvePnP. Writes <code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink)">physics.solver.camera.extrinsic</code> so a planner can project pixel coords into the arm's frame without URDF or external calibration files.</li>
         <li><code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink); background:var(--paper); padding:1px 5px">robot-md init --wizard</code> — interactive 7-step flow: name, physics type, preset or custom, scan, calibrate zero + sign, optional hand-eye. Resume-safe via a <code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink)">ROBOT.md.init</code> state file.</li>
       </ul>
     </div>
