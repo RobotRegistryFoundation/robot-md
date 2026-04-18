@@ -103,7 +103,7 @@ What it does:
 5. Prints the MCP add line for Claude Code:
 
 ```bash
-claude mcp add robot-md -- robot-md-mcp "$(pwd)/ROBOT.md"
+claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 ```
 
 6. (Optional) Drop the agent skill into `~/.claude/skills/` so superpowers-aware harnesses auto-invoke robot-md on the operator's first robot-related message:
@@ -188,10 +188,10 @@ Beyond the initial setup, the rest of the package is designed so that **Claude C
 
 | Surface | Status | Mechanism |
 |---|---|---|
-| **Claude Code** (CLI) | ✅ shipped | `claude mcp add robot-md -- robot-md-mcp ./ROBOT.md` — printed automatically by `robot-md init` |
+| **Claude Code** (CLI) | ✅ shipped | `claude mcp add robot-md -- npx -y robot-md-mcp ./ROBOT.md` — printed automatically by `robot-md init` |
 | **Claude Desktop** (macOS / Windows) | ✅ shipped | One command: `robot-md install-desktop ROBOT.md` merges into `claude_desktop_config.json`. Full MCP — resources + tools + slash commands (`/brief-me`, `/check-safety`, `/explain-capability`, `/manifest-status`). See [`integrations/claude-desktop/`](integrations/claude-desktop/). |
 | **Claude Mobile** (iOS / Android) | ✅ shipped (URL-fetch) | Host `ROBOT.md` + `.well-known/robot-md.json` at any public HTTPS URL, paste into the chat. `robot-md publish-discovery` generates the discovery doc. See [`integrations/claude-mobile/`](integrations/claude-mobile/). |
-| **OpenAI** (Codex CLI, ChatGPT Desktop) | ✅ shipped | Same MCP server — register `robot-md-mcp /path/to/ROBOT.md` in the tool's MCP config |
+| **OpenAI** (Codex CLI, ChatGPT Desktop) | ✅ shipped | Same MCP server — register `npx -y robot-md-mcp /path/to/ROBOT.md` in the tool's MCP config |
 | **Google Gemini CLI** | ✅ shipped | Same MCP server — add to `~/.gemini/settings.json` under `mcpServers` |
 | **Cursor / Zed / Cline / Continue.dev / any MCP-aware harness** | ✅ shipped | Same MCP server — register the `npx` command in the tool's MCP settings |
 

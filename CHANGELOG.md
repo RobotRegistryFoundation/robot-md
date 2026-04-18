@@ -7,9 +7,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [0.3.0] - 2026-04-18
 
-Camera intrinsics, Python MCP server, and pluggable backends. The v0.1.x
-npm `robot-md-mcp` is deprecated in favour of the in-process Python
-server; existing users update one line.
+Camera intrinsics, Python MCP server (as an alternative to the TypeScript
+npm `robot-md-mcp`), and pluggable backends. Both MCP implementations
+coexist — users pick whichever fits their install story; tools are
+protocol-compatible.
 
 ### Added
 
@@ -55,20 +56,13 @@ server; existing users update one line.
 - `physics.solver.camera` (singular) — still auto-upgraded at read
   time; validator emits a deprecation warning. Removed in v2.
 
-### Breaking
+### Notes
 
-- **npm `robot-md-mcp@0.2.0` is a migration stub** that prints the new
-  install command and exits non-zero. Update your `claude mcp add`
-  registration:
-
-  ```
-  pipx install robot-md
-  claude mcp remove robot-md
-  claude mcp add robot-md -- robot-md-mcp /path/to/ROBOT.md
-  ```
-
-  See `site/docs/migrate-to-python.md`. The old v0.1.3 npm package
-  remains installable (frozen, no new features).
+- The TypeScript npm `robot-md-mcp` continues to be maintained in
+  parallel (current: v0.2.1+). The new Python MCP server is an
+  alternative install path, not a replacement. Both speak the same
+  tool protocol for `render` and `validate`; `estop`,
+  `execute_capability`, and `execute_task` are Python-only for now.
 
 ### Added dependencies
 
