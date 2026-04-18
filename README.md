@@ -87,7 +87,7 @@ Two on-ramps, same destination — Claude Code as the planner and the executor, 
 
 **For:** operators at a shell prompt on the robot (or a dev laptop with the robot plugged in).
 
-One command does everything — install, scan, draft, register, print the MCP add line:
+One command does everything — install, scan, draft, register, generate a project-root `CLAUDE.md`, print the MCP add line:
 
 ```bash
 pip install robot-md && robot-md init my-bob --preset so-arm101 --register \
@@ -99,13 +99,20 @@ What it does:
 1. Installs the `robot-md` CLI.
 2. Scans PCI/USB/`/dev/tty*`, matches an SO-ARM101, pre-fills ~85% of the manifest (DH kinematics, servo IDs, safety defaults, capabilities).
 3. Mints a public RRN on [rcan.dev](https://rcan.dev) and writes it back into the manifest.
-4. Prints the MCP add line for Claude Code:
+4. **Writes `CLAUDE.md`** next to `ROBOT.md` — an intent→action table that teaches Claude Code which operator phrases should dispatch which `robot-md` verb, what to do before any physical motion, and where to read the safety gates. Existing `CLAUDE.md` content is preserved (append/update-in-place, never overwrite).
+5. Prints the MCP add line for Claude Code:
 
 ```bash
 claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 ```
 
-5. Open Claude Code — it now knows your robot.
+6. (Optional) Drop the agent skill into `~/.claude/skills/` so superpowers-aware harnesses auto-invoke robot-md on the operator's first robot-related message:
+
+```bash
+robot-md install-skill
+```
+
+7. Open Claude Code — it now knows your robot *and* knows when to use the tooling.
 
 ```bash
 claude
