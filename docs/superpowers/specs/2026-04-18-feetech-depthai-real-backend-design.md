@@ -264,7 +264,9 @@ Safety:
 
 ### Success / failure counters
 
-`execute_task` chains through `execute_capability`. On successful `replay` → `skill_store.increment_success(skill_name)`. On `status != "ok"` → `increment_failure(skill_name, reason)`. Counters mutate the sidecar YAML in place via ruamel round-trip; only the two counter fields are touched.
+Counter updates are the backend's responsibility, not the MCP tool's. In `capabilities.py`, each handler — `_arm_pick`, `_arm_place`, `_arm_reach` — receives the resolved `Skill` and, after `motion.replay`, calls `skill_store.increment_success(skill_name)` on an `ok` result or `skill_store.increment_failure(skill_name, reason)` otherwise. Counters mutate the sidecar YAML in place via ruamel round-trip; only the two counter fields are touched.
+
+`execute_capability` and `execute_task` remain skill-agnostic — they dispatch by capability name and don't know about sidecar files. This keeps the MCP tool layer thin and lets future non-skill backends (e.g. a full IK-based one) plug in without touching the tool code.
 
 ### `robot-md sync-memories`
 
@@ -355,7 +357,7 @@ Each phase has a shippable demo. Operators can stop at any phase if priorities s
 
 - **None in P1.** Pure additions under existing stubs.
 - **P2 adds optional `skills:` to schema.** Legacy manifests validate unchanged.
-- **P3 adds optional `preconditions.detector:` to skill files.** Skills captured in P2 without it default to `vlm`.
+- **`preconditions.detector:` in skill files is added in P2** with default `vlm`; P3 starts actually consuming it. Skills written in P2 validate fine in P3 without edits.
 - **P4 writes `physics.solver.cameras[].extrinsic`.** Field already exists in v0.3 schema; `calibrate --hand-eye` populates it.
 - **P5 adds `robot-md sync-memories`.** Pure CLI addition.
 
