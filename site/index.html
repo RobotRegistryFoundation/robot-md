@@ -755,7 +755,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
 
       <div class="stack-row" role="row">
         <div class="layer"><span>Layer 2 · Registry</span><b>Robot Registry Foundation</b></div>
-        <div class="cell"><span class="tag">Identity</span>Assigns an RRN — a permanent, globally‑unique robot identifier. Resolvable via <code style="font-family:var(--mono)">rrn://</code> URIs.</div>
+        <div class="cell"><span class="tag">Identity</span>Assigns an RRN — a permanent, globally‑unique robot identifier. Mint with one command: <code style="font-family:var(--mono);color:var(--accent-ink)">robot-md register ROBOT.md</code>. Resolvable via <code style="font-family:var(--mono)">rrn://</code> URIs.</div>
         <div class="cell"><span class="tag">Neutral</span>A foundation, not a vendor. Cloudflare Pages + Workers + D1. No seat fees, no per‑robot tax.</div>
         <div class="cell"><span class="tag">Public</span>Public endpoint at <code style="font-family:var(--mono)">robotregistryfoundation.org/r/&lt;rrn&gt;</code>. Self‑hosted mode supported.</div>
       </div>
@@ -791,6 +791,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <ul>
           <li>RRN format: <code>RRN‑000000000001</code> (12‑digit numeric) and <code>rrn://org/category/model/id</code> URI form.</li>
           <li>Public resolver at <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code> — returns the robot's ROBOT.md, its compliance block, its registry metadata.</li>
+          <li>Mint in one command: <code>robot-md register ROBOT.md</code> reads your manifest's <code>metadata.manufacturer/model/version/device_id</code>, POSTs to RRF, writes the assigned RRN back into the file, saves the issued API key at <code>~/.robot-md/keys/&lt;rrn&gt;.apikey</code> (mode 600).</li>
           <li>Edge‑served via Cloudflare Pages + Workers + D1. Zero downtime at the identifier layer.</li>
           <li>Foundation‑governed, not vendor‑owned. Self‑hosted mode for private fleets.</li>
           <li>RRF is the authority ROBOT.md points at when <code>metadata.rrn_uri</code> is populated.</li>
@@ -946,6 +947,15 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
   <span class="ok">✓ encoder_sign[shoulder_pan] = +1</span>
   <span class="c">... (5 more joints)</span>
 <span class="ok">✓ wrote encoder_sign for 6 joints</span>
+
+<span class="c"># Mint a global identity at the Robot Registry Foundation.</span>
+<span class="p">$</span> robot-md register ROBOT.md
+<span class="ok">✓ registered on RRF</span>
+  RRN: RRN-000000000042
+  RCAN URI: rrn://craigm26/robot/so-arm101/my-bob
+  API key saved to ~/.robot-md/keys/RRN-000000000042.apikey (mode 600).
+  manifest ROBOT.md updated with metadata.rrn
+  Public resolver: https://robotregistryfoundation.org/r/RRN-000000000042
 
 <span class="p">$</span> claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 <span class="ok">✓ Added stdio MCP server robot-md</span>
