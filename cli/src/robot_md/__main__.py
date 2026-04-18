@@ -881,5 +881,53 @@ def calibrate(
             raise typer.Exit(code=rc)
 
 
+@app.command("calibrate-intrinsic")
+def calibrate_intrinsic_cmd(
+    manifest: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    driver: str = typer.Option(..., help="drivers[].id of the camera."),
+    stream: str = typer.Option(..., help="Stream name (rgb, left, right, ...)."),
+    session_file: Path = typer.Option(
+        Path("intrinsic.session.json"),
+        help="Session-state file (JSON).",
+    ),
+    frame: Path | None = typer.Option(None, help="Add a captured frame."),
+    finalize: bool = typer.Option(False, help="Solve + write intrinsic back."),
+) -> None:
+    """Checkerboard intrinsic calibration — session-file driven."""
+    from robot_md.calibrate_intrinsic import (
+        session_add_frame,
+        session_finalize,
+        session_init,
+    )
+
+    if finalize:
+        session_finalize(session_file=session_file, robot_md_file=manifest)
+        typer.echo(f"✓ intrinsic written to {manifest}")
+        return
+    if frame is not None:
+        session_add_frame(session_file=session_file, frame_path=frame)
+        typer.echo(f"✓ added frame {frame}")
+        return
+    session_init(
+        session_file=session_file, driver_id=driver, stream=stream, board_size=(9, 6)
+    )
+    typer.echo(
+        f"✓ session at {session_file}; print the checkerboard PNG next to it"
+    )
+
+
+@app.command()
+def mcp(
+    manifest: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+) -> None:
+    """Start the robot-md MCP server over stdio (same as `robot-md-mcp`)."""
+    import sys as _sys
+
+    from robot_md.mcp.server import main as _mcp_main
+
+    _sys.argv = ["robot-md-mcp", str(manifest)]
+    raise typer.Exit(code=_mcp_main())
+
+
 if __name__ == "__main__":
     app()

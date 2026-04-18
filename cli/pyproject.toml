@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robot-md"
-version = "0.2.7"
+version = "0.3.0"
 description = "ROBOT.md — a single self-describing file so Claude can safely operate your robot."
 readme = "../README.md"
 requires-python = ">=3.10"
@@ -30,6 +30,8 @@ dependencies = [
     "typer>=0.9",
     "ruamel.yaml>=0.18",
     "numpy>=1.24",
+    "mcp>=1.0",
+    "anthropic>=0.30",
 ]
 
 [project.optional-dependencies]
@@ -50,15 +52,26 @@ vision = [
     "opencv-contrib-python>=4.8",
     "depthai>=3.0",
 ]
+# Optional: feetech_depthai backend for Feetech servo bus + OAK-D perception.
+feetech-depthai = [
+    "pyserial>=3.5",
+    "depthai>=2.24",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+]
 
 [project.scripts]
 robot-md = "robot_md.__main__:app"
+robot-md-mcp = "robot_md.mcp.server:main"
 
 [project.urls]
 Homepage = "https://robotmd.dev"
 Repository = "https://github.com/RobotRegistryFoundation/robot-md"
 Issues = "https://github.com/RobotRegistryFoundation/robot-md/issues"
 Spec = "https://robotmd.dev/spec/v1"
+
+[project.entry-points."robot_md.backends"]
+feetech_depthai = "robot_md.backends.feetech_depthai:FeetechDepthaiBackend"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/robot_md"]

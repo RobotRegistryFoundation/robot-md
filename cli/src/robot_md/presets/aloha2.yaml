@@ -21,9 +21,23 @@ physics:
     base_frame: { up: z, forward: x }
     encoder:
       steps_per_rev: 4096            # Dynamixel XM/XL native
-    camera:
-      mount: world                   # 4 cameras: top + both wrists + front
-      extrinsic: null
+    cameras:
+      - driver_id: cam_top
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+      - driver_id: cam_front
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+      - driver_id: cam_wrist_left
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+      - driver_id: cam_wrist_right
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
     gripper:
       joint_id: left_gripper         # left by convention — operator tunes
       tip_offset_mm: [50, 0, 0]

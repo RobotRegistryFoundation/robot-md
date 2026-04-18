@@ -55,8 +55,41 @@ def parse_text(text: str) -> ParsedRobotMd:
     if not post.metadata:
         raise ParseError("frontmatter is empty or not a YAML mapping")
 
+    fm = dict(post.metadata)
+    _upgrade_legacy_camera(fm)
     return ParsedRobotMd(
-        frontmatter=dict(post.metadata),
+        frontmatter=fm,
         body=post.content,
         source_path=None,
+    )
+
+
+def _upgrade_legacy_camera(fm: dict) -> None:
+    """Move singular physics.solver.camera → physics.solver.cameras[0] in place.
+
+    The first driver whose protocol looks camera-ish (`depthai`, `realsense`,
+    `v4l2`, `zed`, `uvc`) is used as driver_id. If no such driver exists,
+    fallback to the literal string 'camera' as driver_id. The upgrade always proceeds.
+    """
+    solver = fm.get("physics", {}).get("solver", {})
+    legacy = solver.get("camera")
+    if not isinstance(legacy, dict):
+        return
+    drivers = fm.get("drivers") or []
+    camera_proto = {"depthai", "realsense", "v4l2", "zed", "uvc"}
+    driver_id = next(
+        (d["id"] for d in drivers if d.get("protocol") in camera_proto and d.get("id")),
+        "camera",
+    )
+
+    upgraded = {
+        "driver_id": driver_id,
+        "primary_stream": "rgb",
+        "mount": legacy.get("mount", "world"),
+        "extrinsic": legacy.get("extrinsic"),
+    }
+    solver["cameras"] = [upgraded]
+    solver.pop("camera", None)
+    fm.setdefault("_deprecations", []).append(
+        "physics.solver.camera (singular) is deprecated; upgraded to cameras[]."
     )

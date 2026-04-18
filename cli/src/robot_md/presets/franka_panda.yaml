@@ -18,9 +18,6 @@ physics:
     convention: DH
     base_frame: { up: z, forward: x }
     # encoder block omitted — FCI returns joint angles in radians directly.
-    camera:
-      mount: world
-      extrinsic: null
     # gripper block omitted — Franka Hand is a separate module with its own
     # open/close API, not part of the arm's kinematic chain. Add a `drivers[]`
     # entry + capability if you want the planner to actuate it.

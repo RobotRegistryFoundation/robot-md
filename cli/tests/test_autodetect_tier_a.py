@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from robot_md.autodetect import (
     DRIVER_PROFILES,
+    DetectedCamera,
+    DetectedCameraStream,
     Device,
     Scan,
     driver_profile,
@@ -49,7 +51,15 @@ def test_emit_draft_includes_cameras_when_present():
                 bus="usb",
             )
         ],
-        cameras=[{"id": "depthai-ABC123", "protocol": "depthai", "model": "OAK-D"}],
+        cameras=[
+            DetectedCamera(
+                driver_id="depthai-ABC123",
+                protocol="depthai",
+                model="OAK-D",
+                streams=[],
+                provenance="depthai factory cal",
+            )
+        ],
     )
     draft = emit_draft(scan)
     assert "cameras:" in draft

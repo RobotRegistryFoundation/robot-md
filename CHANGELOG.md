@@ -5,6 +5,80 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.3.0] - 2026-04-18
+
+Camera intrinsics, Python MCP server, and pluggable backends. The v0.1.x
+npm `robot-md-mcp` is deprecated in favour of the in-process Python
+server; existing users update one line.
+
+### Added
+
+- **Camera intrinsics in schema.** Per-stream `intrinsic` block on
+  `drivers[].streams[]` (fx/fy/cx/cy/width/height + distortion model).
+  `physics.solver.cameras[]` cross-references `drivers[].id` and carries
+  deployment-specific mount + extrinsic. Autodetected from factory
+  calibration at `robot-md init` for OAK-D (depthai), RealSense stub,
+  and v4l2 (emits `null` intrinsic + provenance note).
+- **Python MCP server** shipped as `robot-md-mcp` entry point. New
+  tools: `estop` (process-wide software E-stop), `execute_capability`
+  (deterministic primitive with HITL gate enforcement),
+  `execute_task` (natural-language prompt → planner → capability
+  sequence via `brain.planning` declared in the manifest).
+- **Pluggable `CapabilityBackend`** interface. Backends register via
+  Python entry points under `robot_md.backends`; resolution is
+  alphabetical by backend name, with optional `drivers[].backend`
+  override. Reference `feetech_depthai` backend ships in-repo
+  (install with `pip install robot-md[feetech-depthai]`).
+- **`robot-md calibrate-intrinsic`** — session-file-driven checkerboard
+  calibration CLI. Init generates a printable 9×6 checkerboard PNG;
+  `--frame` captures advance coverage; `--finalize` solves via OpenCV
+  and writes the intrinsic block back into ROBOT.md.
+- **`integrations/claude-code-skill/intrinsic-calibration.md`** — guided
+  wizard skill that drives the CLI through its stable JSON session
+  protocol.
+- **`robot-md mcp <path>`** convenience subcommand (same as running
+  `robot-md-mcp <path>` directly).
+
+### Changed
+
+- **Validator** gains a `warnings` list. Null intrinsic on a
+  `primary_stream` surfaces as a warning (with a pointer to
+  `robot-md calibrate-intrinsic`); legacy singular
+  `physics.solver.camera` emits a deprecation warning after being
+  auto-upgraded at parse time.
+- **Presets** migrated to the `cameras[]` shape. ALOHA 2 now declares
+  four cameras with matching driver entries; arm-only presets
+  (SO-ARM101, UR5e, Franka, Koch) no longer bundle a camera block.
+
+### Deprecated
+
+- `physics.solver.camera` (singular) — still auto-upgraded at read
+  time; validator emits a deprecation warning. Removed in v2.
+
+### Breaking
+
+- **npm `robot-md-mcp@0.2.0` is a migration stub** that prints the new
+  install command and exits non-zero. Update your `claude mcp add`
+  registration:
+
+  ```
+  pipx install robot-md
+  claude mcp remove robot-md
+  claude mcp add robot-md -- robot-md-mcp /path/to/ROBOT.md
+  ```
+
+  See `site/docs/migrate-to-python.md`. The old v0.1.3 npm package
+  remains installable (frozen, no new features).
+
+### Added dependencies
+
+- `mcp>=1.0` — MCP SDK (required; server over stdio)
+- `anthropic>=0.30` — for `execute_task` with `provider: anthropic`
+- Optional extra `robot-md[feetech-depthai]`: `pyserial`, `depthai`,
+  `opencv-python`, `numpy`
+
+---
+
 ## [0.2.7] - 2026-04-18
 
 Claude Desktop + Claude Mobile support lands. Every surface Anthropic

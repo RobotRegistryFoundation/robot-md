@@ -14,6 +14,11 @@ physics:
     base_frame: { up: z, forward: x }
     encoder:
       steps_per_rev: 0              # PWM motors — no encoders
+    cameras:
+      - driver_id: camera
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
   kinematics:
     - id: drive
       axis: y
