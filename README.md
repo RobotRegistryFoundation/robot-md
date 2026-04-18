@@ -1,12 +1,26 @@
 # robot-md
 
 > **`ROBOT.md` is to a robot what `CLAUDE.md` is to a codebase.**
-> One file — YAML frontmatter + markdown prose — so Claude (Code, Desktop, Mobile) can safely operate your robot.
+> One file — YAML frontmatter + markdown prose — so Claude Code, Claude Desktop, Cursor, Zed, Gemini CLI, or any MCP-aware agent can safely operate your robot.
 
 [![PyPI](https://img.shields.io/pypi/v/robot-md.svg)](https://pypi.org/project/robot-md/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Spec](https://img.shields.io/badge/spec-v1-green.svg)](spec/robot-md-v1.md)
+[![Spec](https://img.shields.io/badge/spec-v1.1-green.svg)](spec/robot-md-v1.md)
 [![RCAN](https://img.shields.io/badge/RCAN-3.0-blue.svg)](https://rcan.dev/spec/)
+
+## Where this fits in the stack
+
+This repo is the **declaration layer** — the file format + Python CLI. Everything else is independent; adopt one, or all seven.
+
+| Layer | Piece | What it is |
+|---|---|---|
+| **Declaration** ← *this* | [ROBOT.md](https://github.com/RobotRegistryFoundation/robot-md) | The file a robot ships at its root. YAML frontmatter + markdown prose. Declares identity, capabilities, safety gates. **Spec + `robot-md` Python CLI** (`init`, `validate`, `render`, `calibrate`, `register`, `autodetect`). |
+| **Agent bridge** | [robot-md-mcp](https://github.com/RobotRegistryFoundation/robot-md-mcp) | MCP server that exposes a `ROBOT.md` to Claude Code, Claude Desktop, Cursor, Zed, Gemini CLI — any MCP-aware agent. One `claude mcp add` away. |
+| **Wire protocol** | [RCAN](https://rcan.dev/spec/) | How robots, gateways, and planners talk. Signed envelopes, LoA enforcement, PQC crypto. Think HTTP for robots. |
+| **Python SDK** | [rcan-py](https://github.com/continuonai/rcan-py) | `pip install rcan` — `RCANMessage`, `RobotURI`, `ConfidenceGate`, `HiTLGate`, `AuditChain`. |
+| **TypeScript SDK** | [rcan-ts](https://github.com/continuonai/rcan-ts) | `npm install rcan-ts` — same API surface for Node + browser. |
+| **Registry** | [Robot Registry Foundation](https://robotregistryfoundation.org) | Permanent RRN identities. Public resolver at `/r/<rrn>`. Like ICANN for robots. |
+| **Reference runtime** | [OpenCastor](https://github.com/craigm26/OpenCastor) | Open-source robot runtime — connects LLM brains to hardware bodies. One implementation of RCAN. |
 
 ## The 60-second pitch
 
