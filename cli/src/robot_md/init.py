@@ -163,19 +163,28 @@ def merge_preset_into_draft(
         "schema": "https://robotmd.dev/schema/v1/robot.schema.json",
         "metadata": {
             "robot_name": robot_name,
+            # Identity fields — `robot-md register` needs all four to mint
+            # an RRN. Preset name seeds `model` with a sensible default; the
+            # robot name doubles as a reasonable manufacturer + device_id
+            # placeholder. Operator overrides via `init --manufacturer/--model
+            # /--version-/--device-id` or by editing the manifest.
+            "manufacturer": robot_name,
+            "model": preset.display_name,
+            "version": "1.0",
+            "device_id": robot_name,
             # RRN — empty until `robot-md register` mints one against the
-            # Robot Registry Foundation (v0.2). Populated with the canonical
+            # Robot Registry Foundation. Populated with the canonical
             # `RRN-NNNNNNNNNNNN` assigned at mint time; resolvable via
-            # https://robotregistryfoundation.org/r/<rrn>.
+            # https://rcan.dev/r/<rrn>.
             "rrn": "",
             "license": "Apache-2.0",
         },
-        # RRF binding — stable-by-convention endpoint the Registry
-        # Foundation serves. Once a robot is registered, `/r/<rrn>` returns
-        # the signed manifest; `/api/v1/robots/<rrn>/fria` returns the EU
-        # AI Act Fundamental-Rights-Impact-Assessment reference, etc.
+        # RRF binding. The governance home is robotregistryfoundation.org;
+        # the live registry service (mint, resolve, FRIA, signed manifest)
+        # runs at rcan.dev. `/r/<rrn>` returns the signed manifest,
+        # `/api/v1/robots/<rrn>/fria` returns the EU AI Act FRIA reference.
         "network": {
-            "rrf_endpoint": "https://robotregistryfoundation.org",
+            "rrf_endpoint": "https://rcan.dev",
             "signing_alg": "ml-dsa-65",  # RCAN 3.0 primary; ed25519 accepted at L1
             "transports": ["http"],
         },

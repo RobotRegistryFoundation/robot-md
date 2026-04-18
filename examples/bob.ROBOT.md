@@ -3,14 +3,19 @@ rcan_version: "3.0"
 schema: https://robotmd.dev/schema/v1/robot.schema.json
 
 metadata:
+  # Identity — both registered + resolvable at rcan.dev.
+  # Verify live: https://rcan.dev/r/RRN-000000000003
   robot_name: bob
-  rrn: RRN-000000000001
-  rrn_uri: rrn://craigm26/robot/opencastor-rpi5-hailo-soarm101/bob-001
-  ruri: rcan://robot.local:8001/bob
   manufacturer: craigm26
   model: opencastor-rpi5-hailo-soarm101
-  version: 2026.4.17.0
+  version: "1.0"                            # the registered major.minor — see rcan.dev/r/RRN-000000000003
+  device_id: bob-001
+  rrn: RRN-000000000003                     # minted 2026-04-15 via `robot-md register`
+  rrn_uri: rrn://craigm26/robot/opencastor-rpi5-hailo-soarm101/bob-001
+  rcan_uri: rcan://rcan.dev/craigm26/opencastor-rpi5-hailo-soarm101/1-0/bob-001
+  ruri: rcan://robot.local:8001/bob         # operator's LAN gateway (RCAN transport)
   license: Apache-2.0
+  author: craigm26@gmail.com
 
 physics:
   type: arm+camera

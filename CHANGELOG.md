@@ -5,6 +5,55 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.1] - 2026-04-18
+
+One-command-complete-setup release. Patch-bump to land three audit-driven
+fixes that turned the v0.2.0 register flow from "4 commands + manual edit
+afterwards" into a genuine single-command experience.
+
+### Fixed
+
+- **Register endpoint URL drift** (silent failure in v0.2.0). The CLI
+  default was `https://robotregistryfoundation.org/api/v1/robots` — but
+  the live registry service runs at `https://rcan.dev/api/v1/robots`
+  (the foundation's governance home is at robotregistryfoundation.org;
+  the service is hosted separately on rcan.dev). Anyone who ran
+  `robot-md register` in v0.2.0 got an HTML response from the marketing
+  site back, not a minted RRN. Now points at `rcan.dev`.
+- **Manifest/RRF metadata drift.** When `init --register` was called
+  with CLI overrides (`--manufacturer`, `--model`, etc.), the override
+  was sent to RRF's mint endpoint but the *manifest on disk* kept the
+  preset defaults — silently creating a ROBOT.md whose identity fields
+  didn't match the RRF entry. Now overrides land in the manifest before
+  register runs, so the two stay self-consistent.
+- **Preset-generated manifests missing required mint fields.** `preset:
+  so-arm101` previously left `metadata.manufacturer/model/version/
+  device_id` empty, so `--register` would fail with "missing required
+  mint fields" until the operator hand-edited the file. Now the preset
+  seeds defaults: manufacturer=device_id=robot_name, model=preset_name,
+  version="1.0". Operator overrides win.
+
+### Added
+
+- **`robot-md init --register [--contact-email ... --manufacturer ...
+  --model ... --version- ... --device-id ...]`** — one-command complete
+  setup. Validates + POSTs to rcan.dev + updates the manifest with the
+  assigned RRN + prints the `claude mcp add` line. No other commands
+  needed. No OpenCastor. Live-verified end-to-end: `RRN-000000000006`
+  minted, manifest + RRF entry consistent, MCP server streams the 4
+  resources cleanly. (Test entry cleaned up via new `unregister` verb.)
+- **`robot-md unregister <RRN> [--api-key PATH]`** — DELETEs an RRF
+  entry using the issued API key (reads from
+  `~/.robot-md/keys/<rrn>.apikey` by default). Removes the local key
+  file after a successful delete. Does not touch local ROBOT.md files.
+
+### Examples updated
+
+- `examples/bob.ROBOT.md` now reflects the live Bob entry on rcan.dev:
+  RRN-000000000003 (minted 2026-04-15), manufacturer=craigm26,
+  model=opencastor-rpi5-hailo-soarm101, version=1.0, device_id=bob-001.
+  Verify live: https://rcan.dev/r/RRN-000000000003
+
 ## [0.2.0] - 2026-04-18
 
 Big release. `robot-md` goes from "validator for a file format" to

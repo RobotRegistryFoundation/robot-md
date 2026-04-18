@@ -179,24 +179,67 @@ def init(
     wizard_mode: bool = typer.Option(
         False, "--wizard", help="Interactive 7-step walk-through (default is zero prompts)."
     ),
+    do_register: bool = typer.Option(
+        False,
+        "--register",
+        help=(
+            "After writing the draft, validate + POST to rcan.dev to mint "
+            "an RRN. One-command complete setup."
+        ),
+    ),
+    contact_email: str | None = typer.Option(
+        None,
+        "--contact-email",
+        help="Contact email sent with --register. Falls back to metadata.author.",
+    ),
+    manufacturer: str | None = typer.Option(
+        None,
+        "--manufacturer",
+        help="Override manufacturer when --register. Otherwise read from preset/manifest.",
+    ),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Override model when --register. Otherwise the preset name (e.g. 'so-arm101').",
+    ),
+    version_: str | None = typer.Option(
+        None,
+        "--version-",
+        help="Override version when --register. Otherwise '1.0'.",
+    ),
+    device_id: str | None = typer.Option(
+        None,
+        "--device-id",
+        help="Override device_id when --register. Otherwise the robot_name.",
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing ROBOT.md."),
     list_presets: bool = typer.Option(
         False, "--list-presets", help="Print available presets and exit."
     ),
 ) -> None:
-    """Zero-to-ROBOT.md in one command.
+    """Zero-to-registered-ROBOT.md in one command.
 
     Default is *super-duper-quick*: no prompts. Scans hardware, matches a
-    preset from the built-in library, writes a validated draft. Use
-    `--wizard` for the interactive 7-step flow, or `--preset NAME` to
-    force a known robot model.
+    preset from the built-in library, writes a validated draft.
+
+    Add `--register` to ALSO mint an RRN on the Robot Registry Foundation
+    (`rcan.dev/api/v1/robots`) in the same breath — a one-line complete
+    setup with no OpenCastor or other runtime dependency:
+
+      robot-md init my-bob --preset so-arm101 --register --contact-email me@co.com
+
+    Outputs at the end the `claude mcp add` snippet so the operator can
+    hand the manifest to any MCP-aware agent (Claude Code, Cursor, Zed,
+    Gemini CLI, …) with one more paste.
 
     Examples:
 
-      robot-md init                              # zero prompts
-      robot-md init my-bob                       # pick a name
-      robot-md init --preset so-arm101 my-bob    # force a preset
-      robot-md init --wizard                     # interactive
+      robot-md init                                          # zero prompts, draft only
+      robot-md init my-bob                                   # pick a name
+      robot-md init --preset so-arm101 my-bob                # force a preset
+      robot-md init --wizard                                 # interactive
+      robot-md init my-bob -p so-arm101 --register \\
+          --contact-email me@co.com                           # ← full setup, one line
     """
     from robot_md.init import load_presets, quick, wizard
 
@@ -213,12 +256,79 @@ def init(
     if rc != 0:
         raise typer.Exit(code=rc)
 
+    # --register: run validate + register after the draft lands
+    if do_register:
+        # Validate first — mint fails if the manifest is malformed, better
+        # to catch it here with a clear error than get an HTTP 4xx.
+        try:
+            parsed = parse_file(out)
+        except ParseError as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=FILE_ERROR) from None
+        result = validate_parsed(parsed)
+        if result.code != VALID:
+            err_console.print(
+                f"[red]✗[/red] draft failed validation before register — {result.summary}"
+            )
+            for msg in result.errors:
+                err_console.print(f"  - {msg}")
+            raise typer.Exit(code=result.code)
+        out_console.print(f"[green]✓[/green] {result.summary}")
+
+        # Apply --manufacturer/--model/--version-/--device-id overrides to
+        # the manifest BEFORE register runs, so the manifest is self-
+        # consistent with what gets POSTed to RRF. Without this, the mint
+        # request uses the flag values but the manifest keeps preset defaults.
+        overrides = {
+            "manufacturer": manufacturer,
+            "model": model,
+            "version": version_,
+            "device_id": device_id,
+        }
+        if any(v is not None for v in overrides.values()):
+            from ruamel.yaml import YAML
+
+            text = out.read_text()
+            end = text.find("\n---", 3)
+            fm_text = text[3:end].lstrip("\n")
+            body_text = text[end + 4 :]
+            y = YAML()
+            y.preserve_quotes = True
+            y.indent(mapping=2, sequence=4, offset=2)
+            data = y.load(fm_text)
+            meta = data.setdefault("metadata", {})
+            for k, v in overrides.items():
+                if v is not None:
+                    meta[k] = v
+            import io
+
+            buf = io.StringIO()
+            y.dump(data, buf)
+            out.write_text("---\n" + buf.getvalue().rstrip("\n") + "\n---" + body_text)
+
+        from robot_md.register import cli_register
+
+        rc = cli_register(
+            str(out),
+            manufacturer=manufacturer,
+            model=model,
+            version=version_,
+            device_id=device_id,
+            contact_email=contact_email,
+        )
+        if rc != 0:
+            raise typer.Exit(code=rc)
+
+        # Final: print the MCP one-liner
+        out_console.print("\n[bold]Next — hand your manifest to Claude Code:[/bold]")
+        out_console.print(f'  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/{out.name}"')
+
 
 @app.command()
 def register(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
     endpoint: str = typer.Option(
-        "https://robotregistryfoundation.org/api/v1/robots",
+        "https://rcan.dev/api/v1/robots",
         "--endpoint",
         help="RRF mint endpoint. Override for staging / self-hosted.",
     ),
@@ -264,6 +374,41 @@ def register(
         source=source,
         dry_run=dry_run,
     )
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+@app.command()
+def unregister(
+    rrn: str = typer.Argument(..., help="The RRN to delete (e.g. RRN-000000000042)."),
+    endpoint: str = typer.Option(
+        "https://rcan.dev/api/v1/robots",
+        "--endpoint",
+        help="RRF base endpoint. Override for staging / self-hosted.",
+    ),
+    api_key: str | None = typer.Option(
+        None,
+        "--api-key",
+        help="API key for this RRN. Default: read from ~/.robot-md/keys/<rrn>.apikey.",
+    ),
+) -> None:
+    """Delete a robot from the Robot Registry Foundation.
+
+    Uses the issued API key (stored by `robot-md register` at
+    `~/.robot-md/keys/<rrn>.apikey`) to authorize the DELETE against
+    `rcan.dev/api/v1/robots/<rrn>`. The local key file is removed after
+    a successful delete. Does NOT modify any local ROBOT.md files — if
+    you want to un-publish + clean the manifest, edit metadata.rrn to
+    empty string after this returns.
+
+    Examples:
+
+      robot-md unregister RRN-000000000042
+      robot-md unregister RRN-000000000042 --api-key "$(cat old.apikey)"
+    """
+    from robot_md.register import cli_unregister
+
+    rc = cli_unregister(rrn, endpoint=endpoint, api_key=api_key)
     if rc != 0:
         raise typer.Exit(code=rc)
 

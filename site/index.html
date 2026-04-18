@@ -602,11 +602,21 @@
     One file at the root of your robot. YAML frontmatter a schema can trust, markdown prose a planner can read. <em>The CLAUDE.md of physical machines</em> — so the same agent that ships your code can safely drive your arm, your rover, your humanoid.
   </p>
 
+  <div style="margin: 28px 0 10px; padding: 20px 24px; border: 2px solid var(--accent); background: var(--paper-2); position: relative">
+    <div style="font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; font-weight: 600">Get started in one command</div>
+    <div style="font-family: var(--mono); font-size: 15px; color: var(--ink); padding: 8px 12px; background: var(--ink); color: var(--paper); border-radius: 2px; overflow-x: auto; white-space: nowrap">
+      <span style="color: #ff9b76">$</span> pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 --register
+    </div>
+    <div style="font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--ink-2); margin-top: 10px; line-height: 1.4">
+      That's it. Scans your hardware, writes a validated <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">ROBOT.md</code>, mints an <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">RRN</code> at <a href="https://rcan.dev" style="border-bottom: 1px solid currentColor; color: var(--accent-ink)">rcan.dev</a>, prints the <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">claude mcp add</code> line for any MCP agent. No runtime. No wizard. No YAML editing.
+    </div>
+  </div>
+
   <div class="sub-deck">
     <span><b>RCAN 3.0+</b> wire protocol, native</span>
-    <span><b>RRF</b> registry-compatible</span>
+    <span><b>RRF</b> registry-compatible · <code style="font-family:var(--mono); font-size:11px">rcan.dev</code></span>
     <span><b>JSON Schema</b> draft 2020‑12</span>
-    <span><b>Designed for</b> Claude Code · Desktop · Mobile</span>
+    <span><b>Any MCP-aware agent</b> Claude Code · Cursor · Zed · Gemini CLI</span>
   </div>
 </header>
 
@@ -757,7 +767,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <div class="layer"><span>Layer 2 · Registry</span><b>Robot Registry Foundation</b></div>
         <div class="cell"><span class="tag">Identity</span>Assigns an RRN — a permanent, globally‑unique robot identifier. Mint with one command: <code style="font-family:var(--mono);color:var(--accent-ink)">robot-md register ROBOT.md</code>. Resolvable via <code style="font-family:var(--mono)">rrn://</code> URIs.</div>
         <div class="cell"><span class="tag">Neutral</span>A foundation, not a vendor. Cloudflare Pages + Workers + D1. No seat fees, no per‑robot tax.</div>
-        <div class="cell"><span class="tag">Public</span>Public endpoint at <code style="font-family:var(--mono)">robotregistryfoundation.org/r/&lt;rrn&gt;</code>. Self‑hosted mode supported.</div>
+        <div class="cell"><span class="tag">Public</span>Public endpoint at <code style="font-family:var(--mono)">rcan.dev/r/&lt;rrn&gt;</code>. Self‑hosted mode supported.</div>
       </div>
 
       <div class="stack-row" role="row">
@@ -790,7 +800,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <p class="lede">RRF issues an <b>RRN</b> (Robot Registration Number) the same way a VIN identifies a car — one robot, one number, forever.</p>
         <ul>
           <li>RRN format: <code>RRN‑000000000001</code> (12‑digit numeric) and <code>rrn://org/category/model/id</code> URI form.</li>
-          <li>Public resolver at <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code> — returns the robot's ROBOT.md, its compliance block, its registry metadata.</li>
+          <li>Public resolver at <code>rcan.dev/r/&lt;rrn&gt;</code> — returns the robot's ROBOT.md, its compliance block, its registry metadata.</li>
           <li>Mint in one command: <code>robot-md register ROBOT.md</code> reads your manifest's <code>metadata.manufacturer/model/version/device_id</code>, POSTs to RRF, writes the assigned RRN back into the file, saves the issued API key at <code>~/.robot-md/keys/&lt;rrn&gt;.apikey</code> (mode 600).</li>
           <li>Edge‑served via Cloudflare Pages + Workers + D1. Zero downtime at the identifier layer.</li>
           <li>Foundation‑governed, not vendor‑owned. Self‑hosted mode for private fleets.</li>
@@ -889,7 +899,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <tbody>
         <tr><td><code>rcan_version</code></td><td>string</td><td><span class="req yes">✓</span></td><td>RCAN wire-protocol version — <code>"3.0"</code> covers the 3.x line. 2.1+ accepted; 1.x rejected for EU AI Act gap. See <a href="https://rcan.dev/spec/">rcan.dev/spec</a>.</td></tr>
         <tr><td><code>metadata.robot_name</code></td><td>string</td><td><span class="req yes">✓</span></td><td>Short display name. Must match the body H1. Used in every planner citation.</td></tr>
-        <tr><td><code>metadata.rrn</code></td><td>string</td><td><span class="req rec">★</span></td><td>RRF-assigned identifier (e.g. <code>RRN-000000000001</code>). Empty until <code>robot-md register</code> mints one. Resolves via <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code>.</td></tr>
+        <tr><td><code>metadata.rrn</code></td><td>string</td><td><span class="req rec">★</span></td><td>RRF-assigned identifier (e.g. <code>RRN-000000000001</code>). Empty until <code>robot-md register</code> mints one. Resolves via <code>rcan.dev/r/&lt;rrn&gt;</code>.</td></tr>
         <tr><td><code>metadata.rrn_uri</code></td><td>string</td><td><span class="req opt">—</span></td><td>Optional URI form: <code>rrn://&lt;org&gt;/&lt;category&gt;/&lt;model&gt;/&lt;id&gt;</code> — dereferenceable by any RCAN-aware client.</td></tr>
         <tr><td><code>physics.type</code></td><td>enum</td><td><span class="req yes">✓</span></td><td><code>arm</code> · <code>wheeled</code> · <code>tracked</code> · <code>legged</code> · <code>arm+camera</code> · <code>humanoid</code> · <code>sensor</code> · <code>other</code></td></tr>
         <tr><td><code>physics.dof</code></td><td>int</td><td><span class="req yes">✓</span></td><td>Degrees of freedom. <code>0</code> permitted for purely sensory nodes.</td></tr>
@@ -929,35 +939,31 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <div class="try-grid">
       <div class="terminal" aria-label="Terminal session">
         <div class="top"><i></i><i></i><i></i><span>~/projects/my-bob · zsh</span></div>
-<pre class="body"><span class="p">$</span> pip install robot-md
+<pre class="body"><span class="c"># The whole thing — one command, zero OpenCastor, zero config files:</span>
+<span class="p">$</span> pip install robot-md &amp;&amp; \
+      robot-md init my-bob <span class="c">--preset so-arm101 --register \</span>
+        <span class="c">--manufacturer acme --contact-email me@acme.com</span>
 
-<span class="c"># Preset-matched: ~85% of the manifest pre-filled from the library.</span>
-<span class="p">$</span> robot-md init my-bob <span class="c">--preset so-arm101</span>
 <span class="ok">✓ wrote ROBOT.md</span>  preset: so-arm101
-
-<span class="p">$</span> robot-md validate ROBOT.md
 <span class="ok">✓ my-bob (arm, 6 DoF, 5 capabilities)</span>
-
-<span class="c"># Per-joint physical calibration — two verbs, &lt;2 min total.</span>
-<span class="p">$</span> robot-md calibrate <span class="c">--zero</span> ROBOT.md
-<span class="ok">✓ wrote zero_pose_steps for 6 joints</span>
-<span class="p">$</span> robot-md calibrate <span class="c">--sign</span> ROBOT.md
-  → shoulder_pan (servo id=1, axis=z): commanding +80...
-  Did it move in the POSITIVE convention direction? (y/n/s) <span class="w">y</span>
-  <span class="ok">✓ encoder_sign[shoulder_pan] = +1</span>
-  <span class="c">... (5 more joints)</span>
-<span class="ok">✓ wrote encoder_sign for 6 joints</span>
-
-<span class="c"># Mint a global identity at the Robot Registry Foundation.</span>
-<span class="p">$</span> robot-md register ROBOT.md
 <span class="ok">✓ registered on RRF</span>
   RRN: RRN-000000000042
-  RCAN URI: rrn://craigm26/robot/so-arm101/my-bob
-  API key saved to ~/.robot-md/keys/RRN-000000000042.apikey (mode 600).
+  RCAN URI: rcan://rcan.dev/acme/so-arm101/1-0/my-bob
+  API key saved to ~/.robot-md/keys/RRN-000000000042.apikey (mode 600)
   manifest ROBOT.md updated with metadata.rrn
-  Public resolver: https://robotregistryfoundation.org/r/RRN-000000000042
+  Public resolver: <span class="w">https://rcan.dev/r/RRN-000000000042</span>
 
-<span class="p">$</span> claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
+Next — hand your manifest to Claude Code:
+  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
+
+<span class="c"># (Optional) Physical calibration — only if your robot has an arm:</span>
+<span class="p">$</span> robot-md calibrate <span class="c">--zero</span> ROBOT.md
+<span class="p">$</span> robot-md calibrate <span class="c">--sign</span> ROBOT.md
+<span class="p">$</span> robot-md calibrate <span class="c">--hand-eye --marker-pos 300,0,0</span> ROBOT.md
+
+<span class="p">$</span> claude
+<span class="c">· loaded robot-md://my-bob/{frontmatter, capabilities, safety, body}</span>
+<span class="w">→ Claude knows your robot. Ship.</span>
 <span class="ok">✓ Added stdio MCP server robot-md</span>
 
 <span class="p">$</span> claude

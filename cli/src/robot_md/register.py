@@ -1,7 +1,8 @@
 """`robot-md register` — mint an RRN against the Robot Registry Foundation.
 
-Talks to the live v0.1.x RRF mint endpoint at
-``https://robotregistryfoundation.org/api/v1/robots``. On success, writes the
+Talks to the live RRF mint endpoint at ``https://rcan.dev/api/v1/robots``
+(the foundation's governance site is at `robotregistryfoundation.org`, but
+the registry service itself is served from `rcan.dev`). On success, writes the
 assigned RRN back into the manifest's ``metadata.rrn``, stores the issued
 API key at ``~/.robot-md/keys/<rrn>.apikey`` (mode 600), and prints the
 public resolver URL for the new record.
@@ -36,8 +37,79 @@ from typing import Any
 
 from robot_md.parser import parse_file
 
-DEFAULT_ENDPOINT = "https://robotregistryfoundation.org/api/v1/robots"
+DEFAULT_ENDPOINT = "https://rcan.dev/api/v1/robots"
 KEYSTORE_DIR = Path.home() / ".robot-md" / "keys"
+
+
+def load_apikey(rrn: str) -> str | None:
+    """Return the stored API key for `rrn`, or None if no keystore file."""
+    p = KEYSTORE_DIR / f"{rrn}.apikey"
+    if not p.exists():
+        return None
+    return p.read_text().strip() or None
+
+
+def delete_from_rrf(endpoint: str, rrn: str, api_key: str, *, timeout: float = 15.0) -> None:
+    """DELETE `endpoint/rrn` with `Authorization: Bearer <api_key>`.
+
+    Raises :class:`RuntimeError` with a human-readable message on any non-2xx.
+    """
+    url = f"{endpoint.rstrip('/')}/{rrn}"
+    req = urllib.request.Request(
+        url,
+        method="DELETE",
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {api_key}",
+            "User-Agent": "robot-md-cli/0.2 (+https://robotmd.dev)",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        err_text = e.read().decode("utf-8", errors="replace") if hasattr(e, "read") else str(e)
+        raise RuntimeError(f"RRF returned {e.code}: {err_text.strip()[:500]}") from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"could not reach {url}: {e.reason}") from e
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        # Accept empty-body 204s
+        return
+    if "error" in obj:
+        raise RuntimeError(f"RRF refused delete: {obj['error']}")
+
+
+def cli_unregister(
+    rrn: str, *, endpoint: str = DEFAULT_ENDPOINT, api_key: str | None = None
+) -> int:
+    """Operator-facing: `robot-md unregister <RRN>`.
+
+    Reads the API key from `~/.robot-md/keys/<rrn>.apikey` unless `--api-key`
+    is supplied. DELETEs the RRF entry. Does NOT touch local ROBOT.md files.
+    """
+    key = api_key or load_apikey(rrn)
+    if not key:
+        print(
+            f"error: no API key for {rrn}. "
+            f"Pass --api-key (or ensure ~/.robot-md/keys/{rrn}.apikey exists).",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        delete_from_rrf(endpoint, rrn, key)
+    except RuntimeError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 3
+    # Clean up local key file (no longer valid)
+    key_path = KEYSTORE_DIR / f"{rrn}.apikey"
+    if key_path.exists() and api_key is None:
+        # Only delete the file if we used the stored one
+        key_path.unlink()
+        print(f"  removed local key {key_path}", file=sys.stderr)
+    print(f"✓ deleted {rrn} from RRF ({endpoint})", file=sys.stderr)
+    return 0
 
 
 # --------------------------------------------------------------- request shape
@@ -330,6 +402,6 @@ def cli_register(
     except RuntimeError as e:
         print(f"  warning: could not update manifest: {e}", file=sys.stderr)
 
-    public_url = f"https://robotregistryfoundation.org/r/{result.rrn}"
+    public_url = f"https://rcan.dev/r/{result.rrn}"
     print(f"\nPublic resolver: {public_url}", file=sys.stderr)
     return 0
