@@ -279,8 +279,24 @@ def calibrate(
         "--sign",
         help="Per-joint: command a small test move, ask operator for direction, set encoder_sign.",
     ),
+    hand_eye: bool = typer.Option(
+        False,
+        "--hand-eye",
+        help="ArUco-based camera-to-arm-base extrinsic via OAK-D + a printed marker.",
+    ),
+    marker_pos: str | None = typer.Option(
+        None,
+        "--marker-pos",
+        help="`x,y,z` in mm — center of the ArUco marker in arm-base frame.",
+    ),
+    marker_size: float = typer.Option(
+        50.0, "--marker-size", help="Marker side length in mm (default: 50)."
+    ),
+    marker_id: int = typer.Option(0, "--marker-id", help="ArUco id (DICT_4X4_50) — default 0."),
     dry_run: bool = typer.Option(
-        False, "--dry-run", help="Read encoders and print them; do not rewrite the manifest."
+        False,
+        "--dry-run",
+        help="Read encoders / detect marker and print result; do not rewrite the manifest.",
     ),
 ) -> None:
     """Populate kinematic-solver physical fields that can't be autodetected.
@@ -303,12 +319,12 @@ def calibrate(
     """
     from robot_md.calibrate import cli_calibrate_sign, cli_calibrate_zero
 
-    if not (zero or sign):
+    if not (zero or sign or hand_eye):
         err_console.print(
-            "[yellow]calibrate: pick a mode — --zero (record zero_pose_steps) "
-            "or --sign (record encoder_sign per joint).[/yellow]\n"
+            "[yellow]calibrate: pick a mode — --zero, --sign, or --hand-eye.[/yellow]\n"
             "  robot-md calibrate --zero ROBOT.md\n"
-            "  robot-md calibrate --sign ROBOT.md"
+            "  robot-md calibrate --sign ROBOT.md\n"
+            "  robot-md calibrate --hand-eye --marker-pos 300,0,0 ROBOT.md"
         )
         raise typer.Exit(code=2)
 
@@ -319,6 +335,32 @@ def calibrate(
             raise typer.Exit(code=rc)
     if sign:
         rc = cli_calibrate_sign(str(path))
+        if rc != 0:
+            raise typer.Exit(code=rc)
+    if hand_eye:
+        if not marker_pos:
+            err_console.print(
+                "[red]✗[/red] --hand-eye requires --marker-pos x,y,z (mm in arm-base frame)."
+            )
+            raise typer.Exit(code=2)
+        try:
+            xyz = tuple(float(v.strip()) for v in marker_pos.split(","))
+            if len(xyz) != 3:
+                raise ValueError
+        except ValueError:
+            err_console.print(
+                f"[red]✗[/red] --marker-pos must be `x,y,z` (three floats), got {marker_pos!r}"
+            )
+            raise typer.Exit(code=2) from None
+        from robot_md.hand_eye import cli_calibrate_hand_eye
+
+        rc = cli_calibrate_hand_eye(
+            str(path),
+            marker_pos=xyz,
+            marker_size_mm=marker_size,
+            marker_id=marker_id,
+            dry_run=dry_run,
+        )
         if rc != 0:
             raise typer.Exit(code=rc)
 
