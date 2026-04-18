@@ -48,9 +48,11 @@ Spec = "https://robotmd.dev/spec/v1"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/robot_md"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/robot_md/schemas" = "robot_md/schemas"
+# `packages = ["src/robot_md"]` already includes schemas/ as package data —
+# do NOT add a `force-include` for src/robot_md/schemas; that produces
+# duplicate filenames in the wheel ZIP and PyPI Warehouse rejects it with
+# "400 Invalid distribution file. ZIP archive not accepted: Duplicate
+# filename in local headers."
 
 [tool.ruff]
 line-length = 100
