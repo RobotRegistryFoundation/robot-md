@@ -70,8 +70,22 @@ class FeetechDepthaiBackend(CapabilityBackend):
 
         from robot_md.backends.base import SceneSnapshot
 
-        detections = tuple(self._perception.detect_objects()) if self._perception is not None else ()
-        frame = self._perception.grab_frame() if self._perception is not None else None
+        # P3 adds perception.detect_objects; for now, scene_describe reports an empty detection list.
+        detections: tuple = ()
+        # grab_frame returns (rgb_ndarray, depth_ndarray, K). Encode RGB as PNG bytes
+        # so SceneSnapshot.frame stays `bytes | None`-typed.
+        frame: bytes | None = None
+        if self._perception is not None:
+            try:
+                rgb, _depth, _K = self._perception.grab_frame()
+                try:
+                    import cv2
+                    ok, encoded = cv2.imencode(".png", rgb)
+                    frame = bytes(encoded.tobytes()) if ok else None
+                except Exception:
+                    frame = None
+            except Exception:
+                frame = None
         joints = self._servo_bus.read_positions() if self._servo_bus is not None else {}
         return SceneSnapshot(
             frame=frame,
