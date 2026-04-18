@@ -73,25 +73,43 @@ Requires Python 3.10+.
 
 ## Adopt it for your robot (60 seconds)
 
-The Tier 0 flow — Claude Code alone as the runtime, no OpenCastor:
+The Tier 0 flow — Claude Code alone as the runtime, no OpenCastor.
+
+### Option A — Claude Code via MCP *(recommended)*
+
+Three commands, zero config files:
 
 ```bash
-# 1. Install the SessionStart hook (CLI installed above).
+# 1. Generate a draft from visible hardware, edit TODOs, validate
+cd ~/my-robot
+robot-md autodetect --write ROBOT.md   # detects Hailo, Movidius, OAK-D,
+                                       # Coral, CH340/CP210x/FTDI, tty*
+# Fill in robot_name, physics type, DoF, capabilities
+robot-md validate ROBOT.md
+
+# 2. Tell Claude Code about it (one line — no settings.json editing)
+claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
+
+# 3. Open Claude Code. It now knows your robot.
+claude
+```
+
+Claude Code gets Bob's frontmatter, capabilities, safety gates, and prose body as MCP resources. **No harness config, no provider setup, no YAML wrangling** — built for operators who just want Claude Code to understand the robot. See [`robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) for the MCP server.
+
+### Option B — SessionStart hook (pre-MCP path)
+
+If you can't use MCP (e.g. older Claude Code, or you want the ROBOT.md context pinned into every session unconditionally):
+
+```bash
 mkdir -p ~/.claude/hooks
 curl -fsSL https://robotmd.dev/hook > ~/.claude/hooks/robot-md.sh
 chmod +x ~/.claude/hooks/robot-md.sh
 # Add one entry to ~/.claude/settings.json — see integrations/claude-code/settings.template.json.
-
-# 2. cd to your robot's repo. Generate a draft with autodetect, then edit.
-cd ~/my-robot
-robot-md autodetect --write ROBOT.md   # detects Hailo, Movidius, OAK-D,
-                                       # Coral, CH340/CP210x/FTDI, tty*
-# Fill in the TODOs (robot name, physics type, DoF, capabilities), then:
-robot-md validate ROBOT.md
-claude                                 # Claude reads ROBOT.md automatically
 ```
 
-`robot-md autodetect` scans PCI + USB + `/dev/tty*` and emits a draft that validates against the v1 schema but deliberately marks identity fields (`robot_name`, `physics.type`, `dof`) as TODO — the operator is the authority on what the robot *is*. From there, Claude Code is the planner and the executor: no gateway, no runtime to stand up.
+Both paths end the same way: Claude Code is the planner and the executor. No gateway, no runtime to stand up.
+
+`robot-md autodetect` scans PCI + USB + `/dev/tty*` and emits a draft that validates against the v1 schema but deliberately marks identity fields (`robot_name`, `physics.type`, `dof`) as TODO — the operator is the authority on what the robot *is*.
 
 **Want a public identity?** `robot-md register ROBOT.md` (shipping in v0.2) posts to the Robot Registry Foundation, writes the assigned `RRN-XXXXXXXXXXXX` into your manifest, and anchors your robot's signing key.
 
@@ -117,11 +135,16 @@ robot-md context examples/bob.ROBOT.md | head -10
 
 | Surface | Status | Mechanism |
 |---|---|---|
-| **Claude Code** | ✅ v0.1 | SessionStart hook → `robot-md context` → session context |
+| **Claude Code** | ✅ v0.1 | **`claude mcp add robot-md -- npx -y robot-md-mcp ./ROBOT.md`** via [`robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) *(recommended)* · alt: SessionStart hook → `robot-md context` |
 | **Claude Desktop** | ✅ v0.1 (read-only) | [`robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) — resources + validate/render; dispatch tools arrive with v0.2 signing |
 | **Claude Mobile (iOS)** | 🚧 v0.2 | URL fetch: `https://robotmd.dev/r/<rrn>` |
+| **OpenAI** (Codex CLI, ChatGPT Desktop) | ✅ v0.1 | Same MCP server — register `npx -y robot-md-mcp /path/to/ROBOT.md` in the tool's MCP config |
+| **Google Gemini CLI** | ✅ v0.1 | Same MCP server — add to `~/.gemini/settings.json` under `mcpServers` |
+| **Cursor / Zed / Cline / Continue.dev / any MCP-aware harness** | ✅ v0.1 | Same MCP server — register the `npx` command in the tool's MCP settings |
 
-See [`integrations/claude-code/`](integrations/claude-code/) for install instructions. Desktop + Mobile READMEs document the approaches; code ships in v0.2.
+**ROBOT.md is planner-agnostic by design.** MCP is an [open standard](https://modelcontextprotocol.io). The file you write is the file every provider reads. No per-vendor rewrites, no parallel manifests.
+
+See [`integrations/claude-code/`](integrations/claude-code/) for hook-path install instructions. The MCP path needs no files — just the `claude mcp add` one-liner (or your harness's equivalent) above.
 
 ## The broader ecosystem
 
