@@ -51,3 +51,18 @@ class FeetechDepthaiBackend(CapabilityBackend):
         return dispatch(
             self, capability=capability, args=dict(args), dry_run=dry_run, estop=estop
         )
+
+    def scene_describe(self):
+        import time
+
+        from robot_md.backends.base import SceneSnapshot
+
+        detections = tuple(self._perception.detect_objects()) if self._perception is not None else ()
+        frame = self._perception.grab_frame() if self._perception is not None else None
+        joints = self._servo_bus.read_positions() if self._servo_bus is not None else {}
+        return SceneSnapshot(
+            frame=frame,
+            detections=detections,
+            joint_state={k: float(v) for k, v in joints.items()},
+            ts=time.time(),
+        )
