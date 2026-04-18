@@ -1,0 +1,68 @@
+{
+  "findings": {
+    "critical": 0,
+    "high": 0
+  },
+  "generated_at": "2026-04-18T14:48:04Z",
+  "health_score": 90,
+  "repos": [
+    {
+      "ci": "green",
+      "published_at": "2026-04-18T14:38:37Z",
+      "repo": "RobotRegistryFoundation/robot-md",
+      "tag": "v0.2.2"
+    },
+    {
+      "ci": "green",
+      "published_at": "2026-04-18T13:37:11Z",
+      "repo": "RobotRegistryFoundation/robot-md-mcp",
+      "tag": "v0.1.4"
+    },
+    {
+      "ci": "green",
+      "published_at": "2026-04-17T22:55:45Z",
+      "repo": "continuonai/rcan-py",
+      "tag": "v2.0.0"
+    },
+    {
+      "ci": "green",
+      "published_at": "2026-04-02T01:56:50Z",
+      "repo": "continuonai/rcan-spec",
+      "tag": "v2.3.1"
+    },
+    {
+      "ci": "green",
+      "published_at": "2026-04-17T23:02:40Z",
+      "repo": "continuonai/rcan-ts",
+      "tag": "v2.0.0"
+    },
+    {
+      "ci": "green",
+      "published_at": "2026-04-15T14:16:46Z",
+      "repo": "craigm26/OpenCastor",
+      "tag": "v2026.4.15.0"
+    },
+    {
+      "ci": "green",
+      "published_at": "2026-03-26T21:37:11Z",
+      "repo": "craigm26/RobotRegistryFoundation",
+      "tag": "v2.1.0"
+    },
+    {
+      "ci": "green",
+      "repo": "craigm26/opencastor-autoresearch"
+    },
+    {
+      "ci": "green",
+      "published_at": "2026-04-12T23:26:22Z",
+      "repo": "craigm26/opencastor-client",
+      "tag": "v2.0.0"
+    },
+    {
+      "ci": "green",
+      "repo": "craigm26/opencastor-docs"
+    }
+  ],
+  "schema": "https://robotmd.dev/status/v1",
+  "source": "opencastor-ops (private); filtered to public allowlist"
+}

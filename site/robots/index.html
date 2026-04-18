@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Registered robots — ROBOT.md</title>
+<meta name="description" content="Browse robots registered on the Robot Registry Foundation. Live data from rcan.dev. Each card links to the robot's public resolver and its ROBOT.md entry.">
+<meta name="theme-color" content="#F4EFE6">
+<meta property="og:title" content="Registered robots — ROBOT.md">
+<meta property="og:description" content="Browse the live list of robots registered with ROBOT.md / RCAN.">
+<meta property="og:url" content="https://robotmd.dev/robots">
+<link rel="canonical" href="https://robotmd.dev/robots">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --paper:#F4EFE6;
+    --paper-2:#ECE5D6;
+    --paper-3:#DFD5BF;
+    --ink:#111110;
+    --ink-2:#2A2825;
+    --ink-3:#5A574F;
+    --ink-4:#8A8578;
+    --rule:#1d1c1a;
+    --accent:#B34A2A;
+    --accent-ink:#5A1F0E;
+    --accent-wash:#EBD9C9;
+    --ok:#2F6B3E;
+
+    --sans:'Inter Tight', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+    --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --serif:'Fraunces', Georgia, serif;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.55}
+  a{color:var(--accent-ink);text-decoration:none;border-bottom:1px solid currentColor}
+  a:hover{color:var(--accent)}
+
+  .wrap{max-width:1100px;margin:0 auto;padding:40px 28px}
+  header.page{border-bottom:2px solid var(--rule);padding-bottom:20px;margin-bottom:32px}
+  .kicker{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.22em;color:var(--accent);font-weight:600;margin-bottom:8px}
+  h1{font-family:var(--sans);font-weight:700;font-size:42px;margin:0 0 10px;letter-spacing:-.015em}
+  .lede{font-family:var(--serif);font-style:italic;font-size:18px;color:var(--ink-2);max-width:700px;margin:0}
+  nav.crumbs{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-bottom:16px}
+  nav.crumbs a{color:var(--ink-3)}
+
+  .summary{display:flex;gap:24px;margin:20px 0 28px;padding:14px 18px;border:1px solid var(--rule);background:var(--paper-2);font-family:var(--mono);font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+  .summary b{color:var(--ink);font-weight:600}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+
+  .card{display:flex;flex-direction:column;gap:10px;padding:18px 20px;border:1px solid var(--rule);background:var(--paper-2);position:relative;transition:background .15s ease,border-color .15s ease}
+  .card:hover{background:var(--paper-3);border-color:var(--accent)}
+  .card .rrn{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--accent-ink);font-weight:600}
+  .card h2{font-family:var(--sans);font-size:19px;font-weight:600;margin:0;letter-spacing:-.01em;color:var(--ink)}
+  .card .model{font-family:var(--mono);font-size:12px;color:var(--ink-3);margin-top:-4px}
+  .card .desc{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink-2);line-height:1.5;margin:4px 0 8px;flex:1 1 auto}
+  .card .tier{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:3px 8px;background:var(--accent-wash);color:var(--accent-ink);font-weight:600;border:1px solid var(--accent);align-self:flex-start}
+  .card .tier.verified{background:#D4E5CF;color:var(--ok);border-color:var(--ok)}
+  .card .tier.manufacturer,.card .tier.certified{background:#1d1c1a;color:var(--paper);border-color:var(--rule)}
+  .card .meta{display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px dashed var(--ink-4);font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+  .card .arrow{font-family:var(--mono);color:var(--accent);font-size:14px}
+  .card a.cover{position:absolute;inset:0;border-bottom:none}
+
+  .state{padding:28px;border:1px dashed var(--ink-4);background:var(--paper-2);text-align:center;font-family:var(--mono);font-size:14px;color:var(--ink-3)}
+  .state.err{border-color:var(--accent);color:var(--accent-ink);background:var(--accent-wash)}
+
+  footer{margin-top:48px;padding-top:20px;border-top:1px solid var(--ink-4);font-family:var(--mono);font-size:12px;color:var(--ink-3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+<nav class="crumbs"><a href="/">robotmd.dev</a> / robots</nav>
+
+<header class="page">
+  <div class="kicker">§ The registry</div>
+  <h1>Registered robots</h1>
+  <p class="lede">Every robot below was minted on rcan.dev with <code style="font-family:var(--mono);background:var(--paper-2);padding:1px 6px">robot-md register</code>. Data refreshes on page load.</p>
+</header>
+
+<div id="summary" class="summary" aria-live="polite">
+  <span>Loading registry…</span>
+</div>
+
+<div id="grid" class="grid" aria-live="polite">
+  <div class="state" id="state">Fetching from <code>rcan.dev/api/v1/robots</code>…</div>
+</div>
+
+<footer>
+  <span>Source: <a href="https://rcan.dev/api/v1/robots">rcan.dev/api/v1/robots</a></span>
+  <span>Register yours: <code>pip install robot-md &amp;&amp; robot-md init my-bot --preset so-arm101 --register</code></span>
+</footer>
+
+</div>
+
+<script>
+(function() {
+  const API = "https://rcan.dev/api/v1/robots?limit=100";
+  const grid = document.getElementById("grid");
+  const summary = document.getElementById("summary");
+  const state = document.getElementById("state");
+
+  function escape(s) {
+    if (s === undefined || s === null) return "";
+    return String(s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      return d.toISOString().slice(0, 10); // YYYY-MM-DD
+    } catch (e) { return iso; }
+  }
+
+  function card(r) {
+    const rrn = escape(r.rrn);
+    const resolver = `https://rcan.dev/r/${rrn}`;
+    const name = escape(r.device_id || r.model || "unnamed");
+    const model = escape([r.manufacturer, r.model, r.version].filter(Boolean).join(" · "));
+    const desc = escape(r.description || "No description provided.");
+    const tier = escape((r.verification_tier || "community").toLowerCase());
+    const registered = escape(fmtDate(r.registered_at));
+
+    return `
+      <article class="card">
+        <a class="cover" href="${resolver}" aria-label="View ${name}"></a>
+        <div class="rrn">${rrn}</div>
+        <h2>${name}</h2>
+        <div class="model">${model}</div>
+        <div class="desc">${desc}</div>
+        <span class="tier ${tier}">${tier}</span>
+        <div class="meta">
+          <span>registered ${registered}</span>
+          <span class="arrow">→</span>
+        </div>
+      </article>
+    `;
+  }
+
+  fetch(API, { headers: { "Accept": "application/json" } })
+    .then(r => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(data => {
+      const robots = Array.isArray(data.robots) ? data.robots : [];
+      const total = data.total ?? robots.length;
+
+      if (robots.length === 0) {
+        state.textContent = "No robots registered yet. Be the first: " +
+          "pip install robot-md && robot-md init my-bot --preset so-arm101 --register";
+        summary.innerHTML = `<span><b>0</b> robots</span>`;
+        return;
+      }
+
+      // Filter out obvious test entries for the homepage view.
+      const real = robots.filter(r => {
+        const m = (r.manufacturer || "").toLowerCase();
+        const d = (r.description || "").trim();
+        return m !== "test" && d !== "" || r.verification_tier !== "community";
+      });
+      const display = real.length > 0 ? real : robots;
+
+      const tiers = {};
+      display.forEach(r => {
+        const t = (r.verification_tier || "community").toLowerCase();
+        tiers[t] = (tiers[t] || 0) + 1;
+      });
+      const tierStr = Object.entries(tiers)
+        .map(([t, n]) => `${n} ${t}`).join(" · ");
+
+      summary.innerHTML = `
+        <span><b>${display.length}</b> robots shown</span>
+        <span><b>${total}</b> total registered</span>
+        <span>${tierStr}</span>
+      `;
+
+      grid.innerHTML = display.map(card).join("");
+    })
+    .catch(err => {
+      grid.innerHTML = "";
+      state.textContent = "Failed to load registry: " + err.message;
+      state.classList.add("err");
+      grid.appendChild(state);
+      summary.innerHTML = `<span>Registry unreachable</span>`;
+    });
+})();
+</script>
+</body>
+</html>
