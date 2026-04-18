@@ -208,6 +208,7 @@ def init(
 def calibrate(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
     zero: bool = typer.Option(False, "--zero", help="Record current encoder positions as zero_pose_steps for every joint."),
+    sign: bool = typer.Option(False, "--sign", help="Per-joint: command a small test move, ask operator for direction, set encoder_sign."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Read encoders and print them; do not rewrite the manifest."),
 ) -> None:
     """Populate kinematic-solver physical fields that can't be autodetected.
@@ -216,28 +217,38 @@ def calibrate(
       --zero       Interactive: pose arm in the declared zero config, press
                    Enter, we record current encoders as `zero_pose_steps`
                    for every joint in `physics.kinematics[]`.
+      --sign       Per-joint: command a small test move (+~80 steps), ask
+                   operator whether it moved in the positive-convention
+                   direction, record `encoder_sign` (+1 or -1) accordingly.
+                   Each joint is restored to its original position after.
 
-    Future (v1.1):
-      --sign       Per-joint: command +N steps, ask operator which way the
-                   joint moved, record `encoder_sign`.
+    Future:
       --hand-eye   ArUco-based camera-to-arm-base extrinsic, writes
-                   `physics.solver.camera.extrinsic`.
+                   `physics.solver.camera.extrinsic`. (Task #44 follow-up.)
 
     Prerequisite: the arm's serial port must be free — stop any gateway that
     is holding it first (for OpenCastor: `sudo systemctl stop castor-gateway`).
     """
-    from robot_md.calibrate import cli_calibrate_zero
+    from robot_md.calibrate import cli_calibrate_sign, cli_calibrate_zero
 
-    if not zero:
+    if not (zero or sign):
         err_console.print(
-            "[yellow]calibrate: pick a mode — currently only --zero is implemented.[/yellow]\n"
-            "  robot-md calibrate --zero ROBOT.md"
+            "[yellow]calibrate: pick a mode — --zero (record zero_pose_steps) "
+            "or --sign (record encoder_sign per joint).[/yellow]\n"
+            "  robot-md calibrate --zero ROBOT.md\n"
+            "  robot-md calibrate --sign ROBOT.md"
         )
         raise typer.Exit(code=2)
 
-    rc = cli_calibrate_zero(str(path), dry_run=dry_run)
-    if rc != 0:
-        raise typer.Exit(code=rc)
+    rc = 0
+    if zero:
+        rc = cli_calibrate_zero(str(path), dry_run=dry_run)
+        if rc != 0:
+            raise typer.Exit(code=rc)
+    if sign:
+        rc = cli_calibrate_sign(str(path))
+        if rc != 0:
+            raise typer.Exit(code=rc)
 
 
 if __name__ == "__main__":
