@@ -262,7 +262,8 @@ class Scan:
     devices: list[Device] = field(default_factory=list)
     runtime: Runtime | None = None
     warnings: list[str] = field(default_factory=list)
-    cameras: list[DetectedCamera] = field(default_factory=list)
+    # Type tightens to `list[DetectedCamera]` in T05/T06 when probes are typed.
+    cameras: list[dict] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
