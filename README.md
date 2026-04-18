@@ -169,6 +169,14 @@ robot-md context examples/bob.ROBOT.md | head -10
 # emits the Claude-ready '# Robot context' block
 ```
 
+## Agent affordances
+
+Beyond the initial setup, the rest of the package is designed so that **Claude Code and other agent harnesses can recognize when to invoke it**, without the operator naming specific tools. Three surfaces work together:
+
+- **`CLAUDE.md` in the project root** — generate with `robot-md claude-md ROBOT.md`. Teaches Claude which operator intents should dispatch which verb (safety → check HITL gates, "broken" → `doctor`, motion → HITL first). Read at session start.
+- **MCP server descriptions** — `robot-md-mcp` v0.2+ advertises a server-level `instructions` field plus intent-matchable descriptions on every resource and tool. Any MCP client routes to the right resource by description alone.
+- **Skill definition** at [`integrations/claude-code-skill/SKILL.md`](integrations/claude-code-skill/SKILL.md) — for operators running the [superpowers](https://github.com/obra/superpowers) plugin (or any skill-aware harness), a drop-in skill with the intent → action table and a safety protocol Claude follows automatically.
+
 ## Claude integration
 
 | Surface | Status | Mechanism |
