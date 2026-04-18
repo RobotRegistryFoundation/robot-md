@@ -262,8 +262,7 @@ class Scan:
     devices: list[Device] = field(default_factory=list)
     runtime: Runtime | None = None
     warnings: list[str] = field(default_factory=list)
-    # Type tightens to `list[DetectedCamera]` in T05/T06 when probes are typed.
-    cameras: list[dict] = field(default_factory=list)
+    cameras: list[DetectedCamera] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
@@ -455,7 +454,17 @@ def scan_system() -> Scan:
         scan.devices.extend(parse_usb(lsusb_out))
 
     scan.devices.extend(scan_tty())
-    scan.cameras = probe_cameras()  # Tier A camera probe
+    # Compose typed probes (depthai → realsense → v4l2)
+    cameras: list[DetectedCamera] = []
+    cameras.extend(probe_depthai_cameras())
+    cameras.extend(probe_realsense_cameras())
+    # v4l2 last — avoid double-listing an OAK-D / RealSense that v4l2 also enumerates
+    seen_ids = {c.driver_id for c in cameras}
+    for cam in probe_v4l2_cameras():
+        if cam.driver_id in seen_ids:
+            continue
+        cameras.append(cam)
+    scan.cameras = cameras
     scan.runtime = detect_runtime()
     return scan
 
@@ -675,6 +684,66 @@ def _slugify(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (value or "cam").lower()).strip("-") or "cam"
 
 
+def probe_v4l2_cameras() -> list[DetectedCamera]:
+    """v4l2 enumeration — no factory cal. Emits null intrinsic + provenance."""
+    devices = _v4l2_list_devices()
+    cams: list[DetectedCamera] = []
+    for path in devices:
+        caps = _v4l2_device_capabilities(path)
+        model = caps.get("model", "USB Camera")
+        cams.append(
+            DetectedCamera(
+                driver_id=_slugify(model) + "-" + Path(path).name,
+                protocol="v4l2",
+                model=model,
+                streams=[
+                    DetectedCameraStream(
+                        name="rgb",
+                        intrinsic=None,
+                        baseline_m=None,
+                        derived_from=None,
+                        width=caps.get("width", 640),
+                        height=caps.get("height", 480),
+                    )
+                ],
+                provenance="v4l2 enum / no cal",
+            )
+        )
+    return cams
+
+
+def _v4l2_list_devices() -> list[str]:
+    return sorted(str(p) for p in Path("/dev").glob("video*") if p.exists())
+
+
+def _v4l2_device_capabilities(path: str) -> dict:
+    """Return {model, width, height} via v4l2-ctl if available; defaults otherwise."""
+    if shutil.which("v4l2-ctl") is None:
+        return {}
+    try:
+        info = subprocess.check_output(
+            ["v4l2-ctl", "-d", path, "--info"], timeout=2, text=True, stderr=subprocess.DEVNULL
+        )
+    except Exception:
+        return {}
+    model = "USB Camera"
+    for line in info.splitlines():
+        if "Card type" in line:
+            model = line.split(":", 1)[1].strip()
+            break
+    return {"model": model, "width": 640, "height": 480}
+
+
+def probe_realsense_cameras() -> list[DetectedCamera]:
+    """pyrealsense2 probe. Import-guarded stub for now."""
+    try:
+        import pyrealsense2 as rs  # noqa: F401
+    except Exception:
+        return []
+    # Minimal: do not hit hardware here — expanded implementation is a follow-up.
+    return []
+
+
 def _capabilities_from_devices(devices: list[Device]) -> list[str]:
     caps: list[str] = []
     has_camera = any(d.role == "camera" for d in devices)
@@ -723,12 +792,9 @@ def emit_draft(scan: Scan) -> str:
     if scan.cameras:
         lines.append("cameras:")
         for c in scan.cameras:
-            flat = ", ".join(
-                f"{k}: {v!r}" if isinstance(v, str) else f"{k}: {v}"
-                for k, v in c.items()
-                if k != "streams"
+            lines.append(
+                f"  - {{ id: {c.driver_id!r}, protocol: {c.protocol!r}, model: {c.model!r} }}"
             )
-            lines.append(f"  - {{ {flat} }}")
     if caps:
         lines.append("capabilities:")
         for c in caps:

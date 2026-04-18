@@ -94,3 +94,55 @@ def test_depthai_probe_returns_empty_when_calibration_fails(monkeypatch):
     from robot_md.autodetect import probe_depthai_cameras
 
     assert probe_depthai_cameras() == []
+
+
+def test_v4l2_probe_emits_null_intrinsic(monkeypatch, tmp_path):
+    """v4l2 enumeration emits cameras with null intrinsic + provenance."""
+    fake_dev = tmp_path / "video0"
+    fake_dev.touch()
+    monkeypatch.setattr("robot_md.autodetect._v4l2_list_devices", lambda: [str(fake_dev)])
+    monkeypatch.setattr(
+        "robot_md.autodetect._v4l2_device_capabilities",
+        lambda p: {"model": "USB2 Camera", "width": 640, "height": 480},
+    )
+    from robot_md.autodetect import probe_v4l2_cameras
+
+    cams = probe_v4l2_cameras()
+    assert len(cams) == 1
+    assert cams[0].protocol == "v4l2"
+    assert cams[0].streams[0].intrinsic is None
+    assert "no cal" in cams[0].provenance
+
+
+def test_realsense_probe_returns_empty_when_not_installed(monkeypatch):
+    monkeypatch.setitem(sys.modules, "pyrealsense2", None)
+    from robot_md.autodetect import probe_realsense_cameras
+
+    assert probe_realsense_cameras() == []
+
+
+def test_scan_system_composes_cameras(monkeypatch):
+    """scan_system() composes all three probes into Scan.cameras."""
+    from robot_md import autodetect
+    from robot_md.autodetect import DetectedCamera, DetectedCameraStream
+
+    monkeypatch.setattr(autodetect, "probe_depthai_cameras", lambda: [
+        DetectedCamera(driver_id="oak-d-1", protocol="depthai", model="OAK-D",
+                       streams=[], provenance="depthai factory cal")
+    ])
+    monkeypatch.setattr(autodetect, "probe_realsense_cameras", lambda: [])
+    monkeypatch.setattr(autodetect, "probe_v4l2_cameras", lambda: [
+        DetectedCamera(driver_id="usb-camera-video0", protocol="v4l2", model="USB",
+                       streams=[], provenance="v4l2 enum / no cal")
+    ])
+    scan = autodetect.scan_system()
+    protos = {c.protocol for c in scan.cameras}
+    assert "depthai" in protos
+    assert "v4l2" in protos
+
+
+def test_scan_cameras_is_typed_list_of_DetectedCamera():
+    """After T06, Scan.cameras contains DetectedCamera instances, not dicts."""
+    from robot_md.autodetect import scan_system, DetectedCamera
+    scan = scan_system()
+    assert all(isinstance(c, DetectedCamera) for c in scan.cameras)
