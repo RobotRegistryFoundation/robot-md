@@ -5,6 +5,85 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.0] - 2026-04-18
+
+Big release. `robot-md` goes from "validator for a file format" to
+"operator toolkit" — one command takes a new user from plugged-in
+hardware to a manifest Claude Code can ingest, with physical calibration
+and RRF identity minted in the loop.
+
+### Added
+
+- **`robot-md init [NAME] [--preset NAME] [--wizard]`** — super-duper-quick
+  zero-to-ROBOT.md. Default mode emits a validated draft in one shot by
+  matching a preset from the built-in library; `--wizard` opens a 7-step
+  interactive flow for custom hardware. `--list-presets` prints the
+  library.
+- **Preset library** at `cli/src/robot_md/presets/` — 5 shipped:
+  `so_arm101`, `so_arm101_leader`, `turtlebot4`, `picar_x`, `minimal`.
+  YAML (not code) so community preset PRs stay low-friction.
+- **`robot-md calibrate --zero`** — operator poses arm in declared zero
+  configuration, CLI reads every joint's Present Position, rewrites
+  `physics.kinematics[].zero_pose_steps` in place (ruamel.yaml
+  preserves comments).
+- **`robot-md calibrate --sign`** — per-joint test move, operator
+  confirms direction, `encoder_sign` written.
+- **`robot-md calibrate --hand-eye --marker-pos X,Y,Z`** — ArUco +
+  `cv2.solvePnP` camera-to-arm-base extrinsic. Writes
+  `physics.solver.camera.extrinsic` as `[tx, ty, tz, rx, ry, rz]` (mm +
+  Rodrigues radians). OAK-D intrinsics pulled via
+  `depthai.Device.readCalibration()` — no external calibration file.
+- **`robot-md register`** — POSTs manifest metadata to RRF's mint
+  endpoint (`https://robotregistryfoundation.org/api/v1/robots`). Writes
+  the assigned RRN back into `metadata.rrn`, stores the one-time API
+  key at `~/.robot-md/keys/<rrn>.apikey` (mode 600). `--dry-run` and
+  `--endpoint` override supported.
+- **`robot-md autodetect --bus feetech:<port>[:<baud>]`** — Tier B
+  servo-bus scan. Pings IDs 1..253 (3 retries × 20 ms); reads min/max
+  angle limits + present position; emits a populated
+  `physics.kinematics[]` block with `joint_<N>` placeholders.
+- **Baseline `Kinematics` module** (`robot_md.kinematics`) — reads
+  `physics.solver` + `physics.kinematics[]` and provides FK / 3-link
+  planar IK / encoder-step ↔ joint-angle conversions. Any planner with
+  just a validated ROBOT.md can reach a pose from the manifest alone —
+  no URDF, no MoveIt.
+- **v1.1 schema additions**:
+  - `physics.solver.{convention, base_frame, encoder, camera, gripper}`.
+  - Per-joint `servo_id`, `encoder_sign`, `zero_pose_steps`, `a_mm`,
+    `d_mm` (DH params).
+  - All backwards-compatible: 0.1.x manifests validate unchanged.
+- **Tier A autodetect polish**:
+  - `DRIVER_PROFILES` table — autodetect now pre-fills
+    `drivers[].baud_rate` from protocol (Feetech bus → 1 Mbps etc.).
+  - `probe_cameras()` — OAK-D via DepthAI + v4l2-ctl enumeration.
+    Emits a `cameras:` block when real cameras are found; filters Pi
+    ISP plumbing (bcm2835-isp/codec, pispbe, rpi-hevc-dec).
+- **RCAN 3.0+ + RRF-aware generated manifests.** `init` writes a
+  default `network` block with `rrf_endpoint`,
+  `signing_alg: ml-dsa-65`, `transports: [http]`.
+- **Spec `autodetect-prefill-roadmap.md`** maps which fields are
+  auto-fillable at what tier (host scan / bus scan / preset) and where
+  operator walk-through takes over.
+
+### Changed
+
+- `examples/bob.ROBOT.md` carries the full solver block + DH params +
+  `/dev/ttyACM0` port + `tip_offset_mm: [30, 0, 0]`.
+- Core deps: `ruamel.yaml>=0.18`, `numpy>=1.24`. New optional extras:
+  `feetech` (servo SDK) and `vision` (opencv-contrib-python + depthai).
+- CLI help output rewritten with examples for every new command.
+
+### Fixed
+
+- Schema-sync CI gate — canonical, CLI-bundled, and site-served
+  `robot.schema.json` copies must all match.
+
+### Tests
+
+Suite grows 59 → 127 passing. New test files: `test_kinematics.py`,
+`test_calibrate.py`, `test_autodetect_tier_a.py`, `test_bus_scan.py`,
+`test_init.py`, `test_register.py`, `test_hand_eye.py`.
+
 ## [0.1.3] - 2026-04-17
 
 ### Added
