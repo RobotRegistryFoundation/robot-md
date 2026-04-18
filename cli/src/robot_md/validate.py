@@ -49,6 +49,9 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
     body = parsed.body or ""
     errors: list[str] = []
 
+    # Internal parser markers — strip before schema validation, re-attach after
+    _deprecations = fm.pop("_deprecations", None)
+
     # 1. Schema validation
     schema = _load_schema()
     validator = jsonschema.Draft202012Validator(schema)
@@ -57,6 +60,8 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
         for err in schema_errors:
             path = ".".join(str(p) for p in err.absolute_path) or "<root>"
             errors.append(f"schema: {path}: {err.message}")
+        if _deprecations is not None:
+            fm["_deprecations"] = _deprecations
         return ValidationResult(code=SCHEMA_VIOLATION, errors=errors)
 
     # 1b. Cross-reference: physics.solver.cameras[].driver_id must resolve
@@ -71,6 +76,8 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
             )
 
     if errors:
+        if _deprecations is not None:
+            fm["_deprecations"] = _deprecations
         return ValidationResult(code=SCHEMA_VIOLATION, errors=errors)
 
     # 1c. Build warnings list for null intrinsics
@@ -105,7 +112,15 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
         )
 
     if errors:
+        if _deprecations is not None:
+            fm["_deprecations"] = _deprecations
         return ValidationResult(code=MISSING_BODY_SECTION, errors=errors, warnings=warnings)
+
+    # 3. Valid — append deprecation warnings and re-attach marker
+    if _deprecations:
+        for msg in _deprecations:
+            warnings.append(f"deprecated: {msg}")
+        fm["_deprecations"] = _deprecations
 
     # 3. Valid — build summary
     summary = _build_summary(fm)

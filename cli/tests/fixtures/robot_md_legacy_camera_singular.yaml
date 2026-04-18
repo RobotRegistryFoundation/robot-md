@@ -1,0 +1,75 @@
+---
+rcan_version: "3.0"
+metadata:
+  robot_name: test-bot
+physics:
+  type: arm+camera
+  dof: 6
+  solver:
+    camera:
+      mount: world
+      extrinsic: null
+drivers:
+  - id: arm_servos
+    protocol: feetech
+    port: /dev/ttyACM0
+    baud_rate: 1000000
+    count: 6
+  - id: oak-d-1
+    protocol: depthai
+    model: OAK-D
+    streams:
+      rgb:
+        intrinsic:
+          fx: 860.2
+          fy: 860.2
+          cx: 640.0
+          cy: 360.0
+          width: 1280
+          height: 720
+          distortion_model: plumb_bob
+          distortion_coeffs: [0.0, 0.0, 0.0, 0.0, 0.0]
+      left:
+        intrinsic:
+          fx: 860.2
+          fy: 860.2
+          cx: 640.0
+          cy: 360.0
+          width: 1280
+          height: 720
+          distortion_model: none
+        baseline_m: 0.0375
+      right:
+        intrinsic:
+          fx: 860.2
+          fy: 860.2
+          cx: 640.0
+          cy: 360.0
+          width: 1280
+          height: 720
+          distortion_model: none
+        baseline_m: -0.0375
+      depth:
+        derived_from: [left, right]
+safety:
+  estop:
+    software: true
+    response_ms: 100
+capabilities:
+  - arm.pick
+  - arm.place
+---
+
+# test-bot
+
+## Identity
+
+Test bot for schema validation.
+
+## What test-bot Can Do
+
+Pick and place.
+
+## Safety Gates
+
+Software E-stop.
