@@ -56,3 +56,9 @@ def test_cli_version_flag():
     assert result.exit_code == 0
     assert __version__ in result.stdout
     assert "robot-md" in result.stdout
+
+
+def test_cli_mcp_help():
+    result = runner.invoke(app, ["mcp", "--help"])
+    assert result.exit_code == 0
+    assert "ROBOT.md" in result.stdout or "manifest" in result.stdout or "MCP" in result.stdout

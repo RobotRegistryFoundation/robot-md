@@ -881,5 +881,18 @@ def calibrate(
             raise typer.Exit(code=rc)
 
 
+@app.command()
+def mcp(
+    manifest: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+) -> None:
+    """Start the robot-md MCP server over stdio (same as `robot-md-mcp`)."""
+    import sys as _sys
+
+    from robot_md.mcp.server import main as _mcp_main
+
+    _sys.argv = ["robot-md-mcp", str(manifest)]
+    raise typer.Exit(code=_mcp_main())
+
+
 if __name__ == "__main__":
     app()
