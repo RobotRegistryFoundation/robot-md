@@ -163,6 +163,31 @@
                   "description": "Encoder target for the gripper-close pose."
                 }
               }
+            },
+            "cameras": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["driver_id", "primary_stream", "mount"],
+                "properties": {
+                  "driver_id": { "type": "string" },
+                  "primary_stream": {
+                    "type": "string",
+                    "enum": ["rgb", "left", "right", "depth", "mono", "ir", "thermal"]
+                  },
+                  "mount": {
+                    "type": "string",
+                    "pattern": "^(world|tool0|link_[a-z0-9_]+)$"
+                  },
+                  "extrinsic": {
+                    "type": ["array", "null"],
+                    "items": { "type": "number" },
+                    "minItems": 6,
+                    "maxItems": 6
+                  }
+                },
+                "additionalProperties": false
+              }
             }
           },
           "additionalProperties": true
@@ -182,7 +207,68 @@
           "port": { "type": "string" },
           "baud_rate": { "type": "integer" },
           "model": { "type": "string" },
-          "count": { "type": "integer", "minimum": 1 }
+          "count": { "type": "integer", "minimum": 1 },
+          "backend": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "description": "Optional entry-point name forcing a specific CapabilityBackend for this driver."
+          },
+          "streams": {
+            "type": "object",
+            "propertyNames": { "pattern": "^(rgb|left|right|depth|mono|ir|thermal)$" },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "intrinsic": {
+                  "oneOf": [
+                    { "type": "null" },
+                    {
+                      "type": "object",
+                      "required": ["fx", "fy", "cx", "cy", "width", "height"],
+                      "properties": {
+                        "fx": { "type": "number", "exclusiveMinimum": 0 },
+                        "fy": { "type": "number", "exclusiveMinimum": 0 },
+                        "cx": { "type": "number" },
+                        "cy": { "type": "number" },
+                        "width": { "type": "integer", "minimum": 1 },
+                        "height": { "type": "integer", "minimum": 1 },
+                        "distortion_model": {
+                          "type": "string",
+                          "enum": ["plumb_bob", "equidistant", "rational", "none"]
+                        },
+                        "distortion_coeffs": {
+                          "type": "array",
+                          "items": { "type": "number" }
+                        }
+                      },
+                      "allOf": [
+                        {
+                          "if": { "properties": { "distortion_model": { "const": "plumb_bob" } }, "required": ["distortion_model"] },
+                          "then": { "properties": { "distortion_coeffs": { "minItems": 5, "maxItems": 5 } }, "required": ["distortion_coeffs"] }
+                        },
+                        {
+                          "if": { "properties": { "distortion_model": { "const": "equidistant" } }, "required": ["distortion_model"] },
+                          "then": { "properties": { "distortion_coeffs": { "minItems": 4, "maxItems": 4 } }, "required": ["distortion_coeffs"] }
+                        },
+                        {
+                          "if": { "properties": { "distortion_model": { "const": "rational" } }, "required": ["distortion_model"] },
+                          "then": { "properties": { "distortion_coeffs": { "minItems": 8, "maxItems": 8 } }, "required": ["distortion_coeffs"] }
+                        }
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "baseline_m": { "type": "number" },
+                "derived_from": {
+                  "type": "array",
+                  "items": { "type": "string", "enum": ["rgb", "left", "right", "depth", "mono", "ir", "thermal"] },
+                  "minItems": 1
+                }
+              },
+              "additionalProperties": false
+            }
+          }
         },
         "additionalProperties": true
       }
