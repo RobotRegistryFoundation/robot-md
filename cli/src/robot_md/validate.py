@@ -28,6 +28,7 @@ REQUIRED_BODY_SECTIONS = ["## Identity", "## Safety Gates"]
 class ValidationResult:
     code: int
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     summary: str = ""
 
 
@@ -58,6 +59,34 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
             errors.append(f"schema: {path}: {err.message}")
         return ValidationResult(code=SCHEMA_VIOLATION, errors=errors)
 
+    # 1b. Cross-reference: physics.solver.cameras[].driver_id must resolve
+    cameras = (fm.get("physics", {}) or {}).get("solver", {}).get("cameras") or []
+    drivers_by_id = {d.get("id"): d for d in (fm.get("drivers") or []) if d.get("id")}
+    for idx, cam in enumerate(cameras):
+        did = cam.get("driver_id")
+        if did and did not in drivers_by_id:
+            errors.append(
+                f"cross-ref: physics.solver.cameras[{idx}].driver_id='{did}' "
+                f"does not match any drivers[].id"
+            )
+
+    if errors:
+        return ValidationResult(code=SCHEMA_VIOLATION, errors=errors)
+
+    # 1c. Build warnings list for null intrinsics
+    warnings: list[str] = []
+    for idx, cam in enumerate(cameras):
+        did = cam.get("driver_id")
+        primary = cam.get("primary_stream")
+        drv = drivers_by_id.get(did, {})
+        streams = drv.get("streams", {}) or {}
+        stream = streams.get(primary, {}) or {}
+        if stream.get("intrinsic") is None and stream.get("derived_from") is None:
+            warnings.append(
+                f"cameras[{idx}].primary_stream='{primary}' has null intrinsic — "
+                f"run `robot-md calibrate-intrinsic --driver {did} --stream {primary}`"
+            )
+
     # 2. Body-section checks
     robot_name = fm.get("metadata", {}).get("robot_name", "")
     if not _has_matching_h1(body, robot_name):
@@ -76,11 +105,11 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
         )
 
     if errors:
-        return ValidationResult(code=MISSING_BODY_SECTION, errors=errors)
+        return ValidationResult(code=MISSING_BODY_SECTION, errors=errors, warnings=warnings)
 
     # 3. Valid — build summary
     summary = _build_summary(fm)
-    return ValidationResult(code=VALID, errors=[], summary=summary)
+    return ValidationResult(code=VALID, errors=[], warnings=warnings, summary=summary)
 
 
 def _has_matching_h1(body: str, robot_name: str) -> bool:
