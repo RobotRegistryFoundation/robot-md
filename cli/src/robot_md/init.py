@@ -206,6 +206,39 @@ def merge_preset_into_draft(
                     drv["port"] = dev.path
                     break
 
+    # Inject detected cameras as additional drivers[] + physics.solver.cameras[]
+    detected_cams = list(getattr(scan, "cameras", []) or [])
+    if detected_cams:
+        fm.setdefault("drivers", [])
+        solver = fm.setdefault("physics", {}).setdefault("solver", {})
+        cameras_list = solver.setdefault("cameras", [])
+        for cam in detected_cams:
+            streams_out: dict[str, Any] = {}
+            for s in cam.streams:
+                entry: dict[str, Any] = {"intrinsic": s.intrinsic}
+                if s.baseline_m is not None:
+                    entry["baseline_m"] = s.baseline_m
+                if s.derived_from:
+                    entry["derived_from"] = list(s.derived_from)
+                streams_out[s.name] = entry
+            fm["drivers"].append(
+                {
+                    "id": cam.driver_id,
+                    "protocol": cam.protocol,
+                    "model": cam.model,
+                    "streams": streams_out,
+                }
+            )
+            primary = "rgb" if "rgb" in streams_out else next(iter(streams_out.keys()), "rgb")
+            cameras_list.append(
+                {
+                    "driver_id": cam.driver_id,
+                    "primary_stream": primary,
+                    "mount": "world",
+                    "extrinsic": None,
+                }
+            )
+
     return fm
 
 
