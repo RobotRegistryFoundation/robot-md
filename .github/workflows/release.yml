@@ -64,15 +64,12 @@ jobs:
           files: dist/*
 
   pypi-publish:
-    # Manual-only until PyPI trusted publisher is configured at pypi.org
-    # for RobotRegistryFoundation/robot-md. Trigger via the "Release"
-    # workflow → Run workflow → set publish_pypi=true.
+    # Manual-only. Trigger via "Release" workflow → Run workflow →
+    # publish_pypi=true. Requires PYPI_TOKEN set in the pypi environment.
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_pypi == 'true'
     runs-on: ubuntu-latest
     needs: build
     environment: pypi
-    permissions:
-      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -82,3 +79,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist/
+          password: ${{ secrets.PYPI_TOKEN }}
