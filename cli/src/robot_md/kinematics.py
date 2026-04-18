@@ -39,12 +39,18 @@ class KinematicsError(Exception):
 class Joint:
     id: str
     axis: str              # "x" | "y" | "z"
-    length_mm: float       # link length from this joint to the next
+    a_mm: float            # DH a: perpendicular to rotation axis (horizontal reach)
+    d_mm: float            # DH d: along rotation axis (axial offset)
     limits_rad: tuple[float, float]
     servo_id: int | None
     encoder_sign: int      # +1 or -1
     zero_pose_steps: int
     steps_per_rev: int
+
+    @property
+    def length_mm(self) -> float:
+        """Legacy accessor — equals a_mm when d_mm=0. Kept for backward compat."""
+        return self.a_mm
 
     def steps_to_rad(self, steps: int) -> float:
         """Encoder reading → joint angle in radians, per this joint's calibration."""
@@ -83,11 +89,16 @@ class Kinematics:
                 raise KinematicsError("kinematics[] item missing `id`")
             axis = j.get("axis", "y")
             limits_deg = j.get("limits_deg") or [-180, 180]
+            # DH params (v1.1): prefer a_mm/d_mm, fall back to legacy length_mm for a.
+            legacy = float(j.get("length_mm", 0.0))
+            a_mm = float(j["a_mm"]) if "a_mm" in j else legacy
+            d_mm = float(j.get("d_mm", 0.0))
             self.joints.append(
                 Joint(
                     id=jid,
                     axis=axis,
-                    length_mm=float(j.get("length_mm", 0.0)),
+                    a_mm=a_mm,
+                    d_mm=d_mm,
                     limits_rad=(math.radians(limits_deg[0]), math.radians(limits_deg[1])),
                     servo_id=j.get("servo_id"),
                     encoder_sign=int(j.get("encoder_sign", 1)),
@@ -126,8 +137,7 @@ class Kinematics:
         import numpy as np
 
         T = np.eye(4)
-        n = len(self.joints)
-        for i, j in enumerate(self.joints):
+        for j in self.joints:
             is_gripper = (self.gripper_joint_id is not None and j.id == self.gripper_joint_id)
             theta = 0.0 if is_gripper else angles_rad.get(j.id, 0.0)
             T = T @ _rot_about(j.axis, theta)
@@ -136,8 +146,8 @@ class Kinematics:
                 dx, dy, dz = self.gripper_tip_offset_mm
                 T = T @ _trans(dx, dy, dz)
                 break
-            else:
-                T = T @ _trans(j.length_mm, 0.0, 0.0)
+            # DH-style step: a along +x, then d along +z (in the local frame after rotation)
+            T = T @ _trans(j.a_mm, 0.0, j.d_mm)
         return float(T[0, 3]), float(T[1, 3]), float(T[2, 3])
 
     # ------------------------------------------------------------------ IK
@@ -170,24 +180,33 @@ class Kinematics:
             )
 
         x, y, z = target_xyz_mm
-        L1 = self.by_id["shoulder_lift"].length_mm
-        L2 = self.by_id["elbow_flex"].length_mm
+        L1 = self.by_id["shoulder_lift"].a_mm
+        L2 = self.by_id["elbow_flex"].a_mm
+        # Tool length along tool +x from the wrist_flex joint to the grasp tip.
+        # Tool-frame convention: tip_offset_mm is in tool frame at zero pose,
+        # where tool +x = base +x. Use the x component — after wrist_flex rotates
+        # to point tool down, tool +x → base -z, so tip lands |L3| below wrist.
         L3 = (
-            self.by_id["wrist_flex"].length_mm
-            + abs(self.gripper_tip_offset_mm[2])
+            self.by_id["wrist_flex"].a_mm
+            + self.by_id.get("wrist_roll", Joint("", "x", 0, 0, (0, 0), None, 1, 0, 1)).a_mm
+            + abs(self.gripper_tip_offset_mm[0])
         )
+        # Shoulder riser: if shoulder_pan has d_mm, the 2-link IK plane is elevated.
+        d1 = self.by_id["shoulder_pan"].d_mm
 
         # 1. azimuth
         pan = math.atan2(y, x)
 
-        # 2. planar target in (r, z)
+        # 2. planar target in (r, z) relative to shoulder_lift origin.
         r = math.hypot(x, y)
 
-        # 3. "elbow target": the wrist position if the gripper points straight down
+        # 3. "wrist target": where the wrist must be so the gripper points straight
+        #    down and lands at (x, y, z). In arm-base frame, wrist is L3 above target.
         rw = r
-        zw = z + L3
+        zw_base = z + L3              # wrist z in arm-base frame
+        zw = zw_base - d1             # wrist z relative to shoulder joint
 
-        # 4. 2-link IK from shoulder to wrist. Shoulder origin = (0, 0).
+        # 4. 2-link IK from shoulder to wrist.
         d2 = rw * rw + zw * zw
         d = math.sqrt(d2)
         if d > L1 + L2 - 1e-6:
@@ -195,23 +214,30 @@ class Kinematics:
         if d < abs(L1 - L2) + 1e-6:
             raise KinematicsError(f"target too close: need {d:.1f}mm, min {abs(L1-L2):.1f}mm")
 
-        # Law of cosines for elbow angle (interior angle at elbow)
+        # Law of cosines for elbow angle (interior angle at elbow).
         cos_elbow_int = (L1 * L1 + L2 * L2 - d2) / (2.0 * L1 * L2)
         cos_elbow_int = max(-1.0, min(1.0, cos_elbow_int))
         elbow_int = math.acos(cos_elbow_int)
-        # elbow_flex is the signed deviation from straight arm:
-        # elbow_int = pi ⇒ straight ⇒ elbow_flex = 0
-        elbow_flex = math.pi - elbow_int
+        elbow_flex_mag = math.pi - elbow_int            # magnitude; 0 when straight
 
-        # Shoulder lift: angle of line to wrist minus offset from cos
-        alpha = math.atan2(zw, rw)                    # angle of wrist from shoulder
+        # Shoulder lift magnitude: angle of wrist from +r axis, plus offset.
+        alpha = math.atan2(zw, rw)                       # angle of wrist from +r (standard math)
         cos_beta = (L1 * L1 + d2 - L2 * L2) / (2.0 * L1 * d)
         cos_beta = max(-1.0, min(1.0, cos_beta))
-        beta = math.acos(cos_beta)                     # angle between L1 and line to wrist
-        shoulder_lift = alpha + beta                   # elbow-up branch
+        beta = math.acos(cos_beta)
+        shoulder_lift_mag = alpha + beta                 # elbow-up magnitude
 
-        # Wrist flex: keep gripper pointing straight down
-        # Sum of shoulder + elbow + wrist = pi/2 (tool axis down, if base frame z up)
+        # FK rotates about y such that +θ swings +x toward -z (i.e., positive
+        # angle = arm rotates DOWN). Standard math IK assumes +θ is up.
+        # Converting: negate shoulder_lift so +z targets produce negative angles
+        # (arm goes up). elbow_flex stays positive — that's the elbow-UP branch
+        # in our convention.
+        shoulder_lift = -shoulder_lift_mag
+        elbow_flex = elbow_flex_mag
+        # Tool axis (+x in wrist frame) should point along -z in base frame so
+        # the gripper hangs vertically. After three y-rotations by θ_l,θ_e,θ_w:
+        #     tool_x_in_base = (cos(Σθ), 0, -sin(Σθ))
+        # For tool_x = (0, 0, -1) we need Σθ = π/2.
         wrist_flex = (math.pi / 2) - shoulder_lift - elbow_flex
 
         return {

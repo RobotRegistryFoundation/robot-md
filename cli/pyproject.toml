@@ -28,6 +28,7 @@ dependencies = [
     "pyyaml>=6.0",
     "rich>=13.0",
     "typer>=0.9",
+    "ruamel.yaml>=0.18",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +36,11 @@ dev = [
     "pytest>=7.0",
     "pytest-cov>=4.0",
     "ruff>=0.1.0",
+]
+# Optional: installs feetech_servo_sdk so `robot-md calibrate --zero` can
+# talk to a physical Feetech-bus arm. Not required for schema/parse/validate.
+feetech = [
+    "feetech-servo-sdk>=1.0",
 ]
 
 [project.scripts]

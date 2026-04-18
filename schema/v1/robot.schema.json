@@ -60,7 +60,19 @@
                 "minItems": 2,
                 "maxItems": 2
               },
-              "length_mm": { "type": "number", "minimum": 0 },
+              "length_mm": {
+                "type": "number",
+                "minimum": 0,
+                "description": "Legacy scalar — fallback for `a_mm` when DH params aren't declared. Treated as the horizontal offset from this joint to the next."
+              },
+              "a_mm": {
+                "type": "number",
+                "description": "DH parameter: distance from this joint's axis to the next joint's axis along the local +x direction (perpendicular to this joint's rotation axis)."
+              },
+              "d_mm": {
+                "type": "number",
+                "description": "DH parameter: distance from this joint's axis to the next joint's axis along this joint's rotation axis. For a vertical shoulder_pan riser, d_mm is the vertical height to the shoulder_lift joint."
+              },
               "servo_id": {
                 "type": "integer",
                 "minimum": 0,

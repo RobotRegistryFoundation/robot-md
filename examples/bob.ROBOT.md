@@ -25,21 +25,30 @@ physics:
       extrinsic: null            # run `robot-md calibrate --hand-eye` to populate
     gripper:
       joint_id: gripper
-      tip_offset_mm: [0, 0, 30]  # grasp point is 30mm below the gripper flange
+      tip_offset_mm: [30, 0, 0]  # 30mm along tool +x — when wrist rotates tool to
+                                 # point down, this becomes 30mm below gripper joint.
+                                 # Tool-frame convention: +x = forward at zero pose.
       open_steps: 1700
       close_steps: 1200
   kinematics:
+    # DH params: a_mm = horizontal offset to next joint; d_mm = offset along this
+    # joint's rotation axis. shoulder_pan is a vertical riser (d=60, a=0); the
+    # rest are horizontal links (a>0, d=0). length_mm kept for backward compat.
     - id: shoulder_pan
       axis: z
       limits_deg: [-180, 180]
-      length_mm: 60
+      length_mm: 60              # legacy — equals d_mm here
+      a_mm: 0
+      d_mm: 60                   # vertical riser from base to shoulder_lift joint
       servo_id: 1
-      encoder_sign: 1            # +Δ encoder ⇒ +Δ angle (CCW from above); confirmed via 2026-04-17 raw Tier 0 run
-      zero_pose_steps: 2048      # midpoint; replace via `robot-md calibrate --zero`
+      encoder_sign: 1            # +Δ encoder ⇒ +Δ angle (CCW from above); confirmed 2026-04-17
+      zero_pose_steps: 2048      # midpoint placeholder; replace via `robot-md calibrate --zero`
     - id: shoulder_lift
       axis: y
       limits_deg: [-90, 90]
       length_mm: 125
+      a_mm: 125
+      d_mm: 0
       servo_id: 2
       encoder_sign: 1            # +Δ ⇒ arm rotates forward/down; confirmed 2026-04-17
       zero_pose_steps: 2048
@@ -47,6 +56,8 @@ physics:
       axis: y
       limits_deg: [-90, 90]
       length_mm: 125
+      a_mm: 125
+      d_mm: 0
       servo_id: 3
       encoder_sign: 1            # +Δ ⇒ forearm extends; confirmed 2026-04-17
       zero_pose_steps: 2048
@@ -54,6 +65,8 @@ physics:
       axis: y
       limits_deg: [-90, 90]
       length_mm: 60
+      a_mm: 60
+      d_mm: 0
       servo_id: 4
       encoder_sign: 1            # tentative; calibrate before trusting
       zero_pose_steps: 2048
@@ -61,6 +74,8 @@ physics:
       axis: x
       limits_deg: [-180, 180]
       length_mm: 30
+      a_mm: 30
+      d_mm: 0
       servo_id: 5
       encoder_sign: 1
       zero_pose_steps: 2048
@@ -68,6 +83,8 @@ physics:
       axis: y
       limits_deg: [0, 90]
       length_mm: 40
+      a_mm: 0                    # gripper is passive in FK; tip offset lives in solver.gripper
+      d_mm: 0
       servo_id: 6
       encoder_sign: 1
       zero_pose_steps: 1200      # close position; open = 1700
@@ -75,7 +92,7 @@ physics:
 drivers:
   - id: arm_servos
     protocol: feetech
-    port: /dev/ttyUSB0
+    port: /dev/ttyACM0
     baud_rate: 1000000
     model: STS3215
     count: 6

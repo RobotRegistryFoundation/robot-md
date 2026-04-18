@@ -101,7 +101,7 @@ def test_encoder_sign_inverts_direction():
     j = k.by_id["shoulder_lift"]
     # Build a mirror joint with encoder_sign=-1
     mirror = Joint(
-        id=j.id, axis=j.axis, length_mm=j.length_mm, limits_rad=j.limits_rad,
+        id=j.id, axis=j.axis, a_mm=j.a_mm, d_mm=j.d_mm, limits_rad=j.limits_rad,
         servo_id=j.servo_id, encoder_sign=-1, zero_pose_steps=j.zero_pose_steps,
         steps_per_rev=j.steps_per_rev,
     )
