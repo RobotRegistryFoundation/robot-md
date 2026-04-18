@@ -591,6 +591,90 @@ def probe_cameras() -> list[dict]:
     return cameras
 
 
+def probe_depthai_cameras(
+    *, default_width: int = 1280, default_height: int = 720
+) -> list[DetectedCamera]:
+    """Probe for depthai devices and read factory calibration for each socket.
+
+    Returns [] if depthai is not importable or no device is connected.
+    Never raises on import or device failures — this is best-effort.
+    """
+    try:
+        import depthai as dai
+    except Exception:
+        return []
+    try:
+        with dai.Device() as device:
+            features = device.getConnectedCameraFeatures()
+            calib = device.readCalibration()
+            model = device.getDeviceName() if hasattr(device, "getDeviceName") else "OAK"
+            streams: list[DetectedCameraStream] = []
+            for feat in features:
+                name = _depthai_socket_to_stream_name(feat)
+                if name is None:
+                    continue
+                intrinsic: dict | None
+                try:
+                    matrix = calib.getCameraIntrinsics(feat.socket, default_width, default_height)
+                    coeffs = list(calib.getDistortionCoefficients(feat.socket))[:5]
+                    fx, fy = matrix[0][0], matrix[1][1]
+                    cx, cy = matrix[0][2], matrix[1][2]
+                    intrinsic = {
+                        "fx": float(fx),
+                        "fy": float(fy),
+                        "cx": float(cx),
+                        "cy": float(cy),
+                        "width": default_width,
+                        "height": default_height,
+                        "distortion_model": "plumb_bob",
+                        "distortion_coeffs": [float(c) for c in coeffs],
+                    }
+                except Exception:
+                    intrinsic = None
+                streams.append(
+                    DetectedCameraStream(
+                        name=name,
+                        intrinsic=intrinsic,
+                        baseline_m=None,
+                        derived_from=None,
+                        width=default_width,
+                        height=default_height,
+                    )
+                )
+            if not streams:
+                return []
+            return [
+                DetectedCamera(
+                    driver_id=_slugify(model) + "-1",
+                    protocol="depthai",
+                    model=model,
+                    streams=streams,
+                    provenance="depthai factory cal",
+                )
+            ]
+    except Exception:
+        return []
+
+
+def _depthai_socket_to_stream_name(feat) -> str | None:
+    """Map a depthai CameraFeatures socket to our canonical stream name."""
+    name = getattr(feat, "name", None) or ""
+    name = str(name).lower()
+    if "rgb" in name or "color" in name:
+        return "rgb"
+    if "left" in name:
+        return "left"
+    if "right" in name:
+        return "right"
+    if "mono" in name:
+        return "mono"
+    return None
+
+
+def _slugify(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", (value or "cam").lower()).strip("-") or "cam"
+
+
 def _capabilities_from_devices(devices: list[Device]) -> list[str]:
     caps: list[str] = []
     has_camera = any(d.role == "camera" for d in devices)
