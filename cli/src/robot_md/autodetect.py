@@ -239,11 +239,30 @@ class Runtime:
 
 
 @dataclass
+class DetectedCameraStream:
+    name: str
+    intrinsic: dict | None
+    baseline_m: float | None
+    derived_from: list[str] | None
+    width: int
+    height: int
+
+
+@dataclass
+class DetectedCamera:
+    driver_id: str
+    protocol: str
+    model: str
+    streams: list[DetectedCameraStream]
+    provenance: str
+
+
+@dataclass
 class Scan:
     devices: list[Device] = field(default_factory=list)
     runtime: Runtime | None = None
     warnings: list[str] = field(default_factory=list)
-    cameras: list[dict] = field(default_factory=list)
+    cameras: list[DetectedCamera] = field(default_factory=list)
 
 
 # --------------------------------------------------------------------------- #
