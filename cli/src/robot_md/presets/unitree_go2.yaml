@@ -20,9 +20,11 @@ physics:
     convention: custom               # MPC handles leg IK; planner uses velocity cmds
     base_frame: { up: z, forward: x }
     # encoder block omitted — SDK returns joint angles in radians.
-    camera:
-      mount: world                   # Go2 has a front-facing depth camera
-      extrinsic: null
+    cameras:
+      - driver_id: camera
+        primary_stream: depth
+        mount: world
+        extrinsic: null
 
 drivers:
   - id: locomotion

@@ -14,9 +14,11 @@ physics:
     base_frame: { up: z, forward: x }
     encoder:
       steps_per_rev: 2048            # Create 3 wheel encoders
-    camera:
-      mount: world
-      extrinsic: null
+    cameras:
+      - driver_id: camera
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
   kinematics:
     - id: left_wheel
       axis: y

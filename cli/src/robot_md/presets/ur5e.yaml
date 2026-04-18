@@ -16,9 +16,6 @@ physics:
     convention: DH
     base_frame: { up: z, forward: x }
     # encoder block omitted — URScript returns joint angles in radians directly.
-    camera:
-      mount: world
-      extrinsic: null
     # gripper block omitted — UR5e ships with a bare tool flange. Attach a
     # specific EE (e.g. Robotiq 2F-85), add a `drivers[]` entry for it, and
     # uncomment a gripper block here with real tip_offset_mm + step values.

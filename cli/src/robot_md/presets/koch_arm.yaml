@@ -20,9 +20,6 @@ physics:
     base_frame: { up: z, forward: x }
     encoder:
       steps_per_rev: 4096            # Dynamixel XL-330 native
-    camera:
-      mount: world                   # often paired with a laptop webcam
-      extrinsic: null
     gripper:
       joint_id: gripper
       tip_offset_mm: [25, 0, 0]      # approximate tool-frame +x

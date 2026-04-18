@@ -20,9 +20,6 @@ physics:
     base_frame: { up: z, forward: x }
     encoder:
       steps_per_rev: 4096        # Feetech STS3215 native
-    camera:
-      mount: world               # default — operator overrides if eye-in-hand
-      extrinsic: null
     gripper:
       joint_id: gripper
       tip_offset_mm: [30, 0, 0]  # tool-frame +x (becomes -z when wrist points down)
