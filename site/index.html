@@ -1037,8 +1037,34 @@ Next — hand your manifest to Claude Code:
       </div>
     </div>
 
+    <!-- agent-affordances callout: what happens AFTER the manifest lands -->
+    <div style="margin-top:28px; padding:20px 24px; border:2px solid var(--accent); background:var(--paper-2); font-family:var(--sans); font-size:14.5px; color:var(--ink-2); line-height:1.55">
+      <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; margin-bottom:10px; font-size:11px; text-transform:uppercase; font-family:var(--mono)">After init · Claude Code recognizes the robot</div>
+      <p style="margin:0 0 12px"><code>robot-md init</code> writes <code>CLAUDE.md</code> next to the manifest. Add <code>robot-md-mcp</code> via <code>claude mcp add</code> (the one-liner init prints) and every MCP-aware agent gets <b>six live resources</b> + <b>three tools</b> + <b>four slash commands</b>:</p>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; font-family:var(--mono); font-size:13px">
+        <div>
+          <div style="color:var(--ink); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.1em; margin-bottom:6px">Slash commands</div>
+          <ul style="margin:0; padding-left:18px">
+            <li><code style="color:var(--accent-ink)">/brief-me</code> — operator briefing</li>
+            <li><code style="color:var(--accent-ink)">/check-safety action="…"</code> — gate-check before motion</li>
+            <li><code style="color:var(--accent-ink)">/explain-capability capability="…"</code></li>
+            <li><code style="color:var(--accent-ink)">/manifest-status</code> — quick health report</li>
+          </ul>
+        </div>
+        <div>
+          <div style="color:var(--ink); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.1em; margin-bottom:6px">Resources</div>
+          <ul style="margin:0; padding-left:18px">
+            <li><code style="color:var(--accent-ink)">robot-md://bob/identity</code></li>
+            <li><code style="color:var(--accent-ink)">robot-md://bob/context</code> — Claude-ready</li>
+            <li><code style="color:var(--accent-ink)">/frontmatter · /capabilities · /safety · /body</code></li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin:14px 0 0; font-family:var(--serif); font-style:italic; font-size:14px">Optional: <code style="font-family:var(--mono); font-style:normal; color:var(--accent-ink); background:var(--paper); padding:1px 5px">robot-md install-skill</code> drops the <code style="font-family:var(--mono); font-style:normal">using-robot-md</code> skill into <code style="font-family:var(--mono); font-style:normal">~/.claude/skills/</code> — superpowers-aware harnesses auto-invoke the robot-md flow on the operator's first robot-related message.</p>
+    </div>
+
     <!-- custom hardware / no preset callout, spans full width below the try-grid -->
-    <div style="margin-top:28px; padding:20px 24px; border:1px dashed var(--rule); background:var(--paper-2); font-family:var(--sans); font-size:14.5px; color:var(--ink-2); line-height:1.55">
+    <div style="margin-top:18px; padding:20px 24px; border:1px dashed var(--rule); background:var(--paper-2); font-family:var(--sans); font-size:14.5px; color:var(--ink-2); line-height:1.55">
       <div style="color:var(--ink); font-weight:600; letter-spacing:.06em; margin-bottom:8px; font-size:11px; text-transform:uppercase; font-family:var(--mono)">Custom hardware? (no preset yet)</div>
       Three escape hatches:
       <ul style="margin:8px 0 0; padding-left:20px">
