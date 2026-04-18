@@ -26,8 +26,13 @@ def test_intrinsic_required_fields_accepted(fixtures_dir):
 def test_intrinsic_missing_fx_rejected(fixtures_dir):
     parsed = parse_file(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
     parsed.frontmatter["drivers"][1]["streams"]["rgb"]["intrinsic"].pop("fx")
-    with pytest.raises(jsonschema.ValidationError, match="fx"):
+    with pytest.raises(jsonschema.ValidationError) as exc_info:
         jsonschema.Draft202012Validator(_schema()).validate(parsed.frontmatter)
+    # Walk sub-errors (from the oneOf branch) to find the `fx` required-field violation
+    messages = [str(exc_info.value)] + [str(e) for e in exc_info.value.context]
+    assert any("fx" in m for m in messages), (
+        f"expected 'fx' in the error chain, got:\n{messages!r}"
+    )
 
 
 def test_distortion_model_enum(fixtures_dir):
@@ -44,10 +49,40 @@ def test_plumb_bob_requires_5_coeffs(fixtures_dir):
         jsonschema.Draft202012Validator(_schema()).validate(parsed.frontmatter)
 
 
-def test_depth_stream_derived_from_allowed(fixtures_dir):
-    """A `depth` stream with `derived_from` and no intrinsic validates."""
-    parsed = parse_file(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
-    jsonschema.Draft202012Validator(_schema()).validate(parsed.frontmatter)
+def test_depth_stream_derived_from_allowed():
+    """A minimal driver with a depth stream using `derived_from` validates."""
+    minimal = {
+        "rcan_version": "3.0",
+        "metadata": {"robot_name": "d"},
+        "physics": {"type": "arm+camera", "dof": 1},
+        "drivers": [{
+            "id": "cam",
+            "protocol": "depthai",
+            "streams": {
+                "left": {"intrinsic": None},
+                "right": {"intrinsic": None},
+                "depth": {"derived_from": ["left", "right"]},
+            },
+        }],
+        "safety": {"estop": {"software": True, "response_ms": 100}},
+    }
+    jsonschema.Draft202012Validator(_schema()).validate(minimal)
+
+
+def test_depth_stream_without_derived_from_or_intrinsic_allowed():
+    """An empty stream entry is technically valid (intrinsic defaults to absent)."""
+    minimal = {
+        "rcan_version": "3.0",
+        "metadata": {"robot_name": "d"},
+        "physics": {"type": "arm+camera", "dof": 1},
+        "drivers": [{
+            "id": "cam",
+            "protocol": "depthai",
+            "streams": {"depth": {}},
+        }],
+        "safety": {"estop": {"software": True, "response_ms": 100}},
+    }
+    jsonschema.Draft202012Validator(_schema()).validate(minimal)
 
 
 def test_stream_key_unknown_rejected(fixtures_dir):
