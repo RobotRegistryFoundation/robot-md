@@ -930,20 +930,22 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <div class="top"><i></i><i></i><i></i><span>~/projects/my-bob · zsh</span></div>
 <pre class="body"><span class="p">$</span> pip install robot-md
 
+<span class="c"># Preset-matched: ~85% of the manifest pre-filled from the library.</span>
 <span class="p">$</span> robot-md init my-bob <span class="c">--preset so-arm101</span>
-<span class="ok">✓ wrote ROBOT.md</span>
-  preset: so-arm101  (score=100, explicit --preset)
-
-  Next:
-    robot-md calibrate --zero ROBOT.md
-    claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
+<span class="ok">✓ wrote ROBOT.md</span>  preset: so-arm101
 
 <span class="p">$</span> robot-md validate ROBOT.md
 <span class="ok">✓ my-bob (arm, 6 DoF, 5 capabilities)</span>
 
-<span class="c"># Pose arm at zero, press Enter — records zero_pose_steps per joint.</span>
+<span class="c"># Per-joint physical calibration — two verbs, &lt;2 min total.</span>
 <span class="p">$</span> robot-md calibrate <span class="c">--zero</span> ROBOT.md
 <span class="ok">✓ wrote zero_pose_steps for 6 joints</span>
+<span class="p">$</span> robot-md calibrate <span class="c">--sign</span> ROBOT.md
+  → shoulder_pan (servo id=1, axis=z): commanding +80...
+  Did it move in the POSITIVE convention direction? (y/n/s) <span class="w">y</span>
+  <span class="ok">✓ encoder_sign[shoulder_pan] = +1</span>
+  <span class="c">... (5 more joints)</span>
+<span class="ok">✓ wrote encoder_sign for 6 joints</span>
 
 <span class="p">$</span> claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 <span class="ok">✓ Added stdio MCP server robot-md</span>
@@ -992,6 +994,16 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
           All four live in the repo under <code style="color:var(--accent-ink)">examples/</code>. Fork the one closest to your robot and edit.
         </div>
       </div>
+    </div>
+
+    <!-- custom hardware / no preset callout, spans full width below the try-grid -->
+    <div style="margin-top:28px; padding:20px 24px; border:1px dashed var(--rule); background:var(--paper-2); font-family:var(--sans); font-size:14.5px; color:var(--ink-2); line-height:1.55">
+      <div style="color:var(--ink); font-weight:600; letter-spacing:.06em; margin-bottom:8px; font-size:11px; text-transform:uppercase; font-family:var(--mono)">Custom hardware? (no preset yet)</div>
+      Two escape hatches:
+      <ul style="margin:8px 0 0; padding-left:20px">
+        <li style="margin-bottom:6px"><code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink); background:var(--paper); padding:1px 5px">robot-md autodetect --bus feetech:/dev/ttyACM0</code> — pings every ID on a Feetech servo bus and emits a <code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink)">physics.kinematics[]</code> block with real angle limits + present positions, ready to paste into a draft.</li>
+        <li><code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink); background:var(--paper); padding:1px 5px">robot-md init --wizard</code> — interactive 7-step flow: name, physics type, preset or custom, scan, calibrate zero + sign, optional hand-eye. Resume-safe via a <code style="font-family:var(--mono); font-size:13px; color:var(--accent-ink)">ROBOT.md.init</code> state file.</li>
+      </ul>
     </div>
   </div>
 </section>
