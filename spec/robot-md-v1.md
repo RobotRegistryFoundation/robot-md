@@ -194,6 +194,52 @@ A Claude session with this ROBOT.md in context at startup is expected to:
 4. Refuse capabilities NOT listed in `capabilities[]`
 5. Honor `compliance` flags (e.g., extra caution for `eu_ai_act.audit_retention_days > 0`)
 
+## 6.1 Discovery — `.well-known/robot-md.json`
+
+A robot that exposes an HTTP endpoint MAY publish a discovery document at
+`/.well-known/robot-md.json` so that MCP clients, crawlers, and federated
+registries can locate the manifest without prior configuration.
+
+The discovery document is a small JSON object:
+
+```json
+{
+  "robot_md_version": "1.1",
+  "manifest_url": "https://robot.example.com/ROBOT.md",
+  "rrn": "RRN-000000000003",
+  "rcan_uri": "rcan://rcan.dev/acme/so-arm101/1-0/bob-001",
+  "public_resolver": "https://rcan.dev/r/RRN-000000000003",
+  "content_type": "text/markdown; charset=utf-8",
+  "last_modified": "2026-04-17T00:00:00Z",
+  "sha256": "<hex digest of the served manifest file>"
+}
+```
+
+### 6.1.1 Required fields
+
+- `robot_md_version` — spec version the `manifest_url` conforms to (e.g. `"1.1"`).
+- `manifest_url` — absolute URL at which the `ROBOT.md` file can be fetched via HTTP GET.
+
+### 6.1.2 Recommended fields
+
+- `rrn` — the robot's RRN if registered. Lets a client skip fetching the manifest when it only needs identity.
+- `rcan_uri` — the registry-canonical URI for this robot, same as `metadata.rcan_uri` in the manifest.
+- `public_resolver` — the URL at which the robot's RRF entry lives, e.g. `https://rcan.dev/r/<rrn>`.
+- `sha256` — hex digest of the served manifest. Lets a client detect tampering or staleness without re-validating.
+- `last_modified` — ISO-8601 timestamp when the manifest was last updated.
+- `content_type` — MIME type of the manifest (default `text/markdown; charset=utf-8`).
+
+### 6.1.3 Serving requirements
+
+- Endpoint MUST return `Content-Type: application/json`.
+- Endpoint MUST return HTTP 200 on success; MAY return HTTP 410 Gone if the robot has been retired.
+- `manifest_url` MUST resolve to a byte-identical copy of the manifest declared in `sha256`.
+- Unknown top-level keys MUST be ignored by clients (forward compatibility).
+
+### 6.1.4 Emitting the file
+
+The CLI verb `robot-md publish-discovery ROBOT.md --url <manifest-url> [--out .well-known/robot-md.json]` writes a valid discovery document from a local manifest. Copy the emitted file into your robot's web-root `.well-known/` directory — or serve it from an MCP-adjacent sidecar.
+
 ## 7. Extensions
 
 Vendor-specific extensions MUST use the `extensions:` block with namespaced keys:

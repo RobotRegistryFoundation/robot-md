@@ -486,6 +486,60 @@ def doctor(
     raise typer.Exit(code=exit_code(results, strict))
 
 
+@app.command("publish-discovery")
+def publish_discovery(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    url: str = typer.Option(
+        ...,
+        "--url",
+        help="Absolute URL at which the manifest will be served (http[s]://...).",
+    ),
+    out: Path = typer.Option(
+        Path(".well-known/robot-md.json"),
+        "--out",
+        "-o",
+        help="Output path for the discovery JSON document.",
+    ),
+    force: bool = typer.Option(
+        False, "--force", "-f", help="Overwrite an existing discovery file."
+    ),
+) -> None:
+    """Emit a `.well-known/robot-md.json` discovery document.
+
+    The discovery document lets MCP clients, crawlers, and federated
+    registries locate the manifest without prior configuration. Copy the
+    emitted file into the `.well-known/` directory of the robot's web
+    server (or any HTTP-reachable sidecar).
+
+    The document includes the manifest URL, RRN (if present), SHA-256
+    digest of the served manifest, and a derived public resolver URL.
+    See spec §6.1 for the full schema.
+
+    Examples:
+
+      robot-md publish-discovery ROBOT.md --url https://bob.local/ROBOT.md
+      robot-md publish-discovery ROBOT.md --url https://bob.local/ROBOT.md \\
+          --out /var/www/.well-known/robot-md.json
+    """
+    from robot_md.discovery import build_discovery, write_discovery
+
+    if out.exists() and not force:
+        err_console.print(f"[red]✗[/red] {out} already exists — pass --force to overwrite")
+        raise typer.Exit(code=FILE_ERROR)
+
+    try:
+        doc = build_discovery(path, url)
+    except (FileNotFoundError, ValueError, ParseError) as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+
+    write_discovery(doc, out)
+    out_console.print(f"[green]✓[/green] wrote {out}")
+    out_console.print(f"  serve it at: {url.rsplit('/', 1)[0]}/.well-known/robot-md.json")
+    if doc.get("rrn"):
+        out_console.print(f"  rrn: {doc['rrn']}  resolver: {doc.get('public_resolver')}")
+
+
 @app.command()
 def calibrate(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
