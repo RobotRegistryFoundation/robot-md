@@ -5,6 +5,43 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.3] - 2026-04-17
+
+Agent-affordances release — ships tooling explicitly designed for
+Claude Code (and any CLAUDE.md-aware agent harness) to recognize when
+to dispatch robot-md verbs. Two new verbs, one new discovery standard,
+all focused on "let Claude figure out what the operator wants."
+
+### Added
+
+- **`robot-md claude-md ROBOT.md`** — generates a `CLAUDE.md` file
+  tailored to a specific robot. The template declares which operator
+  intents should trigger which `robot-md` verb (diagnose →
+  `doctor`, manifest queries → MCP resources, motion → check HITL
+  gates first). Pre-fills robot name, RRN, declared gates, primary
+  driver, public resolver. Drop it next to `ROBOT.md` and Claude Code
+  reads it at session start.
+- **`robot-md publish-discovery ROBOT.md --url <URL>`** — emits a
+  `.well-known/robot-md.json` document so MCP clients, crawlers, and
+  federated registries can locate a manifest without prior
+  configuration. Includes sha256 digest of the served file + derived
+  public resolver URL.
+- **Spec §6.1** documents the `.well-known/robot-md.json` discovery
+  standard.
+- **`integrations/claude-code/CLAUDE.md.template`** — canonical
+  template consumed by `robot-md claude-md` (and usable directly by
+  operators who want to craft their own).
+
+### Note
+
+v0.2.2's CHANGELOG mentioned `publish-discovery`, but the verb
+actually shipped after the v0.2.2 tag was cut (commit `8a990e1`).
+`pip install robot-md==0.2.2` gets the older code without the verb.
+0.2.3 is the first release where `publish-discovery` and
+`publish-discovery`-related spec text are both in the package.
+
+---
+
 ## [0.2.2] - 2026-04-17
 
 "Proceed with all recommendations" release. Adds a diagnostic verb, five

@@ -486,6 +486,64 @@ def doctor(
     raise typer.Exit(code=exit_code(results, strict))
 
 
+@app.command("claude-md")
+def claude_md_cmd(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    out: Path = typer.Option(
+        Path("CLAUDE.md"),
+        "--out",
+        "-o",
+        help="Output path for the generated CLAUDE.md.",
+    ),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing CLAUDE.md."),
+    stdout: bool = typer.Option(
+        False, "--stdout", help="Print to stdout instead of writing a file."
+    ),
+) -> None:
+    """Generate a `CLAUDE.md` for this robot's project directory.
+
+    The file teaches Claude Code (and any CLAUDE.md-aware agent harness)
+    how to recognize robot-related intent and which `robot-md` verbs to
+    dispatch. Drop it next to `ROBOT.md` and Claude reads it at session
+    start.
+
+    The generated file is pre-filled from your manifest: robot name, RRN,
+    HITL gates, primary driver. Operator-specific TODOs remain for you
+    to customize (host machine notes, project conventions).
+
+    Examples:
+
+      robot-md claude-md ROBOT.md                    # writes ./CLAUDE.md
+      robot-md claude-md ROBOT.md --out docs/CLAUDE.md --force
+      robot-md claude-md ROBOT.md --stdout | less    # preview only
+    """
+    from robot_md.claude_md import render_claude_md
+
+    try:
+        rendered = render_claude_md(path)
+    except ParseError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+    except FileNotFoundError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+
+    if stdout:
+        sys.stdout.write(rendered)
+        return
+
+    if out.exists() and not force:
+        err_console.print(f"[red]✗[/red] {out} already exists — pass --force to overwrite")
+        raise typer.Exit(code=FILE_ERROR)
+
+    out.write_text(rendered)
+    out_console.print(f"[green]✓[/green] wrote {out}")
+    out_console.print(
+        "  Claude Code will read this file at session start. Review the TODOs "
+        "and customize per-project conventions."
+    )
+
+
 @app.command("publish-discovery")
 def publish_discovery(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
