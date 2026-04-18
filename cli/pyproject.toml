@@ -30,6 +30,7 @@ dependencies = [
     "typer>=0.9",
     "ruamel.yaml>=0.18",
     "numpy>=1.24",
+    "mcp>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -53,6 +54,7 @@ vision = [
 
 [project.scripts]
 robot-md = "robot_md.__main__:app"
+robot-md-mcp = "robot_md.mcp.server:main"
 
 [project.urls]
 Homepage = "https://robotmd.dev"
