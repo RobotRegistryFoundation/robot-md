@@ -1,0 +1,53 @@
+"""Reference backend: Feetech STS3215 servos + DepthAI (OAK-D)."""
+
+from __future__ import annotations
+
+from robot_md.backends.base import CapabilityBackend, ExecutionResult
+from robot_md.robot_spec import RobotSpec
+
+
+class FeetechDepthaiBackend(CapabilityBackend):
+    name = "feetech_depthai"
+    protocols = frozenset({"feetech", "depthai"})
+
+    def __init__(self) -> None:
+        self._spec: RobotSpec | None = None
+        self._servo_bus = None
+        self._perception = None
+
+    def open(self, spec: RobotSpec) -> None:
+        from robot_md.backends.feetech_depthai.perception import Perception
+        from robot_md.backends.feetech_depthai.servo import ServoBus
+
+        if spec.safety.max_joint_velocity_dps is None:
+            raise RuntimeError(
+                "feetech_depthai backend refuses to open: "
+                "safety.max_joint_velocity_dps is required"
+            )
+        self._spec = spec
+        self._servo_bus = ServoBus.from_spec(spec)
+        self._perception = Perception.from_spec(spec)
+
+    def close(self) -> None:
+        if self._servo_bus is not None:
+            self._servo_bus.close()
+        if self._perception is not None:
+            self._perception.close()
+        self._servo_bus = None
+        self._perception = None
+        self._spec = None
+
+    def capabilities(self) -> frozenset[str]:
+        return frozenset({
+            "arm.pick",
+            "arm.place",
+            "arm.reach",
+            "vision.describe",
+            "status.report",
+        })
+
+    def execute(self, capability, args, *, dry_run, estop) -> ExecutionResult:
+        from robot_md.backends.feetech_depthai.capabilities import dispatch
+        return dispatch(
+            self, capability=capability, args=dict(args), dry_run=dry_run, estop=estop
+        )

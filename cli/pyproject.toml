@@ -51,6 +51,13 @@ vision = [
     "opencv-contrib-python>=4.8",
     "depthai>=3.0",
 ]
+# Optional: feetech_depthai backend for Feetech servo bus + OAK-D perception.
+feetech-depthai = [
+    "pyserial>=3.5",
+    "depthai>=2.24",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+]
 
 [project.scripts]
 robot-md = "robot_md.__main__:app"
@@ -61,6 +68,9 @@ Homepage = "https://robotmd.dev"
 Repository = "https://github.com/RobotRegistryFoundation/robot-md"
 Issues = "https://github.com/RobotRegistryFoundation/robot-md/issues"
 Spec = "https://robotmd.dev/spec/v1"
+
+[project.entry-points."robot_md.backends"]
+feetech_depthai = "robot_md.backends.feetech_depthai:FeetechDepthaiBackend"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/robot_md"]

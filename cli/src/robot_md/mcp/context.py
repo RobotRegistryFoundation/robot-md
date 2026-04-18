@@ -64,7 +64,13 @@ def load_context(manifest_path: Path) -> McpContext:
     # Pick the first non-None backend (often the same backend claims both feetech + depthai).
     backend = next((b for b in resolved.values() if b is not None), None)
     if backend is not None:
-        backend.open(spec)
+        try:
+            backend.open(spec)
+        except RuntimeError as e:
+            if "max_joint_velocity_dps" in str(e):
+                backend = None  # soft-fail: safety not configured, leave unopened
+            else:
+                raise
 
     return McpContext(
         manifest_path=manifest_path,
