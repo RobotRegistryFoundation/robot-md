@@ -216,6 +216,15 @@ def init(
     list_presets: bool = typer.Option(
         False, "--list-presets", help="Print available presets and exit."
     ),
+    with_claude_md: bool = typer.Option(
+        True,
+        "--with-claude-md/--no-claude-md",
+        help=(
+            "Also generate a CLAUDE.md next to the manifest so Claude Code "
+            "auto-recognizes the robot (default: on; safe — appends rather "
+            "than overwrites if CLAUDE.md already exists)."
+        ),
+    ),
 ) -> None:
     """Zero-to-registered-ROBOT.md in one command.
 
@@ -322,6 +331,31 @@ def init(
         # Final: print the MCP one-liner
         out_console.print("\n[bold]Next — hand your manifest to Claude Code:[/bold]")
         out_console.print(f'  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/{out.name}"')
+
+    # Optionally generate a CLAUDE.md so the agent harness recognizes the
+    # robot without the operator having to run a second command. Safe by
+    # construction: `apply_to_file` appends rather than overwrites if
+    # CLAUDE.md already exists.
+    if with_claude_md:
+        from robot_md.claude_md import apply_to_file, render_claude_md
+
+        claude_md_path = out.parent / "CLAUDE.md"
+        try:
+            rendered = render_claude_md(out)
+        except (ParseError, FileNotFoundError) as e:
+            err_console.print(
+                f"[yellow]⚠[/yellow] could not generate CLAUDE.md: {e} "
+                f"(manifest itself was written OK)"
+            )
+        else:
+            action = apply_to_file(rendered, claude_md_path)
+            verb = {
+                "wrote": "wrote",
+                "appended": "appended robot-md block to",
+                "updated": "updated robot-md block in",
+                "overwrote": "overwrote",
+            }.get(action, action)
+            out_console.print(f"[green]✓[/green] {verb} {claude_md_path}")
 
 
 @app.command()
@@ -559,6 +593,65 @@ def claude_md_cmd(
     out_console.print(
         "  Claude Code will read this file at session start. Review the TODOs "
         "and customize per-project conventions."
+    )
+
+
+@app.command("install-skill")
+def install_skill_cmd(
+    dest: Path | None = typer.Option(
+        None,
+        "--dest",
+        help="Skills directory (default: ~/.claude/skills).",
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        "-f",
+        help="Overwrite an existing using-robot-md/SKILL.md.",
+    ),
+    stdout: bool = typer.Option(
+        False,
+        "--stdout",
+        help="Print the skill to stdout instead of installing it.",
+    ),
+) -> None:
+    """Install the `using-robot-md` skill into your Claude Code skills dir.
+
+    The skill teaches skill-aware harnesses (superpowers, etc.) to
+    auto-invoke robot-md tooling when the operator's message mentions the
+    robot, its capabilities, safety, or any `robot-md` verb. Writes to
+    `~/.claude/skills/using-robot-md/SKILL.md` by default.
+
+    Examples:
+
+    \b
+      robot-md install-skill                       # writes to ~/.claude/skills/
+      robot-md install-skill --dest ./skills       # project-local skills dir
+      robot-md install-skill --force               # overwrite existing
+      robot-md install-skill --stdout | less       # preview the skill
+    """
+    from robot_md.skill import install, skill_content
+
+    try:
+        content = skill_content()
+    except FileNotFoundError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+
+    if stdout:
+        sys.stdout.write(content)
+        return
+
+    try:
+        written = install(dest, force=force)
+    except FileExistsError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+
+    out_console.print(f"[green]✓[/green] installed {written}")
+    out_console.print(
+        "  Claude Code (with superpowers or any skill-aware harness) will "
+        "auto-invoke this skill when the operator mentions the robot."
     )
 
 

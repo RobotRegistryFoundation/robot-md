@@ -5,6 +5,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.5] - 2026-04-18
+
+Zero-touch agent-path release. Install robot-md → run init → Claude
+Code recognizes the robot. No separate commands to learn.
+
+### Added
+
+- **`robot-md init --with-claude-md` (default: on)** — after writing
+  `ROBOT.md`, init now also generates a `CLAUDE.md` next to it. Uses
+  the same sentinel-wrapped append/update-in-place merge logic from
+  0.2.4, so an existing `CLAUDE.md` with operator notes is preserved.
+  Opt out with `--no-claude-md`.
+- **`robot-md install-skill`** — copies the bundled `using-robot-md`
+  skill into `~/.claude/skills/using-robot-md/SKILL.md` (or a custom
+  `--dest`). For operators running [superpowers](https://github.com/obra/superpowers)
+  or any skill-aware harness, this wires the "Claude auto-invokes
+  robot-md when you mention the robot" behavior in one command. Pass
+  `--stdout` to preview.
+- **Skill bundled in the wheel** at `robot_md/skills/using-robot-md.SKILL.md`.
+  Single source of truth: the dev-tree copy at
+  `integrations/claude-code-skill/SKILL.md` is kept in sync.
+
+### One-command agent path
+
+The installed + recognized flow is now:
+
+    pip install robot-md && \\
+        robot-md init my-bob --preset so-arm101 --register --contact-email me@co.com && \\
+        robot-md install-skill && \\
+        claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
+
+After that, Claude Code routes robot-related questions through the
+manifest automatically — no operator mention of robot-md needed.
+
+---
+
 ## [0.2.4] - 2026-04-18
 
 ### Changed
