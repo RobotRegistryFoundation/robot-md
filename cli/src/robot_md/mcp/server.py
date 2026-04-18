@@ -35,6 +35,23 @@ def build_server(ctx: McpContext):
         """Set the software E-stop for this server session."""
         return estop_tool(ctx)
 
+    @server.tool()
+    def execute_capability(
+        capability: str,
+        args: dict | None = None,
+        dry_run: bool = False,
+        confirm_token: str | None = None,
+    ) -> dict:
+        """Execute a declared capability against the resolved backend."""
+        from robot_md.mcp.tools.execute_capability import execute_capability_tool
+        return execute_capability_tool(
+            ctx,
+            capability=capability,
+            args=dict(args or {}),
+            dry_run=dry_run,
+            confirm_token=confirm_token,
+        )
+
     return server
 
 

@@ -42,15 +42,33 @@ class EstopFlag:
 class McpContext:
     manifest_path: Path
     parsed: ParsedRobotMd
+    spec: Any = None
     estop: EstopFlag = field(default_factory=EstopFlag)
     backend: Any = None
     exec_lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 def load_context(manifest_path: Path) -> McpContext:
-    """Parse + validate the manifest. Raise RuntimeError on any fatal error."""
+    """Parse + validate manifest, build RobotSpec, resolve backend, open it."""
     parsed = parse_file(manifest_path)
     result = validate_parsed(parsed)
     if result.code != VALID:
         raise RuntimeError(f"ROBOT.md validation failed: {result.errors}")
-    return McpContext(manifest_path=manifest_path, parsed=parsed)
+
+    from robot_md.backends.registry import BackendRegistry
+    from robot_md.robot_spec import RobotSpec
+
+    spec = RobotSpec.from_parsed(parsed)
+    registry = BackendRegistry.from_entry_points()
+    resolved = registry.resolve(spec)
+    # Pick the first non-None backend (often the same backend claims both feetech + depthai).
+    backend = next((b for b in resolved.values() if b is not None), None)
+    if backend is not None:
+        backend.open(spec)
+
+    return McpContext(
+        manifest_path=manifest_path,
+        parsed=parsed,
+        spec=spec,
+        backend=backend,
+    )
