@@ -1,6 +1,6 @@
 # Claude Desktop integration
 
-> **Status:** v0.1 documents the approach. Working MCP server code lands in v0.2.
+> **Status:** v0.1 shipped — read-only (resources + `validate`/`render` tools). Robot-dispatch tools (`invoke_skill`, `query_status`) arrive with v0.2 signing. See [`spec/v0.1-mcp-design.md`](../../spec/v0.1-mcp-design.md) and the separate repo [`robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) (npm: `robot-md-mcp@0.1.1`).
 
 Claude Desktop uses the **Model Context Protocol (MCP)** to expose resources and tools to the Claude assistant. `robot-md` integrates via a dedicated MCP server, `robot-md-mcp`, that wraps a `ROBOT.md` file (or URL) as MCP resources and tools.
 

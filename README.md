@@ -118,7 +118,7 @@ robot-md context examples/bob.ROBOT.md | head -10
 | Surface | Status | Mechanism |
 |---|---|---|
 | **Claude Code** | ✅ v0.1 | SessionStart hook → `robot-md context` → session context |
-| **Claude Desktop** | 🚧 v0.2 | MCP server `robot-md-mcp` — resources + tools |
+| **Claude Desktop** | ✅ v0.1 (read-only) | [`robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) — resources + validate/render; dispatch tools arrive with v0.2 signing |
 | **Claude Mobile (iOS)** | 🚧 v0.2 | URL fetch: `https://robotmd.dev/r/<rrn>` |
 
 See [`integrations/claude-code/`](integrations/claude-code/) for install instructions. Desktop + Mobile READMEs document the approaches; code ships in v0.2.
