@@ -89,8 +89,11 @@ def test_scan_feetech_errors_cleanly_without_sdk(monkeypatch):
 
 
 def test_scan_feetech_errors_cleanly_on_missing_port():
-    """An invalid port raises RuntimeError with a hint about the gateway."""
+    """An invalid port raises a RuntimeError pointing at one of the two
+    most common causes — the gateway holding the bus, OR the feetech
+    extras not being installed in this environment (CI, minimal installs).
+    """
     with pytest.raises(RuntimeError) as exc:
         scan_feetech("/dev/does-not-exist-nowhere-12345")
-    # Should hint at the most common cause (gateway holding the port)
-    assert "gateway" in str(exc.value).lower() or "open" in str(exc.value).lower()
+    msg = str(exc.value).lower()
+    assert any(hint in msg for hint in ("gateway", "open", "feetech_servo_sdk", "feetech extra"))
