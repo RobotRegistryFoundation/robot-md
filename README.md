@@ -80,12 +80,12 @@ The Tier 0 flow — Claude Code alone as the runtime, no OpenCastor.
 Three commands, zero config files:
 
 ```bash
-# 1. Generate a draft from visible hardware, edit TODOs, validate
+# 1. Zero-to-ROBOT.md, one command. Auto-matches a preset (SO-ARM101,
+#    TurtleBot 4, PiCar-X, ...) and pre-fills ~85% of the manifest for
+#    known robots: DH kinematics, servo IDs, safety defaults, capabilities.
 cd ~/my-robot
-robot-md autodetect --write ROBOT.md   # detects Hailo, Movidius, OAK-D,
-                                       # Coral, CH340/CP210x/FTDI, tty*
-# Fill in robot_name, physics type, DoF, capabilities
-robot-md validate ROBOT.md
+robot-md init my-bob --preset so-arm101
+# → ✓ wrote ROBOT.md (arm, 6 DoF, 5 capabilities, preset: so-arm101)
 
 # 2. Tell Claude Code about it (one line — no settings.json editing)
 claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
@@ -94,7 +94,13 @@ claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 claude
 ```
 
-Claude Code gets Bob's frontmatter, capabilities, safety gates, and prose body as MCP resources. **No harness config, no provider setup, no YAML wrangling** — built for operators who just want Claude Code to understand the robot. See [`robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) for the MCP server.
+For custom hardware, `robot-md init --wizard` walks you through 7 steps.
+For pure scan-to-draft without a preset, `robot-md autodetect --write
+ROBOT.md` still works as the low-level primitive.
+
+Claude Code gets the robot's frontmatter, capabilities, safety gates, and prose body as MCP resources. **No harness config, no provider setup, no YAML wrangling** — built for operators who just want Claude Code to understand the robot. See [`robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) for the MCP server.
+
+**Physical calibration** (for robots with arms): `robot-md calibrate --zero ROBOT.md` pose the arm at its declared zero config, press Enter — the CLI records the encoder readings so the manifest's baseline IK solver knows where "zero" is. Preserves YAML comments on rewrite.
 
 ### Option B — SessionStart hook (pre-MCP path)
 

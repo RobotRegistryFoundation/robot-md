@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ROBOT.md — the one-file declaration for agentic robots</title>
-<meta name="description" content="ROBOT.md is to a robot what CLAUDE.md is to a codebase. One file — YAML + markdown — so a planning LLM can safely operate your robot. Part of the OpenCastor ecosystem. Supports the RCAN 3.0 wire protocol and the Robot Registry Foundation.">
+<meta name="description" content="ROBOT.md is to a robot what CLAUDE.md is to a codebase. One file — YAML + markdown — so a planning LLM can safely operate your robot. Part of the OpenCastor ecosystem. Supports the RCAN 3.0+ wire protocol and the Robot Registry Foundation (RRF).">
 <meta name="theme-color" content="#F4EFE6">
 
 <meta property="og:title" content="ROBOT.md — one-file declaration for agentic robots">
@@ -603,7 +603,7 @@
   </p>
 
   <div class="sub-deck">
-    <span><b>RCAN 3.0</b> wire protocol, native</span>
+    <span><b>RCAN 3.0+</b> wire protocol, native</span>
     <span><b>RRF</b> registry-compatible</span>
     <span><b>JSON Schema</b> draft 2020‑12</span>
     <span><b>Designed for</b> Claude Code · Desktop · Mobile</span>
@@ -616,7 +616,7 @@
     <span>One file per robot</span><b>✦</b>
     <span>Frontmatter the validator trusts</span><b>✦</b>
     <span>Prose the planner reads</span><b>✦</b>
-    <span>RCAN 3.0 conformant</span><b>✦</b>
+    <span>RCAN 3.0+ conformant</span><b>✦</b>
     <span>EU AI Act compliance blocks</span><b>✦</b>
     <span>Registry‑resolvable via RRN</span><b>✦</b>
     <span>Zero runtime lock‑in</span><b>✦</b>
@@ -624,7 +624,7 @@
     <span>One file per robot</span><b>✦</b>
     <span>Frontmatter the validator trusts</span><b>✦</b>
     <span>Prose the planner reads</span><b>✦</b>
-    <span>RCAN 3.0 conformant</span><b>✦</b>
+    <span>RCAN 3.0+ conformant</span><b>✦</b>
     <span>EU AI Act compliance blocks</span><b>✦</b>
     <span>Registry‑resolvable via RRN</span><b>✦</b>
     <span>Zero runtime lock‑in</span><b>✦</b>
@@ -747,9 +747,9 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       </div>
 
       <div class="stack-row primary" role="row">
-        <div class="layer"><span>Layer 3 · Protocol</span><b>RCAN 3.0</b></div>
-        <div class="cell"><span class="tag on">Wire</span>Signed envelopes between planner, gateway, and driver. Level‑of‑Assurance enforcement on every call.</div>
-        <div class="cell"><span class="tag">Crypto</span>PQC‑hybrid‑v1 at L2+. ML‑DSA‑65. Ed25519 accepted at L1 only, sunset mid‑cycle.</div>
+        <div class="layer"><span>Layer 3 · Protocol</span><b>RCAN 3.0+</b></div>
+        <div class="cell"><span class="tag on">Wire</span>Signed envelopes between planner, gateway, and driver. Level‑of‑Assurance enforcement on every call. Manifests declare <code style="font-family:var(--mono)">rcan_version: "3.0"</code> — minor-version increments (3.1, 3.2, …) are backward-compatible.</div>
+        <div class="cell"><span class="tag">Crypto</span>PQC‑primary: <code style="font-family:var(--mono)">ml-dsa-65</code> at L2+. Ed25519 accepted at L1 only, sunset mid‑cycle. Per-manifest via <code style="font-family:var(--mono)">network.signing_alg</code>.</div>
         <div class="cell"><span class="tag">Compliance</span>§23–§27 cover EU AI Act Annex III audit trails, FRIA refs, ISO 42001 self‑assessment.</div>
       </div>
 
@@ -772,7 +772,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <div class="companions" aria-label="Companion standards">
       <article class="companion">
         <h5>Layer 3 · Wire protocol</h5>
-        <h4>RCAN 3.0 — Robot Communication &amp; Addressing Network</h4>
+        <h4>RCAN 3.0+ — Robot Communication &amp; Addressing Network</h4>
         <p class="lede">An open protocol that lets robots, gateways, and planners exchange signed, authority‑aware messages without vendor coupling.</p>
         <ul>
           <li>Signed envelopes with <code>ML‑DSA‑65</code> primary + Ed25519 legacy (L1 only, sunset mid‑cycle).</li>
@@ -886,17 +886,21 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         </tr>
       </thead>
       <tbody>
-        <tr><td><code>rcan_version</code></td><td>string</td><td><span class="req yes">✓</span></td><td>Protocol version — <code>"3.0"</code> recommended. 2.1+ accepted; 1.x rejected for EU AI Act gap.</td></tr>
+        <tr><td><code>rcan_version</code></td><td>string</td><td><span class="req yes">✓</span></td><td>RCAN wire-protocol version — <code>"3.0"</code> covers the 3.x line. 2.1+ accepted; 1.x rejected for EU AI Act gap. See <a href="https://rcan.dev/spec/">rcan.dev/spec</a>.</td></tr>
         <tr><td><code>metadata.robot_name</code></td><td>string</td><td><span class="req yes">✓</span></td><td>Short display name. Must match the body H1. Used in every planner citation.</td></tr>
-        <tr><td><code>metadata.rrn</code></td><td>string</td><td><span class="req rec">★</span></td><td>Robot Registry Foundation identifier. Empty string allowed until registered.</td></tr>
-        <tr><td><code>physics.type</code></td><td>enum</td><td><span class="req yes">✓</span></td><td><code>arm</code> · <code>wheeled</code> · <code>tracked</code> · <code>legged</code> · <code>arm+camera</code> · <code>humanoid</code> · <code>other</code></td></tr>
+        <tr><td><code>metadata.rrn</code></td><td>string</td><td><span class="req rec">★</span></td><td>RRF-assigned identifier (e.g. <code>RRN-000000000001</code>). Empty until <code>robot-md register</code> mints one. Resolves via <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code>.</td></tr>
+        <tr><td><code>metadata.rrn_uri</code></td><td>string</td><td><span class="req opt">—</span></td><td>Optional URI form: <code>rrn://&lt;org&gt;/&lt;category&gt;/&lt;model&gt;/&lt;id&gt;</code> — dereferenceable by any RCAN-aware client.</td></tr>
+        <tr><td><code>physics.type</code></td><td>enum</td><td><span class="req yes">✓</span></td><td><code>arm</code> · <code>wheeled</code> · <code>tracked</code> · <code>legged</code> · <code>arm+camera</code> · <code>humanoid</code> · <code>sensor</code> · <code>other</code></td></tr>
         <tr><td><code>physics.dof</code></td><td>int</td><td><span class="req yes">✓</span></td><td>Degrees of freedom. <code>0</code> permitted for purely sensory nodes.</td></tr>
+        <tr><td><code>physics.kinematics[]</code></td><td>array</td><td><span class="req rec">★</span></td><td>Per-joint geometry. Each entry: <code>id</code>, <code>axis</code> (x/y/z), <code>a_mm</code>/<code>d_mm</code> DH params, <code>limits_deg</code>, <code>servo_id</code>, <code>encoder_sign</code>, <code>zero_pose_steps</code>.</td></tr>
+        <tr><td><code>physics.solver</code></td><td>map</td><td><span class="req opt">—</span></td><td>Baseline FK/IK config so any planner can reach a target from the manifest alone — no URDF, no MoveIt. Fields: <code>convention</code>, <code>base_frame</code>, <code>encoder.steps_per_rev</code>, <code>gripper</code> (tip offset, open/close steps), <code>camera</code> (mount + extrinsic).</td></tr>
         <tr><td><code>drivers[]</code></td><td>array</td><td><span class="req yes">✓</span></td><td>At least one. Each declares <code>id</code> + <code>protocol</code> (feetech, dynamixel, depthai, ros2, …).</td></tr>
         <tr><td><code>capabilities[]</code></td><td>array</td><td><span class="req yes">✓*</span></td><td>Required when <code>dof &gt; 0</code>. Namespaces: <code>nav.*</code>, <code>arm.*</code>, <code>vision.*</code>, <code>status.*</code>, <code>system.*</code>, vendor <code>&lt;prefix&gt;.*</code>.</td></tr>
         <tr><td><code>safety.estop</code></td><td>map</td><td><span class="req yes">✓</span></td><td>At minimum: <code>software: true</code> + <code>response_ms</code>. Hardware button recommended for Annex III systems.</td></tr>
         <tr><td><code>safety.hitl_gates</code></td><td>array</td><td><span class="req rec">★</span></td><td>Scopes (<code>destructive</code>, <code>system</code>, …) that require human authorization via RCAN §8 <code>AUTHORIZE</code>.</td></tr>
         <tr><td><code>brain</code></td><td>map</td><td><span class="req rec">★</span></td><td>Planner + reactive model declaration. Task‑routing overrides. Required if the robot uses an LLM in the loop.</td></tr>
-        <tr><td><code>network</code></td><td>map</td><td><span class="req rec">★</span></td><td>RRF endpoint, gateway port, signing algorithm, transports. Required for network‑addressable robots.</td></tr>
+        <tr><td><code>network.rrf_endpoint</code></td><td>string</td><td><span class="req rec">★</span></td><td>RRF resolver — defaults to <code>https://robotregistryfoundation.org</code>. Serves the signed manifest at <code>/r/&lt;rrn&gt;</code> and FRIA at <code>/api/v1/robots/&lt;rrn&gt;/fria</code>.</td></tr>
+        <tr><td><code>network.signing_alg</code></td><td>string</td><td><span class="req rec">★</span></td><td>RCAN 3.0 primary: <code>ml-dsa-65</code> (PQC). <code>ed25519</code> accepted at Level-of-Assurance 1 only; sunset mid-3.x.</td></tr>
         <tr><td><code>compliance</code></td><td>map</td><td><span class="req rec">★</span></td><td>FRIA URI, ISO 42001 self‑assessment, EU AI Act audit retention. Required for EU deployments.</td></tr>
         <tr><td><code>extensions.x-*</code></td><td>map</td><td><span class="req opt">—</span></td><td>Vendor‑specific. Unknown <code>x-*</code> keys must NOT fail validation.</td></tr>
       </tbody>
@@ -916,46 +920,36 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <div class="sec-head">
       <div class="sec-num">§ 05 — Try it in sixty seconds</div>
       <div>
-        <h2 class="sec-title">Autodetect your hardware. Edit the TODOs. Hand it to Claude.</h2>
-        <p class="sec-lede">The reference CLI is a small Python package. <code>robot-md autodetect</code> scans PCI, USB, and <code>/dev/tty*</code> and emits a draft that already validates against the v1 schema — with identity fields deliberately marked TODO so the operator fills them in.</p>
+        <h2 class="sec-title">One command. Preset-matched. Claude knows your robot.</h2>
+        <p class="sec-lede"><code>robot-md init</code> is the super-duper-quick path: scans PCI/USB/<code>/dev/tty*</code>, matches against the built-in preset library (SO-ARM101, TurtleBot 4, PiCar-X, …), emits a validated draft with full DH kinematics + safety defaults already populated. For known robots, ~85&nbsp;% of the manifest is pre-filled automatically. For custom builds, <code>--wizard</code> walks you through the rest in 7 steps.</p>
       </div>
     </div>
 
     <div class="try-grid">
       <div class="terminal" aria-label="Terminal session">
-        <div class="top"><i></i><i></i><i></i><span>~/projects/bob · zsh</span></div>
-<pre class="body"><span class="p">$</span> pip install git+https://github.com/RobotRegistryFoundation/robot-md.git@v0.1.2#subdirectory=cli
+        <div class="top"><i></i><i></i><i></i><span>~/projects/my-bob · zsh</span></div>
+<pre class="body"><span class="p">$</span> pip install robot-md
 
-<span class="p">$</span> robot-md autodetect --write ROBOT.md
-<span class="ok">✓ wrote draft to ROBOT.md</span>
-  next: edit the TODOs, then <span class="c">robot-md validate ROBOT.md</span>
+<span class="p">$</span> robot-md init my-bob <span class="c">--preset so-arm101</span>
+<span class="ok">✓ wrote ROBOT.md</span>
+  preset: so-arm101  (score=100, explicit --preset)
 
-<span class="p">$</span> head -24 ROBOT.md
----
-<span class="c"># TODO: review this draft before committing.</span>
-rcan_version: "3.0"
-metadata:
-  robot_name: "CHANGE-ME"  <span class="c"># TODO</span>
-physics:
-  type: "other"            <span class="c"># TODO: arm | wheeled | legged ...</span>
-  dof: 0                   <span class="c"># TODO</span>
-drivers:
-  - { id: npu-hailo8,        protocol: hailo-rt, port: /dev/hailo0 }
-  - { id: npu-movidius-ncs2, protocol: openvino }
-  - { id: serial-ch340,      protocol: serial   }   <span class="c"># servo bus candidate</span>
-  - { id: tty-ttyACM0,       protocol: serial,  port: /dev/ttyACM0 }
-...
+  Next:
+    robot-md calibrate --zero ROBOT.md
+    claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 
 <span class="p">$</span> robot-md validate ROBOT.md
-<span class="ok">✓ CHANGE-ME (other, 0 DoF, 1 capabilities)</span>
+<span class="ok">✓ my-bob (arm, 6 DoF, 5 capabilities)</span>
 
-<span class="c"># Tell Claude Code about it — one line, no settings.json editing.</span>
+<span class="c"># Pose arm at zero, press Enter — records zero_pose_steps per joint.</span>
+<span class="p">$</span> robot-md calibrate <span class="c">--zero</span> ROBOT.md
+<span class="ok">✓ wrote zero_pose_steps for 6 joints</span>
+
 <span class="p">$</span> claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 <span class="ok">✓ Added stdio MCP server robot-md</span>
 
-<span class="p">$</span> claude .
-<span class="c">· loaded CLAUDE.md</span>
-<span class="c">· loaded robot-md://bob/{frontmatter, capabilities, safety, body}</span>
+<span class="p">$</span> claude
+<span class="c">· loaded robot-md://my-bob/{frontmatter, capabilities, safety, body}</span>
 <span class="w">→ Claude knows your robot. Ship.</span>
 </pre>
       </div>
@@ -1058,8 +1052,8 @@ drivers:
       </div>
       <div class="eco">
         <h5>Wire protocol · rcan.dev</h5>
-        <b>RCAN 3.0</b>
-        <p>What a robot <em>speaks</em>. Signed envelopes, LoA enforcement, PQC‑hybrid crypto, EU AI Act compliance blocks (§23–§27). Open, Apache‑2.0, community‑governed.</p>
+        <b>RCAN 3.0+</b>
+        <p>What a robot <em>speaks</em>. Signed envelopes, LoA enforcement, <code style="font-family:var(--mono)">ml-dsa-65</code> primary crypto, EU AI Act compliance blocks (§23–§27). Open, Apache‑2.0, community‑governed.</p>
         <a href="https://rcan.dev">rcan.dev →</a>
       </div>
       <div class="eco">

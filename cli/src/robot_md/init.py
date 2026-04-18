@@ -151,12 +151,28 @@ def merge_preset_into_draft(
     since that's machine-specific.
     """
     fm: dict[str, Any] = {
+        # RCAN wire protocol. v1 spec freezes at 3.0; newer releases are
+        # backward-compatible per §2.5 of rcan.dev/spec so "3.0" also covers
+        # 3.1, 3.2, ... at the manifest layer.
         "rcan_version": "3.0",
         "schema": "https://robotmd.dev/schema/v1/robot.schema.json",
         "metadata": {
             "robot_name": robot_name,
-            "rrn": "",                    # empty until registered (v0.2)
+            # RRN — empty until `robot-md register` mints one against the
+            # Robot Registry Foundation (v0.2). Populated with the canonical
+            # `RRN-NNNNNNNNNNNN` assigned at mint time; resolvable via
+            # https://robotregistryfoundation.org/r/<rrn>.
+            "rrn": "",
             "license": "Apache-2.0",
+        },
+        # RRF binding — stable-by-convention endpoint the Registry
+        # Foundation serves. Once a robot is registered, `/r/<rrn>` returns
+        # the signed manifest; `/api/v1/robots/<rrn>/fria` returns the EU
+        # AI Act Fundamental-Rights-Impact-Assessment reference, etc.
+        "network": {
+            "rrf_endpoint": "https://robotregistryfoundation.org",
+            "signing_alg": "ml-dsa-65",   # RCAN 3.0 primary; ed25519 accepted at L1
+            "transports": ["http"],
         },
     }
     # Copy every non-match key from the preset
