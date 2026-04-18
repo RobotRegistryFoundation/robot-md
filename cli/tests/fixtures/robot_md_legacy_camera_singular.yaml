@@ -52,6 +52,7 @@ drivers:
       depth:
         derived_from: [left, right]
 safety:
+  max_joint_velocity_dps: 180
   estop:
     software: true
     response_ms: 100

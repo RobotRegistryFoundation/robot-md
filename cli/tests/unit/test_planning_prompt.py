@@ -34,8 +34,12 @@ def test_prompt_includes_safety_workspace(fixtures_dir):
 def test_prompt_handles_empty_safety(fixtures_dir):
     """Minimal safety envelope still builds a valid prompt."""
     parsed = parse_file(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
+    # Remove safety fields that fixture now has to test empty safety case
+    for field in ["max_joint_velocity_dps", "payload_kg", "workspace_bounds_m"]:
+        if field in parsed.frontmatter["safety"]:
+            del parsed.frontmatter["safety"][field]
     spec = RobotSpec.from_parsed(parsed)
-    # fixture has no max_joint_velocity_dps/payload_kg/workspace_bounds_m
+    # spec now has no max_joint_velocity_dps/payload_kg/workspace_bounds_m
     prompt = build_prompt(spec=spec, scene=SceneSnapshot.empty(), user_prompt="x")
     assert "no safety limits declared" in prompt.lower()
 

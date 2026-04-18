@@ -63,14 +63,17 @@ def load_context(manifest_path: Path) -> McpContext:
     resolved = registry.resolve(spec)
     # Pick the first non-None backend (often the same backend claims both feetech + depthai).
     backend = next((b for b in resolved.values() if b is not None), None)
+    # Spec §Python MCP server: server refuses to dispatch if
+    # safety.max_joint_velocity_dps is missing. Fail fast rather than
+    # silently leaving backend=None, which would be indistinguishable from
+    # "no backend claims this protocol".
     if backend is not None:
-        try:
-            backend.open(spec)
-        except RuntimeError as e:
-            if "max_joint_velocity_dps" in str(e):
-                backend = None  # soft-fail: safety not configured, leave unopened
-            else:
-                raise
+        if spec.safety.max_joint_velocity_dps is None:
+            raise RuntimeError(
+                "refusing to open backend: safety.max_joint_velocity_dps is "
+                "required but missing from ROBOT.md"
+            )
+        backend.open(spec)
 
     return McpContext(
         manifest_path=manifest_path,

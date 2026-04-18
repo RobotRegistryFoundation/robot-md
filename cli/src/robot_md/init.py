@@ -316,7 +316,7 @@ def quick(
         f"\nNext:\n"
         f"  robot-md validate {out_path}\n"
         f"  robot-md calibrate --zero {out_path}    # pose arm, record zero_pose_steps\n"
-        f'  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/{out_path.name}"\n',
+        f'  claude mcp add robot-md -- robot-md-mcp "$(pwd)/{out_path.name}"\n',
         file=sys.stderr,
     )
     return 0
@@ -407,7 +407,7 @@ def wizard(out_path: Path, *, force: bool = False) -> int:
     print(
         "✓ Done. Try:\n"
         f"  robot-md validate {out_path}\n"
-        f'  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/{out_path.name}"\n',
+        f'  claude mcp add robot-md -- robot-md-mcp "$(pwd)/{out_path.name}"\n',
         file=sys.stderr,
     )
     return 0

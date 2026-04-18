@@ -10,8 +10,11 @@ from robot_md.robot_spec import RobotSpec
 def test_refuses_open_without_max_joint_velocity(fixtures_dir):
     """Backend open() raises RuntimeError when safety.max_joint_velocity_dps is missing."""
     parsed = parse_file(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
+    # Remove the max_joint_velocity_dps field that fixture now has
+    if "max_joint_velocity_dps" in parsed.frontmatter["safety"]:
+        del parsed.frontmatter["safety"]["max_joint_velocity_dps"]
     spec = RobotSpec.from_parsed(parsed)
-    # fixture has no max_joint_velocity_dps
+    # spec now has no max_joint_velocity_dps
     assert spec.safety.max_joint_velocity_dps is None
     with pytest.raises(RuntimeError, match="max_joint_velocity_dps"):
         FeetechDepthaiBackend().open(spec)
