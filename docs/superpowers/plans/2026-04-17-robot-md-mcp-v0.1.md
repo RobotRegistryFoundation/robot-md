@@ -81,7 +81,7 @@ git init -b main
     "vitest": "^2.1.0"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=18.20"
   },
   "license": "Apache-2.0",
   "author": "craigm26 <craigm26@gmail.com>",
