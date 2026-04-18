@@ -60,10 +60,100 @@
                 "minItems": 2,
                 "maxItems": 2
               },
-              "length_mm": { "type": "number", "minimum": 0 }
+              "length_mm": { "type": "number", "minimum": 0 },
+              "servo_id": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Bus address of the servo driving this joint. Maps joint to the corresponding driver entry. Set by `robot-md autodetect` from the driver config."
+              },
+              "encoder_sign": {
+                "type": "integer",
+                "enum": [-1, 1],
+                "description": "+1 if positive encoder delta ⇒ positive joint-angle delta; -1 if the encoder is reversed relative to the kinematic convention. Populated by `robot-md calibrate --sign` after observing one test move per joint."
+              },
+              "zero_pose_steps": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Encoder reading when this joint is at 0° in the kinematic convention. Recorded by `robot-md calibrate --zero` while the operator holds the arm in its declared zero pose."
+              }
             },
             "additionalProperties": true
           }
+        },
+        "solver": {
+          "type": "object",
+          "description": "Baseline IK metadata — enough for a planner to compute forward/inverse kinematics from ROBOT.md alone, without an external URDF. Populated by `robot-md autodetect` (deterministic fields) + `robot-md calibrate` (physical fields).",
+          "properties": {
+            "convention": {
+              "type": "string",
+              "enum": ["DH", "URDF", "custom"],
+              "description": "Kinematic convention used by the `kinematics[]` array. `DH` = modified Denavit-Hartenberg (axis + length_mm per joint). `URDF` = reference an external URDF file via `extensions.urdf_ref`. `custom` = body prose must describe the convention."
+            },
+            "base_frame": {
+              "type": "object",
+              "description": "World-frame convention for the arm base.",
+              "properties": {
+                "up": { "type": "string", "enum": ["x", "y", "z"] },
+                "forward": { "type": "string", "enum": ["x", "y", "z"] }
+              }
+            },
+            "encoder": {
+              "type": "object",
+              "description": "Encoder-to-angle conversion. Per-joint overrides live in `kinematics[].encoder_sign` / `.zero_pose_steps`.",
+              "properties": {
+                "steps_per_rev": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Encoder steps per full revolution (360°). Default for the arm. Autodetect fills this from driver type (Feetech STS3215 = 4096, Dynamixel XM430 = 4096, etc)."
+                }
+              }
+            },
+            "camera": {
+              "type": "object",
+              "description": "Camera mount relationship to the kinematic chain — needed to project image pixels into the arm's frame.",
+              "properties": {
+                "mount": {
+                  "type": "string",
+                  "description": "Where the camera is mounted. `world` = fixed frame (eye-to-hand). `tool0` = end-effector (eye-in-hand). `link_<id>` = a specific intermediate link."
+                },
+                "extrinsic": {
+                  "type": ["array", "null"],
+                  "description": "6-DoF transform from the mount frame to the camera frame: [tx, ty, tz, rx, ry, rz] in mm and radians. Null if calibration is required at runtime.",
+                  "items": { "type": "number" },
+                  "minItems": 6,
+                  "maxItems": 6
+                }
+              }
+            },
+            "gripper": {
+              "type": "object",
+              "description": "Gripper geometry + actuation calibration. Needed so a planner can compute where the tip lands given a wrist pose.",
+              "properties": {
+                "joint_id": {
+                  "type": "string",
+                  "description": "Which entry in `kinematics[]` is the gripper (end-effector)."
+                },
+                "tip_offset_mm": {
+                  "type": "array",
+                  "items": { "type": "number" },
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "description": "[x, y, z] offset from the gripper's link frame to the grasp point, in mm."
+                },
+                "open_steps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Encoder target for the gripper-open pose."
+                },
+                "close_steps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "description": "Encoder target for the gripper-close pose."
+                }
+              }
+            }
+          },
+          "additionalProperties": true
         }
       },
       "additionalProperties": true

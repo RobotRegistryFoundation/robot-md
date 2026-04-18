@@ -15,31 +15,62 @@ metadata:
 physics:
   type: arm+camera
   dof: 6
+  solver:
+    convention: DH
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 4096        # Feetech STS3215 native resolution
+    camera:
+      mount: world               # eye-to-hand; fixed OAK-D looking at the arm's workspace
+      extrinsic: null            # run `robot-md calibrate --hand-eye` to populate
+    gripper:
+      joint_id: gripper
+      tip_offset_mm: [0, 0, 30]  # grasp point is 30mm below the gripper flange
+      open_steps: 1700
+      close_steps: 1200
   kinematics:
     - id: shoulder_pan
       axis: z
       limits_deg: [-180, 180]
       length_mm: 60
+      servo_id: 1
+      encoder_sign: 1            # +Δ encoder ⇒ +Δ angle (CCW from above); confirmed via 2026-04-17 raw Tier 0 run
+      zero_pose_steps: 2048      # midpoint; replace via `robot-md calibrate --zero`
     - id: shoulder_lift
       axis: y
       limits_deg: [-90, 90]
       length_mm: 125
+      servo_id: 2
+      encoder_sign: 1            # +Δ ⇒ arm rotates forward/down; confirmed 2026-04-17
+      zero_pose_steps: 2048
     - id: elbow_flex
       axis: y
       limits_deg: [-90, 90]
       length_mm: 125
+      servo_id: 3
+      encoder_sign: 1            # +Δ ⇒ forearm extends; confirmed 2026-04-17
+      zero_pose_steps: 2048
     - id: wrist_flex
       axis: y
       limits_deg: [-90, 90]
       length_mm: 60
+      servo_id: 4
+      encoder_sign: 1            # tentative; calibrate before trusting
+      zero_pose_steps: 2048
     - id: wrist_roll
       axis: x
       limits_deg: [-180, 180]
       length_mm: 30
+      servo_id: 5
+      encoder_sign: 1
+      zero_pose_steps: 2048
     - id: gripper
       axis: y
       limits_deg: [0, 90]
       length_mm: 40
+      servo_id: 6
+      encoder_sign: 1
+      zero_pose_steps: 1200      # close position; open = 1700
 
 drivers:
   - id: arm_servos
