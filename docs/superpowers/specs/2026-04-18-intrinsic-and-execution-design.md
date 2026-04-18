@@ -121,6 +121,7 @@ physics:
 - `streams` keys: canonical set `rgb | left | right | depth | mono | ir | thermal` enforced by pattern; additional keys allowed via schema extension.
 - Cross-reference: every `physics.solver.cameras[].driver_id` must resolve to a `drivers[].id` whose entry has ≥1 `streams.*.intrinsic` OR null intrinsics with an operator TODO. Validator warns (not errors) on null intrinsic for a camera's declared `primary_stream`.
 - Legacy `physics.solver.camera` (singular) read-time auto-upgraded; validator emits a deprecation warning.
+- Optional `drivers[].backend: <entry-point-name>` forces a specific `CapabilityBackend`; absent → alphabetical-first resolution (see §CapabilityBackend).
 
 ### Preset migration
 
@@ -322,7 +323,7 @@ class RobotSpec:
 feetech_depthai = "robot_md.backends.feetech_depthai:FeetechDepthaiBackend"
 ```
 
-Resolution at startup: collect all registered backends → for each `drivers[].protocol`, pick the first backend whose `protocols` set includes it. Unresolved protocols still pass `validate`; `execute_capability` returns `{status: "error", error: {reason: "no_backend", protocol: …}}`.
+Resolution at startup: collect all registered backends, sort by entry-point **name** (ascending, case-sensitive), then for each `drivers[].protocol` pick the first backend in that sorted list whose `protocols` set includes it. Deterministic given the installed package set. Unresolved protocols still pass `validate`; `execute_capability` returns `{status: "error", error: {reason: "no_backend", protocol: …}}`. An operator can force a specific backend per driver with an optional `drivers[].backend: <entry-point-name>` field (added to the schema as part of this spec).
 
 ### Reference backend: `feetech_depthai`
 
