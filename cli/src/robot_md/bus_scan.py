@@ -12,16 +12,16 @@ Supported protocols:
 
 Dynamixel + ODrive live behind ``# TODO``s for future extension.
 """
+
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
 
-
 # STS3215 / SCServo control table addresses (in registers)
-_ADDR_MIN_ANGLE_LIMIT = 0x09   # 2 bytes
-_ADDR_MAX_ANGLE_LIMIT = 0x0B   # 2 bytes
-_ADDR_PRESENT_POSITION = 56    # 2 bytes
+_ADDR_MIN_ANGLE_LIMIT = 0x09  # 2 bytes
+_ADDR_MAX_ANGLE_LIMIT = 0x0B  # 2 bytes
+_ADDR_PRESENT_POSITION = 56  # 2 bytes
 
 # Ping range: full address space 1..253 (0 and 254..255 are reserved).
 _ID_MIN = 1
@@ -33,6 +33,7 @@ _PING_BACKOFF_S = 0.020
 @dataclass
 class ServoEntry:
     """One responding servo's registers."""
+
     servo_id: int
     present_position: int | None
     min_angle_steps: int | None
@@ -48,15 +49,15 @@ class ServoEntry:
         """
         return {
             "id": default_id or f"joint_{self.servo_id}",
-            "axis": "y",                      # assumed; operator verifies
+            "axis": "y",  # assumed; operator verifies
             "servo_id": self.servo_id,
             "limits_deg": [
                 _steps_to_deg(self.min_angle_steps) if self.min_angle_steps is not None else -180,
                 _steps_to_deg(self.max_angle_steps) if self.max_angle_steps is not None else 180,
             ],
-            "length_mm": 0,                   # unknown — operator fills
+            "length_mm": 0,  # unknown — operator fills
             "zero_pose_steps": self.present_position or 2048,
-            "encoder_sign": 1,                # assumed +1; verify via calibrate --sign
+            "encoder_sign": 1,  # assumed +1; verify via calibrate --sign
         }
 
 
@@ -82,7 +83,7 @@ def scan_feetech(port: str, baud: int = 1_000_000) -> list[ServoEntry]:
     try:
         ph = PortHandler(port)
         opened = ph.openPort()
-    except Exception as e:    # pyserial may raise SerialException on a bad port
+    except Exception as e:  # pyserial may raise SerialException on a bad port
         raise RuntimeError(
             f"failed to open {port}: {e} — is the gateway still holding the "
             "bus? Stop it first (e.g. `sudo systemctl stop castor-gateway`)."

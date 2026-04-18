@@ -3,16 +3,14 @@
 Hardware-touching code (read_current_pose) is exercised by live smoke tests
 against a real arm — not covered by this suite.
 """
-from __future__ import annotations
 
-import textwrap
+from __future__ import annotations
 
 import pytest
 
 pytest.importorskip("ruamel.yaml")  # skip if ruamel isn't installed
 
 from robot_md.calibrate import JointReading, write_zero_pose_to_manifest
-
 
 BOB_MIN = """\
 ---
@@ -89,7 +87,7 @@ def test_skips_joints_with_failed_reading(tmp_path):
     p = tmp_path / "bob.ROBOT.md"
     p.write_text(BOB_MIN)
     readings = [
-        JointReading("shoulder_pan", 1, None),       # read failed
+        JointReading("shoulder_pan", 1, None),  # read failed
         JointReading("shoulder_lift", 2, 1800),
     ]
     n = write_zero_pose_to_manifest(p, readings)

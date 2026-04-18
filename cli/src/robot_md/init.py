@@ -12,6 +12,7 @@ Design principles (from spec/autodetect-prefill-roadmap.md):
   * Presets are YAML (this module) not code.
   * Autodetected fields carry provenance in comments.
 """
+
 from __future__ import annotations
 
 import sys
@@ -23,11 +24,11 @@ import yaml
 
 from robot_md.autodetect import scan_system
 
-
 PRESETS_DIR = Path(__file__).parent / "presets"
 
 
 # ---------------------------------------------------------------------- loading
+
 
 @dataclass
 class Preset:
@@ -35,9 +36,10 @@ class Preset:
 
     Loaded from a YAML file in `cli/src/robot_md/presets/`.
     """
-    name: str                               # e.g. "so_arm101"
-    match: dict[str, Any]                   # match rules (see match_score)
-    data: dict[str, Any]                    # full preset body (physics, drivers, ...)
+
+    name: str  # e.g. "so_arm101"
+    match: dict[str, Any]  # match rules (see match_score)
+    data: dict[str, Any]  # full preset body (physics, drivers, ...)
 
     @property
     def display_name(self) -> str:
@@ -62,6 +64,7 @@ def load_presets(directory: Path | None = None) -> list[Preset]:
 
 
 # --------------------------------------------------------------------- matching
+
 
 @dataclass
 class MatchResult:
@@ -117,6 +120,7 @@ def match_score(preset: Preset, scan: Any) -> MatchResult:
 
     # Name hints (match hostname)
     import socket
+
     host = socket.gethostname().lower()
     for hint in m.get("name_hints", []) or []:
         if hint.lower() in host:
@@ -140,6 +144,7 @@ def pick_best(presets: list[Preset], scan: Any) -> MatchResult | None:
 
 
 # ----------------------------------------------------------------------- merge
+
 
 def merge_preset_into_draft(
     preset: Preset,
@@ -171,14 +176,14 @@ def merge_preset_into_draft(
         # AI Act Fundamental-Rights-Impact-Assessment reference, etc.
         "network": {
             "rrf_endpoint": "https://robotregistryfoundation.org",
-            "signing_alg": "ml-dsa-65",   # RCAN 3.0 primary; ed25519 accepted at L1
+            "signing_alg": "ml-dsa-65",  # RCAN 3.0 primary; ed25519 accepted at L1
             "transports": ["http"],
         },
     }
     # Copy every non-match key from the preset
     for k, v in preset.data.items():
         if k == "body_hints":
-            continue                       # used separately when rendering body
+            continue  # used separately when rendering body
         fm[k] = v
 
     # Override driver ports with what the scan actually found
@@ -219,6 +224,7 @@ def render_draft(
 
 # ---------------------------------------------------------------------- drivers
 
+
 def quick(
     out_path: Path,
     *,
@@ -240,7 +246,9 @@ def quick(
         return 2
 
     if preset_name:
-        sel = next((p for p in presets if p.name == preset_name or p.display_name == preset_name), None)
+        sel = next(
+            (p for p in presets if p.name == preset_name or p.display_name == preset_name), None
+        )
         if sel is None:
             names = [p.display_name for p in presets]
             print(f"error: preset {preset_name!r} not found. Available: {names}", file=sys.stderr)
@@ -266,7 +274,7 @@ def quick(
         f"\nNext:\n"
         f"  robot-md validate {out_path}\n"
         f"  robot-md calibrate --zero {out_path}    # pose arm, record zero_pose_steps\n"
-        f"  claude mcp add robot-md -- npx -y robot-md-mcp \"$(pwd)/{out_path.name}\"\n",
+        f'  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/{out_path.name}"\n',
         file=sys.stderr,
     )
     return 0
@@ -298,7 +306,10 @@ def wizard(out_path: Path, *, force: bool = False) -> int:
     # 2. Preset
     presets = load_presets()
     preset_names = [p.display_name for p in presets]
-    print(f"\n2/7 · Known preset? Options: {', '.join(preset_names)} (or 'none' for autodetect only)", file=sys.stderr)
+    print(
+        f"\n2/7 · Known preset? Options: {', '.join(preset_names)} (or 'none' for autodetect only)",
+        file=sys.stderr,
+    )
     preset_choice = ask("    preset", default="autodetect").strip().lower()
 
     # 3. Scan
@@ -308,11 +319,19 @@ def wizard(out_path: Path, *, force: bool = False) -> int:
     # 4. Pick preset
     if preset_choice in ("none", "autodetect", ""):
         chosen = pick_best(presets, scan)
-        print(f"    → auto-selected preset: {chosen.preset.display_name} (score={chosen.score})", file=sys.stderr)
+        print(
+            f"    → auto-selected preset: {chosen.preset.display_name} (score={chosen.score})",
+            file=sys.stderr,
+        )
     else:
-        sel = next((p for p in presets if p.name == preset_choice or p.display_name == preset_choice), None)
+        sel = next(
+            (p for p in presets if p.name == preset_choice or p.display_name == preset_choice), None
+        )
         if sel is None:
-            print(f"    preset {preset_choice!r} not found; falling back to autodetect", file=sys.stderr)
+            print(
+                f"    preset {preset_choice!r} not found; falling back to autodetect",
+                file=sys.stderr,
+            )
             chosen = pick_best(presets, scan)
         else:
             chosen = MatchResult(preset=sel, score=100, reasons=["wizard explicit"])
@@ -325,13 +344,19 @@ def wizard(out_path: Path, *, force: bool = False) -> int:
     print(f"\n4/7 · wrote draft to {out_path}", file=sys.stderr)
 
     # 5. Calibrate --zero prompt
-    do_zero = ask("\n5/7 · Run `calibrate --zero` now? (pose arm, press Enter) (y/n)", default="n").lower()
+    do_zero = ask(
+        "\n5/7 · Run `calibrate --zero` now? (pose arm, press Enter) (y/n)", default="n"
+    ).lower()
     if do_zero.startswith("y"):
         from robot_md.calibrate import cli_calibrate_zero
+
         cli_calibrate_zero(str(out_path))
 
     # 6. Sign calibration — noted as future
-    print("\n6/7 · calibrate --sign (encoder sign verification) — not implemented yet (task #44)", file=sys.stderr)
+    print(
+        "\n6/7 · calibrate --sign (encoder sign verification) — not implemented yet (task #44)",
+        file=sys.stderr,
+    )
 
     # 7. Hand-eye — noted as future
     print("7/7 · calibrate --hand-eye — not implemented yet (task #44)\n", file=sys.stderr)
@@ -340,7 +365,7 @@ def wizard(out_path: Path, *, force: bool = False) -> int:
     print(
         "✓ Done. Try:\n"
         f"  robot-md validate {out_path}\n"
-        f"  claude mcp add robot-md -- npx -y robot-md-mcp \"$(pwd)/{out_path.name}\"\n",
+        f'  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/{out_path.name}"\n',
         file=sys.stderr,
     )
     return 0

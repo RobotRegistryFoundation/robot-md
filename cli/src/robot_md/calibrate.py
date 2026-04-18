@@ -19,22 +19,28 @@ Scope note: tonight's v0 implements the *data pipeline* (read encoders →
 rewrite the manifest with sane comment preservation) and the `--zero` mode.
 The `--sign` mode and ArUco-based `--hand-eye` flag are follow-ups.
 """
+
 from __future__ import annotations
 
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from robot_md.parser import parse_file
+
+
+def die(msg: str) -> int:
+    """Print an error to stderr and return exit code 2."""
+    print(f"ERROR: {msg}", file=sys.stderr)
+    return 2
 
 
 @dataclass
 class JointReading:
     joint_id: str
     servo_id: int
-    current_steps: int | None   # None if the read failed
+    current_steps: int | None  # None if the read failed
 
 
 def read_current_pose(
@@ -132,7 +138,7 @@ def write_zero_pose_to_manifest(
     if end < 0:
         raise RuntimeError(f"{path}: missing closing '---' frontmatter marker")
     fm_text = text[3:end].lstrip("\n")
-    body_text = text[end + 4 :]     # includes leading newline
+    body_text = text[end + 4 :]  # includes leading newline
 
     yaml = YAML()
     yaml.preserve_quotes = True
@@ -152,6 +158,7 @@ def write_zero_pose_to_manifest(
         updated += 1
 
     import io
+
     buf = io.StringIO()
     yaml.dump(data, buf)
     new_text = "---\n" + buf.getvalue().rstrip("\n") + "\n---" + body_text
@@ -241,7 +248,13 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
             time.sleep(0.9)
 
             try:
-                ans = input("  Did the joint move in the POSITIVE convention direction? (y/n/s=skip) > ").strip().lower()
+                ans = (
+                    input(
+                        "  Did the joint move in the POSITIVE convention direction? (y/n/s=skip) > "
+                    )
+                    .strip()
+                    .lower()
+                )
             except (EOFError, KeyboardInterrupt):
                 print("\n  aborted — restoring position.", file=sys.stderr)
                 pk.write2ByteTxRx(ph, int(sid), ADDR_GOAL, start)
@@ -255,7 +268,7 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
             pk.write1ByteTxRx(ph, int(sid), ADDR_TORQUE, 0)
 
             if ans.startswith("s"):
-                print(f"  (skipped)", file=sys.stderr)
+                print("  (skipped)", file=sys.stderr)
                 continue
             signs[jid] = 1 if ans.startswith("y") else -1
             print(f"  ✓ encoder_sign[{jid}] = {signs[jid]:+d}", file=sys.stderr)
@@ -269,15 +282,16 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
     # Rewrite manifest with the new encoder_signs
     try:
         from ruamel.yaml import YAML  # type: ignore[import-not-found]
-    except ImportError as e:
+    except ImportError:
         return die("ruamel.yaml is required — `pip install ruamel.yaml`")
 
     from pathlib import Path as _Path
+
     path = _Path(manifest_path)
     text = path.read_text()
     end = text.find("\n---", 3)
     fm_text = text[3:end].lstrip("\n")
-    body_text = text[end + 4:]
+    body_text = text[end + 4 :]
     y = YAML()
     y.preserve_quotes = True
     y.indent(mapping=2, sequence=4, offset=2)
@@ -286,6 +300,7 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
         if j.get("id") in signs:
             j["encoder_sign"] = signs[j["id"]]
     import io
+
     buf = io.StringIO()
     y.dump(data, buf)
     path.write_text("---\n" + buf.getvalue().rstrip("\n") + "\n---" + body_text)

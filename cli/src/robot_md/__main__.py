@@ -113,9 +113,9 @@ def autodetect(
         None,
         "--bus",
         help="Scan a servo bus for responding IDs + limits. Format: "
-             "`<protocol>:<port>[:<baud>]` (e.g. `feetech:/dev/ttyACM0` or "
-             "`feetech:/dev/ttyACM0:1000000`). Emits a kinematics[] block "
-             "to stdout. Requires the port to be free.",
+        "`<protocol>:<port>[:<baud>]` (e.g. `feetech:/dev/ttyACM0` or "
+        "`feetech:/dev/ttyACM0:1000000`). Emits a kinematics[] block "
+        "to stdout. Requires the port to be free.",
     ),
 ) -> None:
     """Scan visible hardware and emit a draft ROBOT.md.
@@ -142,6 +142,7 @@ def autodetect(
 
         try:
             from robot_md.bus_scan import render_bus_scan_as_yaml, scan_feetech
+
             servos = scan_feetech(port, baud=baud)
         except RuntimeError as e:
             err_console.print(f"[red]✗[/red] {e}")
@@ -169,10 +170,19 @@ def autodetect(
 def init(
     name: str | None = typer.Argument(None, help="Robot name. Defaults to `robot-<hostname>`."),
     out: Path = typer.Option(Path("./ROBOT.md"), "--out", "-o", help="Write draft to this path."),
-    preset: str | None = typer.Option(None, "--preset", "-p", help="Force a specific preset (e.g. so-arm101, turtlebot4, picar-x)."),
-    wizard_mode: bool = typer.Option(False, "--wizard", help="Interactive 7-step walk-through (default is zero prompts)."),
+    preset: str | None = typer.Option(
+        None,
+        "--preset",
+        "-p",
+        help="Force a specific preset (e.g. so-arm101, turtlebot4, picar-x).",
+    ),
+    wizard_mode: bool = typer.Option(
+        False, "--wizard", help="Interactive 7-step walk-through (default is zero prompts)."
+    ),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing ROBOT.md."),
-    list_presets: bool = typer.Option(False, "--list-presets", help="Print available presets and exit."),
+    list_presets: bool = typer.Option(
+        False, "--list-presets", help="Print available presets and exit."
+    ),
 ) -> None:
     """Zero-to-ROBOT.md in one command.
 
@@ -209,7 +219,8 @@ def register(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
     endpoint: str = typer.Option(
         "https://robotregistryfoundation.org/api/v1/robots",
-        "--endpoint", help="RRF mint endpoint. Override for staging / self-hosted.",
+        "--endpoint",
+        help="RRF mint endpoint. Override for staging / self-hosted.",
     ),
     manufacturer: str | None = typer.Option(None, "--manufacturer"),
     model: str | None = typer.Option(None, "--model"),
@@ -260,9 +271,17 @@ def register(
 @app.command()
 def calibrate(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
-    zero: bool = typer.Option(False, "--zero", help="Record current encoder positions as zero_pose_steps for every joint."),
-    sign: bool = typer.Option(False, "--sign", help="Per-joint: command a small test move, ask operator for direction, set encoder_sign."),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Read encoders and print them; do not rewrite the manifest."),
+    zero: bool = typer.Option(
+        False, "--zero", help="Record current encoder positions as zero_pose_steps for every joint."
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Per-joint: command a small test move, ask operator for direction, set encoder_sign.",
+    ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Read encoders and print them; do not rewrite the manifest."
+    ),
 ) -> None:
     """Populate kinematic-solver physical fields that can't be autodetected.
 

@@ -3,6 +3,8 @@
 The live-endpoint POST is exercised via a mocked urlopen; real hits against
 https://robotregistryfoundation.org would pollute the public registry.
 """
+# ruff: noqa: SIM117  (nested `with` in pytest style is idiomatic for mock + raises)
+
 from __future__ import annotations
 
 import json
@@ -16,14 +18,11 @@ pytest.importorskip("ruamel.yaml")
 from robot_md.register import (
     DEFAULT_ENDPOINT,
     MintRequest,
-    MintResult,
     _extract_mint_fields,
     cli_register,
     post_to_rrf,
-    write_apikey,
     write_rrn_to_manifest,
 )
-
 
 BOB_MIN = """\
 ---
@@ -66,12 +65,18 @@ def _write(tmp_path: Path, content: str = BOB_MIN) -> Path:
 
 # ---- field extraction -----------------------------------------------------
 
+
 def test_extract_from_manifest(tmp_path):
     path = _write(tmp_path)
     req = _extract_mint_fields(
         path,
-        manufacturer=None, model=None, version=None, device_id=None,
-        description=None, contact_email=None, source=None,
+        manufacturer=None,
+        model=None,
+        version=None,
+        device_id=None,
+        description=None,
+        contact_email=None,
+        source=None,
     )
     assert req.manufacturer == "craigm26"
     assert req.model == "opencastor-rpi5-hailo-soarm101"
@@ -87,8 +92,13 @@ def test_cli_overrides_win(tmp_path):
     path = _write(tmp_path)
     req = _extract_mint_fields(
         path,
-        manufacturer="acme", model="rx-1", version="2.0", device_id="a-1",
-        description="prototype", contact_email="ops@acme.com", source="acme-fleet",
+        manufacturer="acme",
+        model="rx-1",
+        version="2.0",
+        device_id="a-1",
+        description="prototype",
+        contact_email="ops@acme.com",
+        source="acme-fleet",
     )
     assert req.manufacturer == "acme"
     assert req.model == "rx-1"
@@ -102,13 +112,21 @@ def test_cli_overrides_win(tmp_path):
 def test_missing_required_fields_raises(tmp_path):
     """Without manufacturer/model and no CLI overrides, we must refuse."""
     path = tmp_path / "minimal.ROBOT.md"
-    path.write_text(BOB_MIN.replace("manufacturer: craigm26\n  ", "")
-                            .replace("model: opencastor-rpi5-hailo-soarm101\n  ", ""))
+    path.write_text(
+        BOB_MIN.replace("manufacturer: craigm26\n  ", "").replace(
+            "model: opencastor-rpi5-hailo-soarm101\n  ", ""
+        )
+    )
     with pytest.raises(ValueError, match="missing required mint fields"):
         _extract_mint_fields(
             path,
-            manufacturer=None, model=None, version=None, device_id=None,
-            description=None, contact_email=None, source=None,
+            manufacturer=None,
+            model=None,
+            version=None,
+            device_id=None,
+            description=None,
+            contact_email=None,
+            source=None,
         )
 
 
@@ -118,15 +136,25 @@ def test_missing_robot_name_is_hard_error(tmp_path):
     with pytest.raises(ValueError, match="robot_name"):
         _extract_mint_fields(
             path,
-            manufacturer="x", model="y", version="1", device_id="z",
-            description=None, contact_email=None, source=None,
+            manufacturer="x",
+            model="y",
+            version="1",
+            device_id="z",
+            description=None,
+            contact_email=None,
+            source=None,
         )
 
 
 def test_as_body_strips_empty_optional(tmp_path):
     req = MintRequest(
-        manufacturer="a", model="b", version="1", device_id="c",
-        description="", contact_email="", source="x",
+        manufacturer="a",
+        model="b",
+        version="1",
+        device_id="c",
+        description="",
+        contact_email="",
+        source="x",
     )
     body = req.as_body()
     assert "description" not in body
@@ -137,22 +165,28 @@ def test_as_body_strips_empty_optional(tmp_path):
 
 # ---- network (mocked) -----------------------------------------------------
 
+
 def _mock_urlopen_ok(response_json, status=201):
     """Helper: build a context manager that returns a fake urlopen response."""
+
     class FakeResponse:
         def __init__(self, data, code):
             self._data = data.encode("utf-8") if isinstance(data, str) else data
             self.status = code
+
         def read(self):
             return self._data
+
         def __enter__(self):
             return self
+
         def __exit__(self, *a):
             return False
 
     text = json.dumps(response_json)
-    return patch("robot_md.register.urllib.request.urlopen",
-                 return_value=FakeResponse(text, status))
+    return patch(
+        "robot_md.register.urllib.request.urlopen", return_value=FakeResponse(text, status)
+    )
 
 
 def test_post_to_rrf_success():
@@ -184,8 +218,14 @@ def test_post_to_rrf_already_existed():
 
 def test_post_to_rrf_http_error_wrapped():
     import urllib.error
-    err = urllib.error.HTTPError(DEFAULT_ENDPOINT, 400, "Bad Request", {},
-                                  __import__("io").BytesIO(b'{"error":"missing fields"}'))
+
+    err = urllib.error.HTTPError(
+        DEFAULT_ENDPOINT,
+        400,
+        "Bad Request",
+        {},
+        __import__("io").BytesIO(b'{"error":"missing fields"}'),
+    )
     with patch("robot_md.register.urllib.request.urlopen", side_effect=err):
         with pytest.raises(RuntimeError, match="RRF returned 400"):
             post_to_rrf(DEFAULT_ENDPOINT, {})
@@ -199,13 +239,16 @@ def test_post_to_rrf_missing_rrn_in_response():
 
 # ---- filesystem side-effects ---------------------------------------------
 
+
 def test_write_apikey_mode_600(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     import robot_md.register as reg
+
     monkeypatch.setattr(reg, "KEYSTORE_DIR", tmp_path / ".robot-md" / "keys")
     p = reg.write_apikey("RRN-000000000999", "secret-xyz")
     assert p.exists()
     import stat
+
     st = p.stat()
     assert stat.S_IMODE(st.st_mode) == 0o600
     assert p.read_text().strip() == "secret-xyz"
@@ -234,6 +277,7 @@ def test_write_rrn_to_manifest_rejects_malformed(tmp_path):
 
 # ---- end-to-end dry-run ---------------------------------------------------
 
+
 def test_cli_register_dry_run_no_network(tmp_path, capsys):
     path = _write(tmp_path)
     # Dry run must not invoke urlopen at all
@@ -253,8 +297,8 @@ def test_cli_register_end_to_end_with_mocked_network(tmp_path):
     }
     # Redirect keystore to tmp
     from robot_md import register as reg
-    with _mock_urlopen_ok(payload, 201), \
-         patch.object(reg, "KEYSTORE_DIR", tmp_path / ".keys"):
+
+    with _mock_urlopen_ok(payload, 201), patch.object(reg, "KEYSTORE_DIR", tmp_path / ".keys"):
         rc = cli_register(str(path))
     assert rc == 0
     # Manifest should now carry the new RRN
@@ -264,6 +308,7 @@ def test_cli_register_end_to_end_with_mocked_network(tmp_path):
     assert key_path.exists()
     assert key_path.read_text().strip() == "fake-key-xyz"
     import stat
+
     assert stat.S_IMODE(key_path.stat().st_mode) == 0o600
 
 

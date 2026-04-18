@@ -22,20 +22,19 @@ Usage via CLI:
 
 Exit codes: 0 success, 2 operator error, 3 network/server error.
 """
+
 from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from robot_md.parser import parse_file
-
 
 DEFAULT_ENDPOINT = "https://robotregistryfoundation.org/api/v1/robots"
 KEYSTORE_DIR = Path.home() / ".robot-md" / "keys"
@@ -43,9 +42,11 @@ KEYSTORE_DIR = Path.home() / ".robot-md" / "keys"
 
 # --------------------------------------------------------------- request shape
 
+
 @dataclass
 class MintRequest:
     """Fields POSTed to RRF. Matches the current v0.1.x live schema."""
+
     manufacturer: str
     model: str
     version: str
@@ -82,6 +83,7 @@ class MintResult:
 
 
 # --------------------------------------------------------- manifest extraction
+
 
 def _extract_mint_fields(
     manifest_path: Path,
@@ -134,13 +136,13 @@ def _extract_mint_fields(
     if missing:
         raise ValueError(
             f"manifest missing required mint fields: {missing}. "
-            "Add them to metadata: or pass --"
-            + ", --".join(m.replace("_", "-") for m in missing)
+            "Add them to metadata: or pass --" + ", --".join(m.replace("_", "-") for m in missing)
         )
     return req
 
 
 # -------------------------------------------------------------- network + side
+
 
 def post_to_rrf(endpoint: str, body: dict[str, Any], *, timeout: float = 15.0) -> MintResult:
     """POST the mint body. Raises :class:`RuntimeError` on network or 5xx
@@ -160,13 +162,10 @@ def post_to_rrf(endpoint: str, body: dict[str, Any], *, timeout: float = 15.0) -
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            status = resp.status
             text = resp.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         err_text = e.read().decode("utf-8", errors="replace") if hasattr(e, "read") else str(e)
-        raise RuntimeError(
-            f"RRF returned {e.code}: {err_text.strip()[:500]}"
-        ) from e
+        raise RuntimeError(f"RRF returned {e.code}: {err_text.strip()[:500]}") from e
     except urllib.error.URLError as e:
         raise RuntimeError(f"could not reach {endpoint}: {e.reason}") from e
 
@@ -226,7 +225,7 @@ def write_rrn_to_manifest(manifest_path: Path, rrn: str, rcan_uri: str) -> None:
     if end < 0:
         raise RuntimeError(f"{manifest_path}: missing closing '---' frontmatter marker")
     fm_text = text[3:end].lstrip("\n")
-    body_text = text[end + 4:]
+    body_text = text[end + 4 :]
 
     y = YAML()
     y.preserve_quotes = True
@@ -239,12 +238,14 @@ def write_rrn_to_manifest(manifest_path: Path, rrn: str, rcan_uri: str) -> None:
         meta["rcan_uri"] = rcan_uri
 
     import io
+
     buf = io.StringIO()
     y.dump(data, buf)
     manifest_path.write_text("---\n" + buf.getvalue().rstrip("\n") + "\n---" + body_text)
 
 
 # ------------------------------------------------------------------ cli entry
+
 
 def cli_register(
     manifest_path: str,
@@ -276,8 +277,13 @@ def cli_register(
     try:
         req = _extract_mint_fields(
             path,
-            manufacturer=manufacturer, model=model, version=version, device_id=device_id,
-            description=description, contact_email=contact_email, source=source,
+            manufacturer=manufacturer,
+            model=model,
+            version=version,
+            device_id=device_id,
+            description=description,
+            contact_email=contact_email,
+            source=source,
         )
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
@@ -300,16 +306,12 @@ def cli_register(
 
     if result.already_existed:
         print(
-            f"\n(already registered)\n"
-            f"  RRN: {result.rrn}\n"
-            f"  RCAN URI: {result.rcan_uri or '—'}",
+            f"\n(already registered)\n  RRN: {result.rrn}\n  RCAN URI: {result.rcan_uri or '—'}",
             file=sys.stderr,
         )
     else:
         print(
-            f"\n✓ registered on RRF\n"
-            f"  RRN: {result.rrn}\n"
-            f"  RCAN URI: {result.rcan_uri or '—'}",
+            f"\n✓ registered on RRF\n  RRN: {result.rrn}\n  RCAN URI: {result.rcan_uri or '—'}",
             file=sys.stderr,
         )
 

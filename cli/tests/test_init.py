@@ -1,7 +1,7 @@
 """Tests for `robot-md init` — preset library, matcher, and merge."""
-from __future__ import annotations
+# ruff: noqa: RUF012  (test-local duck-typed Scan/Device classes; mutable defaults are fine)
 
-from pathlib import Path
+from __future__ import annotations
 
 import pytest
 
@@ -37,6 +37,7 @@ def test_every_shipped_preset_has_physics(presets):
 
 def test_preset_match_score_for_so_arm101(presets):
     """A fake scan with a Feetech serial device should match so-arm101 strongly."""
+
     class Device:
         def __init__(self, bus=None, protocol=None, label="", path=None):
             self.bus = bus
@@ -48,7 +49,9 @@ def test_preset_match_score_for_so_arm101(presets):
         def __init__(self, devices):
             self.devices = devices
 
-    scan = Scan([Device(bus="usb", protocol="feetech", label="Feetech servo bus", path="/dev/ttyACM0")])
+    scan = Scan(
+        [Device(bus="usb", protocol="feetech", label="Feetech servo bus", path="/dev/ttyACM0")]
+    )
     so = next(p for p in presets if p.name == "so_arm101")
     r = match_score(so, scan)
     assert r.score >= 10
@@ -58,6 +61,7 @@ def test_preset_match_score_for_so_arm101(presets):
 def test_preset_match_score_zero_on_empty_scan(presets):
     class Scan:
         devices = []
+
     scan = Scan()
     so = next(p for p in presets if p.name == "so_arm101")
     assert match_score(so, scan).score == 0
@@ -75,7 +79,7 @@ def test_pick_best_returns_highest(presets):
 
     r = pick_best(presets, Scan())
     assert r is not None
-    assert r.preset.name == "so_arm101"         # highest scorer on a Feetech bus
+    assert r.preset.name == "so_arm101"  # highest scorer on a Feetech bus
 
 
 def test_merge_populates_identity_and_physics(presets):
@@ -100,7 +104,7 @@ def test_merge_overrides_port_with_scan(presets):
         bus = "usb"
         protocol = "feetech"
         label = ""
-        path = "/dev/ttyUSB7"      # unusual port — scan wins
+        path = "/dev/ttyUSB7"  # unusual port — scan wins
 
     class Scan:
         devices = [Device()]
@@ -127,7 +131,8 @@ def test_render_draft_contains_frontmatter_and_body(presets):
 
 def test_quick_writes_valid_minimal_draft(tmp_path):
     from robot_md.parser import parse_file
-    from robot_md.validate import VALID, validate as validate_parsed
+    from robot_md.validate import VALID
+    from robot_md.validate import validate as validate_parsed
 
     out = tmp_path / "ROBOT.md"
     rc = quick(out, robot_name="test-bot", preset_name="minimal", force=True)
@@ -140,7 +145,8 @@ def test_quick_writes_valid_minimal_draft(tmp_path):
 
 def test_quick_writes_valid_so_arm101_draft(tmp_path):
     from robot_md.parser import parse_file
-    from robot_md.validate import VALID, validate as validate_parsed
+    from robot_md.validate import VALID
+    from robot_md.validate import validate as validate_parsed
 
     out = tmp_path / "ROBOT.md"
     rc = quick(out, robot_name="test-arm", preset_name="so-arm101", force=True)

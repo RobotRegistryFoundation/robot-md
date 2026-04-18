@@ -435,7 +435,7 @@ def scan_system() -> Scan:
         scan.devices.extend(parse_usb(lsusb_out))
 
     scan.devices.extend(scan_tty())
-    scan.cameras = probe_cameras()                 # Tier A camera probe
+    scan.cameras = probe_cameras()  # Tier A camera probe
     scan.runtime = detect_runtime()
     return scan
 
@@ -477,19 +477,19 @@ def _physics_type(devices: list[Device]) -> str:
 #   detected device exposes a serial port.
 # `protocol_version`: sub-protocol selector (Feetech=0 SCServo, Dynamixel=2).
 DRIVER_PROFILES: dict[str, dict] = {
-    "feetech":   {"steps_per_rev": 4096, "default_baud": 1_000_000, "protocol_version": 0},
-    "scservo":   {"steps_per_rev": 4096, "default_baud": 1_000_000, "protocol_version": 0},
-    "dynamixel": {"steps_per_rev": 4096, "default_baud": 57_600,    "protocol_version": 2},
-    "odrive":    {"steps_per_rev": 8192, "default_baud": 115_200,   "protocol_version": 0},
+    "feetech": {"steps_per_rev": 4096, "default_baud": 1_000_000, "protocol_version": 0},
+    "scservo": {"steps_per_rev": 4096, "default_baud": 1_000_000, "protocol_version": 0},
+    "dynamixel": {"steps_per_rev": 4096, "default_baud": 57_600, "protocol_version": 2},
+    "odrive": {"steps_per_rev": 8192, "default_baud": 115_200, "protocol_version": 0},
     # Buses / transports with no single "canonical" baud/encoder:
-    "ros2":      {},
-    "can":       {},
-    "i2c":       {},
+    "ros2": {},
+    "can": {},
+    "i2c": {},
     # Cameras / compute — no servo semantics, but known for symmetry:
-    "depthai":   {},
+    "depthai": {},
     "picamera2": {},
-    "hailo-rt":  {},
-    "openvino":  {},
+    "hailo-rt": {},
+    "openvino": {},
 }
 
 
@@ -525,13 +525,16 @@ def probe_cameras() -> list[dict]:
     # depthai (OAK-D family)
     try:
         import depthai as dai  # type: ignore[import-not-found]
+
         for d in dai.Device.getAllAvailableDevices():
-            cameras.append({
-                "id": f"depthai-{getattr(d, 'getDeviceId', lambda: '?')()}",
-                "protocol": "depthai",
-                "model": "OAK (auto)",
-                "streams": ["rgb", "depth"],
-            })
+            cameras.append(
+                {
+                    "id": f"depthai-{getattr(d, 'getDeviceId', lambda: '?')()}",
+                    "protocol": "depthai",
+                    "model": "OAK (auto)",
+                    "streams": ["rgb", "depth"],
+                }
+            )
     except ImportError:
         pass
     except Exception:
@@ -557,12 +560,14 @@ def probe_cameras() -> list[dict]:
         if any(sp in card.lower() for sp in skip_patterns):
             continue
         seen_cards.add(card)
-        cameras.append({
-            "id": f"v4l2-{path.name}",
-            "protocol": "v4l2",
-            "port": str(path),
-            "model": card,
-        })
+        cameras.append(
+            {
+                "id": f"v4l2-{path.name}",
+                "protocol": "v4l2",
+                "port": str(path),
+                "model": card,
+            }
+        )
     return cameras
 
 
@@ -616,7 +621,8 @@ def emit_draft(scan: Scan) -> str:
         for c in scan.cameras:
             flat = ", ".join(
                 f"{k}: {v!r}" if isinstance(v, str) else f"{k}: {v}"
-                for k, v in c.items() if k != "streams"
+                for k, v in c.items()
+                if k != "streams"
             )
             lines.append(f"  - {{ {flat} }}")
     if caps:

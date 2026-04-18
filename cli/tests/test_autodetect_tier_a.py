@@ -4,9 +4,8 @@ Live-hardware calls (depthai / v4l2) are not exercised here; the probe
 function's *structure* is verified with light unit tests that don't
 depend on the host state.
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from robot_md.autodetect import (
     DRIVER_PROFILES,
@@ -42,13 +41,15 @@ def test_emit_draft_includes_cameras_when_present():
     scan = Scan(
         devices=[
             Device(
-                role="camera", driver_id="oak-d", protocol="depthai",
-                label="Luxonis OAK-D", path=None, bus="usb",
+                role="camera",
+                driver_id="oak-d",
+                protocol="depthai",
+                label="Luxonis OAK-D",
+                path=None,
+                bus="usb",
             )
         ],
-        cameras=[
-            {"id": "depthai-ABC123", "protocol": "depthai", "model": "OAK-D"}
-        ],
+        cameras=[{"id": "depthai-ABC123", "protocol": "depthai", "model": "OAK-D"}],
     )
     draft = emit_draft(scan)
     assert "cameras:" in draft
@@ -76,8 +77,12 @@ def test_driver_entry_gets_default_baud_when_profile_matches(tmp_path):
 
     devices = [
         Device(
-            role="servo_bus", driver_id="arm", protocol="feetech",
-            label="Feetech bus", path="/dev/ttyACM0", bus="usb",
+            role="servo_bus",
+            driver_id="arm",
+            protocol="feetech",
+            label="Feetech bus",
+            path="/dev/ttyACM0",
+            bus="usb",
         )
     ]
     drivers = _drivers_from_devices(devices)
@@ -95,8 +100,12 @@ def test_driver_without_port_gets_no_baud():
 
     devices = [
         Device(
-            role="npu", driver_id="hailo", protocol="hailo-rt",
-            label="Hailo-8", path=None, bus="pci",
+            role="npu",
+            driver_id="hailo",
+            protocol="hailo-rt",
+            label="Hailo-8",
+            path=None,
+            bus="pci",
         )
     ]
     drivers = _drivers_from_devices(devices)

@@ -24,6 +24,7 @@ baseline, not the ceiling. Its value is that it works from the ROBOT.md
 *alone*, so a planner on any host can do basic FK/step-conversion without
 installing robot-specific dependencies.
 """
+
 from __future__ import annotations
 
 import math
@@ -38,12 +39,12 @@ class KinematicsError(Exception):
 @dataclass
 class Joint:
     id: str
-    axis: str              # "x" | "y" | "z"
-    a_mm: float            # DH a: perpendicular to rotation axis (horizontal reach)
-    d_mm: float            # DH d: along rotation axis (axial offset)
+    axis: str  # "x" | "y" | "z"
+    a_mm: float  # DH a: perpendicular to rotation axis (horizontal reach)
+    d_mm: float  # DH d: along rotation axis (axial offset)
     limits_rad: tuple[float, float]
     servo_id: int | None
-    encoder_sign: int      # +1 or -1
+    encoder_sign: int  # +1 or -1
     zero_pose_steps: int
     steps_per_rev: int
 
@@ -60,7 +61,7 @@ class Joint:
     def rad_to_steps(self, rad: float) -> int:
         """Joint angle → encoder target."""
         delta_steps = rad / (2 * math.pi / self.steps_per_rev)
-        return int(round(self.zero_pose_steps + self.encoder_sign * delta_steps))
+        return round(self.zero_pose_steps + self.encoder_sign * delta_steps)
 
 
 class Kinematics:
@@ -138,7 +139,7 @@ class Kinematics:
 
         T = np.eye(4)
         for j in self.joints:
-            is_gripper = (self.gripper_joint_id is not None and j.id == self.gripper_joint_id)
+            is_gripper = self.gripper_joint_id is not None and j.id == self.gripper_joint_id
             theta = 0.0 if is_gripper else angles_rad.get(j.id, 0.0)
             T = T @ _rot_about(j.axis, theta)
             if is_gripper:
@@ -203,29 +204,29 @@ class Kinematics:
         # 3. "wrist target": where the wrist must be so the gripper points straight
         #    down and lands at (x, y, z). In arm-base frame, wrist is L3 above target.
         rw = r
-        zw_base = z + L3              # wrist z in arm-base frame
-        zw = zw_base - d1             # wrist z relative to shoulder joint
+        zw_base = z + L3  # wrist z in arm-base frame
+        zw = zw_base - d1  # wrist z relative to shoulder joint
 
         # 4. 2-link IK from shoulder to wrist.
         d2 = rw * rw + zw * zw
         d = math.sqrt(d2)
         if d > L1 + L2 - 1e-6:
-            raise KinematicsError(f"target unreachable: need {d:.1f}mm, max {L1+L2:.1f}mm")
+            raise KinematicsError(f"target unreachable: need {d:.1f}mm, max {L1 + L2:.1f}mm")
         if d < abs(L1 - L2) + 1e-6:
-            raise KinematicsError(f"target too close: need {d:.1f}mm, min {abs(L1-L2):.1f}mm")
+            raise KinematicsError(f"target too close: need {d:.1f}mm, min {abs(L1 - L2):.1f}mm")
 
         # Law of cosines for elbow angle (interior angle at elbow).
         cos_elbow_int = (L1 * L1 + L2 * L2 - d2) / (2.0 * L1 * L2)
         cos_elbow_int = max(-1.0, min(1.0, cos_elbow_int))
         elbow_int = math.acos(cos_elbow_int)
-        elbow_flex_mag = math.pi - elbow_int            # magnitude; 0 when straight
+        elbow_flex_mag = math.pi - elbow_int  # magnitude; 0 when straight
 
         # Shoulder lift magnitude: angle of wrist from +r axis, plus offset.
-        alpha = math.atan2(zw, rw)                       # angle of wrist from +r (standard math)
+        alpha = math.atan2(zw, rw)  # angle of wrist from +r (standard math)
         cos_beta = (L1 * L1 + d2 - L2 * L2) / (2.0 * L1 * d)
         cos_beta = max(-1.0, min(1.0, cos_beta))
         beta = math.acos(cos_beta)
-        shoulder_lift_mag = alpha + beta                 # elbow-up magnitude
+        shoulder_lift_mag = alpha + beta  # elbow-up magnitude
 
         # FK rotates about y such that +θ swings +x toward -z (i.e., positive
         # angle = arm rotates DOWN). Standard math IK assumes +θ is up.
@@ -271,6 +272,7 @@ class Kinematics:
 
 
 # ---------------------------- small transform helpers ----------------------
+
 
 def _rot_about(axis: str, theta: float):
     import numpy as np

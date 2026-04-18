@@ -3,6 +3,7 @@
 The live-hardware `scan_feetech()` call is exercised by a smoke test against
 a real arm; only its error paths and pure-data helpers are unit-tested here.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -80,6 +81,7 @@ def test_scan_feetech_errors_cleanly_without_sdk(monkeypatch):
     """If `feetech_servo_sdk` isn't importable, the scan raises a helpful
     RuntimeError pointing at the optional extras install."""
     import sys
+
     monkeypatch.setitem(sys.modules, "feetech_servo_sdk", None)
     with pytest.raises(RuntimeError) as exc:
         scan_feetech("/dev/does-not-exist")

@@ -7,15 +7,14 @@ Focuses on the parts that are topology-agnostic and provably correct:
   geometric accuracy — that depends on the chain convention and is
   verified per-robot by calibration, not here.
 """
-from __future__ import annotations
+# ruff: noqa: E501
 
-import math
+from __future__ import annotations
 
 import pytest
 
 from robot_md.kinematics import Joint, Kinematics, KinematicsError
 from robot_md.parser import parse_text
-
 
 BOB_MIN = """---
 rcan_version: "3.0"
@@ -67,8 +66,12 @@ def _kin():
 def test_loads_joints_and_gripper_config():
     k = _kin()
     assert [j.id for j in k.joints] == [
-        "shoulder_pan", "shoulder_lift", "elbow_flex",
-        "wrist_flex", "wrist_roll", "gripper",
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper",
     ]
     assert k.gripper_joint_id == "gripper"
     assert k.gripper_tip_offset_mm == [0, 0, 30]
@@ -101,8 +104,14 @@ def test_encoder_sign_inverts_direction():
     j = k.by_id["shoulder_lift"]
     # Build a mirror joint with encoder_sign=-1
     mirror = Joint(
-        id=j.id, axis=j.axis, a_mm=j.a_mm, d_mm=j.d_mm, limits_rad=j.limits_rad,
-        servo_id=j.servo_id, encoder_sign=-1, zero_pose_steps=j.zero_pose_steps,
+        id=j.id,
+        axis=j.axis,
+        a_mm=j.a_mm,
+        d_mm=j.d_mm,
+        limits_rad=j.limits_rad,
+        servo_id=j.servo_id,
+        encoder_sign=-1,
+        zero_pose_steps=j.zero_pose_steps,
         steps_per_rev=j.steps_per_rev,
     )
     for s in (1000, 2048, 3000):
@@ -123,8 +132,14 @@ def test_full_steps_to_angles_maps_all_joints():
 def test_angles_to_step_targets_inverts_bulk():
     """steps_to_angles followed by angles_to_step_targets is the identity."""
     k = _kin()
-    original = {"shoulder_pan": 2100, "shoulder_lift": 1900, "elbow_flex": 3700,
-                "wrist_flex": 2000, "wrist_roll": 2048, "gripper": 1500}
+    original = {
+        "shoulder_pan": 2100,
+        "shoulder_lift": 1900,
+        "elbow_flex": 3700,
+        "wrist_flex": 2000,
+        "wrist_roll": 2048,
+        "gripper": 1500,
+    }
     angles = k.steps_to_angles(original)
     back = k.angles_to_step_targets(angles)
     for k_, v in original.items():
