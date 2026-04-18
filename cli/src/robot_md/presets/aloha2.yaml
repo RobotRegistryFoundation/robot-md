@@ -1,0 +1,212 @@
+# robot-md preset — ALOHA 2 (bimanual teleoperation rig, Trossen Robotics).
+# Apply with: robot-md init --preset aloha2
+#
+# ALOHA 2 is a bimanual low-cost teleop platform: two 6-DoF ViperX-300s
+# follower arms + two 6-DoF WidowX-250s leader arms + 4 RGB cameras,
+# published by Stanford & Google DeepMind as the standard for bimanual
+# imitation-learning research. This preset models the follower-arm side
+# (the robot the planner drives); the leader side is teleop-only input.
+
+match:
+  drivers:
+    protocol: dynamixel
+  name_hints: ["aloha", "viperx", "trossen"]
+  pci_hints: ["Logitech C922"]       # ALOHA 2's reference cameras
+
+physics:
+  type: arm                          # bimanual treated as arm at the schema level
+  dof: 12                            # 6 per follower × 2 arms (leader is input-only)
+  solver:
+    convention: DH
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 4096            # Dynamixel XM/XL native
+    camera:
+      mount: world                   # 4 cameras: top + both wrists + front
+      extrinsic: null
+    gripper:
+      joint_id: left_gripper         # left by convention — operator tunes
+      tip_offset_mm: [50, 0, 0]
+      open_steps: 2800
+      close_steps: 2100
+  kinematics:
+    # Left follower (ViperX-300s)
+    - id: left_waist
+      axis: z
+      limits_deg: [-180, 180]
+      length_mm: 126
+      a_mm: 0
+      d_mm: 126
+      servo_id: 1
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: left_shoulder
+      axis: y
+      limits_deg: [-108, 114]
+      length_mm: 305
+      a_mm: 305
+      d_mm: 0
+      servo_id: 2
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: left_elbow
+      axis: y
+      limits_deg: [-123, 92]
+      length_mm: 250
+      a_mm: 250
+      d_mm: 0
+      servo_id: 4
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: left_forearm_roll
+      axis: x
+      limits_deg: [-180, 180]
+      length_mm: 72
+      a_mm: 72
+      d_mm: 0
+      servo_id: 6
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: left_wrist_angle
+      axis: y
+      limits_deg: [-100, 123]
+      length_mm: 103
+      a_mm: 103
+      d_mm: 0
+      servo_id: 7
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: left_wrist_rotate
+      axis: x
+      limits_deg: [-180, 180]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+      servo_id: 8
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    # Right follower (ViperX-300s)
+    - id: right_waist
+      axis: z
+      limits_deg: [-180, 180]
+      length_mm: 126
+      a_mm: 0
+      d_mm: 126
+      servo_id: 11
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: right_shoulder
+      axis: y
+      limits_deg: [-108, 114]
+      length_mm: 305
+      a_mm: 305
+      d_mm: 0
+      servo_id: 12
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: right_elbow
+      axis: y
+      limits_deg: [-123, 92]
+      length_mm: 250
+      a_mm: 250
+      d_mm: 0
+      servo_id: 14
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: right_forearm_roll
+      axis: x
+      limits_deg: [-180, 180]
+      length_mm: 72
+      a_mm: 72
+      d_mm: 0
+      servo_id: 16
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: right_wrist_angle
+      axis: y
+      limits_deg: [-100, 123]
+      length_mm: 103
+      a_mm: 103
+      d_mm: 0
+      servo_id: 17
+      encoder_sign: 1
+      zero_pose_steps: 2048
+    - id: right_wrist_rotate
+      axis: x
+      limits_deg: [-180, 180]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+      servo_id: 18
+      encoder_sign: 1
+      zero_pose_steps: 2048
+
+drivers:
+  - id: left_arm
+    protocol: dynamixel
+    port: /dev/ttyUSB0
+    baud_rate: 1000000
+    model: XM540/XM430               # ViperX-300s mixed chain
+    count: 8                         # 6 joints + 2 (shoulder + elbow dual servos)
+  - id: right_arm
+    protocol: dynamixel
+    port: /dev/ttyUSB1
+    baud_rate: 1000000
+    model: XM540/XM430
+    count: 8
+  - id: cam_top
+    protocol: uvc
+    model: Logitech C922
+    path: /dev/video0
+  - id: cam_front
+    protocol: uvc
+    model: Logitech C922
+    path: /dev/video2
+  - id: cam_wrist_left
+    protocol: uvc
+    model: Logitech C922
+    path: /dev/video4
+  - id: cam_wrist_right
+    protocol: uvc
+    model: Logitech C922
+    path: /dev/video6
+
+capabilities:
+  - arm.pick
+  - arm.place
+  - arm.reach
+  - arm.home
+  - bimanual.handover                # core ALOHA capability
+  - teleop.follow
+  - vision.describe
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_joint_velocity_dps: 180
+  payload_kg: 0.5                    # per arm
+  estop:
+    hardware: false                  # operator must wire one externally
+    software: true
+    response_ms: 100
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+    - scope: bimanual
+      require_auth: true             # coordinated-motion mistakes are costly
+
+body_hints:
+  identity: |
+    ALOHA 2 bimanual rig — two 6-DoF ViperX-300s follower arms on a shared
+    frame with four RGB cameras (top, front, and one per wrist). Stationary,
+    workspace ~600 mm radius per arm, payload ≤ 500 g per arm.
+  capabilities: |
+    Single-arm pick/place/reach or coordinated bimanual handovers. The
+    leader-arm side is a separate teleop input path (not exposed here).
+    Cameras cover 4 angles — ideal for imitation-learning dataset capture.
+  safety: |
+    Software e-stop at 100 ms. Bimanual actions route through an explicit
+    `bimanual` HITL gate because coordinated-motion mistakes can make the
+    two arms hit each other. Operator should also wire a hardware e-stop
+    on the power rail.

@@ -5,6 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.2.2] - 2026-04-17
+
+"Proceed with all recommendations" release. Adds a diagnostic verb, five
+new presets, a Claude-Code-native onboarding path, and clear labeling of
+the terminal vs. in-session on-ramps.
+
+### Added
+
+- **`robot-md doctor`** — diagnostic verb. Runs five buckets of checks
+  (install, manifest, network, drivers, keystore) and prints a rich
+  table. `--json` for CI, `--strict` to exit non-zero on warnings.
+  Read-only: never writes files, never touches servo state.
+- **Five new presets**: `franka-panda` (7-DoF Franka FCI arm),
+  `ur5e` (6-DoF Universal Robots cobot), `koch-arm` (5+1-DoF LeRobot
+  teleop rig, Dynamixel), `aloha2` (bimanual 12-DoF ViperX-300s),
+  `unitree-go2` (12-DoF quadruped via Unitree SDK 2). All ship with
+  realistic DH params + driver blocks; operators calibrate from there.
+- **`docs/getting-started-claude-code.md`** — onboarding walkthrough
+  for operators who want Claude Code itself to run the setup. Paste
+  one English sentence; Claude uses its `Bash` tool to run the same
+  one-liner as the terminal path and wires up MCP afterwards.
+- **Two-path getting-started section** in the README and the website.
+  The one-liner is now explicitly labeled "▶ On your machine
+  (terminal)" and a parallel "▶ Inside Claude Code" card shows the
+  prompt-driven flow. SessionStart hook becomes Option C.
+
+### Fixed
+
+- **`bob.ROBOT.md`** `network.rrf_endpoint` was pointing at
+  `robotregistryfoundation.org` (the governance site). Updated to
+  `https://rcan.dev` so `robot-md doctor` against the example
+  resolves correctly.
+
+---
+
 ## [0.2.1] - 2026-04-18
 
 One-command-complete-setup release. Patch-bump to land three audit-driven

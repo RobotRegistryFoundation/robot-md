@@ -414,6 +414,79 @@ def unregister(
 
 
 @app.command()
+def doctor(
+    path: Path | None = typer.Option(
+        None,
+        "--path",
+        help="Target a specific ROBOT.md file (default: ./ROBOT.md if present).",
+    ),
+    strict: bool = typer.Option(
+        False, "--strict", help="Exit non-zero on warnings as well as failures."
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit results as JSON instead of a rich table."
+    ),
+) -> None:
+    """Diagnose the local environment + manifest.
+
+    Runs five buckets of checks: install (CLI + deps), manifest (parse + schema),
+    network (registry reachable + RRN resolvable), drivers (serial/TCP probe per
+    declared driver), and keystore (API key file permissions).
+
+    Never writes files, never mutates servos, never hits registry write
+    endpoints. Safe to run anywhere, anytime.
+
+    Examples:
+
+      robot-md doctor                          # check ./ROBOT.md + env
+      robot-md doctor --path examples/bob.ROBOT.md
+      robot-md doctor --strict --json          # CI-friendly
+    """
+    from robot_md.doctor import counts, exit_code, run_all
+
+    results = run_all(path)
+    c = counts(results)
+
+    if json_out:
+        import json
+
+        payload = {
+            "version": __version__,
+            "summary": c,
+            "checks": [
+                {"name": r.name, "bucket": r.bucket, "status": r.status, "detail": r.detail}
+                for r in results
+            ],
+        }
+        typer.echo(json.dumps(payload, indent=2))
+    else:
+        from rich.table import Table
+
+        table = Table(title="robot-md doctor", show_lines=False)
+        table.add_column("Bucket", style="dim", no_wrap=True)
+        table.add_column("Check", no_wrap=True)
+        table.add_column("Status", no_wrap=True)
+        table.add_column("Detail")
+        glyph = {
+            "pass": "[green]✓[/green]",
+            "warn": "[yellow]⚠[/yellow]",
+            "fail": "[red]✗[/red]",
+            "skip": "[dim]—[/dim]",
+        }
+        for r in results:
+            table.add_row(r.bucket, r.name, glyph.get(r.status, r.status), r.detail)
+        out_console.print(table)
+        out_console.print(
+            f"  [green]{c['pass']} pass[/green]  "
+            f"[yellow]{c['warn']} warn[/yellow]  "
+            f"[red]{c['fail']} fail[/red]  "
+            f"[dim]{c['skip']} skip[/dim]"
+        )
+
+    raise typer.Exit(code=exit_code(results, strict))
+
+
+@app.command()
 def calibrate(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
     zero: bool = typer.Option(

@@ -602,13 +602,24 @@
     One file at the root of your robot. YAML frontmatter a schema can trust, markdown prose a planner can read. <em>The CLAUDE.md of physical machines</em> — so the same agent that ships your code can safely drive your arm, your rover, your humanoid.
   </p>
 
-  <div style="margin: 28px 0 10px; padding: 20px 24px; border: 2px solid var(--accent); background: var(--paper-2); position: relative">
-    <div style="font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; font-weight: 600">Get started in one command</div>
-    <div style="font-family: var(--mono); font-size: 15px; color: var(--ink); padding: 8px 12px; background: var(--ink); color: var(--paper); border-radius: 2px; overflow-x: auto; white-space: nowrap">
-      <span style="color: #ff9b76">$</span> pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 --register
+  <div style="margin: 28px 0 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px">
+    <div style="padding: 18px 20px; border: 2px solid var(--accent); background: var(--paper-2); position: relative">
+      <div style="font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; font-weight: 600">▶ On your machine (terminal)</div>
+      <div style="font-family: var(--mono); font-size: 14px; color: var(--paper); padding: 8px 12px; background: var(--ink); border-radius: 2px; overflow-x: auto; white-space: nowrap">
+        <span style="color: #ff9b76">$</span> pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 --register
+      </div>
+      <div style="font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink-2); margin-top: 10px; line-height: 1.45">
+        One line. Scans hardware, writes <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">ROBOT.md</code>, mints an RRN at <a href="https://rcan.dev" style="border-bottom: 1px solid currentColor; color: var(--accent-ink)">rcan.dev</a>, prints the <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">claude mcp add</code> line.
+      </div>
     </div>
-    <div style="font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--ink-2); margin-top: 10px; line-height: 1.4">
-      That's it. Scans your hardware, writes a validated <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">ROBOT.md</code>, mints an <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">RRN</code> at <a href="https://rcan.dev" style="border-bottom: 1px solid currentColor; color: var(--accent-ink)">rcan.dev</a>, prints the <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">claude mcp add</code> line for any MCP agent. No runtime. No wizard. No YAML editing.
+    <div style="padding: 18px 20px; border: 2px dashed var(--accent); background: var(--paper-2); position: relative">
+      <div style="font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; font-weight: 600">▶ Inside Claude Code (ask Claude)</div>
+      <div style="font-family: var(--serif); font-size: 14px; color: var(--ink); padding: 8px 12px; background: var(--paper); border-left: 3px solid var(--accent); border-radius: 0; line-height: 1.4">
+        "Set up a ROBOT.md for this robot. Use the <b>so-arm101</b> preset. Register under manufacturer <b>acme</b>, email <b>me@acme.com</b>. Then add the robot-md MCP server."
+      </div>
+      <div style="font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink-2); margin-top: 10px; line-height: 1.45">
+        Paste that sentence. Claude uses its <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">Bash</code> tool to run the one-liner, wires up MCP, and verifies. <a href="https://github.com/RobotRegistryFoundation/robot-md/blob/main/docs/getting-started-claude-code.md" style="border-bottom: 1px solid currentColor; color: var(--accent-ink)">Full walkthrough →</a>
+      </div>
     </div>
   </div>
 
@@ -936,9 +947,21 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       </div>
     </div>
 
+    <!-- Two on-ramps: terminal vs. Claude-Code -->
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:12px 0 26px">
+      <div style="padding:14px 18px; border:1px solid var(--rule); background:var(--paper-2)">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:6px">▶ Path A — On your machine (terminal)</div>
+        <p style="margin:0; font-family:var(--serif); font-size:14.5px; color:var(--ink-2); line-height:1.5">You're at a shell on the robot (or a laptop with the robot plugged in). Run the one-liner below in the terminal. The full demo is shown at left.</p>
+      </div>
+      <div style="padding:14px 18px; border:1px dashed var(--rule); background:var(--paper-2)">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:6px">▶ Path B — Inside Claude Code (ask Claude)</div>
+        <p style="margin:0; font-family:var(--serif); font-size:14.5px; color:var(--ink-2); line-height:1.5">You already have Claude Code open. Paste one English sentence; Claude runs the same commands via its <code>Bash</code> tool and wires up MCP for you. <a href="https://github.com/RobotRegistryFoundation/robot-md/blob/main/docs/getting-started-claude-code.md" style="border-bottom:1px solid currentColor; color:var(--accent-ink)">Walkthrough →</a></p>
+      </div>
+    </div>
+
     <div class="try-grid">
       <div class="terminal" aria-label="Terminal session">
-        <div class="top"><i></i><i></i><i></i><span>~/projects/my-bob · zsh</span></div>
+        <div class="top"><i></i><i></i><i></i><span>Path A · terminal · ~/projects/my-bob · zsh</span></div>
 <pre class="body"><span class="c"># The whole thing — one command, zero OpenCastor, zero config files:</span>
 <span class="p">$</span> pip install robot-md &amp;&amp; \
       robot-md init my-bob <span class="c">--preset so-arm101 --register \</span>

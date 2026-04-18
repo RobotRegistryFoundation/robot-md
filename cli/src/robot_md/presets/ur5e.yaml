@@ -1,0 +1,105 @@
+# robot-md preset — Universal Robots UR5e (6-DoF e-Series cobot).
+# Apply with: robot-md init --preset ur5e
+#
+# DH parameters from the UR5e datasheet (classical DH). Wire format is the
+# URScript interface over TCP port 30002 (primary) or 30003 (realtime).
+
+match:
+  drivers:
+    protocol: urscript
+  name_hints: ["ur5e", "universal-robots", "ur-"]
+
+physics:
+  type: arm
+  dof: 6
+  solver:
+    convention: DH
+    base_frame: { up: z, forward: x }
+    # encoder block omitted — URScript returns joint angles in radians directly.
+    camera:
+      mount: world
+      extrinsic: null
+    # gripper block omitted — UR5e ships with a bare tool flange. Attach a
+    # specific EE (e.g. Robotiq 2F-85), add a `drivers[]` entry for it, and
+    # uncomment a gripper block here with real tip_offset_mm + step values.
+  kinematics:
+    - id: shoulder_pan
+      axis: z
+      limits_deg: [-360, 360]
+      length_mm: 163
+      a_mm: 0
+      d_mm: 163
+    - id: shoulder_lift
+      axis: y
+      limits_deg: [-360, 360]
+      length_mm: 425
+      a_mm: 425
+      d_mm: 0
+    - id: elbow
+      axis: y
+      limits_deg: [-360, 360]
+      length_mm: 392
+      a_mm: 392
+      d_mm: 0
+    - id: wrist_1
+      axis: y
+      limits_deg: [-360, 360]
+      length_mm: 133
+      a_mm: 0
+      d_mm: 133
+    - id: wrist_2
+      axis: z
+      limits_deg: [-360, 360]
+      length_mm: 100
+      a_mm: 0
+      d_mm: 100
+    - id: wrist_3
+      axis: y
+      limits_deg: [-360, 360]
+      length_mm: 100
+      a_mm: 0
+      d_mm: 100
+
+drivers:
+  - id: arm
+    protocol: urscript
+    host: 192.168.1.100              # UR default static IP — operator overrides
+    port: "30002"
+    model: UR5e
+
+capabilities:
+  - arm.pick
+  - arm.place
+  - arm.reach
+  - arm.home
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_joint_velocity_dps: 180        # conservative — UR can do much more
+  payload_kg: 5.0
+  estop:
+    hardware: true                   # UR pendant has e-stop
+    software: true
+    response_ms: 10
+  failsafe_behavior: custom          # UR's safety controller trips a "protective stop" on fault
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+    - scope: system
+      require_auth: true
+
+body_hints:
+  identity: |
+    Universal Robots UR5e — 6-DoF industrial cobot with 850 mm reach and
+    5 kg payload. Integrated safety controller handles ISO 10218 category 3
+    stops. Programmed via URScript over TCP.
+  capabilities: |
+    Pick, place, and reach within the 850 mm workspace. Tool flange only —
+    attach a gripper separately (e.g. Robotiq 2F-85) and wire it as an extra
+    driver entry.
+  safety: |
+    UR's internal safety controller trips a protective stop on force, speed,
+    or position violations — independent of the URScript layer. Keep max
+    joint velocity below 180 dps during teaching; raise after validation.

@@ -71,14 +71,6 @@ Now Claude — in Code, Desktop, or Mobile — knows your robot.
 
 ## Install
 
-PyPI publish is imminent; until then, install from the repo:
-
-```bash
-pip install git+https://github.com/RobotRegistryFoundation/robot-md.git#subdirectory=cli
-```
-
-Once `robot-md` lands on PyPI:
-
 ```bash
 pip install robot-md
 ```
@@ -87,38 +79,64 @@ Requires Python 3.10+.
 
 ## Adopt it for your robot (60 seconds)
 
-The Tier 0 flow — Claude Code alone as the runtime, no OpenCastor.
+Two on-ramps, same destination — Claude Code as the planner and the executor, no OpenCastor, no gateway.
 
-### Option A — Claude Code via MCP *(recommended)*
+---
 
-Three commands, zero config files:
+### ▶ Option A — On your machine (terminal) *(recommended)*
+
+**For:** operators at a shell prompt on the robot (or a dev laptop with the robot plugged in).
+
+One command does everything — install, scan, draft, register, print the MCP add line:
 
 ```bash
-# 1. Zero-to-ROBOT.md, one command. Auto-matches a preset (SO-ARM101,
-#    TurtleBot 4, PiCar-X, ...) and pre-fills ~85% of the manifest for
-#    known robots: DH kinematics, servo IDs, safety defaults, capabilities.
-cd ~/my-robot
-robot-md init my-bob --preset so-arm101
-# → ✓ wrote ROBOT.md (arm, 6 DoF, 5 capabilities, preset: so-arm101)
+pip install robot-md && robot-md init my-bob --preset so-arm101 --register \
+    --manufacturer acme --contact-email you@acme.com
+```
 
-# 2. Tell Claude Code about it (one line — no settings.json editing)
+What it does:
+
+1. Installs the `robot-md` CLI.
+2. Scans PCI/USB/`/dev/tty*`, matches an SO-ARM101, pre-fills ~85% of the manifest (DH kinematics, servo IDs, safety defaults, capabilities).
+3. Mints a public RRN on [rcan.dev](https://rcan.dev) and writes it back into the manifest.
+4. Prints the MCP add line for Claude Code:
+
+```bash
 claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
+```
 
-# 3. Open Claude Code. It now knows your robot.
+5. Open Claude Code — it now knows your robot.
+
+```bash
 claude
 ```
 
-For custom hardware, `robot-md init --wizard` walks you through 7 steps.
-For pure scan-to-draft without a preset, `robot-md autodetect --write
-ROBOT.md` still works as the low-level primitive.
+For custom hardware, swap the preset: `robot-md init my-bob --wizard`. For pure scan-to-draft without a preset, `robot-md autodetect --write ROBOT.md` is the low-level primitive.
 
-Claude Code gets the robot's frontmatter, capabilities, safety gates, and prose body as MCP resources. **No harness config, no provider setup, no YAML wrangling** — built for operators who just want Claude Code to understand the robot. See [`robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) for the MCP server.
+**Physical calibration** (for robots with arms): `robot-md calibrate --zero ROBOT.md` — pose the arm at its declared zero, press Enter; the CLI records encoder readings so the manifest's IK solver knows where "zero" is. Preserves YAML comments on rewrite.
 
-**Physical calibration** (for robots with arms): `robot-md calibrate --zero ROBOT.md` pose the arm at its declared zero config, press Enter — the CLI records the encoder readings so the manifest's baseline IK solver knows where "zero" is. Preserves YAML comments on rewrite.
+---
 
-### Option B — SessionStart hook (pre-MCP path)
+### ▶ Option B — Inside Claude Code (ask Claude to do it)
 
-If you can't use MCP (e.g. older Claude Code, or you want the ROBOT.md context pinned into every session unconditionally):
+**For:** operators who already have Claude Code open and would rather type a sentence than run commands.
+
+In any Claude Code session inside the robot's project directory, paste this prompt:
+
+```
+Set up a ROBOT.md for this robot. Use the so-arm101 preset.
+Register it publicly at rcan.dev under manufacturer "acme" with my
+contact email me@acme.com. Then add the robot-md MCP server to this
+session.
+```
+
+Claude will use its `Bash` tool to run the same one-liner from Option A, show you the result, and wire up the MCP server for you. See the full walkthrough (including what to paste for custom robots, how to calibrate interactively, and what Claude is allowed to do) in **[`docs/getting-started-claude-code.md`](docs/getting-started-claude-code.md)**.
+
+---
+
+### ▶ Option C — SessionStart hook (pre-MCP path)
+
+If you can't use MCP (older Claude Code, or you want the ROBOT.md context pinned into every session unconditionally):
 
 ```bash
 mkdir -p ~/.claude/hooks
@@ -127,7 +145,7 @@ chmod +x ~/.claude/hooks/robot-md.sh
 # Add one entry to ~/.claude/settings.json — see integrations/claude-code/settings.template.json.
 ```
 
-Both paths end the same way: Claude Code is the planner and the executor. No gateway, no runtime to stand up.
+All three paths end the same way: Claude Code is the planner and the executor. No gateway, no runtime to stand up.
 
 `robot-md autodetect` scans PCI + USB + `/dev/tty*` and emits a draft that validates against the v1 schema but deliberately marks identity fields (`robot_name`, `physics.type`, `dof`) as TODO — the operator is the authority on what the robot *is*.
 

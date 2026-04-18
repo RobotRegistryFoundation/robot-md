@@ -1,0 +1,77 @@
+# robot-md preset — Unitree Go2 (quadruped, 12-DoF legs).
+# Apply with: robot-md init --preset unitree-go2
+#
+# Go2 exposes three SDKs: the Unitree-SDK2 (C++/Python over CycloneDDS),
+# the ROS 2 bridge, and a high-level HTTP API on the EDU version. This
+# preset defaults to the DDS path (most capable). Locomotion is handled
+# by Unitree's onboard MPC — the planner commands velocities and modes,
+# not individual joint angles.
+
+match:
+  drivers:
+    protocol: unitree-sdk2
+  usb_hints: ["Unitree"]
+  name_hints: ["go2", "unitree"]
+
+physics:
+  type: legged                       # quadruped — 4 legs, 3 DoF each
+  dof: 12                            # 3 per leg × 4 legs (hip abduction, hip, knee)
+  solver:
+    convention: custom               # MPC handles leg IK; planner uses velocity cmds
+    base_frame: { up: z, forward: x }
+    # encoder block omitted — SDK returns joint angles in radians.
+    camera:
+      mount: world                   # Go2 has a front-facing depth camera
+      extrinsic: null
+
+drivers:
+  - id: locomotion
+    protocol: unitree-sdk2
+    host: 192.168.123.15             # Go2 default — network on robot's LAN
+    model: Go2
+  - id: camera
+    protocol: unitree-sdk2           # onboard depth camera via SDK video channel
+    model: Go2-depth
+
+capabilities:
+  - nav.go_to                        # velocity/pose commands, not waypoint planning
+  - nav.rotate
+  - nav.stop
+  - nav.stand
+  - nav.sit
+  - nav.lie
+  - vision.describe
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_linear_velocity_ms: 1.5        # Go2 can do 3+ m/s but cap for safety
+  max_angular_velocity_dps: 90
+  workspace_bounds_m: [10, 10, 2]    # operator overrides for outdoor use
+  payload_kg: 3.0                    # Go2 EDU payload rating
+  estop:
+    hardware: true                   # remote pendant has an e-stop
+    software: true
+    response_ms: 50
+  failsafe_behavior: custom           # Unitree's default: lie down on fault
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+    - scope: nav-high-speed           # over 1.0 m/s commands gate on approval
+      require_auth: true
+
+body_hints:
+  identity: |
+    Unitree Go2 — medium-sized quadruped (~15 kg, ~70 cm long) with 12 DoF
+    (3 per leg) and a front-facing depth camera. Onboard locomotion MPC
+    handles footfall timing and balance; the planner sends velocity and gait
+    commands, not individual joint angles.
+  capabilities: |
+    Locomote (go_to, rotate, stop), change posture (stand, sit, lie). Vision
+    via the onboard depth camera. Operator should add SLAM-based mapping via
+    a mounted LiDAR if the deployment needs global path planning.
+  safety: |
+    Hardware e-stop on the remote pendant. Linear velocity capped at 1.5 m/s
+    by default; commands above 1.0 m/s route through a `nav-high-speed` HITL
+    gate. On fault, the robot lies down rather than freezing mid-gait.

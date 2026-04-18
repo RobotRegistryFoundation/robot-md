@@ -1,0 +1,116 @@
+# robot-md preset — Franka Emika Panda (7-DoF research arm, FCI).
+# Apply with: robot-md init --preset franka-panda
+#
+# DH parameters from the Franka Control Interface manual (modified-DH,
+# distal convention). Values in millimeters / degrees for wire compatibility
+# with the ROBOT.md schema. Operator must calibrate zero_pose_steps per unit
+# if using absolute-joint controllers.
+
+match:
+  drivers:
+    protocol: franka-fci
+  name_hints: ["panda", "franka"]
+
+physics:
+  type: arm
+  dof: 7
+  solver:
+    convention: DH
+    base_frame: { up: z, forward: x }
+    # encoder block omitted — FCI returns joint angles in radians directly.
+    camera:
+      mount: world
+      extrinsic: null
+    # gripper block omitted — Franka Hand is a separate module with its own
+    # open/close API, not part of the arm's kinematic chain. Add a `drivers[]`
+    # entry + capability if you want the planner to actuate it.
+  kinematics:
+    - id: joint1
+      axis: z
+      limits_deg: [-166, 166]
+      length_mm: 333
+      a_mm: 0
+      d_mm: 333                      # base to shoulder
+      joint_id: 1
+    - id: joint2
+      axis: y
+      limits_deg: [-101, 101]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: joint3
+      axis: z
+      limits_deg: [-166, 166]
+      length_mm: 316
+      a_mm: 0
+      d_mm: 316
+    - id: joint4
+      axis: y
+      limits_deg: [-176, -4]
+      length_mm: 0
+      a_mm: 82.5                     # Panda offset
+      d_mm: 0
+    - id: joint5
+      axis: z
+      limits_deg: [-166, 166]
+      length_mm: 384
+      a_mm: -82.5
+      d_mm: 384
+    - id: joint6
+      axis: y
+      limits_deg: [-1, 215]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: joint7
+      axis: z
+      limits_deg: [-166, 166]
+      length_mm: 107
+      a_mm: 88
+      d_mm: 107                      # flange
+
+drivers:
+  - id: arm
+    protocol: franka-fci
+    host: 172.16.0.2                 # typical FCI static IP — operator overrides
+    port: "1337"
+  - id: gripper
+    protocol: franka-fci
+    host: 172.16.0.2                 # shared FCI endpoint
+    model: franka-hand
+
+capabilities:
+  - arm.pick
+  - arm.place
+  - arm.reach
+  - arm.home
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_joint_velocity_dps: 150        # Franka default; reduce for learning
+  payload_kg: 3.0                    # nominal — check per-joint torque limits
+  estop:
+    hardware: true                   # Panda ships with a physical e-stop
+    software: true
+    response_ms: 10
+  failsafe_behavior: custom          # Panda drops into "guiding mode" (torque-soft) on fault
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+    - scope: system
+      require_auth: true
+
+body_hints:
+  identity: |
+    Franka Emika Panda — 7-DoF research arm with torque-controlled joints and
+    a Franka Hand gripper. Workspace ~855 mm reach. Ships with a physical
+    e-stop on the operator pendant.
+  capabilities: |
+    Pick, place, reach anywhere in the 855 mm workspace. Compliance-aware via
+    FCI torque control (safe for human-robot contact at low velocities).
+  safety: |
+    Panda's hardware safety controller enforces Cartesian and joint limits
+    below FCI — violations trigger an immediate reflex stop. Keep max joint
+    velocity under 150 dps during learning; raise after validation.

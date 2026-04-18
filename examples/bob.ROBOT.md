@@ -144,7 +144,7 @@ safety:
       require_auth: true
 
 network:
-  rrf_endpoint: https://robotregistryfoundation.org
+  rrf_endpoint: https://rcan.dev
   port: 8001
   signing_alg: pqc-hybrid-v1
   transports: [http, mqtt]
