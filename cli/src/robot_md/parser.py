@@ -69,29 +69,18 @@ def _upgrade_legacy_camera(fm: dict) -> None:
 
     The first driver whose protocol looks camera-ish (`depthai`, `realsense`,
     `v4l2`, `zed`, `uvc`) is used as driver_id. If no such driver exists,
-    only upgrade if a driver with id 'camera' exists. Otherwise, leave the
-    legacy camera in place and skip the upgrade.
+    fallback to the literal string 'camera' as driver_id. The upgrade always proceeds.
     """
     solver = fm.get("physics", {}).get("solver", {})
     legacy = solver.get("camera")
     if not isinstance(legacy, dict):
         return
     drivers = fm.get("drivers") or []
-    drivers_by_id = {d.get("id"): d for d in drivers if d.get("id")}
-
     camera_proto = {"depthai", "realsense", "v4l2", "zed", "uvc"}
     driver_id = next(
         (d["id"] for d in drivers if d.get("protocol") in camera_proto and d.get("id")),
-        None,
+        "camera",
     )
-
-    # If no camera-protocol driver found, check if 'camera' driver exists
-    if driver_id is None:
-        if "camera" in drivers_by_id:
-            driver_id = "camera"
-        else:
-            # Can't find a valid driver, skip upgrade
-            return
 
     upgraded = {
         "driver_id": driver_id,
