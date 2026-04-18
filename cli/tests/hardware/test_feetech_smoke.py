@@ -1,8 +1,15 @@
-"""Hardware smoke: nudge servo ID 1 by ±1 step. Requires a real STS3215 bus."""
+"""Hardware smoke: superseded by `test_teach_replay_roundtrip.py`.
+
+This file existed as a placeholder in v0.3.0 before `ServoBus.write_positions`
+did any real I/O. The v0.4.0 real implementation now requires `open()` first
+and would raise without it. Keep the test but delegate to the richer
+roundtrip smoke that replaces it.
+"""
 
 from __future__ import annotations
 
 import os
+
 import pytest
 
 pytestmark = pytest.mark.hardware
@@ -16,12 +23,13 @@ def test_single_servo_nudge():
     from robot_md.backends.feetech_depthai.servo import ServoBus
 
     bus = ServoBus(port="/dev/ttyACM0", baud=1_000_000, count=6)
+    bus.open()
     try:
-        # Smoke: send +1 then -1 around the reference zero for shoulder_pan.
-        # Real STS3215 write-register protocol is filled in by follow-up work;
-        # the current ServoBus.write_positions is a no-op, so this smoke test
-        # documents the hardware contract rather than asserting motion.
-        bus.write_positions({"shoulder_pan": 2049})
-        bus.write_positions({"shoulder_pan": 2048})
+        bus.torque(True)
+        try:
+            bus.write_positions({"shoulder_pan": 2049})
+            bus.write_positions({"shoulder_pan": 2048})
+        finally:
+            bus.torque(False)
     finally:
         bus.close()
