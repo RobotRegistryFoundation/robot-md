@@ -52,6 +52,24 @@ def build_server(ctx: McpContext):
             confirm_token=confirm_token,
         )
 
+    @server.tool()
+    def execute_task(
+        prompt: str,
+        context: dict | None = None,
+        dry_run: bool = False,
+        confirm_token: str | None = None,
+    ) -> dict:
+        """Decompose a natural-language task into capability steps and run them."""
+        from robot_md.mcp.tools.execute_task import execute_task_tool
+
+        return execute_task_tool(
+            ctx,
+            prompt=prompt,
+            context=context,
+            dry_run=dry_run,
+            confirm_token=confirm_token,
+        )
+
     return server
 
 
