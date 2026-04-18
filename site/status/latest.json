@@ -3,26 +3,26 @@
     "critical": 0,
     "high": 0
   },
-  "generated_at": "2026-04-18T14:48:04Z",
+  "generated_at": "2026-04-18T15:28:04Z",
   "health_score": 90,
   "repos": [
     {
       "ci": "green",
-      "published_at": "2026-04-18T14:38:37Z",
+      "published_at": "2026-04-18T15:23:10Z",
       "repo": "RobotRegistryFoundation/robot-md",
-      "tag": "v0.2.2"
+      "tag": "v0.2.6"
     },
     {
       "ci": "green",
-      "published_at": "2026-04-18T13:37:11Z",
+      "published_at": "2026-04-18T15:22:08Z",
       "repo": "RobotRegistryFoundation/robot-md-mcp",
-      "tag": "v0.1.4"
+      "tag": "v0.2.1"
     },
     {
       "ci": "green",
-      "published_at": "2026-04-17T22:55:45Z",
+      "published_at": "2026-04-18T15:27:59Z",
       "repo": "continuonai/rcan-py",
-      "tag": "v2.0.0"
+      "tag": "v2.1.0"
     },
     {
       "ci": "green",
@@ -32,9 +32,9 @@
     },
     {
       "ci": "green",
-      "published_at": "2026-04-17T23:02:40Z",
+      "published_at": "2026-04-18T15:26:40Z",
       "repo": "continuonai/rcan-ts",
-      "tag": "v2.0.0"
+      "tag": "v2.1.0"
     },
     {
       "ci": "green",
