@@ -5,6 +5,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.0] - 2026-04-18
+
+Phase 1 of the adaptive backend plan (spec:
+`docs/superpowers/specs/2026-04-18-feetech-depthai-real-backend-design.md`).
+The `feetech_depthai` backend goes from stubs to real hardware drivers.
+
+### Added
+
+- **Real STS3215 wire protocol** in `backends/feetech_depthai/servo.py` —
+  ports the proven code from `examples/tier0/01..04`. ServoBus supports
+  `open/close`, `read_positions` (skips non-responders), `write_positions`,
+  `torque(on/off)`, and `interpolate(start, target, hz, max_steps_per_tick,
+  estop)` with per-tick E-stop checks.
+- **Real OAK-D pipeline** in `backends/feetech_depthai/perception.py` —
+  ports `examples/tier0/05_scene_snapshot.py`. Reads factory intrinsics,
+  builds an RGB + stereo-depth pipeline aligned to RGB, exposes
+  `grab_frame() → (rgb, depth, K)`. 3D back-projection helper `_pixel_to_3d`.
+- **Trajectory replay** in `backends/feetech_depthai/motion.py` — iterates
+  consecutive waypoint pairs, calling `ServoBus.interpolate` between them.
+  Single-waypoint trajectories dispatch as one-shot position commands.
+- **Real capability handlers** for `arm.pick`, `arm.place`, `arm.reach`,
+  `vision.describe`, `status.report`. `arm.pick` / `arm.place` replay a
+  hardcoded first-demo trajectory (small joint deltas around zero pose) —
+  swapped for skill-store lookup in Phase 2.
+- **Hardware smoke tests** (`--run-hardware`) for servo read + nudge and
+  OAK-D frame capture.
+
+### Added dependency
+
+- `feetech-servo-sdk>=1.0` joins the `feetech-depthai` optional extra.
+  Install with `pip install robot-md[feetech-depthai]`.
+
+### Scope note
+
+`arm.pick`/`arm.place` in v0.4.0 replay a hardcoded trajectory embedded in
+the capability handler. Real grasps arrive in v0.5.0 (Phase 2 — skill store).
+Perception is opened but not yet consulted during motion (Phase 3);
+pose-adjust and hand-eye are Phase 4. See the spec for the full rollout.
+
+---
+
 ## [0.3.1] - 2026-04-18
 
 Follow-up patches from the v0.3.0 final review.

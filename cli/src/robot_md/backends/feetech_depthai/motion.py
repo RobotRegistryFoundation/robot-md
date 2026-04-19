@@ -1,26 +1,55 @@
-"""DH kinematics + trajectory generator (skeleton)."""
+"""Trajectory replay + (future-P4) pose-adjust and forward kinematics.
+
+Phase 1 scope: `replay(waypoints, servo_bus, estop)` — iterates consecutive
+waypoint pairs and calls servo_bus.interpolate between them. Single-waypoint
+trajectories are treated as one-shot position commands.
+
+Forward kinematics and pose-adjust are Phase 4 (hand-eye).
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from robot_md.backends.feetech_depthai.servo import ServoBus
 from robot_md.robot_spec import RobotSpec
+
+
+@dataclass(frozen=True)
+class Waypoint:
+    t: float
+    joints: dict[str, int]
 
 
 @dataclass
 class Motion:
     spec: RobotSpec
 
-    def forward(self, joint_deg: dict[str, float]) -> tuple[float, float, float]:
-        """DH forward kinematics → (x, y, z) in mm. Stub zero."""
-        return (0.0, 0.0, 0.0)
+    @classmethod
+    def from_spec(cls, spec: RobotSpec) -> "Motion":
+        return cls(spec=spec)
 
-    def inverse(self, target_mm: tuple[float, float, float]) -> dict[str, float]:
-        """DH inverse kinematics → joint-deg map. Stub zeros."""
-        return {k.get("id", ""): 0.0 for k in self.spec.physics.kinematics if isinstance(k, dict)}
-
-    def plan_trajectory(
-        self, joint_deg: dict[str, float], *, max_dps: float
-    ) -> list[dict]:
-        """Generate a timed trajectory. Stub."""
-        return [{"t": 0.0, "joints": dict(joint_deg)}]
+    def replay(
+        self,
+        waypoints: list[Waypoint],
+        *,
+        servo_bus: ServoBus,
+        estop,
+        hz: int = 30,
+        max_steps_per_tick: int = 12,
+    ) -> None:
+        """Drive `servo_bus` through consecutive waypoint pairs."""
+        if not waypoints:
+            return
+        if len(waypoints) == 1:
+            servo_bus.write_positions(waypoints[0].joints)
+            return
+        for i in range(len(waypoints) - 1):
+            if estop.is_set():
+                return
+            start = waypoints[i].joints
+            target = waypoints[i + 1].joints
+            servo_bus.interpolate(
+                start, target,
+                hz=hz, max_steps_per_tick=max_steps_per_tick, estop=estop,
+            )

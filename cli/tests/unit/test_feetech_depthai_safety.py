@@ -1,10 +1,24 @@
 from __future__ import annotations
 
+import sys
+from unittest.mock import MagicMock
+
 import pytest
 
 from robot_md.backends.feetech_depthai import FeetechDepthaiBackend
 from robot_md.parser import parse_file
 from robot_md.robot_spec import RobotSpec
+
+
+def _install_fake_feetech(monkeypatch):
+    fake = MagicMock()
+    fp = MagicMock(); fp.openPort.return_value = True; fp.setBaudRate.return_value = True
+    fake.PortHandler.return_value = fp
+    ph = MagicMock()
+    ph.read2ByteTxRx.return_value = (2048, 0, 0)
+    fake.PacketHandler.return_value = ph
+    monkeypatch.setitem(sys.modules, "feetech_servo_sdk", fake)
+    monkeypatch.setitem(sys.modules, "depthai", None)
 
 
 def test_refuses_open_without_max_joint_velocity(fixtures_dir):
@@ -20,7 +34,8 @@ def test_refuses_open_without_max_joint_velocity(fixtures_dir):
         FeetechDepthaiBackend().open(spec)
 
 
-def test_opens_with_max_joint_velocity(fixtures_dir):
+def test_opens_with_max_joint_velocity(fixtures_dir, monkeypatch):
+    _install_fake_feetech(monkeypatch)
     parsed = parse_file(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
     parsed.frontmatter["safety"]["max_joint_velocity_dps"] = 180
     spec = RobotSpec.from_parsed(parsed)
@@ -30,7 +45,8 @@ def test_opens_with_max_joint_velocity(fixtures_dir):
     backend.close()
 
 
-def test_scene_describe_returns_snapshot_after_open(fixtures_dir):
+def test_scene_describe_returns_snapshot_after_open(fixtures_dir, monkeypatch):
+    _install_fake_feetech(monkeypatch)
     parsed = parse_file(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
     parsed.frontmatter["safety"]["max_joint_velocity_dps"] = 180
     spec = RobotSpec.from_parsed(parsed)
@@ -39,10 +55,9 @@ def test_scene_describe_returns_snapshot_after_open(fixtures_dir):
     try:
         snap = backend.scene_describe()
         assert snap is not None
-        # Stubs return empty: no detections, no frame, empty joint state, ts > 0
+        # After open, perception fails to initialize (depthai mocked to None) so frame should be None
         assert snap.detections == ()
         assert snap.frame is None
-        assert snap.joint_state == {}
         assert snap.ts > 0
     finally:
         backend.close()

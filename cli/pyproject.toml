@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robot-md"
-version = "0.3.1"
+version = "0.4.0"
 description = "ROBOT.md — a single self-describing file so Claude can safely operate your robot."
 readme = "../README.md"
 requires-python = ">=3.10"
@@ -58,6 +58,7 @@ feetech-depthai = [
     "depthai>=2.24",
     "opencv-python>=4.8",
     "numpy>=1.24",
+    "feetech-servo-sdk>=1.0",
 ]
 
 [project.scripts]
