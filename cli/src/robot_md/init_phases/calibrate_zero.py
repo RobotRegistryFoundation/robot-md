@@ -21,7 +21,10 @@ def _probe_feetech_port(port: str, baud: int = 1_000_000) -> bool:
         from feetech_servo_sdk import PacketHandler, PortHandler  # lazy
     except Exception:
         return False
-    ph = PortHandler(port)
+    try:
+        ph = PortHandler(port)
+    except Exception:
+        return False
     try:
         if not ph.openPort():
             return False
