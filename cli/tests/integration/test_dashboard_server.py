@@ -63,3 +63,34 @@ def test_dashboard_frame_returns_404_when_none(dashboard_app):
     with TestClient(app) as client:
         r = client.get("/api/frame/latest.png")
         assert r.status_code == 404
+
+
+def test_dashboard_tunnel_returns_empty_when_absent(dashboard_app):
+    app, tmp_path = dashboard_app
+    # tunnel.json does not exist
+    with TestClient(app) as client:
+        r = client.get("/api/tunnel")
+        assert r.status_code == 200
+        assert r.json() == {}
+
+
+def test_dashboard_tunnel_returns_json_when_present(dashboard_app):
+    app, tmp_path = dashboard_app
+    tunnel_json = tmp_path / ".robot-md" / "tunnel.json"
+    tunnel_json.write_text('{"url": "https://abc.trycloudflare.com", "alive": true, "since": 123.4}')
+    with TestClient(app) as client:
+        r = client.get("/api/tunnel")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["url"] == "https://abc.trycloudflare.com"
+        assert body["alive"] is True
+
+
+def test_dashboard_tunnel_returns_empty_on_malformed_json(dashboard_app):
+    app, tmp_path = dashboard_app
+    tunnel_json = tmp_path / ".robot-md" / "tunnel.json"
+    tunnel_json.write_text("not valid json {")
+    with TestClient(app) as client:
+        r = client.get("/api/tunnel")
+        assert r.status_code == 200
+        assert r.json() == {}
