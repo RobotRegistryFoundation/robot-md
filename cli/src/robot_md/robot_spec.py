@@ -84,6 +84,21 @@ class CapabilityContract:
 
 
 @dataclass(frozen=True)
+class ObjectDescriptor:
+    id: str
+    detector: str
+    params: dict
+
+
+@dataclass(frozen=True)
+class VisionBlock:
+    object_descriptors: tuple[ObjectDescriptor, ...]
+
+    def find(self, descriptor_id: str) -> ObjectDescriptor | None:
+        return next((d for d in self.object_descriptors if d.id == descriptor_id), None)
+
+
+@dataclass(frozen=True)
 class MetadataBlock:
     robot_name: str
     rrn: str | None
@@ -139,6 +154,7 @@ class RobotSpec:
     brain: BrainBlock | None
     raw_yaml: str
     capability_contracts: dict[str, CapabilityContract]
+    vision: VisionBlock
 
     @classmethod
     def from_parsed(cls, parsed: ParsedRobotMd) -> RobotSpec:
@@ -216,6 +232,18 @@ class RobotSpec:
             )
             capability_contracts[cap] = CapabilityContract(preconditions=pres)
 
+        vision_raw = fm.get("vision") or {}
+        descs = tuple(
+            ObjectDescriptor(
+                id=d["id"],
+                detector=d["detector"],
+                params=dict(d.get("params") or {}),
+            )
+            for d in (vision_raw.get("object_descriptors") or [])
+            if isinstance(d, dict) and "id" in d and "detector" in d
+        )
+        vision_block = VisionBlock(object_descriptors=descs)
+
         workspace = safety.get("workspace_bounds_m")
         workspace_tuple: tuple[float, float, float] | None = None
         if workspace and len(workspace) == 3:
@@ -270,4 +298,5 @@ class RobotSpec:
             brain=brain_block,
             raw_yaml=yaml.safe_dump(fm, sort_keys=False),
             capability_contracts=capability_contracts,
+            vision=vision_block,
         )

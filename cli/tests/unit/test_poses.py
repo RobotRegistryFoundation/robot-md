@@ -134,3 +134,74 @@ safety: {estop: {software: true, response_ms: 100}}
 """
     spec = RobotSpec.from_parsed(parse_text(text))
     assert spec.capability_contracts == {}
+
+
+def test_spec_surfaces_object_descriptors():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [vision.find, status.report]
+vision:
+  object_descriptors:
+    - id: red_lego
+      detector: hsv
+      params:
+        h_ranges: [[0, 10], [170, 180]]
+        s_min: 110
+        v_min: 80
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    descs = spec.vision.object_descriptors
+    assert descs[0].id == "red_lego"
+    assert descs[0].detector == "hsv"
+    assert descs[0].params["s_min"] == 110
+
+
+def test_spec_vision_find_returns_descriptor():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [vision.find]
+vision:
+  object_descriptors:
+    - id: red_lego
+      detector: hsv
+      params: {h_ranges: [[0,10]], s_min: 110, v_min: 80}
+    - id: white_bowl
+      detector: hsv_roi
+      params: {s_max: 80, v_min: 100, roi: {u_max: 450, v_max: 360}}
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    red = spec.vision.find("red_lego")
+    assert red is not None
+    assert red.detector == "hsv"
+    bowl = spec.vision.find("white_bowl")
+    assert bowl is not None
+    assert bowl.params["s_max"] == 80
+    assert spec.vision.find("nonexistent") is None
+
+
+def test_spec_vision_empty_when_absent():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    assert spec.vision.object_descriptors == ()
+    assert spec.vision.find("anything") is None
