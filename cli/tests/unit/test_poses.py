@@ -95,3 +95,42 @@ def test_write_pose_overwrites_existing(tmp_path):
     write_pose_to_manifest(manifest, name="ready", joints={"shoulder_pan": 999})
     fm = yaml.safe_load(manifest.read_text().split("---")[1])
     assert fm["physics"]["poses"]["ready"]["joints"]["shoulder_pan"] == 999
+
+
+def test_spec_surfaces_capability_contracts():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [arm.pick, status.report]
+capability_contracts:
+  arm.pick:
+    preconditions:
+      - {kind: pose_taught, name: ready}
+      - {kind: extrinsic_present}
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    assert "arm.pick" in spec.capability_contracts
+    pre = spec.capability_contracts["arm.pick"].preconditions
+    assert pre[0].kind == "pose_taught"
+    assert pre[0].name == "ready"
+    assert pre[1].kind == "extrinsic_present"
+
+
+def test_spec_capability_contracts_empty_when_absent():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    assert spec.capability_contracts == {}

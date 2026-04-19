@@ -72,6 +72,18 @@ class PoseDef:
 
 
 @dataclass(frozen=True)
+class Precondition:
+    kind: str
+    name: str | None
+    detail: dict
+
+
+@dataclass(frozen=True)
+class CapabilityContract:
+    preconditions: tuple[Precondition, ...]
+
+
+@dataclass(frozen=True)
 class MetadataBlock:
     robot_name: str
     rrn: str | None
@@ -126,6 +138,7 @@ class RobotSpec:
     capabilities: frozenset[str]
     brain: BrainBlock | None
     raw_yaml: str
+    capability_contracts: dict[str, CapabilityContract]
 
     @classmethod
     def from_parsed(cls, parsed: ParsedRobotMd) -> RobotSpec:
@@ -187,6 +200,22 @@ class RobotSpec:
             if isinstance(p, dict)
         }
 
+        contracts_raw = fm.get("capability_contracts") or {}
+        capability_contracts: dict[str, CapabilityContract] = {}
+        for cap, c in contracts_raw.items():
+            if not isinstance(c, dict):
+                continue
+            pres = tuple(
+                Precondition(
+                    kind=p.get("kind", ""),
+                    name=p.get("name"),
+                    detail=dict(p.get("detail") or {}),
+                )
+                for p in (c.get("preconditions") or [])
+                if isinstance(p, dict)
+            )
+            capability_contracts[cap] = CapabilityContract(preconditions=pres)
+
         workspace = safety.get("workspace_bounds_m")
         workspace_tuple: tuple[float, float, float] | None = None
         if workspace and len(workspace) == 3:
@@ -240,4 +269,5 @@ class RobotSpec:
             capabilities=frozenset(fm.get("capabilities") or ()),
             brain=brain_block,
             raw_yaml=yaml.safe_dump(fm, sort_keys=False),
+            capability_contracts=capability_contracts,
         )
