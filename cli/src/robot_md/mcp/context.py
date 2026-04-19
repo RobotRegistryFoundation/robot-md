@@ -77,7 +77,18 @@ def load_context(manifest_path: Path) -> McpContext:
                 "refusing to open backend: safety.max_joint_velocity_dps is "
                 "required but missing from ROBOT.md"
             )
-        backend.open(spec)
+        try:
+            backend.open(spec)
+        except ImportError as e:
+            # Optional hardware dep not installed (e.g. feetech_servo_sdk,
+            # depthai). Degrade to a backend-less context so render/validate
+            # still work. execute_capability will return no_backend.
+            import logging as _logging
+
+            _logging.getLogger("robot_md.mcp").warning(
+                "backend.open failed due to missing dep (%s); running without backend", e
+            )
+            backend = None
 
     ctx = McpContext(
         manifest_path=manifest_path,
