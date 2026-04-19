@@ -446,6 +446,37 @@
         "^x-[a-z0-9_-]+$": { "type": "object" }
       },
       "additionalProperties": false
+    },
+    "capability_contracts": {
+      "type": "object",
+      "description": "Per-capability preconditions and arg/return contracts.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "pose_taught",
+                    "extrinsic_present",
+                    "ik_provider_set",
+                    "workspace_declared",
+                    "learned_skill_ok",
+                    "backend_resolved"
+                  ]
+                },
+                "name": { "type": "string" },
+                "detail": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "additionalProperties": true
