@@ -25,6 +25,7 @@ from robot_md.init_phases.calibrate_sign import phase_calibrate_sign  # noqa: E4
 from robot_md.init_phases.calibrate_zero import phase_calibrate_zero  # noqa: E402
 from robot_md.init_phases.install_mcp import phase_install_mcp  # noqa: E402
 from robot_md.init_phases.install_skill import phase_install_skill  # noqa: E402
+from robot_md.init_phases.register import phase_register  # noqa: E402
 
 __all__ = [
     "PhaseResult",
@@ -33,4 +34,5 @@ __all__ = [
     "phase_calibrate_zero",
     "phase_install_mcp",
     "phase_install_skill",
+    "phase_register",
 ]
