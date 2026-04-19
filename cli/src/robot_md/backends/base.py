@@ -39,6 +39,7 @@ class SceneSnapshot:
 class CapabilityBackend(ABC):
     name: str = "abstract"
     protocols: frozenset[str] = frozenset()
+    read_only_capabilities: frozenset[str] = frozenset()
 
     @abstractmethod
     def open(self, spec: RobotSpec) -> None:

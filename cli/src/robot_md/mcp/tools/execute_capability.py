@@ -27,7 +27,8 @@ def execute_capability_tool(
     # Safety short-circuits come first — E-stop is a hard stop that should
     # outrank any consent workflow. A HITL gate satisfied between estop-set
     # and command-dispatch must not race past a stopped server.
-    if ctx.estop.is_set():
+    read_only = getattr(ctx.backend, "read_only_capabilities", frozenset())
+    if ctx.estop.is_set() and capability not in read_only:
         return {"status": "blocked", "trajectory": None, "events": [],
                 "error": {"reason": "estop_set"}}
 

@@ -9,6 +9,7 @@ from robot_md.robot_spec import RobotSpec
 class FeetechDepthaiBackend(CapabilityBackend):
     name = "feetech_depthai"
     protocols = frozenset({"feetech", "depthai"})
+    read_only_capabilities = frozenset({"status.report", "vision.describe"})
 
     def __init__(self) -> None:
         self._spec: RobotSpec | None = None
