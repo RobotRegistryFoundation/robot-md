@@ -209,6 +209,24 @@
       },
       "additionalProperties": true
     },
+    "vision": {
+      "type": "object",
+      "description": "Perception vocabulary — objects the robot knows how to see.",
+      "properties": {
+        "object_descriptors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "detector", "params"],
+            "properties": {
+              "id":       {"type": "string"},
+              "detector": {"type": "string", "enum": ["hsv", "hsv_roi"]},
+              "params":   {"type": "object"}
+            }
+          }
+        }
+      }
+    },
     "drivers": {
       "type": "array",
       "minItems": 1,
