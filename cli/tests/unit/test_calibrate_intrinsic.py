@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -33,7 +32,10 @@ def test_add_frame_updates_progress(tmp_path, monkeypatch):
     session_init(session_file=session_file, driver_id="oak-d-1", stream="rgb", board_size=(9, 6))
 
     import robot_md.calibrate_intrinsic as m
-    monkeypatch.setattr(m, "_detect_corners", lambda img, size: (True, [[0, 0]] * (size[0] * size[1])))
+
+    monkeypatch.setattr(
+        m, "_detect_corners", lambda img, size: (True, [[0, 0]] * (size[0] * size[1]))
+    )
     monkeypatch.setattr(m, "_load_image", lambda p: b"fake-img")
 
     session_add_frame(session_file=session_file, frame_path=tmp_path / "frame1.png")
@@ -47,6 +49,7 @@ def test_add_frame_records_no_detection(tmp_path, monkeypatch):
     session_init(session_file=session_file, driver_id="oak-d-1", stream="rgb", board_size=(9, 6))
 
     import robot_md.calibrate_intrinsic as m
+
     monkeypatch.setattr(m, "_detect_corners", lambda img, size: (False, None))
     monkeypatch.setattr(m, "_load_image", lambda p: b"fake-img")
 
@@ -63,13 +66,22 @@ def test_finalize_writes_intrinsic_into_robot_md(tmp_path, monkeypatch, fixtures
     session_init(session_file=session_file, driver_id="oak-d-1", stream="rgb", board_size=(9, 6))
 
     import robot_md.calibrate_intrinsic as m
-    monkeypatch.setattr(m, "_calibrate", lambda frames, size: {
-        "fx": 800.0, "fy": 800.0, "cx": 320.0, "cy": 240.0,
-        "width": 640, "height": 480,
-        "distortion_model": "plumb_bob",
-        "distortion_coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
-        "rms_error": 0.3,
-    })
+
+    monkeypatch.setattr(
+        m,
+        "_calibrate",
+        lambda frames, size: {
+            "fx": 800.0,
+            "fy": 800.0,
+            "cx": 320.0,
+            "cy": 240.0,
+            "width": 640,
+            "height": 480,
+            "distortion_model": "plumb_bob",
+            "distortion_coeffs": [0.0, 0.0, 0.0, 0.0, 0.0],
+            "rms_error": 0.3,
+        },
+    )
     # Pre-populate enough frames so finalize doesn't complain about too few
     data = json.loads(session_file.read_text())
     data["frames_captured"] = 10
@@ -79,6 +91,7 @@ def test_finalize_writes_intrinsic_into_robot_md(tmp_path, monkeypatch, fixtures
     session_finalize(session_file=session_file, robot_md_file=robot_md_file)
 
     import yaml
+
     content = robot_md_file.read_text()
     fm = yaml.safe_load(content.split("---")[1])
     drv = next(d for d in fm["drivers"] if d["id"] == "oak-d-1")

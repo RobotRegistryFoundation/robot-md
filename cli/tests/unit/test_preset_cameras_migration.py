@@ -25,6 +25,13 @@ def test_preset_cameras_is_valid_if_present(preset):
     assert isinstance(cams, list)
     for cam in cams:
         assert cam.get("driver_id"), f"{preset.name} cameras[] entry missing driver_id"
-        assert cam.get("primary_stream") in {"rgb", "left", "right", "depth", "mono", "ir", "thermal"}, \
-            f"{preset.name} cameras[].primary_stream invalid"
+        assert cam.get("primary_stream") in {
+            "rgb",
+            "left",
+            "right",
+            "depth",
+            "mono",
+            "ir",
+            "thermal",
+        }, f"{preset.name} cameras[].primary_stream invalid"
         assert "mount" in cam

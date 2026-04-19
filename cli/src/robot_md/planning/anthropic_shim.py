@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Callable
-
+from collections.abc import Callable
 
 PLAN_TOOL = {
     "name": "emit_plan",
@@ -37,7 +36,7 @@ def build_anthropic_client() -> Callable[[str, str, int], dict]:
         try:
             import anthropic
         except Exception as e:
-            raise RuntimeError(f"anthropic SDK not installed: {e}")
+            raise RuntimeError(f"anthropic SDK not installed: {e}") from e
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
             raise RuntimeError("ANTHROPIC_API_KEY not set")

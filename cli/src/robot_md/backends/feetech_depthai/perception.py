@@ -5,12 +5,13 @@ Ports the depthai usage from `examples/tier0/05_scene_snapshot.py`.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from typing import Any
 
 from robot_md.robot_spec import RobotSpec
 
-RGB_SIZE = (1280, 720)           # width, height
+RGB_SIZE = (1280, 720)  # width, height
 DEPTH_SIZE = (640, 400)
 WARMUP_FRAMES = 20
 
@@ -26,7 +27,7 @@ class Perception:
     _rgb_h: int = RGB_SIZE[1]
 
     @classmethod
-    def from_spec(cls, spec: RobotSpec) -> "Perception":
+    def from_spec(cls, spec: RobotSpec) -> Perception:
         cam = next(iter(spec.physics.cameras), None)
         return cls(driver_id=cam.driver_id if cam else "none")
 
@@ -35,12 +36,14 @@ class Perception:
             import depthai as dai
             import numpy as np
         except Exception as e:
-            raise RuntimeError(f"depthai (or numpy) not available: {e}")
+            raise RuntimeError(f"depthai (or numpy) not available: {e}") from e
 
         # Read calibration (exclusive device access) first.
         with dai.Device() as cal_dev:
             mat = cal_dev.readCalibration().getCameraIntrinsics(
-                dai.CameraBoardSocket.CAM_A, self._rgb_w, self._rgb_h,
+                dai.CameraBoardSocket.CAM_A,
+                self._rgb_w,
+                self._rgb_h,
             )
         self.K = np.array(mat, dtype=np.float64)
 
@@ -72,10 +75,8 @@ class Perception:
 
     def close(self) -> None:
         if self._pipe is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._pipe.__exit__(None, None, None)
-            except Exception:
-                pass
         self._pipe = None
         self._rgb_q = None
         self._depth_q = None

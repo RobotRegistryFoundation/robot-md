@@ -35,7 +35,7 @@ class BackendRegistry:
     backends: list[CapabilityBackend] = field(default_factory=list)
 
     @classmethod
-    def from_entry_points(cls) -> "BackendRegistry":
+    def from_entry_points(cls) -> BackendRegistry:
         return cls(backends=discover_backends())
 
     def resolve(self, spec: RobotSpec) -> dict[str, CapabilityBackend | None]:

@@ -26,7 +26,7 @@ class Motion:
     spec: RobotSpec
 
     @classmethod
-    def from_spec(cls, spec: RobotSpec) -> "Motion":
+    def from_spec(cls, spec: RobotSpec) -> Motion:
         return cls(spec=spec)
 
     def replay(
@@ -50,6 +50,9 @@ class Motion:
             start = waypoints[i].joints
             target = waypoints[i + 1].joints
             servo_bus.interpolate(
-                start, target,
-                hz=hz, max_steps_per_tick=max_steps_per_tick, estop=estop,
+                start,
+                target,
+                hz=hz,
+                max_steps_per_tick=max_steps_per_tick,
+                estop=estop,
             )

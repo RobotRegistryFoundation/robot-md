@@ -91,9 +91,9 @@ def test_execute_task_low_confidence_returns_blocked(fixtures_dir, monkeypatch):
     monkeypatch.setattr(
         "robot_md.planning.decompose._build_default_client",
         lambda provider: (
-            lambda prompt, model, timeout_ms: {"plan": [
-                {"capability": "arm.pick", "args": {}, "confidence": 0.5}
-            ]}
+            lambda prompt, model, timeout_ms: {
+                "plan": [{"capability": "arm.pick", "args": {}, "confidence": 0.5}]
+            }
         ),
     )
 
@@ -136,9 +136,7 @@ def test_execute_task_aborts_on_step_failure(fixtures_dir, monkeypatch):
                     events=[],
                     error={"reason": "fake_fail"},
                 )
-            return ExecutionResult(
-                status="ok", trajectory=None, events=[], error=None
-            )
+            return ExecutionResult(status="ok", trajectory=None, events=[], error=None)
 
         def scene_describe(self):
             return SceneSnapshot.empty()

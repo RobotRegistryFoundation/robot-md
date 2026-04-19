@@ -14,7 +14,9 @@ def pytest_configure(config):
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--run-hardware", action="store_true", default=False,
+        "--run-hardware",
+        action="store_true",
+        default=False,
         help="Run tests marked @pytest.mark.hardware",
     )
 

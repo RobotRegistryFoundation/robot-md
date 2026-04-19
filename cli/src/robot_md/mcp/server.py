@@ -49,6 +49,7 @@ def build_server(ctx: McpContext):
     ) -> dict:
         """Execute a declared capability against the resolved backend."""
         from robot_md.mcp.tools.execute_capability import execute_capability_tool
+
         return execute_capability_tool(
             ctx,
             capability=capability,

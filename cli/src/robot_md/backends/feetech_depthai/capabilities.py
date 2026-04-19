@@ -9,10 +9,13 @@ from __future__ import annotations
 from robot_md.backends.base import ExecutionEvent, ExecutionResult
 from robot_md.backends.feetech_depthai.motion import Waypoint
 
-# Hardcoded first-demo waypoints around zero-pose (2048 arm joints; gripper 1700 open / 1200 closed).
+# Hardcoded first-demo waypoints around zero-pose (2048 joints; gripper 1700 open, 1200 closed).
 _ZERO = {
-    "shoulder_pan": 2048, "shoulder_lift": 2048, "elbow_flex": 2048,
-    "wrist_flex": 2048, "wrist_roll": 2048,
+    "shoulder_pan": 2048,
+    "shoulder_lift": 2048,
+    "elbow_flex": 2048,
+    "wrist_flex": 2048,
+    "wrist_roll": 2048,
 }
 _PICK_OPEN = {**_ZERO, "gripper": 1700}
 _PICK_CLOSED = {**_ZERO, "gripper": 1200}
@@ -53,8 +56,9 @@ def dispatch(backend, *, capability: str, args: dict, dry_run: bool, estop) -> E
 
 def _do_replay(backend, *, waypoints, label, args, dry_run, estop) -> ExecutionResult:
     events: list[ExecutionEvent] = [
-        ExecutionEvent(kind="plan", data={"capability": label, "args": args,
-                                           "waypoint_count": len(waypoints)}),
+        ExecutionEvent(
+            kind="plan", data={"capability": label, "args": args, "waypoint_count": len(waypoints)}
+        ),
     ]
     trajectory = [{"t": wp.t, "joints": wp.joints} for wp in waypoints]
 
@@ -75,36 +79,57 @@ def _do_replay(backend, *, waypoints, label, args, dry_run, estop) -> ExecutionR
 
 
 def _arm_pick(backend, *, args, dry_run, estop) -> ExecutionResult:
-    return _do_replay(backend, waypoints=_HARDCODED_PICK_WAYPOINTS,
-                      label="arm.pick", args=args, dry_run=dry_run, estop=estop)
+    return _do_replay(
+        backend,
+        waypoints=_HARDCODED_PICK_WAYPOINTS,
+        label="arm.pick",
+        args=args,
+        dry_run=dry_run,
+        estop=estop,
+    )
 
 
 def _arm_place(backend, *, args, dry_run, estop) -> ExecutionResult:
-    return _do_replay(backend, waypoints=_HARDCODED_PLACE_WAYPOINTS,
-                      label="arm.place", args=args, dry_run=dry_run, estop=estop)
+    return _do_replay(
+        backend,
+        waypoints=_HARDCODED_PLACE_WAYPOINTS,
+        label="arm.place",
+        args=args,
+        dry_run=dry_run,
+        estop=estop,
+    )
 
 
 def _arm_reach(backend, *, args, dry_run, estop) -> ExecutionResult:
     wps = [Waypoint(t=0.0, joints=_PICK_OPEN)]
-    return _do_replay(backend, waypoints=wps,
-                      label="arm.reach", args=args, dry_run=dry_run, estop=estop)
+    return _do_replay(
+        backend, waypoints=wps, label="arm.reach", args=args, dry_run=dry_run, estop=estop
+    )
 
 
 def _vision_describe(backend, *, args, dry_run, estop) -> ExecutionResult:
     if backend._perception is None:
         return ExecutionResult(
-            status="error", trajectory=None, events=[],
+            status="error",
+            trajectory=None,
+            events=[],
             error={"reason": "no_perception"},
         )
-    rgb, depth, K = backend._perception.grab_frame()
+    rgb, depth, _K = backend._perception.grab_frame()
     rgb_shape = tuple(rgb.shape) if hasattr(rgb, "shape") else None
     depth_shape = tuple(depth.shape) if hasattr(depth, "shape") else None
     return ExecutionResult(
         status="ok",
         trajectory=None,
-        events=[ExecutionEvent(kind="frame", data={
-            "rgb_shape": rgb_shape, "depth_shape": depth_shape,
-        })],
+        events=[
+            ExecutionEvent(
+                kind="frame",
+                data={
+                    "rgb_shape": rgb_shape,
+                    "depth_shape": depth_shape,
+                },
+            )
+        ],
         error=None,
     )
 

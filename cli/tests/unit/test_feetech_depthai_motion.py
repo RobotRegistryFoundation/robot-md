@@ -14,11 +14,20 @@ def _spec(fixtures_dir):
 def test_replay_calls_interpolate_per_segment(fixtures_dir):
     motion = Motion.from_spec(_spec(fixtures_dir))
     bus = MagicMock()
-    estop = MagicMock(); estop.is_set.return_value = False
+    estop = MagicMock()
+    estop.is_set.return_value = False
 
-    wp0 = Waypoint(t=0.0, joints={"shoulder_pan": 2048, "shoulder_lift": 2048,
-                                   "elbow_flex": 2048, "wrist_flex": 2048,
-                                   "wrist_roll": 2048, "gripper": 1700})
+    wp0 = Waypoint(
+        t=0.0,
+        joints={
+            "shoulder_pan": 2048,
+            "shoulder_lift": 2048,
+            "elbow_flex": 2048,
+            "wrist_flex": 2048,
+            "wrist_roll": 2048,
+            "gripper": 1700,
+        },
+    )
     wp1 = Waypoint(t=0.5, joints={**wp0.joints, "shoulder_pan": 2100})
     wp2 = Waypoint(t=1.0, joints={**wp1.joints, "gripper": 1200})
 
@@ -32,7 +41,8 @@ def test_replay_calls_interpolate_per_segment(fixtures_dir):
 def test_replay_empty_trajectory_is_noop(fixtures_dir):
     motion = Motion.from_spec(_spec(fixtures_dir))
     bus = MagicMock()
-    estop = MagicMock(); estop.is_set.return_value = False
+    estop = MagicMock()
+    estop.is_set.return_value = False
     motion.replay([], servo_bus=bus, estop=estop)
     bus.interpolate.assert_not_called()
 
@@ -40,7 +50,8 @@ def test_replay_empty_trajectory_is_noop(fixtures_dir):
 def test_replay_single_waypoint_writes_positions_once(fixtures_dir):
     motion = Motion.from_spec(_spec(fixtures_dir))
     bus = MagicMock()
-    estop = MagicMock(); estop.is_set.return_value = False
+    estop = MagicMock()
+    estop.is_set.return_value = False
 
     wp = Waypoint(t=0.0, joints={"shoulder_pan": 2200})
     motion.replay([wp], servo_bus=bus, estop=estop)
@@ -51,7 +62,8 @@ def test_replay_single_waypoint_writes_positions_once(fixtures_dir):
 def test_replay_respects_hz_from_trajectory(fixtures_dir):
     motion = Motion.from_spec(_spec(fixtures_dir))
     bus = MagicMock()
-    estop = MagicMock(); estop.is_set.return_value = False
+    estop = MagicMock()
+    estop.is_set.return_value = False
 
     wp0 = Waypoint(t=0.0, joints={"shoulder_pan": 2048})
     wp1 = Waypoint(t=0.5, joints={"shoulder_pan": 2100})

@@ -13,7 +13,14 @@ from robot_md.parser import parse_file
 
 def _schema() -> dict:
     # Load schema directly from the file system without caching
-    schema_path = Path(__file__).parent.parent.parent / "src" / "robot_md" / "schemas" / "v1" / "robot.schema.json"
+    schema_path = (
+        Path(__file__).parent.parent.parent
+        / "src"
+        / "robot_md"
+        / "schemas"
+        / "v1"
+        / "robot.schema.json"
+    )
     with open(schema_path) as f:
         return json.load(f)
 
@@ -30,9 +37,7 @@ def test_intrinsic_missing_fx_rejected(fixtures_dir):
         jsonschema.Draft202012Validator(_schema()).validate(parsed.frontmatter)
     # Walk sub-errors (from the oneOf branch) to find the `fx` required-field violation
     messages = [str(exc_info.value)] + [str(e) for e in exc_info.value.context]
-    assert any("fx" in m for m in messages), (
-        f"expected 'fx' in the error chain, got:\n{messages!r}"
-    )
+    assert any("fx" in m for m in messages), f"expected 'fx' in the error chain, got:\n{messages!r}"
 
 
 def test_distortion_model_enum(fixtures_dir):
@@ -55,15 +60,17 @@ def test_depth_stream_derived_from_allowed():
         "rcan_version": "3.0",
         "metadata": {"robot_name": "d"},
         "physics": {"type": "arm+camera", "dof": 1},
-        "drivers": [{
-            "id": "cam",
-            "protocol": "depthai",
-            "streams": {
-                "left": {"intrinsic": None},
-                "right": {"intrinsic": None},
-                "depth": {"derived_from": ["left", "right"]},
-            },
-        }],
+        "drivers": [
+            {
+                "id": "cam",
+                "protocol": "depthai",
+                "streams": {
+                    "left": {"intrinsic": None},
+                    "right": {"intrinsic": None},
+                    "depth": {"derived_from": ["left", "right"]},
+                },
+            }
+        ],
         "safety": {"estop": {"software": True, "response_ms": 100}},
     }
     jsonschema.Draft202012Validator(_schema()).validate(minimal)
@@ -75,11 +82,13 @@ def test_depth_stream_without_derived_from_or_intrinsic_allowed():
         "rcan_version": "3.0",
         "metadata": {"robot_name": "d"},
         "physics": {"type": "arm+camera", "dof": 1},
-        "drivers": [{
-            "id": "cam",
-            "protocol": "depthai",
-            "streams": {"depth": {}},
-        }],
+        "drivers": [
+            {
+                "id": "cam",
+                "protocol": "depthai",
+                "streams": {"depth": {}},
+            }
+        ],
         "safety": {"estop": {"software": True, "response_ms": 100}},
     }
     jsonschema.Draft202012Validator(_schema()).validate(minimal)

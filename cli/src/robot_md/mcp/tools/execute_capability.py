@@ -22,13 +22,16 @@ def execute_capability_tool(
 
     request_id = f"{capability}-{int(time.time() * 1000)}"
     if getattr(ctx, "publisher", None) is not None:
-        ctx.publisher.publish("tool.call", {
-            "tool": "execute_capability",
-            "capability": capability,
-            "args": args,
-            "dry_run": dry_run,
-            "request_id": request_id,
-        })
+        ctx.publisher.publish(
+            "tool.call",
+            {
+                "tool": "execute_capability",
+                "capability": capability,
+                "args": args,
+                "dry_run": dry_run,
+                "request_id": request_id,
+            },
+        )
 
     declared = ctx.spec.capabilities if ctx.spec is not None else frozenset()
     if capability not in declared:
@@ -45,8 +48,12 @@ def execute_capability_tool(
     # and command-dispatch must not race past a stopped server.
     read_only = getattr(ctx.backend, "read_only_capabilities", frozenset())
     if ctx.estop.is_set() and capability not in read_only:
-        result = {"status": "blocked", "trajectory": None, "events": [],
-                  "error": {"reason": "estop_set"}}
+        result = {
+            "status": "blocked",
+            "trajectory": None,
+            "events": [],
+            "error": {"reason": "estop_set"},
+        }
         _publish_result(ctx, request_id, capability, result)
         return result
 
@@ -62,8 +69,12 @@ def execute_capability_tool(
         return result
 
     if not ctx.exec_lock.acquire(blocking=False):
-        result = {"status": "blocked", "trajectory": None, "events": [],
-                  "error": {"reason": "busy"}}
+        result = {
+            "status": "blocked",
+            "trajectory": None,
+            "events": [],
+            "error": {"reason": "busy"},
+        }
         _publish_result(ctx, request_id, capability, result)
         return result
     try:
@@ -98,7 +109,7 @@ def _match_hitl_gate(ctx: McpContext, capability: str) -> dict | None:
     cap_scope = capability.split(".", 1)[0]
     for gate in spec.safety.hitl_gates:
         scope = gate.get("scope") if isinstance(gate, dict) else None
-        if scope == cap_scope or scope == capability:
+        if scope in (cap_scope, capability):
             return gate if isinstance(gate, dict) else None
     return None
 
@@ -106,12 +117,15 @@ def _match_hitl_gate(ctx: McpContext, capability: str) -> dict | None:
 def _publish_result(ctx: McpContext, request_id: str, capability: str, result: dict) -> None:
     if getattr(ctx, "publisher", None) is None:
         return
-    ctx.publisher.publish("tool.result", {
-        "tool": "execute_capability",
-        "capability": capability,
-        "status": result.get("status"),
-        "request_id": request_id,
-    })
+    ctx.publisher.publish(
+        "tool.result",
+        {
+            "tool": "execute_capability",
+            "capability": capability,
+            "status": result.get("status"),
+            "request_id": request_id,
+        },
+    )
 
 
 def _gate_satisfied(gate: dict, token: str | None) -> bool:

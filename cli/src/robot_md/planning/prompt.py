@@ -7,7 +7,6 @@ import json
 from robot_md.backends.base import SceneSnapshot
 from robot_md.robot_spec import RobotSpec
 
-
 SYSTEM = """\
 You are the planner for robot `{robot_name}` ({physics_type}, {dof} DoF).
 

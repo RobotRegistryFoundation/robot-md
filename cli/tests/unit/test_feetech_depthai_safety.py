@@ -12,7 +12,9 @@ from robot_md.robot_spec import RobotSpec
 
 def _install_fake_feetech(monkeypatch):
     fake = MagicMock()
-    fp = MagicMock(); fp.openPort.return_value = True; fp.setBaudRate.return_value = True
+    fp = MagicMock()
+    fp.openPort.return_value = True
+    fp.setBaudRate.return_value = True
     fake.PortHandler.return_value = fp
     ph = MagicMock()
     ph.read2ByteTxRx.return_value = (2048, 0, 0)
@@ -55,7 +57,7 @@ def test_scene_describe_returns_snapshot_after_open(fixtures_dir, monkeypatch):
     try:
         snap = backend.scene_describe()
         assert snap is not None
-        # After open, perception fails to initialize (depthai mocked to None) so frame should be None
+        # Perception init fails (depthai mocked to None) so frame should be None.
         assert snap.detections == ()
         assert snap.frame is None
         assert snap.ts > 0

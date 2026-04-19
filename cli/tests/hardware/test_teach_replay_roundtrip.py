@@ -16,11 +16,13 @@ pytest.importorskip("feetech_servo_sdk")
 
 
 class _NoopEstop:
-    def is_set(self): return False
+    def is_set(self):
+        return False
 
 
 def _bus():
     from robot_md.backends.feetech_depthai.servo import ServoBus
+
     return ServoBus(port="/dev/ttyACM0", baud=1_000_000, count=6)
 
 

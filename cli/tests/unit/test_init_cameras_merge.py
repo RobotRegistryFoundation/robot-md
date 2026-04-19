@@ -13,25 +13,35 @@ class _FakeScan:
 
 
 def test_merge_adds_detected_camera_to_drivers_and_cameras():
-    scan = _FakeScan(cameras=[
-        DetectedCamera(
-            driver_id="oak-d-1",
-            protocol="depthai",
-            model="OAK-D",
-            streams=[
-                DetectedCameraStream(
-                    name="rgb",
-                    intrinsic={"fx": 860.2, "fy": 860.2, "cx": 640.0, "cy": 360.0,
-                               "width": 1280, "height": 720,
-                               "distortion_model": "plumb_bob",
-                               "distortion_coeffs": [0.0] * 5},
-                    baseline_m=None, derived_from=None,
-                    width=1280, height=720,
-                ),
-            ],
-            provenance="depthai factory cal",
-        )
-    ])
+    scan = _FakeScan(
+        cameras=[
+            DetectedCamera(
+                driver_id="oak-d-1",
+                protocol="depthai",
+                model="OAK-D",
+                streams=[
+                    DetectedCameraStream(
+                        name="rgb",
+                        intrinsic={
+                            "fx": 860.2,
+                            "fy": 860.2,
+                            "cx": 640.0,
+                            "cy": 360.0,
+                            "width": 1280,
+                            "height": 720,
+                            "distortion_model": "plumb_bob",
+                            "distortion_coeffs": [0.0] * 5,
+                        },
+                        baseline_m=None,
+                        derived_from=None,
+                        width=1280,
+                        height=720,
+                    ),
+                ],
+                provenance="depthai factory cal",
+            )
+        ]
+    )
 
     presets = load_presets()
     preset = next(p for p in presets if p.name == "so_arm101")
@@ -62,18 +72,26 @@ def test_merge_without_detected_cameras_is_a_noop():
 
 def test_merge_preserves_preset_cameras_when_detected_adds_more():
     """A preset that already ships cameras (like aloha2) keeps them and adds detected."""
-    scan = _FakeScan(cameras=[
-        DetectedCamera(
-            driver_id="extra-cam",
-            protocol="depthai",
-            model="OAK-D",
-            streams=[DetectedCameraStream(
-                name="rgb", intrinsic=None, baseline_m=None, derived_from=None,
-                width=1280, height=720,
-            )],
-            provenance="depthai factory cal",
-        )
-    ])
+    scan = _FakeScan(
+        cameras=[
+            DetectedCamera(
+                driver_id="extra-cam",
+                protocol="depthai",
+                model="OAK-D",
+                streams=[
+                    DetectedCameraStream(
+                        name="rgb",
+                        intrinsic=None,
+                        baseline_m=None,
+                        derived_from=None,
+                        width=1280,
+                        height=720,
+                    )
+                ],
+                provenance="depthai factory cal",
+            )
+        ]
+    )
     presets = load_presets()
     preset = next(p for p in presets if p.name == "aloha2")
     fm = merge_preset_into_draft(preset, "alo", scan)

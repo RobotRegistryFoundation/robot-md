@@ -32,7 +32,7 @@ class SceneSnapshot:
     ts: float
 
     @classmethod
-    def empty(cls) -> "SceneSnapshot":
+    def empty(cls) -> SceneSnapshot:
         return cls(frame=None, detections=(), joint_state={}, ts=time.time())
 
 
@@ -42,16 +42,13 @@ class CapabilityBackend(ABC):
     read_only_capabilities: frozenset[str] = frozenset()
 
     @abstractmethod
-    def open(self, spec: RobotSpec) -> None:
-        ...
+    def open(self, spec: RobotSpec) -> None: ...
 
     @abstractmethod
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
 
     @abstractmethod
-    def capabilities(self) -> frozenset[str]:
-        ...
+    def capabilities(self) -> frozenset[str]: ...
 
     @abstractmethod
     def execute(
@@ -61,8 +58,7 @@ class CapabilityBackend(ABC):
         *,
         dry_run: bool,
         estop: Any,
-    ) -> ExecutionResult:
-        ...
+    ) -> ExecutionResult: ...
 
     def scene_describe(self) -> SceneSnapshot:
         return SceneSnapshot.empty()

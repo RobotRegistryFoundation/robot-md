@@ -4,8 +4,6 @@ import json
 import time
 from pathlib import Path
 
-import pytest
-
 from robot_md.mcp.context import load_context
 
 
@@ -98,19 +96,29 @@ def test_execute_capability_publishes_call_and_result(fixtures_dir, tmp_path, mo
         class _Fake(CapabilityBackend):
             name = "fake"
             protocols = frozenset({"feetech", "depthai"})
-            def open(self, spec): self.spec = spec
-            def close(self): pass
-            def capabilities(self): return frozenset({"arm.pick"})
+
+            def open(self, spec):
+                self.spec = spec
+
+            def close(self):
+                pass
+
+            def capabilities(self):
+                return frozenset({"arm.pick"})
+
             def execute(self, capability, args, *, dry_run, estop):
                 return ExecutionResult(status="ok", trajectory=None, events=[], error=None)
 
-        ctx.backend = _Fake(); ctx.backend.open(ctx.spec)
-        execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None)
+        ctx.backend = _Fake()
+        ctx.backend.open(ctx.spec)
+        execute_capability_tool(
+            ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None
+        )
         time.sleep(0.3)
 
         events_path = tmp_path / ".robot-md" / "events.jsonl"
         lines = events_path.read_text().splitlines()
-        kinds = [json.loads(l)["kind"] for l in lines]
+        kinds = [json.loads(line)["kind"] for line in lines]
         assert "tool.call" in kinds
         assert "tool.result" in kinds
     finally:

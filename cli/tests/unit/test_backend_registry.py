@@ -13,9 +13,15 @@ class _Zeta(CapabilityBackend):
     name = "zeta"
     protocols = frozenset({"feetech", "depthai"})
 
-    def open(self, spec): self._spec = spec
-    def close(self): pass
-    def capabilities(self): return frozenset({"arm.pick"})
+    def open(self, spec):
+        self._spec = spec
+
+    def close(self):
+        pass
+
+    def capabilities(self):
+        return frozenset({"arm.pick"})
+
     def execute(self, capability, args, *, dry_run, estop):
         return ExecutionResult(status="ok", trajectory=None, events=[], error=None)
 
@@ -24,9 +30,15 @@ class _Alpha(CapabilityBackend):
     name = "alpha"
     protocols = frozenset({"feetech"})
 
-    def open(self, spec): pass
-    def close(self): pass
-    def capabilities(self): return frozenset({"arm.reach"})
+    def open(self, spec):
+        pass
+
+    def close(self):
+        pass
+
+    def capabilities(self):
+        return frozenset({"arm.reach"})
+
     def execute(self, capability, args, *, dry_run, estop):
         return ExecutionResult(status="ok", trajectory=None, events=[], error=None)
 
@@ -63,12 +75,20 @@ def test_registry_unresolved_protocol_maps_to_none(fixtures_dir):
 
 def test_scene_describe_default_returns_empty():
     """CapabilityBackend.scene_describe returns an empty snapshot by default."""
+
     class _Stub(CapabilityBackend):
         name = "stub"
         protocols = frozenset()
-        def open(self, spec): pass
-        def close(self): pass
-        def capabilities(self): return frozenset()
+
+        def open(self, spec):
+            pass
+
+        def close(self):
+            pass
+
+        def capabilities(self):
+            return frozenset()
+
         def execute(self, capability, args, *, dry_run, estop):
             return ExecutionResult(status="ok", trajectory=None, events=[], error=None)
 
@@ -81,5 +101,6 @@ def test_scene_describe_default_returns_empty():
 def test_abstract_cannot_instantiate():
     """ABC enforcement — CapabilityBackend can't be instantiated directly."""
     import pytest
+
     with pytest.raises(TypeError):
         CapabilityBackend()

@@ -9,12 +9,17 @@ def _backend():
     class _FakeSpec:
         class metadata:
             robot_name = "test-bot"
+
     b = MagicMock()
     b._spec = _FakeSpec()
     b._servo_bus = MagicMock()
     b._servo_bus.read_positions.return_value = {
-        "shoulder_pan": 2048, "shoulder_lift": 2048, "elbow_flex": 2048,
-        "wrist_flex": 2048, "wrist_roll": 2048, "gripper": 1700,
+        "shoulder_pan": 2048,
+        "shoulder_lift": 2048,
+        "elbow_flex": 2048,
+        "wrist_flex": 2048,
+        "wrist_roll": 2048,
+        "gripper": 1700,
     }
     b._perception = MagicMock()
     b._perception.grab_frame.return_value = (b"rgb", b"depth", None)
@@ -23,7 +28,8 @@ def _backend():
 
 
 def _estop():
-    e = MagicMock(); e.is_set.return_value = False
+    e = MagicMock()
+    e.is_set.return_value = False
     return e
 
 

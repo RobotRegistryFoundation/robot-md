@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from robot_md.backends.base import SceneSnapshot
 from robot_md.planning.prompt import build_prompt
 from robot_md.planning.types import Plan, PlanError, PlanStep
 from robot_md.robot_spec import RobotSpec
-
 
 PlannerClient = Callable[[str, str, int], dict]
 
@@ -31,9 +30,9 @@ def decompose(
     try:
         raw = client(prompt, brain.planning_model, brain.planning_timeout_ms)
     except TimeoutError as e:
-        raise PlanError("timeout", str(e))
+        raise PlanError("timeout", str(e)) from e
     except Exception as e:
-        raise PlanError("planner_call_failed", str(e))
+        raise PlanError("planner_call_failed", str(e)) from e
 
     raw_steps = raw.get("plan") if isinstance(raw, dict) else None
     if not isinstance(raw_steps, list):
@@ -51,14 +50,13 @@ def decompose(
                 "low_confidence",
                 f"step {i}: '{cap}' confidence={conf:.2f} < gate={gate}",
             )
-        steps.append(
-            PlanStep(capability=cap, args=dict(s.get("args") or {}), confidence=conf)
-        )
+        steps.append(PlanStep(capability=cap, args=dict(s.get("args") or {}), confidence=conf))
     return Plan(steps=tuple(steps), raw_response=raw)
 
 
 def _build_default_client(provider: str) -> PlannerClient:
     if provider == "anthropic":
         from robot_md.planning.anthropic_shim import build_anthropic_client
+
         return build_anthropic_client()
     raise PlanError("unsupported_provider", f"provider '{provider}' not supported")

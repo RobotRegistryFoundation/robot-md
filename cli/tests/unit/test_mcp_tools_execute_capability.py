@@ -46,6 +46,7 @@ def test_execute_capability_rejects_not_implemented(fixtures_dir):
     # Add arm.reach to spec but backend only implements arm.pick/arm.place
     ctx.parsed.frontmatter["capabilities"].append("arm.reach")
     from robot_md.robot_spec import RobotSpec
+
     ctx.spec = RobotSpec.from_parsed(ctx.parsed)
     ctx.backend = _PickOnly()
     ctx.backend.open(ctx.spec)
@@ -98,6 +99,7 @@ def test_execute_capability_hitl_gate_blocks_without_token(fixtures_dir):
         {"scope": "arm", "require_auth": True}
     )
     from robot_md.robot_spec import RobotSpec
+
     ctx.spec = RobotSpec.from_parsed(ctx.parsed)
     ctx.backend = _PickOnly()
     ctx.backend.open(ctx.spec)

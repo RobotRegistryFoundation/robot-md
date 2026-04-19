@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from robot_md.parser import ParsedRobotMd, parse_file
-from robot_md.validate import VALID, validate as validate_parsed
+from robot_md.validate import VALID
+from robot_md.validate import validate as validate_parsed
 
 
 class EstopFlag:
@@ -88,6 +89,7 @@ def load_context(manifest_path: Path) -> McpContext:
     # Dashboard publisher + command watcher (opt-out via env)
     if os.environ.get("ROBOT_MD_DASHBOARD_DISABLED") != "1":
         from robot_md.dashboard.events import EventPublisher
+
         events_dir = Path(os.environ.get("HOME", str(Path.home()))) / ".robot-md"
         events_dir.mkdir(parents=True, exist_ok=True)
         ctx.publisher = EventPublisher(jsonl_path=events_dir / "events.jsonl")
@@ -149,11 +151,17 @@ def _start_command_watcher(ctx, cmd_path: Path):
                                     snap = ctx.backend.scene_describe()
                                     if ctx.publisher and snap and snap.frame:
                                         import base64 as _b64
-                                        ctx.publisher.publish("frame", {
-                                            "png_b64": _b64.b64encode(snap.frame).decode("ascii"),
-                                            "width": 0,
-                                            "height": 0,
-                                        })
+
+                                        ctx.publisher.publish(
+                                            "frame",
+                                            {
+                                                "png_b64": _b64.b64encode(snap.frame).decode(
+                                                    "ascii"
+                                                ),
+                                                "width": 0,
+                                                "height": 0,
+                                            },
+                                        )
                                 except Exception as e:
                                     log.warning("command_watcher: snapshot failed: %s", e)
                         else:

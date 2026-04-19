@@ -10,7 +10,6 @@ from __future__ import annotations
 from robot_md.autodetect import (
     DRIVER_PROFILES,
     DetectedCamera,
-    DetectedCameraStream,
     Device,
     Scan,
     driver_profile,

@@ -7,6 +7,7 @@ and the `_interpolate` helper from `examples/tier0/04_pick_place.py`.
 
 from __future__ import annotations
 
+import contextlib
 import time
 from dataclasses import dataclass, field
 
@@ -41,7 +42,7 @@ class ServoBus:
     _ph: object | None = None
 
     @classmethod
-    def from_spec(cls, spec: RobotSpec) -> "ServoBus":
+    def from_spec(cls, spec: RobotSpec) -> ServoBus:
         drv = next((d for d in spec.drivers if d.protocol == "feetech"), None)
         if drv is None:
             raise RuntimeError("no feetech driver in spec")
@@ -65,10 +66,8 @@ class ServoBus:
 
     def close(self) -> None:
         if self._port is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._port.closePort()
-            except Exception:
-                pass
         self._port = None
         self._ph = None
 
@@ -143,6 +142,6 @@ class ServoBus:
                 sid = name_to_id.get(n)
                 if sid is None:
                     continue
-                val = int(round(start[n] + alpha * d))
+                val = round(start[n] + alpha * d)
                 self._ph.write2ByteTxRx(self._port, sid, ADDR_GOAL_POSITION, val)
             time.sleep(dt)

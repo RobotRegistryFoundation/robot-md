@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import gzip
-import json
-import os
 import time
-from pathlib import Path
 
 import pytest
 
@@ -88,7 +85,7 @@ def test_publisher_frame_rate_limit(tmp_path, monkeypatch):
     finally:
         pub.stop()
     lines = p.read_text().splitlines()
-    assert len([l for l in lines if '"kind": "frame"' in l]) == 1
+    assert len([line for line in lines if '"kind": "frame"' in line]) == 1
 
 
 def test_publisher_non_frame_not_rate_limited(tmp_path):

@@ -40,8 +40,10 @@ def _install_fakes(monkeypatch):
     fake_depth_msg = MagicMock()
     fake_depth_msg.getFrame.return_value = np.full((720, 1280), 400, dtype=np.uint16)
 
-    fake_rgb_q = MagicMock(); fake_rgb_q.get.return_value = fake_rgb_msg
-    fake_depth_q = MagicMock(); fake_depth_q.get.return_value = fake_depth_msg
+    fake_rgb_q = MagicMock()
+    fake_rgb_q.get.return_value = fake_rgb_msg
+    fake_depth_q = MagicMock()
+    fake_depth_q.get.return_value = fake_depth_msg
 
     fake_pipe = MagicMock()
     fake_pipe.__enter__.return_value = fake_pipe
@@ -54,8 +56,10 @@ def _install_fakes(monkeypatch):
     fake_rgb_cam.requestOutput.return_value = fake_rgb_cam_out
     fake_rgb_cam.build.return_value = fake_rgb_cam
 
-    fake_cam_left = MagicMock(); fake_cam_left.build.return_value = fake_cam_left
-    fake_cam_right = MagicMock(); fake_cam_right.build.return_value = fake_cam_right
+    fake_cam_left = MagicMock()
+    fake_cam_left.build.return_value = fake_cam_left
+    fake_cam_right = MagicMock()
+    fake_cam_right.build.return_value = fake_cam_right
     fake_cam_left_out = MagicMock()
     fake_cam_right_out = MagicMock()
     fake_cam_left.requestOutput.return_value = fake_cam_left_out
@@ -93,6 +97,7 @@ def test_open_reads_intrinsics(monkeypatch, fixtures_dir):
 
 def test_grab_frame_returns_rgb_depth_k(monkeypatch, fixtures_dir):
     import numpy as np
+
     _install_fakes(monkeypatch)
     from robot_md.backends.feetech_depthai.perception import Perception
 
@@ -107,6 +112,7 @@ def test_grab_frame_returns_rgb_depth_k(monkeypatch, fixtures_dir):
 
 def test_pixel_to_3d_math():
     import numpy as np
+
     from robot_md.backends.feetech_depthai.perception import _pixel_to_3d
 
     K = np.array([[860.0, 0.0, 640.0], [0.0, 860.0, 360.0], [0.0, 0.0, 1.0]])
@@ -119,8 +125,11 @@ def test_pixel_to_3d_math():
 
 def test_pixel_to_3d_zero_depth_is_nan():
     import math
+
     import numpy as np
+
     from robot_md.backends.feetech_depthai.perception import _pixel_to_3d
+
     K = np.eye(3)
     x, y, z = _pixel_to_3d(10, 10, 0.0, K)
     assert math.isnan(x) and math.isnan(y) and math.isnan(z)

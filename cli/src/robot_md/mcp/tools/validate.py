@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from robot_md.mcp.context import McpContext
-from robot_md.validate import VALID, validate as validate_parsed
+from robot_md.validate import VALID
+from robot_md.validate import validate as validate_parsed
 
 
 def validate_tool(ctx: McpContext) -> dict:

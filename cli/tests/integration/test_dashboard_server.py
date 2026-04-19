@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,6 +13,7 @@ def dashboard_app(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     (tmp_path / ".robot-md").mkdir()
     from robot_md.dashboard.server import build_app
+
     app = build_app(manifest=None)
     return app, tmp_path
 
@@ -35,7 +35,7 @@ def test_dashboard_estop_button_writes_command(dashboard_app):
     cmd_path = tmp_path / ".robot-md" / "commands.jsonl"
     assert cmd_path.exists()
     lines = cmd_path.read_text().splitlines()
-    assert any(json.loads(l).get("cmd") == "estop.set" for l in lines)
+    assert any(json.loads(line).get("cmd") == "estop.set" for line in lines)
 
 
 def test_dashboard_estop_clear_button_writes_command(dashboard_app):
@@ -45,7 +45,7 @@ def test_dashboard_estop_clear_button_writes_command(dashboard_app):
         assert r.status_code == 200
     cmd_path = tmp_path / ".robot-md" / "commands.jsonl"
     lines = cmd_path.read_text().splitlines()
-    assert any(json.loads(l).get("cmd") == "estop.clear" for l in lines)
+    assert any(json.loads(line).get("cmd") == "estop.clear" for line in lines)
 
 
 def test_dashboard_snapshot_button_writes_command(dashboard_app):
@@ -55,7 +55,7 @@ def test_dashboard_snapshot_button_writes_command(dashboard_app):
         assert r.status_code == 200
     cmd_path = tmp_path / ".robot-md" / "commands.jsonl"
     lines = cmd_path.read_text().splitlines()
-    assert any(json.loads(l).get("cmd") == "snapshot" for l in lines)
+    assert any(json.loads(line).get("cmd") == "snapshot" for line in lines)
 
 
 def test_dashboard_frame_returns_404_when_none(dashboard_app):
@@ -66,8 +66,7 @@ def test_dashboard_frame_returns_404_when_none(dashboard_app):
 
 
 def test_dashboard_tunnel_returns_empty_when_absent(dashboard_app):
-    app, tmp_path = dashboard_app
-    # tunnel.json does not exist
+    app, _ = dashboard_app
     with TestClient(app) as client:
         r = client.get("/api/tunnel")
         assert r.status_code == 200
@@ -77,7 +76,9 @@ def test_dashboard_tunnel_returns_empty_when_absent(dashboard_app):
 def test_dashboard_tunnel_returns_json_when_present(dashboard_app):
     app, tmp_path = dashboard_app
     tunnel_json = tmp_path / ".robot-md" / "tunnel.json"
-    tunnel_json.write_text('{"url": "https://abc.trycloudflare.com", "alive": true, "since": 123.4}')
+    tunnel_json.write_text(
+        '{"url": "https://abc.trycloudflare.com", "alive": true, "since": 123.4}'
+    )
     with TestClient(app) as client:
         r = client.get("/api/tunnel")
         assert r.status_code == 200

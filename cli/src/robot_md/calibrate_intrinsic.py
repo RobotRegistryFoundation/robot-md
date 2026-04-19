@@ -13,7 +13,6 @@ from typing import Any
 
 import yaml
 
-
 BOARD_DEFAULT = (9, 6)
 MIN_FRAMES = 8
 
@@ -48,7 +47,7 @@ def session_init(
 def session_add_frame(*, session_file: Path, frame_path: Path) -> None:
     data = json.loads(session_file.read_text())
     img = _load_image(frame_path)
-    found, corners = _detect_corners(img, tuple(data["board_size"]))
+    found, _corners = _detect_corners(img, tuple(data["board_size"]))
     if not found:
         data["next_hint"] = "No checkerboard detected — adjust angle/lighting and retry."
     else:
@@ -58,7 +57,9 @@ def session_add_frame(*, session_file: Path, frame_path: Path) -> None:
         if data["frames_captured"] >= MIN_FRAMES:
             data["next_hint"] = "Enough coverage — run with --finalize to solve."
         else:
-            data["next_hint"] = f"{data['frames_captured']}/{MIN_FRAMES} captured. Vary pose + distance."
+            data["next_hint"] = (
+                f"{data['frames_captured']}/{MIN_FRAMES} captured. Vary pose + distance."
+            )
     session_file.write_text(json.dumps(data, indent=2))
 
 
@@ -84,11 +85,13 @@ def session_finalize(*, session_file: Path, robot_md_file: Path) -> None:
 
 def _load_image(path: Path) -> Any:
     import cv2
+
     return cv2.imread(str(path))
 
 
 def _detect_corners(img: Any, size: tuple[int, int]):
     import cv2
+
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     return cv2.findChessboardCorners(gray, size, None)
 
@@ -96,8 +99,9 @@ def _detect_corners(img: Any, size: tuple[int, int]):
 def _calibrate(frame_paths: list[str], size: tuple[int, int]) -> dict:
     import cv2
     import numpy as np
+
     objp = np.zeros((size[0] * size[1], 3), np.float32)
-    objp[:, :2] = np.mgrid[0:size[0], 0:size[1]].T.reshape(-1, 2)
+    objp[:, :2] = np.mgrid[0 : size[0], 0 : size[1]].T.reshape(-1, 2)
     objpoints, imgpoints = [], []
     h, w = 0, 0
     for p in frame_paths:
@@ -115,9 +119,12 @@ def _calibrate(frame_paths: list[str], size: tuple[int, int]) -> dict:
         raise RuntimeError("too few frames with detected corners")
     rms, K, D, _, _ = cv2.calibrateCamera(objpoints, imgpoints, (w, h), None, None)
     return {
-        "fx": float(K[0][0]), "fy": float(K[1][1]),
-        "cx": float(K[0][2]), "cy": float(K[1][2]),
-        "width": int(w), "height": int(h),
+        "fx": float(K[0][0]),
+        "fy": float(K[1][1]),
+        "cx": float(K[0][2]),
+        "cy": float(K[1][2]),
+        "width": int(w),
+        "height": int(h),
         "distortion_model": "plumb_bob",
         "distortion_coeffs": [float(c) for c in D.flatten()[:5]],
         "rms_error": float(rms),

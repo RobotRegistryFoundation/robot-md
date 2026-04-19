@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
 import sys
+from unittest.mock import MagicMock
 
-from robot_md.autodetect import scan_system, DetectedCamera, DetectedCameraStream
+from robot_md.autodetect import DetectedCamera, DetectedCameraStream, scan_system
 
 
 def test_scan_has_cameras_field():
@@ -14,12 +14,19 @@ def test_scan_has_cameras_field():
 
 def test_detected_camera_dataclass_shape():
     stream = DetectedCameraStream(
-        name="rgb", intrinsic=None, baseline_m=None,
-        derived_from=None, width=1280, height=720,
+        name="rgb",
+        intrinsic=None,
+        baseline_m=None,
+        derived_from=None,
+        width=1280,
+        height=720,
     )
     cam = DetectedCamera(
-        driver_id="oak-d-1", protocol="depthai", model="OAK-D",
-        streams=[stream], provenance="test",
+        driver_id="oak-d-1",
+        protocol="depthai",
+        model="OAK-D",
+        streams=[stream],
+        provenance="test",
     )
     assert cam.driver_id == "oak-d-1"
     assert cam.streams[0].name == "rgb"
@@ -43,7 +50,11 @@ def test_depthai_probe_reads_factory_cal(monkeypatch):
     fake_feature_c.name = "right"
 
     fake_device = MagicMock()
-    fake_device.getConnectedCameraFeatures.return_value = [fake_feature_a, fake_feature_b, fake_feature_c]
+    fake_device.getConnectedCameraFeatures.return_value = [
+        fake_feature_a,
+        fake_feature_b,
+        fake_feature_c,
+    ]
     fake_device.getDeviceName.return_value = "OAK-D"
 
     fake_calib = MagicMock()
@@ -124,17 +135,35 @@ def test_realsense_probe_returns_empty_when_not_installed(monkeypatch):
 def test_scan_system_composes_cameras(monkeypatch):
     """scan_system() composes all three probes into Scan.cameras."""
     from robot_md import autodetect
-    from robot_md.autodetect import DetectedCamera, DetectedCameraStream
+    from robot_md.autodetect import DetectedCamera
 
-    monkeypatch.setattr(autodetect, "probe_depthai_cameras", lambda: [
-        DetectedCamera(driver_id="oak-d-1", protocol="depthai", model="OAK-D",
-                       streams=[], provenance="depthai factory cal")
-    ])
+    monkeypatch.setattr(
+        autodetect,
+        "probe_depthai_cameras",
+        lambda: [
+            DetectedCamera(
+                driver_id="oak-d-1",
+                protocol="depthai",
+                model="OAK-D",
+                streams=[],
+                provenance="depthai factory cal",
+            )
+        ],
+    )
     monkeypatch.setattr(autodetect, "probe_realsense_cameras", lambda: [])
-    monkeypatch.setattr(autodetect, "probe_v4l2_cameras", lambda: [
-        DetectedCamera(driver_id="usb-camera-video0", protocol="v4l2", model="USB",
-                       streams=[], provenance="v4l2 enum / no cal")
-    ])
+    monkeypatch.setattr(
+        autodetect,
+        "probe_v4l2_cameras",
+        lambda: [
+            DetectedCamera(
+                driver_id="usb-camera-video0",
+                protocol="v4l2",
+                model="USB",
+                streams=[],
+                provenance="v4l2 enum / no cal",
+            )
+        ],
+    )
     scan = autodetect.scan_system()
     protos = {c.protocol for c in scan.cameras}
     assert "depthai" in protos
@@ -143,6 +172,7 @@ def test_scan_system_composes_cameras(monkeypatch):
 
 def test_scan_cameras_is_typed_list_of_DetectedCamera():
     """After T06, Scan.cameras contains DetectedCamera instances, not dicts."""
-    from robot_md.autodetect import scan_system, DetectedCamera
+    from robot_md.autodetect import DetectedCamera, scan_system
+
     scan = scan_system()
     assert all(isinstance(c, DetectedCamera) for c in scan.cameras)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 import yaml
 
@@ -22,12 +21,15 @@ class Intrinsic:
     distortion_coeffs: tuple[float, ...] | None
 
     @classmethod
-    def from_dict(cls, d: dict) -> "Intrinsic":
+    def from_dict(cls, d: dict) -> Intrinsic:
         coeffs = d.get("distortion_coeffs")
         return cls(
-            fx=float(d["fx"]), fy=float(d["fy"]),
-            cx=float(d["cx"]), cy=float(d["cy"]),
-            width=int(d["width"]), height=int(d["height"]),
+            fx=float(d["fx"]),
+            fy=float(d["fy"]),
+            cx=float(d["cx"]),
+            cy=float(d["cy"]),
+            width=int(d["width"]),
+            height=int(d["height"]),
             distortion_model=d.get("distortion_model"),
             distortion_coeffs=tuple(float(c) for c in coeffs) if coeffs else None,
         )
@@ -117,7 +119,7 @@ class RobotSpec:
     raw_yaml: str
 
     @classmethod
-    def from_parsed(cls, parsed: ParsedRobotMd) -> "RobotSpec":
+    def from_parsed(cls, parsed: ParsedRobotMd) -> RobotSpec:
         fm = parsed.frontmatter
         meta = fm.get("metadata", {}) or {}
         physics = fm.get("physics", {}) or {}
@@ -137,19 +139,22 @@ class RobotSpec:
                     baseline_m=(s.get("baseline_m") if isinstance(s, dict) else None),
                     derived_from=(
                         tuple(s["derived_from"])
-                        if isinstance(s, dict) and s.get("derived_from") else None
+                        if isinstance(s, dict) and s.get("derived_from")
+                        else None
                     ),
                 )
-            drivers.append(DriverEntry(
-                id=d.get("id", ""),
-                protocol=d.get("protocol", ""),
-                port=d.get("port"),
-                baud_rate=d.get("baud_rate"),
-                model=d.get("model"),
-                count=d.get("count"),
-                backend=d.get("backend"),
-                streams=streams,
-            ))
+            drivers.append(
+                DriverEntry(
+                    id=d.get("id", ""),
+                    protocol=d.get("protocol", ""),
+                    port=d.get("port"),
+                    baud_rate=d.get("baud_rate"),
+                    model=d.get("model"),
+                    count=d.get("count"),
+                    backend=d.get("backend"),
+                    streams=streams,
+                )
+            )
 
         cams = tuple(
             SolverCamera(

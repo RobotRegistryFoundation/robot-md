@@ -908,12 +908,8 @@ def calibrate_intrinsic_cmd(
         session_add_frame(session_file=session_file, frame_path=frame)
         typer.echo(f"✓ added frame {frame}")
         return
-    session_init(
-        session_file=session_file, driver_id=driver, stream=stream, board_size=(9, 6)
-    )
-    typer.echo(
-        f"✓ session at {session_file}; print the checkerboard PNG next to it"
-    )
+    session_init(session_file=session_file, driver_id=driver, stream=stream, board_size=(9, 6))
+    typer.echo(f"✓ session at {session_file}; print the checkerboard PNG next to it")
 
 
 @app.command()

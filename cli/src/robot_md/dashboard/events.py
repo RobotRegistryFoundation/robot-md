@@ -8,18 +8,20 @@ JSONL is the durable record; the WS is the live pipe.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import gzip
 import json
 import queue
 import threading
 import time
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
-ROTATE_BYTES = 10 * 1024 * 1024        # 10 MB
+ROTATE_BYTES = 10 * 1024 * 1024  # 10 MB
 ROTATE_KEEP = 3
-FRAME_MIN_INTERVAL_S = 5.0              # throttle for frame events
+FRAME_MIN_INTERVAL_S = 5.0  # throttle for frame events
 
 
 @dataclass(frozen=True)
@@ -32,7 +34,7 @@ class Event:
         return json.dumps({"kind": self.kind, "ts": self.ts, "data": self.data}) + "\n"
 
     @classmethod
-    def from_jsonl(cls, line: str) -> "Event":
+    def from_jsonl(cls, line: str) -> Event:
         obj = json.loads(line)
         return cls(kind=obj["kind"], ts=float(obj["ts"]), data=obj.get("data") or {})
 
@@ -66,22 +68,20 @@ class EventPublisher:
 
     def publish(self, kind: str, data: dict) -> None:
         import robot_md.dashboard.events as _mod
+
         now = time.time()
         if kind == "frame":
             if now - self._last_frame_ts < _mod.FRAME_MIN_INTERVAL_S:
                 return
             self._last_frame_ts = now
         evt = Event(kind=kind, ts=now, data=dict(data))
-        try:
+        # Publisher refuses to block the hot path — drop on full queue.
+        with contextlib.suppress(queue.Full):
             self._q.put_nowait(evt)
-        except queue.Full:
-            # Publisher refuses to block the hot path. Drop silently.
-            pass
 
     # ------------------------------------------------------- writer thread
 
     def _writer_loop(self) -> None:
-        import robot_md.dashboard.events as _mod
         while not self._stop.is_set() or not self._q.empty():
             try:
                 evt = self._q.get(timeout=0.1)
@@ -93,6 +93,7 @@ class EventPublisher:
 
     def _append_and_rotate(self, line: str) -> None:
         import robot_md.dashboard.events as _mod
+
         p = self.jsonl_path
         with p.open("a") as f:
             f.write(line)
@@ -214,10 +215,8 @@ class EventLog:
                     f.seek(pos)
                     for line in f:
                         if line.strip():
-                            try:
+                            with contextlib.suppress(Exception):
                                 yield Event.from_jsonl(line)
-                            except Exception:
-                                pass
                     pos = f.tell()
             elif size < pos:
                 pos = 0

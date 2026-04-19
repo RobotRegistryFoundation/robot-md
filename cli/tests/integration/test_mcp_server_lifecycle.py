@@ -34,34 +34,46 @@ def test_server_lists_tools(fixtures_dir):
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
     proc = subprocess.Popen(
-        [VENV_PY, "-m", "robot_md.mcp.server",
-         str(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        [
+            VENV_PY,
+            "-m",
+            "robot_md.mcp.server",
+            str(fixtures_dir / "robot_md_oak_d_factory_cal.yaml"),
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         env=env,
     )
     try:
         _wait_ready(proc)
-        init = _rpc(proc, {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "test", "version": "0"},
+        init = _rpc(
+            proc,
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "0"},
+                },
             },
-        })
+        )
         assert "result" in init, f"initialize failed: {init}"
 
         # MCP requires an `initialized` notification after initialize
-        _note = (json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n").encode()
+        _note = (
+            json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n"
+        ).encode()
         proc.stdin.write(_note)
         proc.stdin.flush()
 
         listing = _rpc(proc, {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
         tool_names = {t["name"] for t in listing["result"]["tools"]}
-        assert {"render", "validate", "estop"}.issubset(tool_names), \
+        assert {"render", "validate", "estop"}.issubset(tool_names), (
             f"expected render/validate/estop in tools, got {tool_names}"
+        )
     finally:
         proc.terminate()
         try:
@@ -76,9 +88,12 @@ def test_server_fails_fast_on_bad_manifest(tmp_path):
     bad.write_text("no frontmatter here")
     r = subprocess.run(
         [VENV_PY, "-m", "robot_md.mcp.server", str(bad)],
-        capture_output=True, text=True, timeout=5,
+        capture_output=True,
+        text=True,
+        timeout=5,
     )
     assert r.returncode != 0, f"expected nonzero exit, got {r.returncode}"
     msg = (r.stderr or "").lower()
-    assert "fatal" in msg or "validation" in msg or "parse" in msg, \
+    assert "fatal" in msg or "validation" in msg or "parse" in msg, (
         f"expected validation/parse error on stderr, got {r.stderr!r}"
+    )

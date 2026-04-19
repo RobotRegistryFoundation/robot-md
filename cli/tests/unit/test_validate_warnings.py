@@ -14,9 +14,7 @@ def test_legacy_singular_camera_autoupgraded(fixtures_dir):
 def test_legacy_singular_camera_emits_deprecation_warning(fixtures_dir):
     parsed = parse_file(fixtures_dir / "robot_md_legacy_camera_singular.yaml")
     result = validate(parsed)
-    assert any(
-        "deprecat" in w.lower() and "camera" in w.lower() for w in result.warnings
-    )
+    assert any("deprecat" in w.lower() and "camera" in w.lower() for w in result.warnings)
 
 
 def test_legacy_upgrade_sets_driver_id_from_camera_protocol(fixtures_dir):
@@ -35,7 +33,7 @@ def test_legacy_upgrade_fallback_to_literal_camera_id(tmp_path):
     robot_md = tmp_path / "fallback.ROBOT.md"
     robot_md.write_text(
         "---\n"
-        "rcan_version: \"3.0\"\n"
+        'rcan_version: "3.0"\n'
         "metadata: {robot_name: t}\n"
         "physics:\n"
         "  type: arm\n"
@@ -53,6 +51,7 @@ def test_legacy_upgrade_fallback_to_literal_camera_id(tmp_path):
         "## What t Can Do\n\nx\n\n## Safety Gates\n\nx\n"
     )
     from robot_md.parser import parse_file
+
     parsed = parse_file(robot_md)
     cams = parsed.frontmatter["physics"]["solver"]["cameras"]
     assert len(cams) == 1

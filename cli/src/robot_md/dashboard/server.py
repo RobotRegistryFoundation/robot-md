@@ -38,6 +38,7 @@ def build_app(*, manifest: Path | None = None) -> FastAPI:
         try:
             from robot_md.parser import parse_file
             from robot_md.validate import validate as _validate
+
             parsed = parse_file(manifest)
             result = _validate(parsed)
             warnings = list(result.warnings)
@@ -48,19 +49,24 @@ def build_app(*, manifest: Path | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse)
     async def index(request: Request):
         from robot_md.dashboard.events import EventLog
+
         log = EventLog(jsonl_path=_events_dir() / "events.jsonl", ws_url=None)
         snap = await log.snapshot(n=50)
         last_hb = next((e for e in reversed(snap) if e.kind == "heartbeat"), None)
         joints = (last_hb.data.get("joints") if last_hb else {}) or {}
         estop_set = bool(last_hb.data.get("estop")) if last_hb else False
         tool_calls = [e for e in snap if e.kind in ("tool.call", "tool.result")][-20:]
-        return templates.TemplateResponse(request, "index.html", {
-            "robot_name": robot_name,
-            "warnings": warnings,
-            "joints": joints,
-            "estop_set": estop_set,
-            "tool_calls": tool_calls,
-        })
+        return templates.TemplateResponse(
+            request,
+            "index.html",
+            {
+                "robot_name": robot_name,
+                "warnings": warnings,
+                "joints": joints,
+                "estop_set": estop_set,
+                "tool_calls": tool_calls,
+            },
+        )
 
     @app.post("/api/estop")
     async def api_estop():
@@ -80,6 +86,7 @@ def build_app(*, manifest: Path | None = None) -> FastAPI:
     @app.get("/api/frame/latest.png")
     async def api_frame():
         from robot_md.dashboard.events import EventLog
+
         log = EventLog(jsonl_path=_events_dir() / "events.jsonl", ws_url=None)
         snap = await log.snapshot(n=500)
         frame = next((e for e in reversed(snap) if e.kind == "frame"), None)
@@ -103,6 +110,7 @@ def build_app(*, manifest: Path | None = None) -> FastAPI:
 
 def main() -> int:
     import argparse
+
     import uvicorn
 
     parser = argparse.ArgumentParser(prog="robot-md dashboard serve")

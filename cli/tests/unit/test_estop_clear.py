@@ -22,6 +22,7 @@ def test_estop_clear_blocked_without_token_when_gate_declared(fixtures_dir):
         {"scope": "system", "require_auth": True}
     )
     from robot_md.robot_spec import RobotSpec
+
     ctx.spec = RobotSpec.from_parsed(ctx.parsed)
     estop_tool(ctx)
 
@@ -37,6 +38,7 @@ def test_estop_clear_succeeds_with_token_when_gated(fixtures_dir):
         {"scope": "system", "require_auth": True}
     )
     from robot_md.robot_spec import RobotSpec
+
     ctx.spec = RobotSpec.from_parsed(ctx.parsed)
     estop_tool(ctx)
 

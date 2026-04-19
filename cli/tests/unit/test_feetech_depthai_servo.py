@@ -3,8 +3,6 @@ from __future__ import annotations
 import sys
 from unittest.mock import MagicMock
 
-import pytest
-
 from robot_md.parser import parse_file
 from robot_md.robot_spec import RobotSpec
 
@@ -46,15 +44,19 @@ def test_read_positions_returns_named_dict(monkeypatch, fixtures_dir):
     bus.open()
     positions = bus.read_positions()
     assert set(positions.keys()) == {
-        "shoulder_pan", "shoulder_lift", "elbow_flex",
-        "wrist_flex", "wrist_roll", "gripper",
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper",
     }
     assert all(v == 2048 for v in positions.values())
     bus.close()
 
 
 def test_read_positions_skips_nonresponders(monkeypatch, fixtures_dir):
-    fake_sdk, _, fake_ph = _install_fake_sdk(monkeypatch)
+    _, _, fake_ph = _install_fake_sdk(monkeypatch)
 
     def _fake_read(port, sid, addr):
         if sid == 3:
@@ -117,8 +119,14 @@ def test_interpolate_respects_estop(monkeypatch, fixtures_dir):
             return self.calls > 3
 
     estop = _Estop()
-    start = {"shoulder_pan": 2048, "shoulder_lift": 2048, "elbow_flex": 2048,
-             "wrist_flex": 2048, "wrist_roll": 2048, "gripper": 1700}
+    start = {
+        "shoulder_pan": 2048,
+        "shoulder_lift": 2048,
+        "elbow_flex": 2048,
+        "wrist_flex": 2048,
+        "wrist_roll": 2048,
+        "gripper": 1700,
+    }
     target = {**start, "shoulder_pan": 2200}
 
     bus.interpolate(start, target, hz=200, max_steps_per_tick=5, estop=estop)
@@ -134,14 +142,23 @@ def test_interpolate_interpolates_monotonic(monkeypatch, fixtures_dir):
     bus.open()
 
     class _NoopEstop:
-        def is_set(self): return False
+        def is_set(self):
+            return False
 
-    start = {"shoulder_pan": 2048, "shoulder_lift": 2048, "elbow_flex": 2048,
-             "wrist_flex": 2048, "wrist_roll": 2048, "gripper": 1700}
+    start = {
+        "shoulder_pan": 2048,
+        "shoulder_lift": 2048,
+        "elbow_flex": 2048,
+        "wrist_flex": 2048,
+        "wrist_roll": 2048,
+        "gripper": 1700,
+    }
     target = {**start, "shoulder_pan": 2200}
     bus.interpolate(start, target, hz=200, max_steps_per_tick=10, estop=_NoopEstop())
 
     shoulder_writes = [c.args[3] for c in bus._ph.write2ByteTxRx.call_args_list if c.args[1] == 1]
     assert shoulder_writes[0] > 2048 and shoulder_writes[-1] == 2200
-    assert all(shoulder_writes[i] <= shoulder_writes[i + 1] for i in range(len(shoulder_writes) - 1))
+    assert all(
+        shoulder_writes[i] <= shoulder_writes[i + 1] for i in range(len(shoulder_writes) - 1)
+    )
     bus.close()
