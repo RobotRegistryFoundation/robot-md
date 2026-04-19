@@ -2,10 +2,7 @@
 from __future__ import annotations
 
 import subprocess
-from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 
 def test_add_returns_failed_when_claude_not_in_path(tmp_path):
