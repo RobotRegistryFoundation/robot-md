@@ -92,6 +92,20 @@
             "additionalProperties": true
           }
         },
+        "poses": {
+          "type": "object",
+          "description": "Named joint-space poses. 'ready' is the manipulation home if present.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "joints": { "type": "object", "additionalProperties": { "type": "integer" } },
+              "source": { "type": "string", "enum": ["declared", "taught", "solved_from_dh"] },
+              "taught_at": { "type": "string" }
+            },
+            "required": ["joints"]
+          }
+        },
         "solver": {
           "type": "object",
           "description": "Baseline IK metadata — enough for a planner to compute forward/inverse kinematics from ROBOT.md alone, without an external URDF. Populated by `robot-md autodetect` (deterministic fields) + `robot-md calibrate` (physical fields).",
