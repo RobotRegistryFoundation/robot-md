@@ -177,41 +177,22 @@ def init(
         help="Force a specific preset (e.g. so-arm101, turtlebot4, picar-x).",
     ),
     wizard_mode: bool = typer.Option(
-        False, "--wizard", help="Interactive 7-step walk-through (default is zero prompts)."
+        False,
+        "--wizard",
+        help="(Deprecated alias for the default interactive flow; kept for compat.)",
     ),
     do_register: bool = typer.Option(
         False,
         "--register",
-        help=(
-            "After writing the draft, validate + POST to rcan.dev to mint "
-            "an RRN. One-command complete setup."
-        ),
+        help="Mint an RRN on rcan.dev as part of setup.",
     ),
     contact_email: str | None = typer.Option(
-        None,
-        "--contact-email",
-        help="Contact email sent with --register. Falls back to metadata.author.",
+        None, "--contact-email", help="Contact email for --register."
     ),
-    manufacturer: str | None = typer.Option(
-        None,
-        "--manufacturer",
-        help="Override manufacturer when --register. Otherwise read from preset/manifest.",
-    ),
-    model: str | None = typer.Option(
-        None,
-        "--model",
-        help="Override model when --register. Otherwise the preset name (e.g. 'so-arm101').",
-    ),
-    version_: str | None = typer.Option(
-        None,
-        "--version-",
-        help="Override version when --register. Otherwise '1.0'.",
-    ),
-    device_id: str | None = typer.Option(
-        None,
-        "--device-id",
-        help="Override device_id when --register. Otherwise the robot_name.",
-    ),
+    manufacturer: str | None = typer.Option(None, "--manufacturer"),
+    model: str | None = typer.Option(None, "--model"),
+    version_: str | None = typer.Option(None, "--version-"),
+    device_id: str | None = typer.Option(None, "--device-id"),
     force: bool = typer.Option(False, "--force", "-f", help="Overwrite an existing ROBOT.md."),
     list_presets: bool = typer.Option(
         False, "--list-presets", help="Print available presets and exit."
@@ -219,38 +200,42 @@ def init(
     with_claude_md: bool = typer.Option(
         True,
         "--with-claude-md/--no-claude-md",
-        help=(
-            "Also generate a CLAUDE.md next to the manifest so Claude Code "
-            "auto-recognizes the robot (default: on; safe — appends rather "
-            "than overwrites if CLAUDE.md already exists)."
-        ),
+        help="Also generate a CLAUDE.md next to the manifest.",
+    ),
+    no_install_mcp: bool = typer.Option(
+        False, "--no-install-mcp", help="Skip the Claude Code MCP registration step."
+    ),
+    no_install_skill: bool = typer.Option(
+        False, "--no-install-skill", help="Skip the using-robot-md skill install step."
+    ),
+    no_sign: bool = typer.Option(
+        False, "--no-sign", help="Skip encoder-sign calibration (still run zero-cal)."
+    ),
+    no_calibrate: bool = typer.Option(
+        False, "--no-calibrate", help="Skip BOTH sign and zero calibration."
+    ),
+    non_interactive: bool = typer.Option(
+        False,
+        "--non-interactive",
+        help="Manifest only — implies --no-install-mcp, --no-install-skill, --no-calibrate. "
+        "For scripted callers / CI.",
     ),
 ) -> None:
-    """Zero-to-registered-ROBOT.md in one command.
+    """Zero-to-actuatable-ROBOT.md in one command.
 
-    Default is *super-duper-quick*: no prompts. Scans hardware, matches a
-    preset from the built-in library, writes a validated draft.
-
-    Add `--register` to ALSO mint an RRN on the Robot Registry Foundation
-    (`rcan.dev/api/v1/robots`) in the same breath — a one-line complete
-    setup with no OpenCastor or other runtime dependency:
-
-      robot-md init my-bob --preset so-arm101 --register --contact-email me@co.com
-
-    Outputs at the end the `claude mcp add` snippet so the operator can
-    hand the manifest to any MCP-aware agent (Claude Code, Cursor, Zed,
-    Gemini CLI, …) with one more paste.
+    Default flow walks six phases: write manifest → (register) → install MCP
+    with Claude Code → install skill → prompt + sign-cal → prompt + zero-cal.
+    Headless (no-TTY) callers auto-skip the calibration phases.
 
     Examples:
 
-      robot-md init                                          # zero prompts, draft only
-      robot-md init my-bob                                   # pick a name
-      robot-md init --preset so-arm101 my-bob                # force a preset
-      robot-md init --wizard                                 # interactive
-      robot-md init my-bob -p so-arm101 --register \\
-          --contact-email me@co.com                           # ← full setup, one line
+      robot-md init                          # zero prompts on headless, full flow on TTY
+      robot-md init bob --preset so-arm101               # explicit name + preset
+      robot-md init bob --preset so-arm101 --register \\
+          --contact-email me@acme.com                    # + mint RRN
+      robot-md init bob --preset so-arm101 --non-interactive   # scripted / CI
     """
-    from robot_md.init import load_presets, quick, wizard
+    from robot_md.init import default_flow, load_presets
 
     if list_presets:
         presets = load_presets()
@@ -259,103 +244,36 @@ def init(
         raise typer.Exit()
 
     if wizard_mode:
-        rc = wizard(out, force=force)
-    else:
-        rc = quick(out, robot_name=name, preset_name=preset, force=force)
+        typer.echo(
+            "note: --wizard is now an alias for the default flow. You can drop the flag.",
+            err=True,
+        )
+
+    if non_interactive:
+        no_install_mcp = True
+        no_install_skill = True
+        no_calibrate = True
+
+    rc = default_flow(
+        out,
+        robot_name=name,
+        preset_name=preset,
+        force=force,
+        do_register=do_register,
+        contact_email=contact_email,
+        manufacturer=manufacturer,
+        model=model,
+        version_=version_,
+        device_id=device_id,
+        do_install_mcp=not no_install_mcp,
+        do_install_skill=not no_install_skill,
+        do_sign_cal=not (no_calibrate or no_sign),
+        do_zero_cal=not no_calibrate,
+        do_refresh_claude_md=with_claude_md,
+    )
+
     if rc != 0:
         raise typer.Exit(code=rc)
-
-    # --register: run validate + register after the draft lands
-    if do_register:
-        # Validate first — mint fails if the manifest is malformed, better
-        # to catch it here with a clear error than get an HTTP 4xx.
-        try:
-            parsed = parse_file(out)
-        except ParseError as e:
-            err_console.print(f"[red]✗[/red] {e}")
-            raise typer.Exit(code=FILE_ERROR) from None
-        result = validate_parsed(parsed)
-        if result.code != VALID:
-            err_console.print(
-                f"[red]✗[/red] draft failed validation before register — {result.summary}"
-            )
-            for msg in result.errors:
-                err_console.print(f"  - {msg}")
-            raise typer.Exit(code=result.code)
-        out_console.print(f"[green]✓[/green] {result.summary}")
-
-        # Apply --manufacturer/--model/--version-/--device-id overrides to
-        # the manifest BEFORE register runs, so the manifest is self-
-        # consistent with what gets POSTed to RRF. Without this, the mint
-        # request uses the flag values but the manifest keeps preset defaults.
-        overrides = {
-            "manufacturer": manufacturer,
-            "model": model,
-            "version": version_,
-            "device_id": device_id,
-        }
-        if any(v is not None for v in overrides.values()):
-            from ruamel.yaml import YAML
-
-            text = out.read_text()
-            end = text.find("\n---", 3)
-            fm_text = text[3:end].lstrip("\n")
-            body_text = text[end + 4 :]
-            y = YAML()
-            y.preserve_quotes = True
-            y.indent(mapping=2, sequence=4, offset=2)
-            data = y.load(fm_text)
-            meta = data.setdefault("metadata", {})
-            for k, v in overrides.items():
-                if v is not None:
-                    meta[k] = v
-            import io
-
-            buf = io.StringIO()
-            y.dump(data, buf)
-            out.write_text("---\n" + buf.getvalue().rstrip("\n") + "\n---" + body_text)
-
-        from robot_md.register import cli_register
-
-        rc = cli_register(
-            str(out),
-            manufacturer=manufacturer,
-            model=model,
-            version=version_,
-            device_id=device_id,
-            contact_email=contact_email,
-        )
-        if rc != 0:
-            raise typer.Exit(code=rc)
-
-        # Final: print the MCP one-liner
-        out_console.print("\n[bold]Next — hand your manifest to Claude Code:[/bold]")
-        out_console.print(f'  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/{out.name}"')
-
-    # Optionally generate a CLAUDE.md so the agent harness recognizes the
-    # robot without the operator having to run a second command. Safe by
-    # construction: `apply_to_file` appends rather than overwrites if
-    # CLAUDE.md already exists.
-    if with_claude_md:
-        from robot_md.claude_md import apply_to_file, render_claude_md
-
-        claude_md_path = out.parent / "CLAUDE.md"
-        try:
-            rendered = render_claude_md(out)
-        except (ParseError, FileNotFoundError) as e:
-            err_console.print(
-                f"[yellow]⚠[/yellow] could not generate CLAUDE.md: {e} "
-                f"(manifest itself was written OK)"
-            )
-        else:
-            action = apply_to_file(rendered, claude_md_path)
-            verb = {
-                "wrote": "wrote",
-                "appended": "appended robot-md block to",
-                "updated": "updated robot-md block in",
-                "overwrote": "overwrote",
-            }.get(action, action)
-            out_console.print(f"[green]✓[/green] {verb} {claude_md_path}")
 
 
 @app.command()

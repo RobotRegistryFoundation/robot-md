@@ -478,6 +478,7 @@ def default_flow(
     do_install_skill: bool = True,
     do_sign_cal: bool = True,
     do_zero_cal: bool = True,
+    do_refresh_claude_md: bool = True,
 ) -> int:
     """Run the six-phase init flow. Returns 0 unless manifest-write failed.
 
@@ -524,7 +525,8 @@ def default_flow(
         return 2  # only fatal exit path
 
     # Refresh CLAUDE.md next to the new manifest.
-    _refresh_claude_md(out_path)
+    if do_refresh_claude_md:
+        _refresh_claude_md(out_path)
 
     # Phase 2: register (opt-in)
     if do_register:
