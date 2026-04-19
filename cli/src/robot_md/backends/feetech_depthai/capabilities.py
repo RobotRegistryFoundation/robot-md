@@ -107,6 +107,42 @@ def _arm_reach(backend, *, args, dry_run, estop) -> ExecutionResult:
     )
 
 
+def _home_joints(backend) -> dict[str, int]:
+    """Resolve arm.home target joints.
+
+    Prefers `physics.poses.ready` from the spec (Task 2 surfaced poses on
+    RobotSpec). Falls back to the hardcoded zero pose so v0.5.0 manifests,
+    which have no `physics.poses`, keep working.
+    """
+    base = {
+        "shoulder_pan": 2048,
+        "shoulder_lift": 2048,
+        "elbow_flex": 2048,
+        "wrist_flex": 2048,
+        "wrist_roll": 2048,
+        "gripper": 1700,
+    }
+    spec = getattr(backend, "_spec", None)
+    if spec is None:
+        return base
+    physics = getattr(spec, "physics", None)
+    poses = getattr(physics, "poses", None) if physics is not None else None
+    if not poses:
+        return base
+    ready = poses.get("ready")
+    if ready is None or not ready.joints:
+        return base
+    base.update({k: int(v) for k, v in ready.joints.items()})
+    return base
+
+
+def _arm_home(backend, *, args, dry_run, estop) -> ExecutionResult:
+    wps = [Waypoint(t=0.0, joints=_home_joints(backend))]
+    return _do_replay(
+        backend, waypoints=wps, label="arm.home", args=args, dry_run=dry_run, estop=estop
+    )
+
+
 def _vision_describe(backend, *, args, dry_run, estop) -> ExecutionResult:
     if backend._perception is None:
         return ExecutionResult(
@@ -151,6 +187,7 @@ _HANDLERS = {
     "arm.pick": _arm_pick,
     "arm.place": _arm_place,
     "arm.reach": _arm_reach,
+    "arm.home": _arm_home,
     "vision.describe": _vision_describe,
     "status.report": _status_report,
 }

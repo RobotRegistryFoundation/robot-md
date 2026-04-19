@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from robot_md.backends.feetech_depthai.capabilities import dispatch
+from robot_md.robot_spec import PoseDef
 
 
-def _backend():
-    class _FakeSpec:
-        class metadata:
-            robot_name = "test-bot"
-
+def _backend(*, poses: dict[str, PoseDef] | None = None):
     b = MagicMock()
-    b._spec = _FakeSpec()
+    b._spec = SimpleNamespace(
+        metadata=SimpleNamespace(robot_name="test-bot"),
+        physics=SimpleNamespace(poses=dict(poses) if poses else {}),
+    )
     b._servo_bus = MagicMock()
     b._servo_bus.read_positions.return_value = {
         "shoulder_pan": 2048,
@@ -81,5 +82,53 @@ def test_vision_describe_grabs_a_frame():
 def test_arm_pick_torque_on_then_off():
     b = _backend()
     dispatch(b, capability="arm.pick", args={}, dry_run=False, estop=_estop())
+    torque_calls = [c.args[0] for c in b._servo_bus.torque.call_args_list]
+    assert torque_calls == [True, False]
+
+
+def test_arm_home_uses_poses_ready_when_present():
+    """arm.home targets physics.poses.ready, not the hardcoded ZERO."""
+    ready = PoseDef(
+        joints={
+            "shoulder_pan": 1900,
+            "shoulder_lift": 1700,
+            "elbow_flex": 2048,
+            "wrist_flex": 2048,
+            "wrist_roll": 2048,
+            "gripper": 1700,
+        },
+        description=None,
+        source="taught",
+        taught_at=None,
+    )
+    b = _backend(poses={"ready": ready})
+    res = dispatch(b, capability="arm.home", args={}, dry_run=True, estop=_estop())
+    assert res.status == "ok"
+    final_joints = res.trajectory[-1]["joints"]
+    assert final_joints["shoulder_pan"] == 1900
+    assert final_joints["shoulder_lift"] == 1700
+    assert final_joints["elbow_flex"] == 2048
+    assert final_joints["gripper"] == 1700
+
+
+def test_arm_home_falls_back_to_zero_when_no_ready():
+    """No poses.ready -> hardcoded (2048,...,gripper=1700) fallback."""
+    b = _backend()  # no poses at all
+    res = dispatch(b, capability="arm.home", args={}, dry_run=True, estop=_estop())
+    assert res.status == "ok"
+    final_joints = res.trajectory[-1]["joints"]
+    assert final_joints["shoulder_pan"] == 2048
+    assert final_joints["shoulder_lift"] == 2048
+    assert final_joints["elbow_flex"] == 2048
+    assert final_joints["wrist_flex"] == 2048
+    assert final_joints["wrist_roll"] == 2048
+    assert final_joints["gripper"] == 1700
+
+
+def test_arm_home_invokes_motion_replay_when_not_dry_run():
+    b = _backend()
+    res = dispatch(b, capability="arm.home", args={}, dry_run=False, estop=_estop())
+    assert res.status == "ok"
+    b._motion.replay.assert_called_once()
     torque_calls = [c.args[0] for c in b._servo_bus.torque.call_args_list]
     assert torque_calls == [True, False]

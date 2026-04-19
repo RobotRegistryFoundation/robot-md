@@ -58,6 +58,7 @@ class FeetechDepthaiBackend(CapabilityBackend):
                 "arm.pick",
                 "arm.place",
                 "arm.reach",
+                "arm.home",
                 "vision.describe",
                 "status.report",
             }
