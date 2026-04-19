@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from robot_md.mcp.context import McpContext, load_context
-from robot_md.mcp.tools.estop import estop_tool
+from robot_md.mcp.tools.estop import estop_clear_tool, estop_tool
 from robot_md.mcp.tools.render import render_tool
 from robot_md.mcp.tools.validate import validate_tool
 
@@ -34,6 +34,11 @@ def build_server(ctx: McpContext):
     def estop() -> dict:
         """Set the software E-stop for this server session."""
         return estop_tool(ctx)
+
+    @server.tool()
+    def estop_clear(confirm_token: str | None = None) -> dict:
+        """Clear the software E-stop. Gated by the `system` HITL scope by default."""
+        return estop_clear_tool(ctx, confirm_token=confirm_token)
 
     @server.tool()
     def execute_capability(
