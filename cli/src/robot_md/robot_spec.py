@@ -64,6 +64,14 @@ class SolverCamera:
 
 
 @dataclass(frozen=True)
+class PoseDef:
+    joints: dict[str, int]
+    description: str | None
+    source: str | None
+    taught_at: str | None
+
+
+@dataclass(frozen=True)
 class MetadataBlock:
     robot_name: str
     rrn: str | None
@@ -81,6 +89,7 @@ class PhysicsBlock:
     kinematics: tuple[dict, ...]
     solver: dict
     cameras: tuple[SolverCamera, ...]
+    poses: dict[str, PoseDef]
 
 
 @dataclass(frozen=True)
@@ -166,6 +175,18 @@ class RobotSpec:
             for c in (solver.get("cameras") or [])
         )
 
+        poses_raw = physics.get("poses") or {}
+        poses: dict[str, PoseDef] = {
+            name: PoseDef(
+                joints=dict(p.get("joints") or {}),
+                description=p.get("description"),
+                source=p.get("source"),
+                taught_at=p.get("taught_at"),
+            )
+            for name, p in poses_raw.items()
+            if isinstance(p, dict)
+        }
+
         workspace = safety.get("workspace_bounds_m")
         workspace_tuple: tuple[float, float, float] | None = None
         if workspace and len(workspace) == 3:
@@ -202,6 +223,7 @@ class RobotSpec:
                 kinematics=tuple(physics.get("kinematics") or ()),
                 solver=dict(solver),
                 cameras=cams,
+                poses=poses,
             ),
             drivers=tuple(drivers),
             safety=SafetyBlock(
