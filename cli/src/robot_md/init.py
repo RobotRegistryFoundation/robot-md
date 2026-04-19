@@ -267,7 +267,7 @@ def render_draft(
 # ---------------------------------------------------------------------- drivers
 
 
-def quick(
+def non_interactive(
     out_path: Path,
     *,
     robot_name: str | None = None,
@@ -320,6 +320,26 @@ def quick(
         file=sys.stderr,
     )
     return 0
+
+
+def quick(
+    out_path: Path,
+    *,
+    robot_name: str | None = None,
+    preset_name: str | None = None,
+    force: bool = False,
+) -> int:
+    """Deprecated alias for non_interactive() — kept for external callers.
+
+    Emits a one-time note to stderr and forwards. Remove in a future release.
+    """
+    print(
+        "note: robot_md.init.quick is deprecated; call non_interactive() instead.",
+        file=sys.stderr,
+    )
+    return non_interactive(
+        out_path, robot_name=robot_name, preset_name=preset_name, force=force
+    )
 
 
 def wizard(out_path: Path, *, force: bool = False) -> int:

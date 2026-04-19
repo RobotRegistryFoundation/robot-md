@@ -11,8 +11,8 @@ from robot_md.init import (
     load_presets,
     match_score,
     merge_preset_into_draft,
+    non_interactive,
     pick_best,
-    quick,
     render_draft,
 )
 
@@ -129,13 +129,13 @@ def test_render_draft_contains_frontmatter_and_body(presets):
     assert "## Safety Gates" in text
 
 
-def test_quick_writes_valid_minimal_draft(tmp_path):
+def test_non_interactive_writes_valid_minimal_draft(tmp_path):
     from robot_md.parser import parse_file
     from robot_md.validate import VALID
     from robot_md.validate import validate as validate_parsed
 
     out = tmp_path / "ROBOT.md"
-    rc = quick(out, robot_name="test-bot", preset_name="minimal", force=True)
+    rc = non_interactive(out, robot_name="test-bot", preset_name="minimal", force=True)
     assert rc == 0
     assert out.exists()
     parsed = parse_file(out)
@@ -143,23 +143,33 @@ def test_quick_writes_valid_minimal_draft(tmp_path):
     assert result.code == VALID
 
 
-def test_quick_writes_valid_so_arm101_draft(tmp_path):
+def test_non_interactive_writes_valid_so_arm101_draft(tmp_path):
     from robot_md.parser import parse_file
     from robot_md.validate import VALID
     from robot_md.validate import validate as validate_parsed
 
     out = tmp_path / "ROBOT.md"
-    rc = quick(out, robot_name="test-arm", preset_name="so-arm101", force=True)
+    rc = non_interactive(out, robot_name="test-arm", preset_name="so-arm101", force=True)
     assert rc == 0
     parsed = parse_file(out)
     result = validate_parsed(parsed)
     assert result.code == VALID
 
 
+def test_quick_alias_still_works_with_warning(tmp_path, capsys):
+    from robot_md.init import quick
+
+    out = tmp_path / "ROBOT.md"
+    rc = quick(out, robot_name="bob", preset_name="minimal", force=True)
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "deprecated" in err.lower() or "non_interactive" in err.lower()
+
+
 def test_quick_refuses_overwrite_without_force(tmp_path):
     out = tmp_path / "ROBOT.md"
     out.write_text("existing content\n")
-    rc = quick(out, robot_name="x", preset_name="minimal", force=False)
+    rc = non_interactive(out, robot_name="x", preset_name="minimal", force=False)
     assert rc == 2
     assert out.read_text() == "existing content\n"
 
@@ -167,7 +177,7 @@ def test_quick_refuses_overwrite_without_force(tmp_path):
 def test_quick_allows_overwrite_with_force(tmp_path):
     out = tmp_path / "ROBOT.md"
     out.write_text("existing\n")
-    rc = quick(out, robot_name="x", preset_name="minimal", force=True)
+    rc = non_interactive(out, robot_name="x", preset_name="minimal", force=True)
     assert rc == 0
     assert out.read_text() != "existing\n"
 
@@ -180,6 +190,6 @@ def test_presets_dir_is_in_package():
 
 def test_unknown_preset_name_fails_cleanly(tmp_path):
     out = tmp_path / "ROBOT.md"
-    rc = quick(out, robot_name="x", preset_name="not-a-real-preset", force=True)
+    rc = non_interactive(out, robot_name="x", preset_name="not-a-real-preset", force=True)
     assert rc != 0
     assert not out.exists()
