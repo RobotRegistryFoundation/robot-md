@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ robot_name }} — robot-md dev dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body>
+  <header>
+    <h1>{{ robot_name }}</h1>
+    <div class="actions">
+      <button hx-post="/api/estop" hx-swap="none" class="btn-danger">🔴 E-STOP</button>
+      <button hx-post="/api/estop/clear" hx-swap="none">↻ Clear E-stop</button>
+      <button hx-post="/api/snapshot" hx-swap="none">📸 Snapshot</button>
+    </div>
+  </header>
+
+  {% if warnings %}
+  <div id="warnings-banner" class="warnings">
+    <strong>⚠ {{ warnings|length }} warnings</strong>
+    <ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <main class="grid">
+    <section id="servos">
+      <h2>Servo positions</h2>
+      <table>
+        <thead><tr><th>joint</th><th>steps</th></tr></thead>
+        <tbody>
+        {% for name, steps in joints.items() %}
+          <tr><td>{{ name }}</td><td>{{ steps }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section id="frame">
+      <h2>Last OAK-D frame</h2>
+      <img src="/api/frame/latest.png" alt="no frame yet" />
+    </section>
+
+    <section id="estop" class="estop-panel">
+      <h2>E-stop</h2>
+      <div class="state {% if estop_set %}set{% else %}clear{% endif %}">
+        {{ "🛑 SET" if estop_set else "✅ clear" }}
+      </div>
+    </section>
+
+    <section id="toolcall-log">
+      <h2>Recent tool calls</h2>
+      <ol>
+      {% for e in tool_calls %}
+        <li>
+          <span class="ts">{{ '%.0f' % e.ts }}</span>
+          <code>{{ e.kind }}</code>
+          <span>{{ e.data.get('capability') or e.data.get('tool') or '' }}</span>
+          {% if e.kind == 'tool.result' %}→ <em>{{ e.data.get('status') }}</em>{% endif %}
+        </li>
+      {% endfor %}
+      </ol>
+    </section>
+  </main>
+</body>
+</html>
