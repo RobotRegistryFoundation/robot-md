@@ -22,5 +22,6 @@ class PhaseResult:
 
 
 from robot_md.init_phases.install_mcp import phase_install_mcp  # noqa: E402
+from robot_md.init_phases.install_skill import phase_install_skill  # noqa: E402
 
-__all__ = ["PhaseResult", "PhaseStatus", "phase_install_mcp"]
+__all__ = ["PhaseResult", "PhaseStatus", "phase_install_mcp", "phase_install_skill"]
