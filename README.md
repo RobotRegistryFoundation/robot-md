@@ -130,7 +130,7 @@ claude
 
 **One-command actuatable:** as of v0.5.0, `robot-md init` on a TTY with the arm plugged in also installs the MCP server into Claude Code, installs the `using-robot-md` skill, and prompts Y/n for encoder-sign and zero-pose calibration. On headless runs (no TTY, or `--non-interactive`), these steps auto-skip and init degrades to the old manifest-only behavior. Individual phases can be skipped with `--no-install-mcp`, `--no-install-skill`, `--no-sign`, or `--no-calibrate`.
 
-For custom hardware, swap the preset: `robot-md init my-bob --wizard`. For pure scan-to-draft without a preset, `robot-md autodetect --write ROBOT.md` is the low-level primitive.
+For custom hardware without a matching preset, drop `--preset` to let the scan pick the best available match (falls back to `minimal.yaml`), or use the lower-level primitive directly: `robot-md autodetect --write ROBOT.md`.
 
 **Physical calibration** (for robots with arms): `robot-md calibrate --zero ROBOT.md` — pose the arm at its declared zero, press Enter; the CLI records encoder readings so the manifest's IK solver knows where "zero" is. Preserves YAML comments on rewrite.
 

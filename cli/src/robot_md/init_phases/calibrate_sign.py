@@ -7,7 +7,12 @@ from pathlib import Path
 
 from robot_md.calibrate import cli_calibrate_sign
 from robot_md.init_phases import PhaseResult
-from robot_md.init_phases.calibrate_zero import _drivers, _probe_feetech_port
+from robot_md.init_phases._feetech_probe import (
+    drivers_from as _drivers,
+)
+from robot_md.init_phases._feetech_probe import (
+    probe_feetech_port as _probe_feetech_port,
+)
 
 
 def phase_calibrate_sign(manifest_path: Path, *, prompt: bool = True) -> PhaseResult:

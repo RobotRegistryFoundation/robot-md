@@ -2,50 +2,17 @@
 
 from __future__ import annotations
 
-import contextlib
 import sys
 from pathlib import Path
 
 from robot_md.calibrate import cli_calibrate_zero
 from robot_md.init_phases import PhaseResult
-from robot_md.parser import parse_file
-
-
-def _probe_feetech_port(port: str, baud: int = 1_000_000) -> bool:
-    """Return True if the port opens and servo id 1 responds to Present Position.
-
-    Runs in a few hundred ms; imports feetech_servo_sdk lazily so the
-    phase module is importable on systems without the hardware SDK.
-    """
-    try:
-        from feetech_servo_sdk import PacketHandler, PortHandler  # lazy
-    except Exception:
-        return False
-    try:
-        ph = PortHandler(port)
-    except Exception:
-        return False
-    try:
-        if not ph.openPort():
-            return False
-        if not ph.setBaudRate(baud):
-            return False
-        pk = PacketHandler(0)
-        _, comm, err = pk.read2ByteTxRx(ph, 1, 56)  # servo id 1, ADDR_PRESENT
-        return comm == 0 and err == 0
-    except Exception:
-        return False
-    finally:
-        with contextlib.suppress(Exception):
-            ph.closePort()
-
-
-def _drivers(manifest_path: Path) -> list[dict]:
-    try:
-        parsed = parse_file(manifest_path)
-    except Exception:
-        return []
-    return list(parsed.frontmatter.get("drivers") or [])
+from robot_md.init_phases._feetech_probe import (
+    drivers_from as _drivers,
+)
+from robot_md.init_phases._feetech_probe import (
+    probe_feetech_port as _probe_feetech_port,
+)
 
 
 def phase_calibrate_zero(manifest_path: Path, *, prompt: bool = True) -> PhaseResult:

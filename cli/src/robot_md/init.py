@@ -1,10 +1,10 @@
-"""`robot-md init` — zero-to-ROBOT.md in one command.
+"""`robot-md init` — zero-to-actuatable ROBOT.md in one command.
 
-Default mode is **super-duper-quick**: no prompts. Scans hardware, matches
-against a preset library, emits a validated draft. If nothing matches, falls
-back to plain `autodetect`.
-
-Interactive mode opt-in: `--wizard`.
+Default flow (`default_flow`) walks six phases: write manifest → register
+(opt-in) → install MCP → install skill → sign calibration → zero
+calibration. Each phase is independently callable from `init_phases/`.
+Scripted / CI callers pass `--non-interactive` to skip every phase
+except manifest write (equivalent to the pre-v0.5.0 `quick`-style path).
 
 Design principles (from spec/autodetect-prefill-roadmap.md):
   * Pre-fill is opt-in per tier; default composes all tiers.
@@ -338,97 +338,6 @@ def quick(
         file=sys.stderr,
     )
     return non_interactive(out_path, robot_name=robot_name, preset_name=preset_name, force=force)
-
-
-def wizard(out_path: Path, *, force: bool = False) -> int:
-    """Interactive 7-step walkthrough. Opt-in via `--wizard`."""
-    import socket
-
-    if out_path.exists() and not force:
-        print(f"error: {out_path} already exists (pass --force to overwrite)", file=sys.stderr)
-        return 2
-
-    def ask(prompt: str, default: str | None = None) -> str:
-        suffix = f" [{default}]" if default else ""
-        try:
-            ans = input(f"{prompt}{suffix} > ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\naborted.", file=sys.stderr)
-            sys.exit(1)
-        return ans or (default or "")
-
-    print("robot-md init (wizard mode) — 7 steps.\n", file=sys.stderr)
-
-    # 1. Robot name
-    default_name = f"robot-{socket.gethostname()}"
-    name = ask("1/7 · Robot name? (short, lowercase)", default=default_name)
-
-    # 2. Preset
-    presets = load_presets()
-    preset_names = [p.display_name for p in presets]
-    print(
-        f"\n2/7 · Known preset? Options: {', '.join(preset_names)} (or 'none' for autodetect only)",
-        file=sys.stderr,
-    )
-    preset_choice = ask("    preset", default="autodetect").strip().lower()
-
-    # 3. Scan
-    print("\n3/7 · Scanning hardware...", file=sys.stderr)
-    scan = scan_system()
-
-    # 4. Pick preset
-    if preset_choice in ("none", "autodetect", ""):
-        chosen = pick_best(presets, scan)
-        print(
-            f"    → auto-selected preset: {chosen.preset.display_name} (score={chosen.score})",
-            file=sys.stderr,
-        )
-    else:
-        sel = next(
-            (p for p in presets if p.name == preset_choice or p.display_name == preset_choice), None
-        )
-        if sel is None:
-            print(
-                f"    preset {preset_choice!r} not found; falling back to autodetect",
-                file=sys.stderr,
-            )
-            chosen = pick_best(presets, scan)
-        else:
-            chosen = MatchResult(preset=sel, score=100, reasons=["wizard explicit"])
-
-    # 5. Write draft
-    fm = merge_preset_into_draft(chosen.preset, name, scan)
-    body_hints = chosen.preset.data.get("body_hints", {}) or {}
-    text = render_draft(fm, body_hints)
-    out_path.write_text(text)
-    print(f"\n4/7 · wrote draft to {out_path}", file=sys.stderr)
-
-    # 5. Calibrate --zero prompt
-    do_zero = ask(
-        "\n5/7 · Run `calibrate --zero` now? (pose arm, press Enter) (y/n)", default="n"
-    ).lower()
-    if do_zero.startswith("y"):
-        from robot_md.calibrate import cli_calibrate_zero
-
-        cli_calibrate_zero(str(out_path))
-
-    # 6. Sign calibration — noted as future
-    print(
-        "\n6/7 · calibrate --sign (encoder sign verification) — not implemented yet (task #44)",
-        file=sys.stderr,
-    )
-
-    # 7. Hand-eye — noted as future
-    print("7/7 · calibrate --hand-eye — not implemented yet (task #44)\n", file=sys.stderr)
-
-    # Final hint
-    print(
-        "✓ Done. Try:\n"
-        f"  robot-md validate {out_path}\n"
-        f'  claude mcp add robot-md -- robot-md-mcp "$(pwd)/{out_path.name}"\n',
-        file=sys.stderr,
-    )
-    return 0
 
 
 # ---------------------------------------------------------------- orchestrator
