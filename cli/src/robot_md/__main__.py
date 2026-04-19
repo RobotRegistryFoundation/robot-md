@@ -929,5 +929,25 @@ def mcp(
     raise typer.Exit(code=_mcp_main())
 
 
+dashboard_app = typer.Typer(help="Dev dashboard for robot-md.", no_args_is_help=True)
+app.add_typer(dashboard_app, name="dashboard")
+
+
+@dashboard_app.command("serve")
+def dashboard_serve(
+    manifest: Path | None = typer.Option(None, help="Optional ROBOT.md; warnings shown in header."),
+    host: str = typer.Option("127.0.0.1", help="Bind host (keep local)."),
+    port: int = typer.Option(8091, help="Bind port."),
+) -> None:
+    """Start the dev dashboard at http://<host>:<port>."""
+    import uvicorn
+
+    from robot_md.dashboard.server import build_app
+
+    app_ = build_app(manifest=manifest)
+    typer.echo(f"dashboard: http://{host}:{port}")
+    uvicorn.run(app_, host=host, port=port, log_level="info")
+
+
 if __name__ == "__main__":
     app()

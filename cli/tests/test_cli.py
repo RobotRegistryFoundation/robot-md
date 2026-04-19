@@ -62,3 +62,10 @@ def test_cli_mcp_help():
     result = runner.invoke(app, ["mcp", "--help"])
     assert result.exit_code == 0
     assert "ROBOT.md" in result.stdout or "manifest" in result.stdout or "MCP" in result.stdout
+
+
+def test_cli_dashboard_serve_help():
+    result = runner.invoke(app, ["dashboard", "serve", "--help"])
+    assert result.exit_code == 0
+    out = result.output.lower()
+    assert "manifest" in out or "port" in out
