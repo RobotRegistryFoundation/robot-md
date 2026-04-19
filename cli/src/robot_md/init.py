@@ -411,3 +411,168 @@ def wizard(out_path: Path, *, force: bool = False) -> int:
         file=sys.stderr,
     )
     return 0
+
+
+# ---------------------------------------------------------------- orchestrator
+
+_PHASE_NAMES = (
+    "PhaseResult",
+    "phase_write_manifest",
+    "phase_register",
+    "phase_install_mcp",
+    "phase_install_skill",
+    "phase_calibrate_sign",
+    "phase_calibrate_zero",
+)
+
+
+def __getattr__(name: str) -> Any:
+    if name in _PHASE_NAMES:
+        from robot_md import init_phases as _ip
+
+        value = getattr(_ip, name)
+        globals()[name] = value  # cache so future lookups (and mock.patch) hit __dict__
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def _tally_line(r: Any) -> str:
+    glyph = {"ok": "✓", "skipped": "-", "failed": "✗"}[r.status]
+    # Human phase name: install_mcp → install-mcp, write_manifest → manifest (friendlier)
+    label_map = {
+        "write_manifest": "manifest    ",
+        "register":       "register    ",
+        "install_mcp":    "install_mcp ",
+        "install_skill":  "install_skill",
+        "sign_cal":       "sign_cal    ",
+        "zero_cal":       "zero_cal    ",
+    }
+    label = label_map.get(r.phase, r.phase)
+    return f"{glyph} {label}  {r.message}"
+
+
+def _refresh_claude_md(out_path: Path) -> None:
+    """Invoke claude_md.apply_to_file(render_claude_md(out_path)) — best-effort."""
+    try:
+        from robot_md.claude_md import apply_to_file, render_claude_md
+
+        rendered = render_claude_md(out_path)
+        apply_to_file(rendered, out_path.parent / "CLAUDE.md")
+    except Exception as e:
+        print(f"  (CLAUDE.md not refreshed: {e})", file=sys.stderr)
+
+
+def default_flow(
+    out_path: Path,
+    *,
+    robot_name: str | None = None,
+    preset_name: str | None = None,
+    force: bool = False,
+    do_register: bool = False,
+    contact_email: str | None = None,
+    manufacturer: str | None = None,
+    model: str | None = None,
+    version_: str | None = None,
+    device_id: str | None = None,
+    do_install_mcp: bool = True,
+    do_install_skill: bool = True,
+    do_sign_cal: bool = True,
+    do_zero_cal: bool = True,
+) -> int:
+    """Run the six-phase init flow. Returns 0 unless manifest-write failed.
+
+    Each step emits a single status line to stderr. A final tally block
+    summarizes what ran, was skipped, or failed. Phase ordering is:
+    manifest → register → install_mcp → install_skill → sign_cal → zero_cal.
+    """
+    # Resolve phase callables from THIS module so mock.patch replacements are honoured
+    _self = sys.modules[__name__]
+    phase_write_manifest = _self.phase_write_manifest  # type: ignore[attr-defined]
+    phase_register = _self.phase_register  # type: ignore[attr-defined]
+    phase_install_mcp = _self.phase_install_mcp  # type: ignore[attr-defined]
+    phase_install_skill = _self.phase_install_skill  # type: ignore[attr-defined]
+    phase_calibrate_sign = _self.phase_calibrate_sign  # type: ignore[attr-defined]
+    phase_calibrate_zero = _self.phase_calibrate_zero  # type: ignore[attr-defined]
+
+    scan = scan_system()
+    results: list[Any] = []
+
+    # Phase 1: write manifest (required)
+    r_write = phase_write_manifest(
+        out_path=out_path,
+        robot_name=robot_name,
+        preset_name=preset_name,
+        scan=scan,
+        force=force,
+    )
+    results.append(r_write)
+    if r_write.status != "ok":
+        _print_tally(results, out_path)
+        return 2  # only fatal exit path
+
+    # Refresh CLAUDE.md next to the new manifest.
+    _refresh_claude_md(out_path)
+
+    # Phase 2: register (opt-in)
+    if do_register:
+        results.append(
+            phase_register(
+                out_path,
+                contact_email=contact_email,
+                manufacturer=manufacturer,
+                model=model,
+                version=version_,
+                device_id=device_id,
+            )
+        )
+
+    # Phase 3: install MCP with Claude Code
+    if do_install_mcp:
+        results.append(phase_install_mcp(out_path))
+
+    # Phase 4: install skill
+    if do_install_skill:
+        results.append(phase_install_skill())
+
+    # Phase 5: encoder-sign calibration
+    if do_sign_cal:
+        results.append(phase_calibrate_sign(out_path))
+
+    # Phase 6: zero-pose calibration
+    if do_zero_cal:
+        results.append(phase_calibrate_zero(out_path))
+
+    _print_tally(results, out_path)
+    return 0
+
+
+def _print_tally(results: list[Any], out_path: Path) -> None:
+    print("", file=sys.stderr)
+    for r in results:
+        print(_tally_line(r), file=sys.stderr)
+
+    any_failed = any(r.status == "failed" for r in results)
+    any_skipped = any(r.status == "skipped" for r in results)
+
+    robot_name = None
+    try:
+        from robot_md.parser import parse_file
+
+        parsed = parse_file(out_path)
+        robot_name = (parsed.frontmatter.get("metadata") or {}).get("robot_name")
+    except Exception:
+        pass
+
+    print("", file=sys.stderr)
+    if any_failed or any_skipped:
+        print(
+            "Some steps were skipped or failed — rerun the individual verbs "
+            "(robot-md calibrate, install-skill, claude mcp add) as needed.",
+            file=sys.stderr,
+        )
+    if robot_name:
+        print(
+            f"{robot_name} is set up. Open Claude Code in this dir:\n"
+            f"  cd {out_path.parent} && claude\n",
+            file=sys.stderr,
+        )
