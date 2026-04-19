@@ -235,10 +235,10 @@ def test_tally_prints_one_line_per_executed_phase(tmp_path, fake_scan, capsys):
         )
 
     err = capsys.readouterr().err
-    assert "✓ manifest" in err or "✓ write_manifest" in err
-    assert "install_mcp" in err
-    assert "install_skill" in err
-    assert "sign_cal" in err
-    assert "zero_cal" in err
+    assert "✓ manifest" in err
+    assert "install-mcp" in err
+    assert "install-skill" in err
+    assert "sign-cal" in err
+    assert "zero-cal" in err
     # Skipped prefix
     assert "-" in err  # dash for skipped

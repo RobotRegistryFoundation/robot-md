@@ -440,14 +440,14 @@ def _tally_line(r: Any) -> str:
     glyph = {"ok": "✓", "skipped": "-", "failed": "✗"}[r.status]
     # Human phase name: install_mcp → install-mcp, write_manifest → manifest (friendlier)
     label_map = {
-        "write_manifest": "manifest    ",
-        "register":       "register    ",
-        "install_mcp":    "install_mcp ",
-        "install_skill":  "install_skill",
-        "sign_cal":       "sign_cal    ",
-        "zero_cal":       "zero_cal    ",
+        "write_manifest": "manifest",
+        "register":       "register",
+        "install_mcp":    "install-mcp",
+        "install_skill":  "install-skill",
+        "sign_cal":       "sign-cal",
+        "zero_cal":       "zero-cal",
     }
-    label = label_map.get(r.phase, r.phase)
+    label = label_map.get(r.phase, r.phase).ljust(13)
     return f"{glyph} {label}  {r.message}"
 
 
@@ -497,14 +497,27 @@ def default_flow(
     scan = scan_system()
     results: list[Any] = []
 
-    # Phase 1: write manifest (required)
-    r_write = phase_write_manifest(
-        out_path=out_path,
-        robot_name=robot_name,
-        preset_name=preset_name,
-        scan=scan,
-        force=force,
-    )
+    # Phase 1: write manifest (required). OSError / FileExistsError on truly
+    # fatal conditions (disk full, permission denied) is caught at the top
+    # level per the spec — we convert to a failed PhaseResult so the tally
+    # still prints cleanly instead of a raw traceback.
+    try:
+        r_write = phase_write_manifest(
+            out_path=out_path,
+            robot_name=robot_name,
+            preset_name=preset_name,
+            scan=scan,
+            force=force,
+        )
+    except OSError as e:
+        from robot_md.init_phases import PhaseResult as _PhaseResult
+
+        r_write = _PhaseResult(
+            phase="write_manifest",
+            status="failed",
+            message=f"fatal I/O error: {e}",
+            detail={"reason": "os_error", "error": str(e)},
+        )
     results.append(r_write)
     if r_write.status != "ok":
         _print_tally(results, out_path)
