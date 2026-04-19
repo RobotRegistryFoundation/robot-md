@@ -246,3 +246,71 @@ def test_tally_prints_one_line_per_executed_phase(tmp_path, fake_scan, capsys):
     assert "zero-cal" in err
     # Skipped prefix
     assert "-" in err  # dash for skipped
+
+
+def test_claude_md_refresh_runs_after_register_so_rrn_is_not_stale(tmp_path, fake_scan):
+    """The generated CLAUDE.md must include the minted RRN, not '(unregistered)'.
+
+    Regression test for a bug where _refresh_claude_md ran before phase_register,
+    so the marketing one-liner `init --register ...` left CLAUDE.md showing
+    "Registered RRN: (unregistered)" even when the mint succeeded.
+    """
+    from robot_md.init import default_flow
+
+    out = tmp_path / "ROBOT.md"
+
+    def _fake_register(*_, **__):
+        # phase_register normally calls cli_register which writes metadata.rrn.
+        # Simulate that by patching the freshly-written manifest in place.
+        from ruamel.yaml import YAML
+
+        text = out.read_text()
+        end = text.find("\n---", 3)
+        fm_text = text[3:end].lstrip("\n")
+        body = text[end + 4 :]
+        y = YAML()
+        y.preserve_quotes = True
+        y.indent(mapping=2, sequence=4, offset=2)
+        data = y.load(fm_text)
+        data.setdefault("metadata", {})["rrn"] = "RRN-ABC123456789"
+        import io
+
+        buf = io.StringIO()
+        y.dump(data, buf)
+        out.write_text("---\n" + buf.getvalue().rstrip("\n") + "\n---" + body)
+        return PhaseResult(
+            phase="register",
+            status="ok",
+            message="minted RRN-ABC123456789",
+            detail={"rrn": "RRN-ABC123456789", "exit_code": 0},
+        )
+
+    with (
+        patch("robot_md.init.scan_system", return_value=fake_scan),
+        patch("robot_md.init.phase_register", side_effect=_fake_register),
+        patch("robot_md.init.phase_install_mcp", return_value=_ok("install_mcp")),
+        patch("robot_md.init.phase_install_skill", return_value=_ok("install_skill")),
+        patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal")),
+        patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal")),
+    ):
+        # Real write_manifest + real _refresh_claude_md — only the phase mocks
+        # that shortcut network / hardware / skill-install side effects.
+        rc = default_flow(
+            out,
+            robot_name="bob",
+            preset_name="so-arm101",
+            force=False,
+            do_register=True,
+            contact_email="me@acme.com",
+            do_install_mcp=True,
+            do_install_skill=True,
+            do_sign_cal=True,
+            do_zero_cal=True,
+        )
+
+    assert rc == 0
+    claude_md = (tmp_path / "CLAUDE.md").read_text()
+    assert "RRN-ABC123456789" in claude_md, (
+        f"CLAUDE.md should contain the minted RRN; got:\n{claude_md}"
+    )
+    assert "(unregistered)" not in claude_md

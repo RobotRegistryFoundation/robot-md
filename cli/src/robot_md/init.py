@@ -542,11 +542,8 @@ def default_flow(
         _print_tally(results, out_path)
         return 2  # only fatal exit path
 
-    # Refresh CLAUDE.md next to the new manifest.
-    if do_refresh_claude_md:
-        _refresh_claude_md(out_path)
-
-    # Phase 2: register (opt-in)
+    # Phase 2: register (opt-in). Runs BEFORE the first CLAUDE.md refresh so
+    # a successful mint's RRN lands in the generated CLAUDE.md on first write.
     if do_register:
         results.append(
             phase_register(
@@ -558,6 +555,13 @@ def default_flow(
                 device_id=device_id,
             )
         )
+
+    # Refresh CLAUDE.md next to the new manifest. Deferred until after
+    # register so the "Registered RRN" row reflects the freshly-minted value
+    # (or "(unregistered)" if register was skipped/failed) — consistent with
+    # what the render_claude_md template will read from the manifest.
+    if do_refresh_claude_md:
+        _refresh_claude_md(out_path)
 
     # Phase 3: install MCP with Claude Code
     if do_install_mcp:
