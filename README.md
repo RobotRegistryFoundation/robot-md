@@ -132,6 +132,18 @@ For custom hardware, swap the preset: `robot-md init my-bob --wizard`. For pure 
 
 **Physical calibration** (for robots with arms): `robot-md calibrate --zero ROBOT.md` — pose the arm at its declared zero, press Enter; the CLI records encoder readings so the manifest's IK solver knows where "zero" is. Preserves YAML comments on rewrite.
 
+### Dev observability
+
+While you work, spin up the local dashboard in a second terminal:
+
+```bash
+robot-md dashboard serve --manifest ./ROBOT.md
+```
+
+Opens `http://127.0.0.1:8091` — live servo positions, last OAK-D frame, tool-call log, estop button, validator warnings. Data comes from the MCP server's event log at `~/.robot-md/events.jsonl`, which is also the durable record for later replay and memory-sync features. Localhost-only; no auth.
+
+Disable the event log entirely with `ROBOT_MD_DASHBOARD_DISABLED=1`.
+
 ---
 
 ### ▶ Option B — Inside Claude Code (ask Claude to do it)

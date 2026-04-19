@@ -5,6 +5,46 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.4.1] - 2026-04-18
+
+Dev ergonomics release. Live local dashboard + two safety patches from the v0.4.0 E2E smoke findings.
+
+### Added
+
+- **Dev dashboard** (`robot-md dashboard serve`): local FastAPI+HTMX page on
+  `http://127.0.0.1:8091` showing live servo positions, last OAK-D frame,
+  tool-call log, estop state, and validator warnings. Localhost-only, no auth.
+- **JSONL event log** at `~/.robot-md/events.jsonl` — durable record of every
+  MCP tool call + state change, written non-blockingly by an in-server
+  `EventPublisher`. Rotates at 10 MB. Backs future `robot-md replay` and the
+  v0.8 memory-sync feature.
+- **Command channel** at `~/.robot-md/commands.jsonl` — dashboard writes,
+  MCP server reads, mutates state. Commands supported: `estop.set`,
+  `estop.clear`, `snapshot`.
+- **`estop_clear` MCP tool** (fixes #2). HITL-gated on the `system` scope by
+  default; pass a `confirm_token` to clear when the gate is declared.
+
+### Fixed
+
+- **#1 — read-only capabilities no longer blocked by estop.** `status.report`
+  and `vision.describe` execute even when the estop flag is set. New
+  `CapabilityBackend.read_only_capabilities: frozenset[str]` declares which
+  capabilities skip the gate; the `feetech_depthai` backend declares those
+  two. Motion-producing capabilities are unaffected.
+
+### Added dependencies
+
+- `fastapi>=0.110`, `jinja2>=3.1`, `websockets>=12` (base deps)
+- `pytest-asyncio>=0.23` (dev extra)
+
+### Opt-out
+
+- Set `ROBOT_MD_DASHBOARD_DISABLED=1` to disable the publisher + command
+  watcher if the MCP server runs in a constrained environment (e.g., a
+  container without a writable home).
+
+---
+
 ## [0.4.0] - 2026-04-18
 
 Phase 1 of the adaptive backend plan (spec:
