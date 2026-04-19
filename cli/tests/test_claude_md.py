@@ -249,7 +249,8 @@ def test_template_lists_all_six_mcp_tools(tmp_path):
     )
 
     text = render_claude_md(manifest)
-    for tool in ("validate", "render", "estop", "estop_clear", "execute_capability", "execute_task"):
+    tools = ("validate", "render", "estop", "estop_clear", "execute_capability", "execute_task")
+    for tool in tools:
         assert tool in text, f"expected MCP tool {tool!r} in CLAUDE.md template"
 
 

@@ -1,4 +1,5 @@
 """Unit tests for phase_write_manifest — extracted from init.quick."""
+
 from __future__ import annotations
 
 

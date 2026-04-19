@@ -1,4 +1,5 @@
 """Integration tests for the init orchestrator — all phases mocked."""
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -51,6 +52,7 @@ def test_default_flow_runs_all_phases_in_order(tmp_path, fake_scan):
         def fn(*a, **kw):
             calls.append(name)
             return _ok(name) if status == "ok" else _skip(name)
+
         return fn
 
     with (
@@ -97,6 +99,7 @@ def test_write_manifest_failure_aborts(tmp_path, fake_scan):
         def fn(*a, **kw):
             other_called.append(name)
             return _ok(name)
+
         return fn
 
     with (
@@ -164,6 +167,7 @@ def test_skip_flags_omit_phases(tmp_path, fake_scan):
         def fn(*a, **kw):
             calls.append(name)
             return _ok(name)
+
         return fn
 
     with (

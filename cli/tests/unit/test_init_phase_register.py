@@ -1,4 +1,5 @@
 """Unit tests for phase_register."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -187,5 +188,3 @@ def test_metadata_overrides_persisted_to_manifest(tmp_path):
     assert "model: so-arm101" in text
     assert "oldco" not in text
     assert "old-model" not in text
-
-

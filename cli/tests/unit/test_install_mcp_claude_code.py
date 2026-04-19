@@ -1,4 +1,5 @@
 """Unit tests for the claude-mcp-add subprocess wrapper."""
+
 from __future__ import annotations
 
 import subprocess

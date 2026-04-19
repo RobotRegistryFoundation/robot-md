@@ -1,4 +1,5 @@
 """Package-import smoke test for init_phases."""
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -25,9 +26,7 @@ def test_phase_install_mcp_derives_server_name_from_robot_name(tmp_path):
     from robot_md.init_phases import PhaseResult, phase_install_mcp
 
     manifest = tmp_path / "ROBOT.md"
-    manifest.write_text(
-        "---\nmetadata:\n  robot_name: bob\n---\n\n# bob\n"
-    )
+    manifest.write_text("---\nmetadata:\n  robot_name: bob\n---\n\n# bob\n")
 
     fake_result = PhaseResult(
         phase="install_mcp",

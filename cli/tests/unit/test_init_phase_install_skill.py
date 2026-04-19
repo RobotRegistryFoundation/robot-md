@@ -1,4 +1,5 @@
 """Unit tests for phase_install_skill."""
+
 from __future__ import annotations
 
 from unittest.mock import patch

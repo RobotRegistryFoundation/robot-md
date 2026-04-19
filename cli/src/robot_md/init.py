@@ -337,9 +337,7 @@ def quick(
         "note: robot_md.init.quick is deprecated; call non_interactive() instead.",
         file=sys.stderr,
     )
-    return non_interactive(
-        out_path, robot_name=robot_name, preset_name=preset_name, force=force
-    )
+    return non_interactive(out_path, robot_name=robot_name, preset_name=preset_name, force=force)
 
 
 def wizard(out_path: Path, *, force: bool = False) -> int:
@@ -461,11 +459,11 @@ def _tally_line(r: Any) -> str:
     # Human phase name: install_mcp → install-mcp, write_manifest → manifest (friendlier)
     label_map = {
         "write_manifest": "manifest",
-        "register":       "register",
-        "install_mcp":    "install-mcp",
-        "install_skill":  "install-skill",
-        "sign_cal":       "sign-cal",
-        "zero_cal":       "zero-cal",
+        "register": "register",
+        "install_mcp": "install-mcp",
+        "install_skill": "install-skill",
+        "sign_cal": "sign-cal",
+        "zero_cal": "zero-cal",
     }
     label = label_map.get(r.phase, r.phase).ljust(13)
     return f"{glyph} {label}  {r.message}"

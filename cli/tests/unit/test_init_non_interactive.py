@@ -3,6 +3,7 @@
 This is the scripted-caller / CI compatibility test. It must keep passing
 after Task 10 wires default_flow into __main__.py.
 """
+
 from __future__ import annotations
 
 from typer.testing import CliRunner
