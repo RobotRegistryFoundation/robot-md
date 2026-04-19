@@ -565,6 +565,90 @@
   .marquee .track span{opacity:.6}
   .marquee .track b{color:var(--accent); font-weight:600}
   @keyframes slide{ from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+  /* =================================================================
+     TERMINAL-FIRST HERO (Variant C — ported from variants/hero-and-how.html)
+     The command *is* the hero. Staggered reveal of install → scan →
+     mint RRN → claude boot. Nameplate sits as a sig line underneath.
+     ================================================================= */
+  .C-mast{ padding: 40px 0 32px; border-bottom:3px double var(--rule) }
+  .C-eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--accent); margin-bottom:16px;
+    display:flex; align-items:center; gap:14px;
+  }
+  .C-eyebrow .line{flex:1; height:1px; background:var(--rule); opacity:.6}
+  .C-head{
+    font-family:var(--sans); font-weight:300; font-size: clamp(40px, 5.6vw, 76px);
+    line-height:1.04; letter-spacing:-0.028em; text-wrap:balance; margin: 0 0 28px;
+    color:var(--ink);
+  }
+  .C-head b{ font-weight:700 }
+  .C-head em{ font-style:italic; font-family:var(--serif); font-weight:400; color:var(--accent) }
+
+  .C-term{
+    background:#0E0D0C; color:#E8E3D3; border:1px solid var(--rule);
+    box-shadow: 8px 8px 0 var(--rule);
+    font-family:var(--mono); font-size:14px; line-height:1.7;
+    padding: 0;
+    overflow:hidden;
+    max-width: 1000px; margin: 0 auto 28px;
+  }
+  .C-term-head{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 16px; background:#1a1816;
+    border-bottom:1px solid #2a2825;
+    font-size:11px; color:#9a9384; letter-spacing:.12em; text-transform:uppercase;
+  }
+  .C-term-head .bulbs{display:flex; gap:6px}
+  .C-term-head .bulbs i{ width:11px; height:11px; border-radius:50%; background:#3a3834; display:block }
+  .C-term-head .bulbs i:nth-child(1){background:#e06c5a}
+  .C-term-head .bulbs i:nth-child(2){background:#d9a55e}
+  .C-term-head .bulbs i:nth-child(3){background:#7fb27a}
+  .C-term-head .path{color:#7d776a; margin-left:8px}
+  .C-term-head .tag{margin-left:auto; color:var(--accent); font-weight:600}
+  .C-term-body{ padding: 22px 26px 26px; min-height: 260px }
+  .C-line{ white-space:pre-wrap }
+  .C-line.prompt{ color:#E8E3D3 }
+  .C-line.prompt .p{ color:var(--accent); font-weight:600; margin-right:8px }
+  .C-line.prompt .cmd{ color:#fff; font-weight:500 }
+  .C-line.out{ color:#9fa993 }
+  .C-line.out .k{ color:#ffb88c }
+  .C-line.out .v{ color:#b8d9a1 }
+  .C-line.out .mute{ color:#5a574f }
+  .C-line.out .ok{ color:#7fb27a }
+  .C-line.step{ color:#E8E3D3 }
+  .C-line.step .bullet{ color:var(--accent); margin-right:8px; display:inline-block; width:1.2em }
+  .C-cursor{display:inline-block; width:.55em; height:1em; background:var(--accent); vertical-align:text-bottom; animation: blink 1.05s steps(1) infinite; margin-left:2px}
+  @keyframes blink{ 50%{opacity:0} }
+
+  .C-term .C-line{ opacity:0; transform:translateY(4px); transition: opacity .25s ease, transform .25s ease }
+  .C-term.lit .C-line{ opacity:1; transform:none }
+  .C-term.lit .C-line:nth-child(1){ transition-delay:.05s }
+  .C-term.lit .C-line:nth-child(2){ transition-delay:.45s }
+  .C-term.lit .C-line:nth-child(3){ transition-delay:.85s }
+  .C-term.lit .C-line:nth-child(4){ transition-delay:1.25s }
+  .C-term.lit .C-line:nth-child(5){ transition-delay:1.60s }
+  .C-term.lit .C-line:nth-child(6){ transition-delay:1.90s }
+  .C-term.lit .C-line:nth-child(7){ transition-delay:2.20s }
+  .C-term.lit .C-line:nth-child(8){ transition-delay:2.50s }
+  .C-term.lit .C-line:nth-child(9){ transition-delay:2.80s }
+  .C-term.lit .C-line:nth-child(10){ transition-delay:3.15s }
+  .C-term.lit .C-line:nth-child(11){ transition-delay:3.55s }
+
+  .C-sig{ display:grid; grid-template-columns: auto 1fr auto; gap:24px; align-items:center; padding:16px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); margin-top: 12px }
+  .C-sig .nm{ font-family:var(--sans); font-weight:700; font-size:34px; letter-spacing:-.03em; line-height:1 }
+  .C-sig .nm .dot{color:var(--accent)}
+  .C-sig .nm .md{font-family:var(--serif); font-weight:400; font-style:italic; color:var(--ink-2)}
+  .C-sig .sub{ font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-3) }
+  .C-sig .sub b{color:var(--ink)}
+  .C-sig .more{ font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--accent); border-bottom:1px solid var(--accent); padding-bottom:2px }
+  @media (max-width: 720px){
+    .C-sig{ grid-template-columns: 1fr; gap:10px }
+    .C-sig .more{ justify-self:start }
+    .C-term-body{ padding: 16px 14px 18px }
+    .C-term{ font-size:12.5px }
+  }
 </style>
 </head>
 <body>
@@ -588,48 +672,43 @@
   </div>
 </div>
 
-<!-- ================= MASTHEAD ================= -->
-<header class="wrap masthead">
-  <div class="mast-meta">
-    <div>VOL. 1 · NO. 1</div>
-    <div class="c">An open declaration format for agentic robots</div>
-    <div class="r">APRIL 17, 2026 · OPENCASTOR ECOSYSTEM</div>
+<!-- ================= MASTHEAD — Terminal variant (C) ================= -->
+<header class="wrap C-mast">
+  <div class="C-eyebrow">
+    <span>§ Getting started · one line</span>
+    <span class="line"></span>
+    <span>APRIL 18, 2026</span>
   </div>
-
-  <h1 class="nameplate">
-    <span>ROBOT</span><span class="dot-glyph">.</span><span class="md">md</span>
+  <h1 class="C-head">
+    A robot should <em>introduce itself</em> to the agent.<br>
+    <b>ROBOT.md is how.</b>
   </h1>
 
-  <p class="deck">
-    One file at the root of your robot. YAML frontmatter a schema can trust, markdown prose a planner can read. <em>The CLAUDE.md of physical machines</em> — so the same agent that ships your code can safely drive your arm, your rover, your humanoid.
-  </p>
-
-  <div style="margin: 28px 0 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px">
-    <div style="padding: 18px 20px; border: 2px solid var(--accent); background: var(--paper-2); position: relative">
-      <div style="font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; font-weight: 600">▶ On your machine (terminal)</div>
-      <div style="font-family: var(--mono); font-size: 14px; color: var(--paper); padding: 8px 12px; background: var(--ink); border-radius: 2px; overflow-x: auto; white-space: nowrap">
-        <span style="color: #ff9b76">$</span> pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 --register
-      </div>
-      <div style="font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink-2); margin-top: 10px; line-height: 1.45">
-        One line. Scans hardware, writes <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">ROBOT.md</code>, mints an RRN at <a href="https://rcan.dev" style="border-bottom: 1px solid currentColor; color: var(--accent-ink)">rcan.dev</a>, prints the <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">claude mcp add</code> line.
-      </div>
+  <div class="C-term" id="termC">
+    <div class="C-term-head">
+      <div class="bulbs"><i></i><i></i><i></i></div>
+      <span class="path">~/bob</span>
+      <span class="tag">● live · writes one file</span>
     </div>
-    <div style="padding: 18px 20px; border: 2px dashed var(--accent); background: var(--paper-2); position: relative">
-      <div style="font-family: var(--mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; font-weight: 600">▶ Inside Claude Code (ask Claude)</div>
-      <div style="font-family: var(--serif); font-size: 14px; color: var(--ink); padding: 8px 12px; background: var(--paper); border-left: 3px solid var(--accent); border-radius: 0; line-height: 1.4">
-        "Set up a ROBOT.md for this robot. Use the <b>so-arm101</b> preset. Register under manufacturer <b>acme</b>, email <b>me@acme.com</b>. Then add the robot-md MCP server."
-      </div>
-      <div style="font-family: var(--serif); font-style: italic; font-size: 14px; color: var(--ink-2); margin-top: 10px; line-height: 1.45">
-        Paste that sentence. Claude uses its <code style="font-family: var(--mono); font-style: normal; background: var(--paper); padding: 1px 5px">Bash</code> tool to run the one-liner, wires up MCP, and verifies. <a href="https://github.com/RobotRegistryFoundation/robot-md/blob/main/docs/getting-started-claude-code.md" style="border-bottom: 1px solid currentColor; color: var(--accent-ink)">Full walkthrough →</a>
-      </div>
+    <div class="C-term-body">
+      <div class="C-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 --register</span></div>
+      <div class="C-line out"><span class="mute">→</span> scanning <span class="v">/dev/ttyUSB0</span> (feetech, 1 Mbps) ............ <span class="ok">6 servos</span></div>
+      <div class="C-line out"><span class="mute">→</span> detecting <span class="v">OAK-D</span> over DepthAI .................... <span class="ok">ok</span></div>
+      <div class="C-line out"><span class="mute">→</span> writing <span class="k">ROBOT.md</span> <span class="mute">· frontmatter + body · 1.8 kb · 55 lines</span></div>
+      <div class="C-line out"><span class="mute">→</span> minting <span class="k">RRN</span> at <span class="v">rcan.dev</span> ............ <span class="ok">RRN-000000000173</span></div>
+      <div class="C-line out"><span class="mute">→</span> validating against <span class="v">schema/v1/robot.schema.json</span> .. <span class="ok">valid</span></div>
+      <div class="C-line out"><span class="mute">→</span> next: <span class="k">claude mcp add robot-md</span> <span class="mute">— copied to clipboard</span></div>
+      <div class="C-line step"><span class="bullet">▸</span> 6 resources, 3 tools, 4 slash commands ready for your next Claude session.</div>
+      <div class="C-line prompt" style="margin-top:14px"><span class="p">$</span><span class="cmd">claude</span><span class="C-cursor"></span></div>
     </div>
   </div>
 
-  <div class="sub-deck">
-    <span><b>Claude Code · Desktop · Mobile</b> all three, one install path each</span>
-    <span><b>RCAN 3.0+</b> wire protocol, native</span>
-    <span><b>RRF</b> registry · <code style="font-family:var(--mono); font-size:11px">rcan.dev</code></span>
-    <span><b>Any MCP-aware agent</b> Cursor · Zed · Gemini CLI · Codex</span>
+  <div class="C-sig">
+    <div class="nm">ROBOT<span class="dot">.</span><span class="md">md</span></div>
+    <div class="sub">
+      <b>One file at the robot's root.</b> YAML a schema can trust · markdown a planner can read · part of the OpenCastor ecosystem.
+    </div>
+    <a class="more" href="#spec">How it works →</a>
   </div>
 </header>
 
@@ -1170,8 +1249,24 @@ Next — hand your manifest to Claude Code:
 <footer class="wrap foot">
   <div>ROBOT.md · © 2026 craigm26 · Part of the OpenCastor ecosystem</div>
   <div>Hosted on Cloudflare Pages · Edge‑served · No cookies, no trackers</div>
-  <div>robotmd.dev · robot-md 0.2.7 · robot-md-mcp 0.2.1 · built 2026‑04‑18</div>
+  <div>robotmd.dev · robot-md 0.4.1 · robot-md-mcp 0.2.1 · built 2026‑04‑18</div>
 </footer>
+
+<script>
+  // Terminal hero reveal: lit when in view. Stagger is driven by CSS
+  // nth-child transition-delay on .C-term.lit .C-line.
+  (function(){
+    var term = document.getElementById('termC');
+    if (!term) return;
+    if ('IntersectionObserver' in window){
+      new IntersectionObserver(function(entries){
+        entries.forEach(function(e){ if (e.isIntersecting) term.classList.add('lit'); });
+      }, {threshold: 0.25}).observe(term);
+    } else {
+      term.classList.add('lit');
+    }
+  })();
+</script>
 
 </body>
 </html>
