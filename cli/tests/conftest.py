@@ -2,9 +2,27 @@
 
 from __future__ import annotations
 
+import importlib.util
+import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
+
+# Stub out hardware-only optional deps when the extra isn't installed so unit
+# tests that go through load_context() don't blow up on import. The backend
+# still fails to actually talk to hardware — that's expected; hardware tests
+# are gated behind --run-hardware and the real modules.
+if importlib.util.find_spec("feetech_servo_sdk") is None:
+    _fake_feetech = MagicMock()
+    _fake_port = MagicMock()
+    _fake_port.openPort.return_value = True
+    _fake_port.setBaudRate.return_value = True
+    _fake_feetech.PortHandler.return_value = _fake_port
+    _fake_ph = MagicMock()
+    _fake_ph.read2ByteTxRx.return_value = (2048, 0, 0)
+    _fake_feetech.PacketHandler.return_value = _fake_ph
+    sys.modules.setdefault("feetech_servo_sdk", _fake_feetech)
 
 
 def pytest_configure(config):

@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 
 import pytest
 
 pytestmark = pytest.mark.integration
 
-VENV_PY = "/home/craigm26/opencastor/venv/bin/python3"
+VENV_PY = sys.executable
 
 
 def _rpc(proc, body: dict, *, timeout: float = 5.0) -> dict:
