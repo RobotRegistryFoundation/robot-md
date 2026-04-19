@@ -43,6 +43,24 @@ def execute_capability_tool(
         _publish_result(ctx, request_id, capability, result)
         return result
 
+    # Precondition gate — consult capability_contracts[capability].preconditions.
+    # Runs BEFORE estop so a blocked precondition doesn't mask a raised estop;
+    # estop below outranks everything else.
+    contract = ctx.spec.capability_contracts.get(capability) if ctx.spec else None
+    if contract is not None and contract.preconditions:
+        from robot_md.preconditions import evaluate
+
+        ok, failed = evaluate(contract, ctx.spec, backend_resolved=ctx.backend is not None)
+        if not ok:
+            result = {
+                "status": "blocked",
+                "trajectory": None,
+                "events": [],
+                "error": {"reason": "precondition", "failed": failed},
+            }
+            _publish_result(ctx, request_id, capability, result)
+            return result
+
     # Safety short-circuits come first — E-stop is a hard stop that should
     # outrank any consent workflow. A HITL gate satisfied between estop-set
     # and command-dispatch must not race past a stopped server.
