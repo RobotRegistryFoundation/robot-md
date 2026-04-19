@@ -21,4 +21,6 @@ class PhaseResult:
     detail: dict | None
 
 
-__all__ = ["PhaseResult", "PhaseStatus"]
+from robot_md.init_phases.install_mcp import phase_install_mcp  # noqa: E402
+
+__all__ = ["PhaseResult", "PhaseStatus", "phase_install_mcp"]
