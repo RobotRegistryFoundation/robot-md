@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -46,6 +47,8 @@ class McpContext:
     estop: EstopFlag = field(default_factory=EstopFlag)
     backend: Any = None
     exec_lock: threading.Lock = field(default_factory=threading.Lock)
+    publisher: Any = None
+    _command_watcher: Any = None
 
 
 def load_context(manifest_path: Path) -> McpContext:
@@ -75,9 +78,85 @@ def load_context(manifest_path: Path) -> McpContext:
             )
         backend.open(spec)
 
-    return McpContext(
+    ctx = McpContext(
         manifest_path=manifest_path,
         parsed=parsed,
         spec=spec,
         backend=backend,
     )
+
+    # Dashboard publisher + command watcher (opt-out via env)
+    if os.environ.get("ROBOT_MD_DASHBOARD_DISABLED") != "1":
+        from robot_md.dashboard.events import EventPublisher
+        events_dir = Path(os.environ.get("HOME", str(Path.home()))) / ".robot-md"
+        events_dir.mkdir(parents=True, exist_ok=True)
+        ctx.publisher = EventPublisher(jsonl_path=events_dir / "events.jsonl")
+        ctx.publisher.start()
+        ctx._command_watcher = _start_command_watcher(ctx, events_dir / "commands.jsonl")
+
+    return ctx
+
+
+def _start_command_watcher(ctx, cmd_path: Path):
+    """Spawn a daemon thread that polls commands.jsonl and dispatches."""
+    import json as _json
+    import logging as _logging
+    import threading as _threading
+    import time as _time
+
+    log = _logging.getLogger("robot_md.mcp.command_watcher")
+
+    def _loop():
+        cmd_path.parent.mkdir(parents=True, exist_ok=True)
+        cmd_path.touch(exist_ok=True)
+        pos = cmd_path.stat().st_size
+        while True:
+            try:
+                size = cmd_path.stat().st_size
+            except FileNotFoundError:
+                _time.sleep(0.2)
+                continue
+            if size < pos:
+                pos = 0
+            if size > pos:
+                with cmd_path.open("r") as f:
+                    f.seek(pos)
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            obj = _json.loads(line)
+                        except Exception:
+                            log.warning("command_watcher: malformed line: %r", line)
+                            continue
+                        cmd = obj.get("cmd")
+                        if cmd == "estop.set":
+                            ctx.estop.set()
+                            if ctx.publisher:
+                                ctx.publisher.publish("estop.set", {"set": True})
+                        elif cmd == "estop.clear":
+                            ctx.estop.clear()
+                            if ctx.publisher:
+                                ctx.publisher.publish("estop.cleared", {"set": False})
+                        elif cmd == "snapshot":
+                            if ctx.backend is not None:
+                                try:
+                                    snap = ctx.backend.scene_describe()
+                                    if ctx.publisher and snap and snap.frame:
+                                        import base64 as _b64
+                                        ctx.publisher.publish("frame", {
+                                            "png_b64": _b64.b64encode(snap.frame).decode("ascii"),
+                                            "width": 0,
+                                            "height": 0,
+                                        })
+                                except Exception as e:
+                                    log.warning("command_watcher: snapshot failed: %s", e)
+                        else:
+                            log.warning("command_watcher: unknown cmd: %r", cmd)
+                    pos = f.tell()
+            _time.sleep(0.2)
+
+    t = _threading.Thread(target=_loop, daemon=True, name="robot-md-cmd-watcher")
+    t.start()
+    return t

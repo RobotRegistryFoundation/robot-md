@@ -7,6 +7,8 @@ from robot_md.mcp.context import McpContext
 
 def estop_tool(ctx: McpContext) -> dict:
     ts = ctx.estop.set()
+    if getattr(ctx, "publisher", None) is not None:
+        ctx.publisher.publish("estop.set", {"set": True})
     return {"ok": True, "set_at": ts}
 
 
@@ -26,4 +28,6 @@ def estop_clear_tool(ctx: McpContext, *, confirm_token: str | None = None) -> di
                 break
 
     ctx.estop.clear()
+    if getattr(ctx, "publisher", None) is not None:
+        ctx.publisher.publish("estop.cleared", {"set": False})
     return {"ok": True, "cleared_at": time.time()}
