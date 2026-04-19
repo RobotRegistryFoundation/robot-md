@@ -21,7 +21,14 @@ class PhaseResult:
     detail: dict | None
 
 
+from robot_md.init_phases.calibrate_zero import phase_calibrate_zero  # noqa: E402
 from robot_md.init_phases.install_mcp import phase_install_mcp  # noqa: E402
 from robot_md.init_phases.install_skill import phase_install_skill  # noqa: E402
 
-__all__ = ["PhaseResult", "PhaseStatus", "phase_install_mcp", "phase_install_skill"]
+__all__ = [
+    "PhaseResult",
+    "PhaseStatus",
+    "phase_calibrate_zero",
+    "phase_install_mcp",
+    "phase_install_skill",
+]
