@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ROBOT.md — the one-file declaration for agentic robots</title>
-<meta name="description" content="ROBOT.md is to a robot what CLAUDE.md is to a codebase. One file — YAML + markdown — so a planning LLM can safely operate your robot. Part of the OpenCastor ecosystem. Supports the RCAN 3.0+ wire protocol and the Robot Registry Foundation (RRF).">
+<meta name="description" content="ROBOT.md is to a robot what CLAUDE.md is to a codebase. One file — YAML + markdown — so a planning LLM can safely operate your robot. Zero flags: bare `robot-md init` is enough; Claude Code drives the follow-up. Speaks the RCAN 3.0+ wire protocol, registers with the Robot Registry Foundation, and is the native robot format for OpenCastor — though none of the three are required.">
 <meta name="theme-color" content="#F4EFE6">
 
 <meta property="og:title" content="ROBOT.md — one-file declaration for agentic robots">
@@ -616,7 +616,7 @@
       <a href="/status">Status</a>
       <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
     </nav>
-    <div>part of the OpenCastor ecosystem</div>
+    <div>standalone · OpenCastor optional</div>
   </div>
 </div>
 
@@ -636,25 +636,26 @@
     <div class="C-term-head">
       <div class="bulbs"><i></i><i></i><i></i></div>
       <span class="path">~/bob</span>
-      <span class="tag">● live · writes one file</span>
+      <span class="tag">● zero flags · one command</span>
     </div>
     <div class="C-term-body">
-      <div class="C-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 --register</span></div>
-      <div class="C-line out"><span class="mute">→</span> scanning <span class="v">/dev/ttyUSB0</span> (feetech, 1 Mbps) ............ <span class="ok">6 servos</span></div>
-      <div class="C-line out"><span class="mute">→</span> detecting <span class="v">OAK-D</span> over DepthAI .................... <span class="ok">ok</span></div>
-      <div class="C-line out"><span class="mute">→</span> writing <span class="k">ROBOT.md</span> <span class="mute">· frontmatter + body · 1.8 kb · 55 lines</span></div>
-      <div class="C-line out"><span class="mute">→</span> minting <span class="k">RRN</span> at <span class="v">rcan.dev</span> ............ <span class="ok">RRN-000000000173</span></div>
-      <div class="C-line out"><span class="mute">→</span> validating against <span class="v">schema/v1/robot.schema.json</span> .. <span class="ok">valid</span></div>
-      <div class="C-line out"><span class="mute">→</span> next: <span class="k">claude mcp add robot-md</span> <span class="mute">— copied to clipboard</span></div>
-      <div class="C-line step"><span class="bullet">▸</span> 6 resources, 3 tools, 4 slash commands ready for your next Claude session.</div>
-      <div class="C-line prompt" style="margin-top:14px"><span class="p">$</span><span class="cmd">claude</span><span class="C-cursor"></span></div>
+      <div class="C-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md</span></div>
+      <div class="C-line prompt"><span class="p">$</span><span class="cmd">robot-md init</span></div>
+      <div class="C-line out"><span class="mute">→</span> autodetect ........ <span class="v">feetech bus /dev/ttyACM0</span> · <span class="ok">6 servos</span></div>
+      <div class="C-line out"><span class="mute">→</span> preset matched .... <span class="ok">so-arm101</span> <span class="mute">(protocol +10)</span></div>
+      <div class="C-line out"><span class="mute">→</span> wrote <span class="k">ROBOT.md</span> + <span class="k">CLAUDE.md</span> <span class="mute">· validates · 55 lines</span></div>
+      <div class="C-line out"><span class="mute">→</span> installed <span class="k">robot-md</span> MCP + <span class="k">using-robot-md</span> skill</div>
+      <div class="C-line step"><span class="bullet">▸</span> 6 resources · 3 tools · 4 slash commands ready.</div>
+      <div class="C-line prompt" style="margin-top:14px"><span class="p">$</span><span class="cmd">claude</span></div>
+      <div class="C-line out"><span class="mute">›</span> <span class="v">bob</span> is online. Register with RRF so web &amp; mobile can reach him?</div>
+      <div class="C-line out">yes<span class="C-cursor"></span></div>
     </div>
   </div>
 
   <div class="C-sig">
     <div class="nm">ROBOT<span class="dot">.</span><span class="md">md</span></div>
     <div class="sub">
-      <b>One file at the robot's root.</b> YAML a schema can trust · markdown a planner can read · part of the OpenCastor ecosystem.
+      <b>One file at the robot's root.</b> YAML a schema can trust · markdown a planner can read · Claude Code reads it standalone.
     </div>
     <a class="more" href="#spec">How it works →</a>
   </div>
@@ -768,7 +769,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
             <div class="n">04</div>
             <div>
               <h4>Runtime‑agnostic.</h4>
-              <p>The spec imports nothing. <a href="https://github.com/craigm26/OpenCastor">OpenCastor</a>, ROS 2, LeRobot, Spot SDK — any runtime can read it; any planner can consume it.</p>
+              <p>The spec imports nothing. <a href="https://github.com/craigm26/OpenCastor">OpenCastor</a> (agent-harness editor + swarms), ROS 2, LeRobot, Spot SDK — any runtime can read it; any planner can consume it.</p>
             </div>
           </div>
         </div>
@@ -784,7 +785,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <div class="sec-num">§ 02 — The stack</div>
       <div>
         <h2 class="sec-title">Four layers. Each independent. Each composable.</h2>
-        <p class="sec-lede">ROBOT.md declares what the robot <em>is</em>. RCAN is how fleets <em>speak</em>. The Registry is where robots <em>live</em>. The runtime is whatever <em>executes</em> — and for Tier 0, that's Claude Code itself. Adopt one layer or all four.</p>
+        <p class="sec-lede">Four independent standards. <b>ROBOT.md</b> declares what the robot <em>is</em>. <b>RCAN</b> is the signed wire protocol fleets <em>speak</em>. <b>Robot Registry Foundation (RRF)</b> is the neutral authority where robots <em>live</em>. <b>OpenCastor</b> is the visual agent-harness editor and swarm orchestrator — optional. Tier 0 runtime is Claude Code itself. Adopt one layer or all four.</p>
       </div>
     </div>
 
@@ -811,10 +812,10 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       </div>
 
       <div class="stack-row" role="row">
-        <div class="layer"><span>Layer 1 · Runtime</span><b>Claude Code is enough. OpenCastor for production.</b></div>
+        <div class="layer"><span>Layer 1 · Runtime</span><b>Claude Code is enough. OpenCastor for harness authoring &amp; swarms.</b></div>
         <div class="cell"><span class="tag on">Tier 0</span><b>Claude Code is already a runtime.</b> Drop <code>ROBOT.md</code> in a repo with shell access to your robot — USB, serial, HTTP, MQTT — and the Bash tool dispatches. No SDK to install.</div>
         <div class="cell"><span class="tag">Tier 1</span>Add your own driver scripts for sub‑second loops. Still no "runtime" in the traditional sense — just Claude plus the scripts you'd write anyway.</div>
-        <div class="cell"><span class="tag">Tier 2</span>Production: OpenCastor adds a reactive VLA layer, P66 hardware interlocks, fleet scale, EU AI Act audit. Opt‑in when you need it.</div>
+        <div class="cell"><span class="tag">Tier 2</span><b>OpenCastor</b> — a visual agent-harness editor plus multi-robot swarm orchestration. ROBOT.md is its native robot format, but Claude Code reads the same file standalone. Opt-in when you need to compose harnesses visually or run a fleet.</div>
       </div>
     </div>
 
@@ -871,17 +872,17 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <article class="surface">
         <div class="st ship">● Shipping</div>
         <h3>Claude Code · CLI</h3>
-        <div class="mech"><b>Zero-touch.</b> <code>robot-md init</code> prints the <code>claude mcp add</code> line for you.</div>
-        <p>Built for operators at a terminal. <code>pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 --register</code> scans hardware, writes <code>ROBOT.md</code>, mints an RRN, generates <code>CLAUDE.md</code>, and prints the <code>claude mcp add</code> one-liner. Paste it, open Claude Code, and the planner reads your robot's frontmatter, capabilities, safety gates, and prose body as MCP resources. From there Claude's Bash tool talks directly to your robot over serial, HTTP, MQTT.</p>
+        <div class="mech"><b>Zero flags.</b> <code>robot-md init</code> — Claude Code drives the rest.</div>
+        <p>Built for operators at a terminal. <code>pip install robot-md &amp;&amp; robot-md init</code> autodetects your hardware, picks the right preset, writes <code>ROBOT.md</code> and <code>CLAUDE.md</code>, installs the <code>robot-md</code> MCP server, and drops the <code>using-robot-md</code> skill. Open Claude Code next and the planner reads your robot's frontmatter, capabilities, safety gates, and prose body as MCP resources. Claude asks follow-ups — register? calibrate zero? hand-eye? — in English.</p>
         <div class="mock" aria-hidden="true">
           <div class="bar"><i></i><i></i><i></i></div>
-          <div><span class="k">⏵ robot-md init my-bob --preset so-arm101 --register</span></div>
-          <div style="color:var(--ink-4)">✓ ROBOT.md · CLAUDE.md · RRN-…042 · next: claude mcp add …</div>
-          <div><span class="k">⏵ claude mcp add robot-md</span> <span style="color:var(--ink-4)">-- npx -y robot-md-mcp ./ROBOT.md</span></div>
+          <div><span class="k">⏵ robot-md init</span></div>
+          <div style="color:var(--ink-4)">✓ ROBOT.md · CLAUDE.md · MCP · skill installed</div>
+          <div><span class="k">⏵ claude</span></div>
           <div style="color:var(--ink-4)">· 6 resources · 3 tools · 4 slash commands loaded</div>
           <div style="color:var(--accent-ink)">→ /brief-me · /check-safety · /explain-capability</div>
         </div>
-        <div class="cta">One terminal. Two commands. Claude Code recognizes the robot.</div>
+        <div class="cta">Two commands. Zero flags. Claude Code recognizes the robot.</div>
       </article>
 
       <article class="surface">
@@ -974,8 +975,8 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <div class="sec-head">
       <div class="sec-num">§ 05 — Try it in sixty seconds</div>
       <div>
-        <h2 class="sec-title">One command. Preset-matched. Claude knows your robot.</h2>
-        <p class="sec-lede"><code>robot-md init</code> is the super-duper-quick path: scans PCI/USB/<code>/dev/tty*</code>, matches against the 10-preset library — <b>so-arm101</b>, <b>so-arm101-leader</b>, <b>turtlebot4</b>, <b>picar-x</b>, <b>franka-panda</b>, <b>ur5e</b>, <b>koch-arm</b>, <b>aloha2</b> (bimanual), <b>unitree-go2</b> (quadruped), <b>minimal</b> — and emits a validated draft with full DH kinematics + safety defaults already populated. For known robots, ~85&nbsp;% of the manifest is pre-filled automatically. For custom builds, <code>--wizard</code> walks you through the rest in 7 steps.</p>
+        <h2 class="sec-title">Zero flags. One command. Claude does the rest.</h2>
+        <p class="sec-lede">Bare <code>robot-md init</code> scans PCI/USB/<code>/dev/tty*</code>, actively probes for Feetech servo buses, matches against the 10-preset library — <b>so-arm101</b>, <b>so-arm101-leader</b>, <b>turtlebot4</b>, <b>picar-x</b>, <b>franka-panda</b>, <b>ur5e</b>, <b>koch-arm</b>, <b>aloha2</b> (bimanual), <b>unitree-go2</b> (quadruped), <b>minimal</b> — and emits a validated draft with full DH kinematics + safety defaults already populated. For known robots, ~85&nbsp;% of the manifest is pre-filled automatically. Follow-ups (register, calibrate, hand-eye) happen inside Claude Code in English — or as flags if you'd rather script them.</p>
       </div>
     </div>
 
@@ -983,7 +984,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:12px 0 26px">
       <div style="padding:14px 18px; border:1px solid var(--rule); background:var(--paper-2)">
         <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:6px">▶ Path A — On your machine (terminal)</div>
-        <p style="margin:0; font-family:var(--serif); font-size:14.5px; color:var(--ink-2); line-height:1.5">You're at a shell on the robot (or a laptop with the robot plugged in). Run the one-liner below in the terminal. The full demo is shown at left.</p>
+        <p style="margin:0; font-family:var(--serif); font-size:14.5px; color:var(--ink-2); line-height:1.5">You're at a shell on the robot (or a laptop with the robot plugged in). Type <code style="font-family:var(--mono); font-style:normal">robot-md init</code> — no flags. Autodetect fills in the rest. Demo at left.</p>
       </div>
       <div style="padding:14px 18px; border:1px dashed var(--rule); background:var(--paper-2)">
         <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:6px">▶ Path B — Inside Claude Code (ask Claude)</div>
@@ -994,42 +995,36 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <div class="try-grid">
       <div class="terminal" aria-label="Terminal session">
         <div class="top"><i></i><i></i><i></i><span>Path A · terminal · ~/projects/my-bob · zsh</span></div>
-<pre class="body"><span class="c"># The whole thing — one command, zero OpenCastor, zero config files:</span>
-<span class="p">$</span> pip install robot-md &amp;&amp; \
-      robot-md init my-bob <span class="c">--preset so-arm101 --register \</span>
-        <span class="c">--manufacturer acme --contact-email me@acme.com</span>
+<pre class="body"><span class="c"># Zero flags. Claude Code drives the follow-up.</span>
+<span class="p">$</span> pip install robot-md
+<span class="p">$</span> robot-md init
 
-<span class="ok">✓ wrote ROBOT.md</span>  preset: so-arm101
-<span class="ok">✓ my-bob (arm, 6 DoF, 5 capabilities)</span>
-<span class="ok">✓ registered on RRF</span>
-  RRN: RRN-000000000042
-  RCAN URI: rcan://rcan.dev/acme/so-arm101/1-0/my-bob
-  API key saved to ~/.robot-md/keys/RRN-000000000042.apikey (mode 600)
-  Public resolver: <span class="w">https://rcan.dev/r/RRN-000000000042</span>
-<span class="ok">✓ wrote CLAUDE.md</span>                     <span class="c"># agent reads it at session start</span>
+<span class="ok">✓ autodetect</span>     feetech bus on /dev/ttyACM0 (6 servos)
+<span class="ok">✓ preset matched</span> so-arm101 (protocol +10)
+<span class="ok">✓ wrote ROBOT.md</span>  preset: so-arm101 · 6 DoF · 5 capabilities
+<span class="ok">✓ wrote CLAUDE.md</span> <span class="c"># agent reads it at session start</span>
+<span class="ok">✓ installed MCP</span>   robot-md (claude mcp add …)
+<span class="ok">✓ installed skill</span> ~/.claude/skills/using-robot-md/SKILL.md
+<span class="ok">✓ zero calibration</span> skipped (safe default — ask Claude to run it)
 
-Next — hand your manifest to Claude Code:
-  claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
-
-<span class="c"># Or wire Claude Desktop in one shot (macOS/Windows):</span>
-<span class="p">$</span> robot-md install-desktop ROBOT.md
-<span class="ok">✓ added `robot-md` entry to ~/Library/…/claude_desktop_config.json</span>
-
-<span class="c"># Optional: drop the superpowers skill so any skill-aware harness</span>
-<span class="c"># auto-invokes robot-md on the operator's first robot-related message.</span>
-<span class="p">$</span> robot-md install-skill
-<span class="ok">✓ installed ~/.claude/skills/using-robot-md/SKILL.md</span>
-
-<span class="c"># (Optional) Physical calibration — only if your robot has an arm:</span>
-<span class="p">$</span> robot-md calibrate <span class="c">--zero</span> ROBOT.md
-<span class="p">$</span> robot-md calibrate <span class="c">--hand-eye --marker-pos 300,0,0</span> ROBOT.md
-
+<span class="c"># That's the whole setup. Now boot the agent:</span>
 <span class="p">$</span> claude
-<span class="c">· 6 resources loaded: robot-md://my-bob/{identity, context, frontmatter,</span>
-<span class="c">                                           capabilities, safety, body}</span>
+<span class="c">· 6 resources loaded: robot-md://bob/{identity, context, frontmatter,</span>
+<span class="c">                                       capabilities, safety, body}</span>
 <span class="c">· 3 tools: validate, render, doctor_summary</span>
 <span class="c">· 4 slash commands: /brief-me  /check-safety  /explain-capability  /manifest-status</span>
-<span class="w">→ Claude knows your robot. Ship.</span>
+
+<span class="w">› bob is online. Register with RRF so web &amp; mobile can reach him?</span>
+yes
+<span class="ok">✓ RRN-000000000042 minted · public at rcan.dev/r/RRN-000000000042</span>
+<span class="ok">✓ API key saved to ~/.robot-md/keys/RRN-000000000042.apikey (mode 600)</span>
+
+<span class="w">› Calibrate zero pose now? (required before actuation)</span>
+yes
+<span class="ok">✓ physics.kinematics[].zero_pose_steps written</span>
+
+<span class="w">› Ready. What should bob do first?</span>
+<span class="c"># Claude operates the robot via the Bash tool + MCP — English in, motion out.</span>
 </pre>
       </div>
 
@@ -1124,8 +1119,8 @@ Next — hand your manifest to Claude Code:
     <div class="sec-head">
       <div class="sec-num">§ 06 — The rest of the ecosystem</div>
       <div>
-        <h2 class="sec-title">The OpenCastor ecosystem, at a glance.</h2>
-        <p class="sec-lede">ROBOT.md sits alongside three sibling projects. Each is independent; together they give a robot an identity, a voice, a registry, and a runtime. All four can be adopted à la carte.</p>
+        <h2 class="sec-title">Four standards. Separate roles. Adopt à la carte.</h2>
+        <p class="sec-lede">ROBOT.md stands alone — Claude Code reads it directly, no OpenCastor required. Three siblings extend it: <b>RCAN</b> (the signed wire protocol fleets speak), the <b>Robot Registry Foundation</b> (permanent identity, neutral authority), and <b>OpenCastor</b> (visual agent-harness editor + swarm orchestration). Mix and match.</p>
       </div>
     </div>
 
@@ -1150,9 +1145,9 @@ Next — hand your manifest to Claude Code:
         <a href="https://robotregistryfoundation.org">robotregistryfoundation.org →</a>
       </div>
       <div class="eco">
-        <h5>Production runtime · opencastor.com</h5>
+        <h5>Agent harness · opencastor.com</h5>
         <b>OpenCastor</b>
-        <p>Optional — for fleets, regulated deployments, and real-time reactive control. Open‑source, community‑driven, 7,800+ tests, Claude Opus 4.7 as reference planner, OpenVLA‑7B reactive. Single‑robot setups don't need it — Claude Code alone is Tier 0.</p>
+        <p>Optional. Visual editor for Claude agent harnesses plus multi-robot swarm orchestration. Compose MCP stacks, wire tools, scale from one robot to a fleet. ROBOT.md is its native robot format — but Claude Code reads the same file standalone. Pick it up when you outgrow a single terminal.</p>
         <a href="https://github.com/craigm26/OpenCastor">github.com/craigm26/OpenCastor →</a>
       </div>
     </div>
@@ -1160,9 +1155,9 @@ Next — hand your manifest to Claude Code:
 </section>
 
 <footer class="wrap foot">
-  <div>ROBOT.md · © 2026 craigm26 · Part of the OpenCastor ecosystem</div>
+  <div>ROBOT.md · © 2026 craigm26 · Standalone · OpenCastor optional</div>
   <div>Hosted on Cloudflare Pages · Edge‑served · No cookies, no trackers</div>
-  <div>robotmd.dev · robot-md 0.4.1 · robot-md-mcp 0.2.1 · built 2026‑04‑18</div>
+  <div>robotmd.dev · robot-md 0.5.0 · robot-md-mcp 0.2.1 · built 2026‑04‑19</div>
 </footer>
 
 <script>
