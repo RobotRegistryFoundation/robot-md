@@ -137,6 +137,33 @@ Claude runs `robot-md calibrate --zero ROBOT.md`, prompts you to pose the arm, a
 
 ---
 
+### After init on a TTY with the arm plugged in
+
+Once `robot-md init` finishes (either via the shell or the Claude-Code-driven one-liner), the robot is actuatable right away:
+
+```bash
+cd ~/your-robot-dir
+claude
+```
+
+Inside Claude Code, say:
+
+```
+Dry-run pick the red lego and put it in the bowl.
+```
+
+Claude reads `CLAUDE.md`, calls `mcp__robot-md-<your_robot_name>__execute_capability(arm.pick, dry_run=true)`, shows you the trajectory, and waits for your go-ahead. Say "now actually do it" and Claude re-runs with `dry_run=false`.
+
+### For scripted / CI callers
+
+```bash
+robot-md init bob --preset so-arm101 --non-interactive
+```
+
+Manifest-only; no prompts, no MCP or skill install, no hardware touched. Identical behavior to the pre-v0.5.0 `quick()` path.
+
+---
+
 ## What Claude is allowed to do
 
 Claude Code honors your permission mode. In the default *accept edits* mode, it will:

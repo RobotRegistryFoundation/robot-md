@@ -5,6 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## v0.5.0 — 2026-04-19
+
+### Added
+- `robot-md init` default flow now folds MCP install, skill install, and
+  zero/sign calibration into the single command. TTY + hardware detection
+  gates the interactive phases; headless / CI callers auto-skip cleanly.
+- New flags: `--non-interactive` (scripted callers — manifest-only),
+  `--no-install-mcp`, `--no-install-skill`, `--no-sign`, `--no-calibrate`.
+- New module `robot_md.install_mcp_claude_code` — subprocess wrapper around
+  `claude mcp add` that returns a `PhaseResult` rather than raising.
+- New package `robot_md.init_phases` — each phase of init is an independently
+  callable library function returning a uniform `PhaseResult`.
+
+### Changed
+- `robot_md.init.quick` renamed to `non_interactive`; `quick` kept as a
+  deprecated alias that prints a one-time note to stderr.
+- `robot-md init --wizard` now an alias for the default flow (the two paths
+  are identical). Emits a one-time deprecation note.
+- Generated `CLAUDE.md` template now advertises all six MCP tools
+  (`validate`, `render`, `estop`, `estop_clear`, `execute_capability`,
+  `execute_task`) and points the motion row at `execute_capability`.
+
+### Migration
+- Scripted callers relying on `robot-md init` being non-interactive must
+  add `--non-interactive`. On CI machines this is the recommended invocation.
+- External code importing `robot_md.init.quick` should switch to
+  `non_interactive`. The old name still works but warns on each call.
+
+---
+
 ## [0.4.1] - 2026-04-18
 
 Dev ergonomics release. Live local dashboard + two safety patches from the v0.4.0 E2E smoke findings.
