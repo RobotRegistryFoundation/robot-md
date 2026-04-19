@@ -430,6 +430,51 @@ def _run(cmd: list[str]) -> str | None:
     return result.stdout
 
 
+def _probe_servo_buses(devices: list[Device]) -> list[Device]:
+    """Actively probe serial ports to discover their actual protocol.
+
+    For each `/dev/ttyACM*` or `/dev/ttyUSB*` in `devices`, call
+    `bus_scan.scan_feetech`. If one or more servos respond, emit a
+    synthetic `Device(protocol="feetech")` so preset matching can score
+    so-arm101 (and its feetech siblings) above alphabetical fallbacks.
+
+    Probes are bounded to ACM/USB tty paths — never `/dev/ttyS*` (built-in
+    UARTs often host console/login gettys, and sending Feetech bytes to a
+    login shell would be a mess). Opt out via env `ROBOT_MD_SKIP_BUS_PROBE=1`.
+
+    Silent no-op on: missing SDK, no servos, probe exception. Never raises.
+    """
+    if os.environ.get("ROBOT_MD_SKIP_BUS_PROBE") == "1":
+        return []
+
+    out: list[Device] = []
+    for d in devices:
+        if d.bus != "tty" or not d.path:
+            continue
+        if not (d.path.startswith("/dev/ttyACM") or d.path.startswith("/dev/ttyUSB")):
+            continue
+        try:
+            from robot_md.bus_scan import scan_feetech  # lazy
+
+            servos = scan_feetech(d.path)
+        except Exception:
+            continue
+        if not servos:
+            continue
+        leaf = d.path.rsplit("/", 1)[-1]
+        out.append(
+            Device(
+                role="servo-bus",
+                driver_id=f"feetech-bus-{leaf}",
+                protocol="feetech",
+                label=f"Feetech bus on {d.path} ({len(servos)} servos)",
+                bus="probe",
+                path=d.path,
+            )
+        )
+    return out
+
+
 def scan_system() -> Scan:
     """Run the full scan against the live system. Linux-only."""
     scan = Scan()
@@ -454,6 +499,10 @@ def scan_system() -> Scan:
         scan.devices.extend(parse_usb(lsusb_out))
 
     scan.devices.extend(scan_tty())
+    # Active bus probe — if a serial tty responds to Feetech protocol, add
+    # a synthetic Device(protocol="feetech") so preset matching can score
+    # so-arm101 / so-arm101-leader above the alphabetical-first fallback.
+    scan.devices.extend(_probe_servo_buses(scan.devices))
     # Compose typed probes (depthai → realsense → v4l2)
     cameras: list[DetectedCamera] = []
     cameras.extend(probe_depthai_cameras())

@@ -82,6 +82,24 @@ def test_pick_best_returns_highest(presets):
     assert r.preset.name == "so_arm101"  # highest scorer on a Feetech bus
 
 
+def test_pick_best_prefers_minimal_when_all_scores_zero(presets):
+    """When nothing matches (e.g. headless CI with no hardware), the
+    empty-match `minimal` preset is the semantically correct fallback.
+    Without this tie-break, alphabetical ordering gives the operator
+    `aloha2.yaml` for a machine with no Dynamixel arm — confusing.
+    """
+
+    class Scan:
+        devices = []
+
+    r = pick_best(presets, Scan())
+    assert r is not None
+    assert r.preset.name == "minimal", (
+        f"expected minimal on all-zero scan, got {r.preset.name}"
+    )
+    assert r.score == 0
+
+
 def test_merge_populates_identity_and_physics(presets):
     so = next(p for p in presets if p.name == "so_arm101")
 

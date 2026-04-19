@@ -131,16 +131,27 @@ def match_score(preset: Preset, scan: Any) -> MatchResult:
 
 
 def pick_best(presets: list[Preset], scan: Any) -> MatchResult | None:
-    """Return the highest-scoring preset, or None if all score zero and no
-    empty-match fallback exists."""
+    """Return the highest-scoring preset, or None if the list is empty.
+
+    Ties are broken in preference of an empty-match preset (e.g.
+    ``minimal.yaml``) — those are purpose-built fallbacks for robots that
+    don't match any specific preset. Without this, a CI machine with no
+    robot hardware would get alphabetically-first ``aloha2.yaml`` just
+    because every score is 0, which is worse than the intentionally
+    generic fallback.
+    """
     scored = [match_score(p, scan) for p in presets]
-    scored.sort(key=lambda r: r.score, reverse=True)
     if not scored:
         return None
-    # Always return the best (top score), even if 0 — fallback is a valid preset
-    # (e.g. minimal.yaml). Caller can check `result.score == 0` to detect
-    # "nothing actually matched" and respond with a TODO.
-    return scored[0]
+    top_score = max(r.score for r in scored)
+    top = [r for r in scored if r.score == top_score]
+    # Among top-scored, prefer an empty-match preset (fallback-intended).
+    fallback = next((r for r in top if not r.preset.match), None)
+    # But only when the top score is 0 — if something actually matched
+    # (even weakly), don't substitute the fallback.
+    if fallback is not None and top_score == 0:
+        return fallback
+    return top[0]
 
 
 # ----------------------------------------------------------------------- merge
@@ -267,6 +278,19 @@ def render_draft(
 # ---------------------------------------------------------------------- drivers
 
 
+def _default_robot_name() -> str:
+    """Default `robot-<hostname>`, but skip the prefix when the hostname
+    already starts with "robot" (case-insensitive). Prevents awkward
+    doubles like `robot-robot` on machines whose hostname is "robot".
+    """
+    import socket
+
+    host = socket.gethostname()
+    if host.lower().startswith("robot"):
+        return host
+    return f"robot-{host}"
+
+
 def non_interactive(
     out_path: Path,
     *,
@@ -274,9 +298,7 @@ def non_interactive(
     preset_name: str | None = None,
     force: bool = False,
 ) -> int:
-    """Super-duper-quick init. Zero prompts."""
-    import socket
-
+    """Manifest-only init for scripted / non-interactive callers. Zero prompts."""
     if out_path.exists() and not force:
         print(f"error: {out_path} already exists (pass --force to overwrite)", file=sys.stderr)
         return 2
@@ -302,7 +324,7 @@ def non_interactive(
             print("error: preset list empty", file=sys.stderr)
             return 2
 
-    name = robot_name or f"robot-{socket.gethostname()}"
+    name = robot_name or _default_robot_name()
     fm = merge_preset_into_draft(chosen.preset, name, scan)
     body_hints = chosen.preset.data.get("body_hints", {}) or {}
     text = render_draft(fm, body_hints)

@@ -67,9 +67,9 @@ def phase_write_manifest(
                 detail={"reason": "pick_best_empty"},
             )
 
-    import socket
+    from robot_md.init import _default_robot_name
 
-    name = robot_name or f"robot-{socket.gethostname()}"
+    name = robot_name or _default_robot_name()
     fm = merge_preset_into_draft(chosen.preset, name, scan)
     body_hints = chosen.preset.data.get("body_hints", {}) or {}
     text = render_draft(fm, body_hints)
