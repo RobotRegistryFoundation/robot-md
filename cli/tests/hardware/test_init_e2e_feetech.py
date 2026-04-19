@@ -11,10 +11,13 @@ import os
 import pytest
 from typer.testing import CliRunner
 
-pytestmark = pytest.mark.skipif(
-    os.environ.get("ROBOT_MD_HARDWARE") != "1",
-    reason="hardware smoke test; set ROBOT_MD_HARDWARE=1 with arm plugged in",
-)
+pytestmark = [
+    pytest.mark.hardware,
+    pytest.mark.skipif(
+        os.environ.get("ROBOT_MD_HARDWARE") != "1",
+        reason="hardware smoke test; set ROBOT_MD_HARDWARE=1 with arm plugged in",
+    ),
+]
 
 
 def test_default_flow_writes_calibrated_manifest(tmp_path, monkeypatch):
