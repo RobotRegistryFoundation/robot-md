@@ -843,6 +843,61 @@ def mcp(
     raise typer.Exit(code=_mcp_main())
 
 
+pose_app = typer.Typer(help="Teach and manage named arm poses.", no_args_is_help=True)
+app.add_typer(pose_app, name="pose")
+
+
+def _open_feetech_bus(manifest_path: Path):
+    """Resolve the Feetech servo bus for the manifest. Overridable in tests."""
+    from robot_md.mcp.context import load_context
+
+    ctx = load_context(manifest_path)
+    bus = getattr(ctx.backend, "_servo_bus", None)
+    if bus is None:
+        raise RuntimeError("no feetech servo bus available for this manifest")
+    return bus
+
+
+@pose_app.command("teach")
+def pose_teach(
+    name: str = typer.Argument(..., help="Pose name, e.g. 'ready' or 'stowed'."),
+    path: Path = typer.Argument(..., help="Path to ROBOT.md"),
+    description: str | None = typer.Option(None, "--description", "-d"),
+    yes: bool = typer.Option(False, "--yes", help="Skip the interactive prompt."),
+):
+    """Record the arm's current joint positions under physics.poses[name].
+
+    Torques off the servos, reads every joint, writes to the manifest, and
+    re-torques. The operator is expected to have physically posed the arm
+    before invoking.
+    """
+    from robot_md.poses import teach_pose
+
+    if not yes:
+        typer.confirm(
+            f"Torque will release so you can pose the arm. Ready to teach '{name}'?",
+            abort=True,
+        )
+    bus = _open_feetech_bus(path)
+    joints = teach_pose(bus, path, name=name, description=description)
+    typer.echo(f"✓ wrote physics.poses.{name} ({len(joints)} joints)")
+
+
+@pose_app.command("list")
+def pose_list(path: Path = typer.Argument(..., help="Path to ROBOT.md")):
+    """List named poses declared in the manifest."""
+    from robot_md.parser import parse_file
+    from robot_md.robot_spec import RobotSpec
+
+    spec = RobotSpec.from_parsed(parse_file(path))
+    if not spec.physics.poses:
+        typer.echo("(no poses declared)")
+        return
+    for name, pose in spec.physics.poses.items():
+        desc = f" — {pose.description}" if pose.description else ""
+        typer.echo(f"  {name} ({pose.source or 'declared'}, {len(pose.joints)} joints){desc}")
+
+
 dashboard_app = typer.Typer(help="Dev dashboard for robot-md.", no_args_is_help=True)
 app.add_typer(dashboard_app, name="dashboard")
 
