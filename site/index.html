@@ -461,58 +461,7 @@
   .example .arrow{font-family:var(--mono); font-size:18px; color:var(--ink-4)}
   .example:hover .arrow{color:var(--accent)}
 
-  /* ============ §06 letter ============ */
-  .letter{
-    background:var(--paper-2);
-    border:1px solid var(--rule);
-    padding: 48px clamp(32px, 6vw, 72px);
-    position:relative;
-    font-family:var(--serif);
-    font-size: 19px;
-    line-height: 1.65;
-    color:var(--ink-2);
-    text-wrap:pretty;
-  }
-  .letter::before, .letter::after{
-    content:""; position:absolute; top:14px; bottom:14px; width:1px; background:var(--rule);
-  }
-  .letter::before{left:14px}
-  .letter::after{right:14px}
-  .letter h4{
-    font-family:var(--sans);
-    font-weight:500;
-    font-size:12px;
-    letter-spacing:.14em;
-    text-transform:uppercase;
-    color:var(--ink-3);
-    margin:0 0 22px;
-    display:flex; justify-content:space-between; gap:16px;
-  }
-  .letter p{margin:0 0 14px}
-  .letter p em{color:var(--accent)}
-  .letter .sign{
-    margin-top:28px;
-    font-family:var(--mono);
-    font-style:normal;
-    font-size:12px;
-    letter-spacing:.06em;
-    color:var(--ink-3);
-  }
-  .letter .stamp{
-    position:absolute; top:28px; right:28px;
-    border:2px solid var(--accent);
-    color:var(--accent);
-    padding:8px 14px;
-    font-family:var(--mono); font-size:10px; letter-spacing:.18em; text-transform:uppercase;
-    transform: rotate(-6deg);
-    font-weight:600;
-    line-height:1.2;
-    text-align:center;
-    opacity:.9;
-  }
-  .letter .stamp span{display:block; font-size:8px; letter-spacing:.14em; opacity:.7; margin-top:2px}
-
-  /* ============ §07 ecosystem / footer ============ */
+  /* ============ §06 ecosystem / footer ============ */
   .ecosystem{
     display:grid; grid-template-columns: repeat(4, 1fr); gap: 0;
     border-top:1px solid var(--rule);
@@ -665,7 +614,6 @@
       <a href="#try">Try it</a>
       <a href="/robots">Robots</a>
       <a href="/status">Status</a>
-      <a href="#anthropic">Anthropic</a>
       <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
     </nav>
     <div>part of the OpenCastor ecosystem</div>
@@ -1170,46 +1118,11 @@ Next — hand your manifest to Claude Code:
   </div>
 </section>
 
-<!-- ================= §06 LETTER TO ANTHROPIC ================= -->
-<section class="sec" id="anthropic">
-  <div class="wrap">
-    <div class="sec-head">
-      <div class="sec-num">§ 06 — An open letter</div>
-      <div>
-        <h2 class="sec-title">A proposal — not a pitch — for Anthropic.</h2>
-        <p class="sec-lede">ROBOT.md is drafted for review so readers can inspect the full context. The ask is narrow. The adoption cost is small. The cost of silence is structural.</p>
-      </div>
-    </div>
-
-    <article class="letter">
-      <div class="stamp">Draft v0.1<span>open for review</span></div>
-      <h4>
-        <span>To: Product · DevRel · Applied, Anthropic</span>
-        <span>From: craigm26 · OpenCastor maintainer</span>
-      </h4>
-
-      <p>The best planner on the market for physical robots is already yours. The reference arm we run — a 6‑DOF SO‑ARM101 we call <em>bob</em> — routes its reasoning through Claude Opus 4.7 with a local VLA model for sub‑second reflexes. It works. Dozens of community robots now do the same.</p>
-
-      <p>The physical‑AI market in 2026 is in flight, and configuration‑format lock‑in determines which planner adopters default to. <em>CLAUDE.md</em> won the developer's root directory. <em>ROBOT.md</em> is the same move, one layer out — the file a robot ships at its root so any agent can pick it up and be useful in the first second of the first session.</p>
-
-      <p>What we're asking for is small. Endorse the pattern in Claude Code docs the way CLAUDE.md is endorsed. List <code style="font-family:var(--mono); background:var(--paper); padding:1px 6px">robot-md-mcp</code> beside filesystem and github in your recommended MCPs — it's shipped (npm, v0.2.1+) with server <code>instructions</code>, 6 resources, 3 tools, and 4 slash commands that route to the robot's manifest by description-match alone. Document the URL‑fetch pattern on Claude Mobile — the phones already do the work. If the repo should live at <code style="font-family:var(--mono); background:var(--paper); padding:1px 6px">Anthropic/robot-md</code>, we will transfer it; committer status retained, governance open.</p>
-
-      <p>Not asked: code contributions, exclusivity, or IP up‑front. ROBOT.md is designed to work best with the provider's agent harnesses — Claude Code, Desktop, Mobile — but other planners (GPT, Gemini) are welcome to read the file too. We would simply prefer the operator's default, on day one, to be the planner that already drives our robot.</p>
-
-      <p>Feedback via GitHub issues. Coffee via email.</p>
-
-      <div class="sign">
-        — craigm26 · craigm26@gmail.com · April 17, 2026
-      </div>
-    </article>
-  </div>
-</section>
-
-<!-- ================= §07 ECOSYSTEM ================= -->
+<!-- ================= §06 ECOSYSTEM ================= -->
 <section class="sec" id="eco" style="border-bottom:none; padding-bottom:24px">
   <div class="wrap">
     <div class="sec-head">
-      <div class="sec-num">§ 07 — The rest of the ecosystem</div>
+      <div class="sec-num">§ 06 — The rest of the ecosystem</div>
       <div>
         <h2 class="sec-title">The OpenCastor ecosystem, at a glance.</h2>
         <p class="sec-lede">ROBOT.md sits alongside three sibling projects. Each is independent; together they give a robot an identity, a voice, a registry, and a runtime. All four can be adopted à la carte.</p>
