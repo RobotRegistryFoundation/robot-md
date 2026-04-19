@@ -234,3 +234,33 @@ def test_apply_is_idempotent_on_bob(tmp_path):
     text = out.read_text()
     assert text.count("BEGIN robot-md") == 1
     assert text.count("END robot-md") == 1
+
+
+def test_template_lists_all_six_mcp_tools(tmp_path):
+    """CLAUDE.md should advertise the full python-MCP tool set."""
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(
+        "---\n"
+        "metadata:\n  robot_name: bob\n"
+        "capabilities:\n  - arm.pick\n  - arm.place\n"
+        "safety:\n  hitl_gates: []\n"
+        "drivers: []\n"
+        "---\n\n# bob\nIdentity.\n"
+    )
+
+    text = render_claude_md(manifest)
+    for tool in ("validate", "render", "estop", "execute_capability", "execute_task"):
+        assert tool in text, f"expected MCP tool {tool!r} in CLAUDE.md template"
+
+
+def test_template_motion_row_points_at_execute_capability(tmp_path):
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(
+        "---\nmetadata:\n  robot_name: bob\ncapabilities: []\n"
+        "safety:\n  hitl_gates: []\ndrivers: []\n---\n\n# bob\n"
+    )
+
+    text = render_claude_md(manifest)
+    # The "Pick up the X" row should mention execute_capability so Claude
+    # knows which tool to call for physical motion.
+    assert "execute_capability" in text

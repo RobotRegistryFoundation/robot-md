@@ -40,7 +40,7 @@ When the operator asks any of the following, **you should act** — not ask clar
 | "Is the manifest valid?" / "Did I break something?" | Run `robot-md validate ROBOT.md`. |
 | "Pose the arm at zero" / "Calibrate" | `robot-md calibrate --zero ROBOT.md`. Relay the interactive prompts to the operator. |
 | "Publish my robot" / "Give it a public URL" | `robot-md publish-discovery ROBOT.md --url <URL>` writes `.well-known/robot-md.json`. |
-| "Pick up the X" / any physical motion | This is a **hardware action**. Check `safety.hitl_gates` first. If the scope matches a gate with `require_auth: true`, stop and ask for explicit approval before issuing any command. |
+| "Pick up the X" / any physical motion | Call `mcp__robot-md-{{ROBOT_NAME}}__execute_capability` (dry-run first). Check `safety.hitl_gates` for the cap's scope; if a gate with `require_auth: true` matches, request explicit operator approval before re-running without dry-run. |
 
 ## Tooling available in this workspace
 
@@ -60,7 +60,7 @@ If `robot-md-mcp` is registered in this session (check with `/mcp`), prefer the 
 - `robot-md://{{ROBOT_NAME}}/safety` — safety block
 - `robot-md://{{ROBOT_NAME}}/body` — prose
 
-MCP tools (also available): `validate`, `render`.
+MCP tools (also available): `validate`, `render`, `estop`, `estop_clear`, `execute_capability`, `execute_task`.
 
 ## Safety posture
 
