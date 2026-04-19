@@ -106,10 +106,14 @@ def _start_command_watcher(ctx, cmd_path: Path):
 
     log = _logging.getLogger("robot_md.mcp.command_watcher")
 
+    # Initialize the tail position synchronously before returning so callers
+    # (and tests) can append commands without racing the thread's startup.
+    cmd_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd_path.touch(exist_ok=True)
+    initial_pos = cmd_path.stat().st_size
+
     def _loop():
-        cmd_path.parent.mkdir(parents=True, exist_ok=True)
-        cmd_path.touch(exist_ok=True)
-        pos = cmd_path.stat().st_size
+        pos = initial_pos
         while True:
             try:
                 size = cmd_path.stat().st_size
