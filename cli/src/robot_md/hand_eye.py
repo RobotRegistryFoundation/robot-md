@@ -44,6 +44,7 @@ import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Sequence
 
 import numpy as np
 
@@ -335,3 +336,70 @@ def cli_calibrate_hand_eye(
         print(f"  warning: could not update manifest: {e}", file=sys.stderr)
         return 2
     return 0
+
+
+# ---------------------------------------------------------------------------
+# v1 hand-eye via cv2.calibrateHandEye (Task 9)
+#
+# Unlike the v0 single-shot PnP above, this path samples N (robot_pose,
+# marker_pose) pairs and solves AX = XB to recover the camera→arm-base
+# transform. Driven by the CLI verb (added in Task 10); pure math here.
+# ---------------------------------------------------------------------------
+
+
+def calibrate_from_samples(
+    *,
+    R_gripper2base: Sequence[np.ndarray],
+    t_gripper2base: Sequence[np.ndarray],
+    R_target2cam: Sequence[np.ndarray],
+    t_target2cam: Sequence[np.ndarray],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Wrap cv2.calibrateHandEye. Returns (R_cam2base, t_cam2base)."""
+    import cv2
+
+    n = len(R_gripper2base)
+    if n < 3:
+        raise ValueError(f"hand-eye needs at least 3 samples, got {n}")
+    if not (n == len(t_gripper2base) == len(R_target2cam) == len(t_target2cam)):
+        raise ValueError("all four sample lists must be the same length")
+
+    R, t = cv2.calibrateHandEye(
+        R_gripper2base=list(R_gripper2base),
+        t_gripper2base=list(t_gripper2base),
+        R_target2cam=list(R_target2cam),
+        t_target2cam=list(t_target2cam),
+        method=cv2.CALIB_HAND_EYE_TSAI,
+    )
+    t = np.asarray(t).reshape(-1)
+    return (np.asarray(R), t)
+
+
+def detect_marker_pose(
+    frame,
+    *,
+    K: np.ndarray,
+    dist_coeffs: np.ndarray,
+    marker_id: int,
+    marker_size_mm: float,
+    dictionary_id: int | None = None,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    """Find a single ArUco marker in an RGB frame. Returns (R, t) in cam frame, mm."""
+    import cv2
+
+    dict_id = dictionary_id if dictionary_id is not None else cv2.aruco.DICT_4X4_50
+    dictionary = cv2.aruco.getPredefinedDictionary(dict_id)
+    params = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(dictionary, params)
+    corners, ids, _ = detector.detectMarkers(frame)
+    if ids is None or len(ids) == 0:
+        return None
+    matches = [i for i, row in enumerate(ids) if int(row[0]) == marker_id]
+    if not matches:
+        return None
+    idx = matches[0]
+    rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(
+        [corners[idx]], marker_size_mm, K, dist_coeffs
+    )
+    R, _ = cv2.Rodrigues(rvecs[0][0])
+    t = tvecs[0][0]
+    return (R, t)
