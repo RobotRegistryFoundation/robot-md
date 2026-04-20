@@ -5,6 +5,45 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.0] — 2026-04-20
+
+### Added
+
+- **Gripper-silhouette extrinsic calibration.** `robot-md calibrate --extrinsic ROBOT.md` runs a 6-pose sweep that uses the gripper itself as the fiducial — no printed ArUco marker, no hand-measured `--marker-pos`. Residual (mm) is reported and persisted to `physics.solver.cameras[0].extrinsic_residual_mm`. New `extrinsic_source: gripper_silhouette_calibrated` enum value.
+- **`init` runs extrinsic calibration as an opt-in phase.** Interactive TTY runs of `robot-md init` open the bus + camera and prompt `"Calibrate camera-to-arm alignment now?"` after the auto-calibrate-ready phase. Non-interactive runs skip cleanly; doctor warns on uncalibrated extrinsics.
+- **Depth-aware HSV detectors.** HSV descriptors now accept optional `min_depth_mm` / `max_depth_mm`; when unset, bounds are auto-derived from `physics.workspace.bounds_mm` projected (Z-depth) into camera frame via the current extrinsic. Fixes `white_bowl` matching walls at 8m. Opt out per descriptor with `ignore_workspace_bounds: true`.
+- **`detectors/depth.py`.** Depth-first bowl detector — color-free. Registered as `kind: depth_shape`. Params: `shape`, `min_diameter_mm`, `max_diameter_mm`, `z_range_mm`.
+- **Three-layer servo-latch defense.**
+  - **Pre-flight.** `Kinematics.analyze_envelope()` rejects trajectories that would hold a joint above 85% of its envelope for more than ~500ms — the exact failure mode observed on the SO-ARM101 wrist_flex during v0.6.3 hardware bring-up. `plan_pick` / `plan_place` take a `hold_ms` kwarg and invoke the analyzer.
+  - **Runtime.** `motion.verify_alive()` reads bus enumeration after every motion; a dropped servo id triggers immediate torque-off of the remaining servos and a structured `{status: error, reason: servo_latched}` response. Wired into `_do_replay`, `_arm_home`, `_arm_pick`, `_arm_place`.
+  - **Post-hoc.** `robot-md doctor --hardware` enumerates servos + probes RGB/depth streams; flags missing ids and missing streams. Auto-enabled when `/dev/ttyACM*` is present; `on`/`off` override available.
+- **Preset-scoring tie-break.** `match.drivers.count` (already-declared schema field, previously unused) now contributes +5 when the scan's servo count matches. New `match.negative_hints` field subtracts 5 when any listed word appears in a device label. `pick_best` breaks remaining ties alphabetically by preset name. Resolves the `so_arm101` vs `so_arm101_leader` ambiguity.
+- **Schema additions.** `physics.solver.cameras[].extrinsic_source` now accepts `gripper_silhouette_calibrated`. New optional `physics.solver.cameras[].extrinsic_residual_mm` field.
+
+### Changed
+
+- `robot-md calibrate --hand-eye` → `--extrinsic`. The old flag still works this cycle but emits a deprecation warning and routes to the new code path. Removed in v0.8.
+- **Behavior:** HSV detectors now apply workspace-bounds depth filter by default. Descriptors whose valid targets sit outside the workspace must opt out via `ignore_workspace_bounds: true` or widen `physics.workspace.bounds_mm`. Doctor warns when the new filter plausibly broke a descriptor.
+- `trajectory.plan_pick` / `plan_place` now take `hold_ms: int = 1000` and call `analyze_envelope` at the grasp/place pose. Out-of-envelope trajectories raise `KinematicsError`; the backend dispatcher classifies the error as `envelope_risk` (latch warning), `joint_limit` (hard limit), or `ik_failed`.
+
+### Removed
+
+- `cli/src/robot_md/hand_eye.py` and its ArUco / `cv2.calibrateHandEye` path.
+- `opencv-contrib-python` from `[project.optional-dependencies].vision` (base `opencv-python` stays; `depthai` may still transitively install contrib).
+
+### Compatibility
+
+- v0.6.3 manifests validate and load unchanged. All new schema fields are additive and optional.
+- Extrinsic calibrated via v0.6.x (`extrinsic_source: hand_eye_calibrated`) is still accepted by all consumers; only new calibrations produce `gripper_silhouette_calibrated`.
+- **Migration for existing descriptors with out-of-workspace valid matches:** add `ignore_workspace_bounds: true` to the descriptor, or widen `physics.workspace.bounds_mm`. Doctor warns when the new filter plausibly broke a descriptor.
+
+### Known issues
+
+- `default_flow` opens the bus + camera synchronously when `stdin.isatty()` is true; there is no settle-delay between `bus.interpolate(...)` and `camera.grab_frame(...)` during the sweep, which may produce motion-blurred captures on rigs with slow servos. Track for v0.7.1. Mitigation: the sweep tolerates per-pose failures and aborts cleanly if more than 2 of 6 poses fail to locate the gripper.
+- `mcp/resources.py::calibration_status` still exports the legacy `hand_eye` key name for backward compatibility with existing MCP clients. Will be renamed to `extrinsic` in v0.8 (with a back-compat alias for one release).
+
+---
+
 ## [0.6.3] — 2026-04-20
 
 ### Fixed — hardware bring-up lessons
