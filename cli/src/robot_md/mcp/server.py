@@ -83,6 +83,32 @@ def build_server(ctx: McpContext):
 
         return vision_find_tool(ctx, descriptor_id=descriptor_id)
 
+    robot_name = ctx.spec.metadata.robot_name if ctx.spec else "robot"
+
+    @server.resource(f"robot-md://{robot_name}/learned_skills")
+    def _resource_learned_skills() -> str:
+        import json
+
+        from robot_md.mcp.resources import learned_skills as _ls
+
+        return json.dumps(_ls(ctx), indent=2)
+
+    @server.resource(f"robot-md://{robot_name}/calibration_status")
+    def _resource_calibration_status() -> str:
+        import json
+
+        from robot_md.mcp.resources import calibration_status as _cs
+
+        return json.dumps(_cs(ctx), indent=2)
+
+    @server.resource(f"robot-md://{robot_name}/poses")
+    def _resource_poses() -> str:
+        import json
+
+        from robot_md.mcp.resources import poses as _poses
+
+        return json.dumps(_poses(ctx), indent=2)
+
     return server
 
 
