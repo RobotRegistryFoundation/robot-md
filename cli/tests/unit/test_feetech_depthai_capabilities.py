@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 from robot_md.backends.feetech_depthai.capabilities import dispatch
+from robot_md.backends.feetech_depthai.motion import AliveReport
 from robot_md.robot_spec import PoseDef
 
 
@@ -196,4 +197,85 @@ def test_arm_home_invokes_motion_replay_when_not_dry_run():
     b._motion.replay.assert_called_once()
     # Torque stays on after successful motion so the arm holds the ready pose.
     torque_calls = [c.args[0] for c in b._servo_bus.torque.call_args_list]
+    assert torque_calls == [True]
+
+
+def test_arm_home_returns_servo_latched_on_dropped_servo():
+    """After motion.replay, if verify_alive detects a missing servo in the bus
+    enumeration, dispatch returns a structured error with reason=servo_latched
+    instead of 'ok'. The watchdog contains the failure: verify_alive torques
+    off remaining servos internally, and the caller knows to power-cycle."""
+    b = _backend()
+    # Simulate wrist_flex dropping from bus enumeration after motion.
+    b._motion.verify_alive.return_value = AliveReport(
+        alive=False, missing=["wrist_flex"]
+    )
+
+    res = dispatch(b, capability="arm.home", args={}, dry_run=False, estop=_estop())
+
+    assert res.status == "error"
+    assert res.error["reason"] == "servo_latched"
+    assert res.error["servo"] == "wrist_flex"
+    assert "wrist_flex" in res.error["missing"]
+    # verify_alive was called — the watchdog is wired.
+    b._motion.verify_alive.assert_called_once()
+    # Torque was turned on before motion (as usual); verify_alive handles
+    # torque(False) internally — dispatch must NOT double-torque-off.
+    torque_calls = [c.args[0] for c in b._servo_bus.torque.call_args_list]
+    assert torque_calls == [True]
+
+
+def test_arm_pick_returns_servo_latched_on_dropped_servo():
+    """Same watchdog contract as arm.home but for the pick dispatcher."""
+    b = _backend()
+    b._motion.verify_alive.return_value = AliveReport(
+        alive=False, missing=["wrist_flex"]
+    )
+
+    res = dispatch(
+        b, capability="arm.pick", args={"target": "lego"}, dry_run=False, estop=_estop()
+    )
+
+    assert res.status == "error"
+    assert res.error["reason"] == "servo_latched"
+    assert "wrist_flex" in res.error["missing"]
+    b._motion.verify_alive.assert_called_once()
+
+
+def test_arm_place_returns_servo_latched_on_dropped_servo():
+    """Same watchdog contract as arm.home but for the place dispatcher."""
+    b = _backend()
+    b._motion.verify_alive.return_value = AliveReport(
+        alive=False, missing=["wrist_flex"]
+    )
+
+    res = dispatch(
+        b, capability="arm.place", args={"target": "lego"}, dry_run=False, estop=_estop()
+    )
+
+    assert res.status == "error"
+    assert res.error["reason"] == "servo_latched"
+    assert "wrist_flex" in res.error["missing"]
+    b._motion.verify_alive.assert_called_once()
+
+
+def test_arm_home_verify_alive_not_called_on_dry_run():
+    """verify_alive must not be called in dry-run mode — no actual motion occurs."""
+    b = _backend()
+    res = dispatch(b, capability="arm.home", args={}, dry_run=True, estop=_estop())
+    assert res.status == "ok"
+    b._motion.verify_alive.assert_not_called()
+
+
+def test_arm_home_success_torque_stays_on_when_alive():
+    """On successful motion with all servos alive, torque remains on (arm holds pose).
+    This is the v0.6.3 contract — regression guard."""
+    b = _backend()
+    b._motion.verify_alive.return_value = AliveReport(alive=True, missing=[])
+
+    res = dispatch(b, capability="arm.home", args={}, dry_run=False, estop=_estop())
+
+    assert res.status == "ok"
+    torque_calls = [c.args[0] for c in b._servo_bus.torque.call_args_list]
+    # Exactly one torque call: torque(True) before motion. No torque(False).
     assert torque_calls == [True]

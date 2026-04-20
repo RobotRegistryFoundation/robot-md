@@ -20,6 +20,24 @@ from robot_md.kinematics import Kinematics, KinematicsError
 from robot_md.trajectory import plan_pick, plan_place
 
 
+def _expected_servo_ids(backend) -> set[str]:
+    """Return the set of servo IDs declared in the robot spec.
+
+    Tries raw_frontmatter["physics"]["kinematics"] first (always present in
+    the test fixture and in real manifests). Falls back to
+    spec.physics.kinematics for dataclass-form specs.
+    """
+    fm = getattr(backend, "raw_frontmatter", None) or {}
+    kin = (fm.get("physics") or {}).get("kinematics") or []
+    if kin:
+        return {j["id"] for j in kin if isinstance(j, dict) and "id" in j}
+    # Fallback: dataclass-form spec
+    spec = getattr(backend, "_spec", None)
+    phys = getattr(spec, "physics", None) if spec is not None else None
+    kin = getattr(phys, "kinematics", None) or [] if phys is not None else []
+    return {j["id"] for j in kin if isinstance(j, dict) and "id" in j}
+
+
 # ---------------------------------------------------------------- dispatch --
 
 
@@ -231,6 +249,22 @@ def _execute_pick_or_place(
     # Torque stays on after successful motion — the arm holds the final pose.
     # Callers that want limp (teach-mode, shutdown) should drop torque explicitly.
 
+    # Post-motion watchdog: verify all expected servos still respond on the bus.
+    # verify_alive calls bus.torque(False) internally on any mismatch (safety).
+    report = backend._motion.verify_alive(bus, expected_ids=_expected_servo_ids(backend))
+    if not report.alive:
+        return ExecutionResult(
+            status="error",
+            trajectory=trajectory,
+            events=events,
+            error={
+                "reason": "servo_latched",
+                "servo": report.missing[0] if report.missing else None,
+                "missing": report.missing,
+                "detail": "servo dropped from bus enumeration — power-cycle required",
+            },
+        )
+
     events.append(ExecutionEvent(kind="done", data={"label": label}))
     return ExecutionResult(status="ok", trajectory=trajectory, events=events, error=None)
 
@@ -292,6 +326,22 @@ def _do_replay(backend, *, waypoints, label, args, dry_run, estop) -> ExecutionR
     bus.torque(True)
     motion.replay(waypoints, servo_bus=bus, estop=estop)
     # Torque stays on after successful motion — arm holds the final pose.
+
+    # Post-motion watchdog: verify all expected servos still respond on the bus.
+    # verify_alive calls bus.torque(False) internally on any mismatch (safety).
+    report = motion.verify_alive(bus, expected_ids=_expected_servo_ids(backend))
+    if not report.alive:
+        return ExecutionResult(
+            status="error",
+            trajectory=trajectory,
+            events=events,
+            error={
+                "reason": "servo_latched",
+                "servo": report.missing[0] if report.missing else None,
+                "missing": report.missing,
+                "detail": "servo dropped from bus enumeration — power-cycle required",
+            },
+        )
 
     events.append(ExecutionEvent(kind="done", data={"label": label}))
     return ExecutionResult(status="ok", trajectory=trajectory, events=events, error=None)
