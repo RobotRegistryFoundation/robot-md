@@ -556,17 +556,47 @@ def default_flow(
         results.append(phase_auto_calibrate_ready(manifest_path=out_path))
 
     # Phase 6.7: extrinsic calibration — interactive prompt; skips cleanly when
-    # non-interactive, no camera, or no actuatable bus.  default_flow opens no
-    # hardware, so bus=None and camera=None always; the phase's own guards
-    # (no_camera, no_actuatable_bus) fire and produce a clean "skipped" result.
-    results.append(
-        phase_calibrate_extrinsic(
-            out_path,
-            bus=None,
-            camera=None,
-            interactive=sys.stdin.isatty(),
-        )
+    # non-interactive, no camera, or no actuatable bus.  When running
+    # interactively, attempt to open hardware so the phase can actually run.
+    interactive = sys.stdin.isatty()
+    bus_for_cal = None
+    cam_for_cal = None
+    if interactive:
+        try:
+            from robot_md.backends.feetech_depthai.servo import ServoBus
+            from robot_md.backends.feetech_depthai.perception import Perception
+            from robot_md.robot_spec import RobotSpec
+            from robot_md.parser import parse_file as _parse_file
+
+            spec = RobotSpec.from_parsed(_parse_file(out_path))
+            try:
+                bus_for_cal = ServoBus.from_spec(spec)
+                bus_for_cal.open()
+            except Exception:
+                bus_for_cal = None
+            try:
+                cam_for_cal = Perception.from_spec(spec)
+            except Exception:
+                cam_for_cal = None
+        except Exception:
+            # Any setup failure → leave both None; phase will skip.
+            bus_for_cal = None
+            cam_for_cal = None
+
+    result_cal = phase_calibrate_extrinsic(
+        out_path,
+        bus=bus_for_cal,
+        camera=cam_for_cal,
+        interactive=interactive,
     )
+    results.append(result_cal)
+
+    # Release bus if we opened it.
+    if bus_for_cal is not None:
+        try:
+            bus_for_cal.close()
+        except Exception:
+            pass
 
     # Phase 7: teach poses (opt-in, TTY-only).
     if do_teach_poses:

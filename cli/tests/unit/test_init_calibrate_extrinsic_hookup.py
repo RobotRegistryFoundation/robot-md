@@ -174,3 +174,68 @@ def test_non_interactive_invokes_calibrate_extrinsic_phase_with_skip(tmp_path, m
     assert calls["count"] == 1, (
         "phase_calibrate_extrinsic must be called even in non-interactive runs"
     )
+
+
+def test_default_flow_attempts_hardware_open_for_interactive_extrinsic(tmp_path, monkeypatch):
+    """When stdin is a TTY and ServoBus/Perception resolve, default_flow should
+    pass the opened bus and camera to phase_calibrate_extrinsic."""
+    from unittest.mock import MagicMock
+    from robot_md import init
+
+    fake_bus = MagicMock()
+    fake_cam = MagicMock()
+    fake_spec = MagicMock()
+    received: dict = {}
+
+    # Force TTY.
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+
+    # Patch the hardware backends that default_flow imports inside the if-block.
+    monkeypatch.setattr(
+        "robot_md.backends.feetech_depthai.servo.ServoBus.from_spec",
+        lambda spec: fake_bus,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "robot_md.backends.feetech_depthai.perception.Perception.from_spec",
+        lambda spec: fake_cam,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "robot_md.robot_spec.RobotSpec.from_parsed",
+        lambda parsed: fake_spec,
+        raising=False,
+    )
+
+    def fake_phase(manifest_path, *, bus, camera, interactive):
+        received["bus"] = bus
+        received["camera"] = camera
+        return PhaseResult(
+            phase="calibrate_extrinsic",
+            status="skipped",
+            message="stub",
+            detail={"reason": "declined"},
+        )
+
+    monkeypatch.setattr(init, "phase_calibrate_extrinsic", fake_phase, raising=False)
+    _patch_other_phases(monkeypatch, init)
+
+    out = tmp_path / "ROBOT.md"
+    out.write_text("---\nmetadata:\n  robot_name: r\n---\n\n# r\n\n")
+
+    init.default_flow(
+        out,
+        robot_name="r",
+        preset_name="so-arm101",
+        do_install_mcp=False,
+        do_install_skill=False,
+        do_register=False,
+        do_refresh_claude_md=False,
+    )
+
+    assert received.get("bus") is fake_bus, (
+        "phase_calibrate_extrinsic must receive the opened bus in interactive mode"
+    )
+    assert received.get("camera") is fake_cam, (
+        "phase_calibrate_extrinsic must receive the opened camera in interactive mode"
+    )
