@@ -482,7 +482,7 @@
   .C-term-head .path{color:#7d776a; margin-left:8px}
   .C-term-head .tag{margin-left:auto; color:var(--accent); font-weight:600}
   .C-term-body{ padding: 22px 26px 26px; min-height: 260px }
-  .C-line{ white-space:pre-wrap }
+  .C-line{ white-space:pre-wrap; opacity:0; transform:translateY(4px); transition: opacity .22s ease, transform .22s ease }
   .C-line.prompt{ color:#E8E3D3 }
   .C-line.prompt .p{ color:var(--accent); font-weight:600; margin-right:8px }
   .C-line.prompt .cmd{ color:#fff; font-weight:500 }
@@ -491,24 +491,20 @@
   .C-line.out .v{ color:#b8d9a1 }
   .C-line.out .mute{ color:#5a574f }
   .C-line.out .ok{ color:#7fb27a }
+  .C-line.out .warn{ color:#d9a55e }
+  .C-line.phase{ color:#9a9384; padding: 4px 0 2px; font-size:11px; letter-spacing:.16em; text-transform:uppercase; border-top:1px dashed #26231f; margin-top:6px }
+  .C-line.phase:first-child{ border-top:none; margin-top:0 }
+  .C-line.phase .n{ color:var(--accent); font-weight:600; margin-right:10px }
+  .C-line.ask{ color:#E8E3D3 }
+  .C-line.ask .q{ color:#fff }
+  .C-line.ask .ans{ color:var(--accent); font-weight:600 }
   .C-line.step{ color:#E8E3D3 }
   .C-line.step .bullet{ color:var(--accent); margin-right:8px; display:inline-block; width:1.2em }
+  .C-line.banner{ color:#7fb27a; padding: 4px 0 2px }
   .C-cursor{display:inline-block; width:.55em; height:1em; background:var(--accent); vertical-align:text-bottom; animation: blink 1.05s steps(1) infinite; margin-left:2px}
   @keyframes blink{ 50%{opacity:0} }
 
-  .C-term .C-line{ opacity:0; transform:translateY(4px); transition: opacity .25s ease, transform .25s ease }
   .C-term.lit .C-line{ opacity:1; transform:none }
-  .C-term.lit .C-line:nth-child(1){ transition-delay:.05s }
-  .C-term.lit .C-line:nth-child(2){ transition-delay:.45s }
-  .C-term.lit .C-line:nth-child(3){ transition-delay:.85s }
-  .C-term.lit .C-line:nth-child(4){ transition-delay:1.25s }
-  .C-term.lit .C-line:nth-child(5){ transition-delay:1.60s }
-  .C-term.lit .C-line:nth-child(6){ transition-delay:1.90s }
-  .C-term.lit .C-line:nth-child(7){ transition-delay:2.20s }
-  .C-term.lit .C-line:nth-child(8){ transition-delay:2.50s }
-  .C-term.lit .C-line:nth-child(9){ transition-delay:2.80s }
-  .C-term.lit .C-line:nth-child(10){ transition-delay:3.15s }
-  .C-term.lit .C-line:nth-child(11){ transition-delay:3.55s }
 
   .C-sig{ display:grid; grid-template-columns: auto 1fr auto; gap:24px; align-items:center; padding:16px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); margin-top: 12px }
   .C-sig .nm{ font-family:var(--sans); font-weight:700; font-size:34px; letter-spacing:-.03em; line-height:1 }
@@ -560,19 +556,42 @@
   <div class="C-term" id="termC">
     <div class="C-term-head">
       <div class="bulbs"><i></i><i></i><i></i></div>
-      <span class="path">~/bob</span>
-      <span class="tag">● zero flags · one command</span>
+      <span class="path">~/bob · robot-md v0.6.0</span>
+      <span class="tag">● one command · manifest + MCP + skill + calibration</span>
     </div>
-    <div class="C-term-body">
-      <div class="C-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md</span></div>
-      <div class="C-line prompt"><span class="p">$</span><span class="cmd">robot-md init</span></div>
-      <div class="C-line out"><span class="mute">→</span> autodetect ........ <span class="v">feetech bus /dev/ttyACM0</span> · <span class="ok">6 servos</span></div>
-      <div class="C-line out"><span class="mute">→</span> preset matched .... <span class="ok">so-arm101</span> <span class="mute">(protocol +10)</span></div>
-      <div class="C-line out"><span class="mute">→</span> wrote <span class="k">ROBOT.md</span> + <span class="k">CLAUDE.md</span> <span class="mute">· validates · 55 lines</span></div>
-      <div class="C-line out"><span class="mute">→</span> installed <span class="k">robot-md</span> MCP + <span class="k">using-robot-md</span> skill</div>
-      <div class="C-line step"><span class="bullet">▸</span> 6 resources · 3 tools · 4 slash commands ready.</div>
-      <div class="C-line prompt" style="margin-top:14px"><span class="p">$</span><span class="cmd">claude</span></div>
-      <div class="C-line out"><span class="mute">›</span> <span class="v">bob</span> is online. Register with RRF so web &amp; mobile can reach him?</div>
+    <div class="C-term-body" id="termCBody">
+      <div class="C-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 \
+    --register --manufacturer acme --contact-email me@acme.com</span></div>
+
+      <div class="C-line phase"><span class="n">[1/5]</span>scaffold manifest</div>
+      <div class="C-line out"><span class="mute">→</span> scan <span class="v">/dev/ttyUSB0</span> · feetech @ 1 Mbps · ids 1–20 ....... <span class="ok">6 servos</span></div>
+      <div class="C-line out"><span class="mute">→</span> detect <span class="v">OAK-D</span> · pulled factory intrinsics from DepthAI ... <span class="ok">ok</span></div>
+      <div class="C-line out"><span class="mute">→</span> write <span class="k">ROBOT.md</span> · frontmatter + body · <span class="mute">1.8 kb, 55 lines</span></div>
+      <div class="C-line out"><span class="mute">→</span> write <span class="k">CLAUDE.md</span> · intent → verb table, sentinel-wrapped</div>
+
+      <div class="C-line phase"><span class="n">[2/5]</span>register · <span style="color:#5a574f">POST rcan.dev/api/v1/robots</span></div>
+      <div class="C-line out"><span class="mute">→</span> mint ...................................................... <span class="ok">RRN-000000000173</span></div>
+      <div class="C-line out"><span class="mute">→</span> api key ................................ <span class="v">~/.robot-md/keys/&lt;rrn&gt;.apikey</span> <span class="mute">(0600)</span></div>
+      <div class="C-line out"><span class="mute">→</span> validate · schema v1 draft 2020-12 ......................... <span class="ok">55 / 55 valid</span></div>
+
+      <div class="C-line phase"><span class="n">[3/5]</span>install MCP server into Claude Code <span style="color:#5a574f">· tty detected</span></div>
+      <div class="C-line out"><span class="mute">→</span> <span class="k">claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"</span></div>
+      <div class="C-line out"><span class="mute">→</span> 6 resources · 6 tools <span class="mute">(validate, render, estop, estop_clear, execute_capability, execute_task)</span> · 4 prompts ... <span class="ok">ok</span></div>
+
+      <div class="C-line phase"><span class="n">[4/5]</span>install <span class="v">using-robot-md</span> skill</div>
+      <div class="C-line out"><span class="mute">→</span> copy → <span class="v">~/.claude/skills/using-robot-md/SKILL.md</span> ....... <span class="ok">ok</span></div>
+
+      <div class="C-line phase"><span class="n">[5/5]</span>calibrate <span style="color:#5a574f">· arm plugged in</span></div>
+      <div class="C-line ask"><span class="q">Run encoder-sign test move on joints 1–6? [Y/n]</span> <span class="ans">y</span></div>
+      <div class="C-line out"><span class="mute">→</span> sign check j1…j6 ........................................... <span class="ok">6 / 6 confirmed</span></div>
+      <div class="C-line ask"><span class="q">Pose arm at declared zero and press Enter to record zero_pose_steps.</span></div>
+      <div class="C-line out"><span class="mute">→</span> zero_pose_steps written · comments preserved by ruamel ...... <span class="ok">ok</span></div>
+
+      <div class="C-line banner">▸ ready · bob @ RRN-000000000173 · rcan.dev/r/RRN-000000000173</div>
+      <div class="C-line step"><span class="bullet">▸</span> hint: <span style="color:#ffb88c">robot-md dashboard serve</span> opens 127.0.0.1:8091 for live servo + OAK-D + tool-call log.</div>
+
+      <div class="C-line prompt" style="margin-top:10px"><span class="p">$</span><span class="cmd">claude</span></div>
+      <div class="C-line out"><span class="mute">›</span> <span class="v">bob</span> is online. Teach the <code style="color:#ffb88c">ready</code> pose so I can pick things up?</div>
       <div class="C-line out">yes<span class="C-cursor"></span></div>
     </div>
   </div>
@@ -580,7 +599,7 @@
   <div class="C-sig">
     <div class="nm">ROBOT<span class="dot">.</span><span class="md">md</span></div>
     <div class="sub">
-      <b>One file at the robot's root.</b> YAML a schema can trust · markdown a planner can read · Claude Code reads it standalone.
+      <b>v0.6.0 · one command.</b> Manifest, MCP server, skill, and arm calibration — all from <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">robot-md init</code>. Headless? same command, <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">--non-interactive</code>.
     </div>
     <a class="more" href="#spec">How it works →</a>
   </div>
@@ -939,16 +958,14 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
 <span class="c">· 3 tools: validate, render, doctor_summary</span>
 <span class="c">· 4 slash commands: /brief-me  /check-safety  /explain-capability  /manifest-status</span>
 
-<span class="w">› bob is online. Register with RRF so web &amp; mobile can reach him?</span>
+<span class="w">› bob is online. Teach the `ready` pose so I can pick things up?</span>
 yes
-<span class="ok">✓ RRN-000000000042 minted · public at rcan.dev/r/RRN-000000000042</span>
-<span class="ok">✓ API key saved to ~/.robot-md/keys/RRN-000000000042.apikey (mode 600)</span>
-
-<span class="w">› Calibrate zero pose now? (required before actuation)</span>
-yes
-<span class="ok">✓ physics.kinematics[].zero_pose_steps written</span>
+<span class="ok">✓ physics.poses.ready taught (6 joints)</span>
 
 <span class="w">› Ready. What should bob do first?</span>
+pick up the red lego and place it in the bowl
+<span class="ok">✓ discover → red_lego @ (-62, +25, +522) mm, white_bowl @ (-210, +10, +480) mm</span>
+<span class="ok">✓ execute_capability arm.pick(target: red_lego) · arm.place(target: white_bowl) · ok</span>
 <span class="c"># Claude operates the robot via the Bash tool + MCP — English in, motion out.</span>
 </pre>
       </div>
@@ -1082,19 +1099,29 @@ yes
 <footer class="wrap foot">
   <div>ROBOT.md · © 2026 craigm26 · Standalone · OpenCastor optional</div>
   <div>Hosted on Cloudflare Pages · Edge‑served · No cookies, no trackers</div>
-  <div>robotmd.dev · robot-md 0.5.0 · robot-md-mcp 0.2.1 · built 2026‑04‑19</div>
+  <div>robotmd.dev · robot-md 0.6.0 · robot-md-mcp 0.2.1 · built 2026‑04‑19</div>
 </footer>
 
 <script>
-  // Terminal hero reveal: lit when in view. Stagger is driven by CSS
-  // nth-child transition-delay on .C-term.lit .C-line.
+  // Terminal hero reveal: JS-driven per-line stagger so phase headers,
+  // prompts, and asks get distinct beats (vs. an even tick-tick-tick).
   (function(){
     var term = document.getElementById('termC');
     if (!term) return;
+    var lines = term.querySelectorAll('.C-line');
+    var t = 50;
+    lines.forEach(function(el){
+      el.style.transitionDelay = t + 'ms';
+      if (el.classList.contains('phase'))       t += 420;
+      else if (el.classList.contains('prompt')) t += 520;
+      else if (el.classList.contains('ask'))    t += 380;
+      else if (el.classList.contains('banner')) t += 300;
+      else                                      t += 260;
+    });
     if ('IntersectionObserver' in window){
       new IntersectionObserver(function(entries){
         entries.forEach(function(e){ if (e.isIntersecting) term.classList.add('lit'); });
-      }, {threshold: 0.25}).observe(term);
+      }, {threshold: 0.15}).observe(term);
     } else {
       term.classList.add('lit');
     }
