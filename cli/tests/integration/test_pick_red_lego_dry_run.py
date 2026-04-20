@@ -2,14 +2,21 @@
 
 Uses a faked perception + servo bus. Validates the plumbing (manifest → context
 → MCP tools), not the hardware. Gated with @pytest.mark.integration.
+
+Also hosts the v0.6.1 end-to-end pick-red-lego test (no hardware) that
+exercises init + auto-calibrate + arm.pick descriptor → IK → trajectory.
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import cv2
 import numpy as np
 import pytest
+import yaml
 
 
 @pytest.mark.integration
@@ -83,3 +90,75 @@ def test_discover_then_vision_find_then_execute(tmp_path):
         ctx, capability="arm.home", args={}, dry_run=True, confirm_token=None
     )
     assert exe["status"] == "ok", f"execute_capability blocked: {exe}"
+
+
+# --------------------------------------------------------------------------- #
+# v0.6.1: end-to-end pipeline test                                            #
+# --------------------------------------------------------------------------- #
+
+
+def test_v061_pipeline_end_to_end(tmp_path: Path):
+    """End-to-end: robot-md init + arm.pick("red_lego") dry-run succeeds.
+
+    No hardware. Uses mocked servo bus + perception to confirm the full
+    v0.6.1 pipeline: auto-calibrated ready pose → extrinsic → IK →
+    trajectory → dispatch.
+    """
+    from robot_md.init import default_flow
+    from robot_md.backends.feetech_depthai.capabilities import _arm_pick
+    from robot_md.init_phases import PhaseResult
+
+    @dataclass
+    class B:
+        raw_frontmatter: dict
+        _servo_bus: Any
+        _motion: Any
+        _perception: Any
+        _spec: Any = None
+
+    out = tmp_path / "ROBOT.md"
+
+    def _stub_phase(name):
+        def _inner(*a, **kw):
+            return PhaseResult(phase=name, status="skipped", message="", detail={})
+        return _inner
+
+    with patch("robot_md.init.phase_register", _stub_phase("register")), \
+         patch("robot_md.init.phase_install_mcp", _stub_phase("install_mcp")), \
+         patch("robot_md.init.phase_install_skill", _stub_phase("install_skill")), \
+         patch("robot_md.init.phase_calibrate_sign", _stub_phase("calibrate_sign")), \
+         patch("robot_md.init.phase_calibrate_zero", _stub_phase("calibrate_zero")), \
+         patch("robot_md.init.phase_teach_poses", _stub_phase("teach_poses")):
+        rc = default_flow(
+            out, robot_name="lego-bot", preset_name="so-arm101",
+            do_install_mcp=False, do_install_skill=False,
+            do_register=False, do_refresh_claude_md=False,
+        )
+    assert rc == 0, f"init failed rc={rc}"
+
+    # Manifest exists and has poses.ready populated (auto-calibrate ran).
+    fm_text = out.read_text()
+    fm = yaml.safe_load(fm_text.split("---")[1])
+    ready = ((fm["physics"].get("poses") or {}).get("ready") or {}).get("joints")
+    assert ready is not None and len(ready) >= 6, f"ready pose not auto-calibrated: {ready}"
+
+    # Now simulate arm.pick("red_lego") against this manifest.
+    bus = MagicMock()
+    bus.read_positions.return_value = ready
+    bus.torque = MagicMock()
+    perception = MagicMock()
+    # Camera-frame XYZ chosen to land inside the preset-default workspace
+    # (base-frame ~(97, 0, 125)) after the so-arm101 default extrinsic
+    # [400, 0, 300, 0, π/6, π] is applied. See Task 12 plan notes: the
+    # preset-default extrinsic is a placeholder until hand-eye calibration
+    # runs, so the purely geometric workspace mapping is what matters here.
+    perception.vision_find.return_value = {
+        "status": "ok", "descriptor": "red_lego", "xyz_cam_mm": (350.0, 0.0, 0.0),
+    }
+    backend = B(raw_frontmatter=fm, _servo_bus=bus, _motion=MagicMock(), _perception=perception)
+
+    result = _arm_pick(backend, args={"target": "red_lego"}, dry_run=True, estop=None)
+    assert result.status == "ok", result.error
+    assert result.trajectory is not None
+    phases = [wp["phase"] for wp in result.trajectory]
+    assert "approach" in phases and "grasp_close" in phases and "lift" in phases
