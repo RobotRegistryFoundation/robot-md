@@ -70,8 +70,8 @@ class EnvelopeRisk:
 
     level:
       - "ok":            all joints well within envelope
-      - "latch_warning": wrist_flex sustained > 85% of envelope, or any
-                         joint within 5° of limit — high risk of STS3215
+      - "latch_warning": any joint exceeds 85% of envelope on a
+                         sustained hold — high risk of STS3215
                          overload latch under gravity load
       - "out_of_limits": at least one joint outside declared limits_rad
     """
@@ -291,14 +291,11 @@ class Kinematics:
         """Analyze a joint configuration for STS3215 latch risk.
 
         Hard limits (out_of_limits) are always enforced. Latch-warning fires
-        when wrist_flex (or any similarly-named flex joint) exceeds 85% of
-        its envelope AND the configuration will be held for more than
-        ~500ms — transient excursions are allowed because gravity load
-        takes time to trip overload protection.
-
-        The 85% threshold and 500ms transient window come from hardware
-        bring-up on the SO-ARM101 (see project_so_arm101_hardware_constraints
-        memory): wrist_flex stalled at ~80° sustained, ok at 89° for ~200ms.
+        when any joint exceeds 85% of its envelope AND the configuration
+        will be held for more than ~500ms — transient excursions are
+        allowed because gravity load takes time to trip overload
+        protection. The 85% threshold is calibrated from SO-ARM101 bring-up
+        where wrist_flex stalled at sustained ~80° under gravity load.
         """
         TRANSIENT_MS = 500
 
