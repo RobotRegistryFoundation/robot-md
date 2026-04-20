@@ -40,9 +40,10 @@ def test_real_extrinsic_sweep_produces_small_residual(tmp_path, monkeypatch):
 
     spec = RobotSpec.from_parsed(parse_file(manifest))
     bus = ServoBus.from_spec(spec)
+    cam = Perception.from_spec(spec)
     bus.open()
+    cam.open()
     try:
-        cam = Perception.from_spec(spec)
         result = phase_calibrate_extrinsic(
             manifest, bus=bus, camera=cam, interactive=True, n_poses=6,
         )
@@ -54,4 +55,5 @@ def test_real_extrinsic_sweep_produces_small_residual(tmp_path, monkeypatch):
             "gripper_silhouette_calibrated"
         )
     finally:
+        cam.close()
         bus.close()

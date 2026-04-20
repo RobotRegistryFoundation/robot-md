@@ -30,10 +30,10 @@ def test_real_arm_pick_red_lego_after_calibrate(tmp_path, monkeypatch):
 
     spec = RobotSpec.from_parsed(parse_file(manifest))
     bus = ServoBus.from_spec(spec)
+    cam = Perception.from_spec(spec)
     bus.open()
+    cam.open()
     try:
-        cam = Perception.from_spec(spec)
-
         # 1. Calibrate extrinsic.
         cal = phase_calibrate_extrinsic(
             manifest, bus=bus, camera=cam, interactive=True, n_poses=6,
@@ -50,4 +50,5 @@ def test_real_arm_pick_red_lego_after_calibrate(tmp_path, monkeypatch):
         )
         assert result.get("status") == "ok", f"pick failed: {result}"
     finally:
+        cam.close()
         bus.close()

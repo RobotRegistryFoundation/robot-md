@@ -856,6 +856,7 @@ def calibrate(
                 bus = None
             try:
                 cam = Perception.from_spec(spec)
+                cam.open()
             except Exception as e:
                 typer.echo(f"could not open camera: {e}", err=True)
                 cam = None
@@ -866,6 +867,11 @@ def calibrate(
         if bus is not None:
             try:
                 bus.close()
+            except Exception:
+                pass
+        if cam is not None:
+            try:
+                cam.close()
             except Exception:
                 pass
         raise typer.Exit(0 if result.status in ("ok", "skipped") else 1)

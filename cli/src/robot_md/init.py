@@ -576,6 +576,7 @@ def default_flow(
                 bus_for_cal = None
             try:
                 cam_for_cal = Perception.from_spec(spec)
+                cam_for_cal.open()
             except Exception:
                 cam_for_cal = None
         except Exception:
@@ -591,10 +592,15 @@ def default_flow(
     )
     results.append(result_cal)
 
-    # Release bus if we opened it.
+    # Release hardware if we opened it.
     if bus_for_cal is not None:
         try:
             bus_for_cal.close()
+        except Exception:
+            pass
+    if cam_for_cal is not None:
+        try:
+            cam_for_cal.close()
         except Exception:
             pass
 
