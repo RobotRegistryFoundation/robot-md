@@ -87,13 +87,12 @@ def phase_calibrate_extrinsic(
     try:
         from robot_md.calibrate_extrinsic import (
             Sample,
-            capture_via_wrist_wiggle,
             plan_sweep,
             solve,
             write_extrinsic,
             CalibrationError,
         )
-        from robot_md.gripper_silhouette import find_in_depth
+        from robot_md.gripper_silhouette import find_in_depth, find_via_motion_delta
         from robot_md.kinematics import Kinematics
         import numpy as np
 
@@ -102,48 +101,47 @@ def phase_calibrate_extrinsic(
         poses = plan_sweep(fm, workspace, n_poses=n_poses, seed=0)
 
         samples: list[Sample] = []
+        prev_depth: np.ndarray | None = None
         for pose in poses:
-            # Primary detector: wrist-wiggle isolation. Only wrist_flex
-            # moves between the two captured frames, so the motion-delta
-            # centroid is the gripper silhouette — not a forearm-dominated
-            # average (the v0.7.3 ceiling at ~128mm residual).
-            wiggled_pose, centroid, confidence = capture_via_wrist_wiggle(
-                bus, camera, kin, pose
-            )
-
-            if centroid is not None and confidence >= 0.2:
-                tip_base = np.array(kin.fk(wiggled_pose), dtype=float)
-                samples.append(
-                    Sample(joints=wiggled_pose, tip_cam=centroid,
-                           tip_base=tip_base, confidence=confidence)
-                )
-                continue
-
-            # Fallback: projection-based find_in_depth at the base pose.
-            # Only useful on rigs where the preset extrinsic is already
-            # close; retained so wiggle-unreachable poses (joint at limit,
-            # gripper out of frame) don't automatically fail calibration.
+            # Convert rad dict to step dict for the servo bus.
             step_cfg = {
                 jid: kin.by_id[jid].rad_to_steps(rad)
                 for jid, rad in pose.items()
                 if jid in kin.by_id
             }
+            # Move to pose. Read current first to hand to interpolate().
             current = bus.read_positions()
             bus.interpolate(current, step_cfg, hz=30, estop=None)
+
+            # Capture and detect gripper in camera frame.
             frame = camera.grab_frame()
             if frame is None:
                 continue
             _rgb, depth, K = frame
             tip_base = np.array(kin.fk(pose), dtype=float)
 
-            from robot_md.extrinsic import six_vec_to_matrix
-            current_ext = fm["physics"]["solver"]["cameras"][0]["extrinsic"]
-            T = six_vec_to_matrix(current_ext)  # camera→base matrix
-            tip_base_h = np.append(tip_base, 1.0)
-            tip_cam_guess = (np.linalg.inv(T) @ tip_base_h)[:3][None, :]
-            centroid, confidence = find_in_depth(
-                depth, K, tip_cam_guess, search_radius_mm=60
-            )
+            # Primary detector: motion-delta vs previous frame. Extrinsic-free
+            # — works even when the preset-default projection is hundreds of
+            # pixels off from the physical camera mount. First pose has no
+            # previous frame, so we only capture it as a baseline.
+            centroid = None
+            confidence = 0.0
+            if prev_depth is not None:
+                centroid, confidence = find_via_motion_delta(prev_depth, depth, K)
+
+            # Fallback: projection-based search using the current extrinsic.
+            # Useful on rigs where the preset is already close enough.
+            if centroid is None or confidence < 0.2:
+                from robot_md.extrinsic import six_vec_to_matrix
+                current_ext = fm["physics"]["solver"]["cameras"][0]["extrinsic"]
+                T = six_vec_to_matrix(current_ext)  # camera→base matrix
+                tip_base_h = np.append(tip_base, 1.0)
+                tip_cam_guess = (np.linalg.inv(T) @ tip_base_h)[:3][None, :]
+                centroid, confidence = find_in_depth(
+                    depth, K, tip_cam_guess, search_radius_mm=60
+                )
+
+            prev_depth = depth
 
             if centroid is None or confidence < 0.2:
                 continue

@@ -5,20 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased] — v0.7.4 (wrist-wiggle calibration primitive)
+## [Unreleased]
 
-### Added
+### Added (experimental — not wired)
 
-- **`calibrate_extrinsic.capture_via_wrist_wiggle(bus, camera, kin, pose)`** — new primary detector for the calibration sweep. At each target pose, moves the arm to the pose, captures `depth_A`, shifts *only* `wrist_flex` by ±0.15 rad, captures `depth_B`, and returns the motion-delta centroid. Because only `wrist_flex` moves between frames, the centroid is the gripper silhouette in isolation — not a forearm-dominated weighted centroid, which is the failure mode that held v0.7.3 to a 128mm residual on physical hardware.
-- Wiggle direction is chosen to stay within `wrist_flex` joint limits; if neither +Δ nor −Δ fits, the pose is skipped and the caller falls back to `find_in_depth`.
+- **`calibrate_extrinsic.capture_via_wrist_wiggle(bus, camera, kin, pose)`** — attempted gripper-isolation primitive. At each target pose, captures `depth_A`, shifts *only* `wrist_flex` by ±0.15 rad, captures `depth_B`, returns the motion-delta centroid. Unit-tested; kept in the module for future use. **Not wired into `phase_calibrate_extrinsic`** — on-rig validation showed the OAK-D depth noise floor exceeds the wiggle signal: zero-commanded-motion `find_via_motion_delta` returned confidence 1.0 with 7,655 "arrived" pixels (>60mm frame-to-frame variation). The ~18mm tip motion from a 0.15-rad wiggle cannot rise above that floor. The v0.7.3 pose-to-pose motion-delta remains the primary detector because its whole-arm transit motion is large enough to out-vote the noise.
 
-### Changed
+### Known limitation
 
-- **`phase_calibrate_extrinsic` uses wrist-wiggle as primary detector.** Replaces the pose-to-pose motion delta introduced in v0.7.3. Projection-based `find_in_depth` remains as fallback when the wiggle confidence is below 0.2 (gripper out of frame, joint at limit, etc.).
-
-### Compatibility
-
-- No schema changes. v0.7.x manifests load unchanged.
+- **v0.7.3 residual ceiling unchanged at ~128mm on physical SO-ARM101+OAK-D.** The real fix requires either temporal denoising of depth frames before the delta, or a non-motion-based primitive (3D shape match against known gripper geometry, or colored-fiducial HSV detection). Tracked for v0.8.
 
 ---
 
