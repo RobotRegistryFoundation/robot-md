@@ -12,6 +12,8 @@ from typing import Any
 from robot_md.parser import ParsedRobotMd, parse_file
 from robot_md.validate import VALID
 from robot_md.validate import validate as validate_parsed
+from robot_md.mcp.invocation_log import InvocationLog
+from robot_md.mcp.invocation_record import InvocationRecord
 
 
 class EstopFlag:
@@ -50,6 +52,83 @@ class McpContext:
     exec_lock: threading.Lock = field(default_factory=threading.Lock)
     publisher: Any = None
     _command_watcher: Any = None
+    invocation_log: InvocationLog = field(default_factory=lambda: InvocationLog(maxlen=100))
+    _pending_calls: dict[str, dict] = field(default_factory=dict)
+    _pending_lock: threading.Lock = field(default_factory=threading.Lock)
+
+
+_PENDING_TTL_S = 60.0
+
+
+class _PublisherFanoutWrapper:
+    """Wraps an EventPublisher-like object to: (a) stamp manifest_path into
+    every event's data; (b) pair tool.call/tool.result events by request_id
+    and append an InvocationRecord to ctx.invocation_log on each pair.
+
+    The wrapper is installed in-place on ctx (ctx.publisher becomes this
+    wrapper); all existing `ctx.publisher.publish(...)` call sites are
+    unchanged.
+    """
+
+    def __init__(self, ctx: "McpContext", inner: Any) -> None:
+        self._ctx = ctx
+        self._inner = inner
+
+    def publish(self, kind: str, data: dict) -> None:
+        # Copy to avoid mutating the caller's dict; stamp manifest_path.
+        stamped = dict(data)
+        stamped["manifest_path"] = str(self._ctx.manifest_path)
+
+        # Fan out paired tool.call / tool.result into the invocation log
+        # before forwarding — the JSONL write is what other consumers see
+        # anyway, so ordering between log append and JSONL write does not
+        # matter for correctness.
+        self._maybe_pair_and_log(kind, stamped)
+        self._inner.publish(kind, stamped)
+
+    def _maybe_pair_and_log(self, kind: str, data: dict) -> None:
+        if kind == "tool.call":
+            rid = data.get("request_id")
+            if not rid:
+                return
+            with self._ctx._pending_lock:
+                self._sweep_expired_locked()
+                self._ctx._pending_calls[rid] = {"ts": time.time(), "data": data, "kind": kind}
+            return
+        if kind != "tool.result":
+            return
+        rid = data.get("request_id")
+        if not rid:
+            return
+        with self._ctx._pending_lock:
+            call_entry = self._ctx._pending_calls.pop(rid, None)
+        if call_entry is None:
+            return
+        call_evt = {"kind": "tool.call", "ts": call_entry["ts"], "data": call_entry["data"]}
+        result_evt = {"kind": "tool.result", "ts": time.time(), "data": data}
+        try:
+            record = InvocationRecord.from_event_pair(call_evt, result_evt)
+        except Exception:
+            return
+        self._ctx.invocation_log.append(record)
+
+    def _sweep_expired_locked(self) -> None:
+        now = time.time()
+        expired = [
+            rid for rid, v in self._ctx._pending_calls.items()
+            if now - v["ts"] > _PENDING_TTL_S
+        ]
+        for rid in expired:
+            self._ctx._pending_calls.pop(rid, None)
+
+
+def _install_publisher_fanout(ctx: "McpContext") -> None:
+    """Wrap ctx.publisher in place. Safe to call multiple times (idempotent)."""
+    if isinstance(ctx.publisher, _PublisherFanoutWrapper):
+        return
+    if ctx.publisher is None:
+        return
+    ctx.publisher = _PublisherFanoutWrapper(ctx, ctx.publisher)
 
 
 def load_context(manifest_path: Path) -> McpContext:
