@@ -64,6 +64,24 @@ class Joint:
         return round(self.zero_pose_steps + self.encoder_sign * delta_steps)
 
 
+@dataclass
+class EnvelopeRisk:
+    """Result of a pre-flight envelope analysis.
+
+    level:
+      - "ok":            all joints well within envelope
+      - "latch_warning": wrist_flex sustained > 85% of envelope, or any
+                         joint within 5° of limit — high risk of STS3215
+                         overload latch under gravity load
+      - "out_of_limits": at least one joint outside declared limits_rad
+    """
+
+    level: str  # "ok" | "latch_warning" | "out_of_limits"
+    joint: str | None
+    angle_rad: float | None
+    reason: str
+
+
 class Kinematics:
     """Baseline FK/IK driven by ROBOT.md's `physics.solver` + `physics.kinematics[]`."""
 
@@ -261,6 +279,71 @@ class Kinematics:
                     f"[{math.degrees(lo):+.1f}, {math.degrees(hi):+.1f}]°"
                 )
         return solved
+
+    # -------------------------------------------------- envelope analysis
+
+    def analyze_envelope(
+        self,
+        joint_cfg: dict[str, float],
+        *,
+        duration_ms: int = 1000,
+    ) -> EnvelopeRisk:
+        """Analyze a joint configuration for STS3215 latch risk.
+
+        Hard limits (out_of_limits) are always enforced. Latch-warning fires
+        when wrist_flex (or any similarly-named flex joint) exceeds 85% of
+        its envelope AND the configuration will be held for more than
+        ~500ms — transient excursions are allowed because gravity load
+        takes time to trip overload protection.
+
+        The 85% threshold and 500ms transient window come from hardware
+        bring-up on the SO-ARM101 (see project_so_arm101_hardware_constraints
+        memory): wrist_flex stalled at ~80° sustained, ok at 89° for ~200ms.
+        """
+        TRANSIENT_MS = 500
+
+        # Hard-limit check first — always applies.
+        for name, angle in joint_cfg.items():
+            j = self.by_id.get(name)
+            if j is None:
+                continue
+            lo, hi = j.limits_rad
+            if not (lo <= angle <= hi):
+                return EnvelopeRisk(
+                    level="out_of_limits",
+                    joint=name,
+                    angle_rad=angle,
+                    reason=(
+                        f"{name}={math.degrees(angle):.1f}° outside limits "
+                        f"[{math.degrees(lo):.1f}, {math.degrees(hi):.1f}]"
+                    ),
+                )
+
+        if duration_ms <= TRANSIENT_MS:
+            return EnvelopeRisk(level="ok", joint=None, angle_rad=None, reason="")
+
+        # Latch-warning: ratio of |angle| to nearer limit > 0.85.
+        for name, angle in joint_cfg.items():
+            j = self.by_id.get(name)
+            if j is None:
+                continue
+            lo, hi = j.limits_rad
+            limit = hi if angle >= 0 else -lo
+            if limit <= 0:
+                continue
+            ratio = abs(angle) / limit
+            if ratio > 0.85:
+                return EnvelopeRisk(
+                    level="latch_warning",
+                    joint=name,
+                    angle_rad=angle,
+                    reason=(
+                        f"{name}={math.degrees(angle):.1f}° is {ratio*100:.0f}% of "
+                        f"envelope ±{math.degrees(limit):.1f}° — STS3215 latch risk"
+                    ),
+                )
+
+        return EnvelopeRisk(level="ok", joint=None, angle_rad=None, reason="")
 
     # ------------------------------------------------------------ helpers
 
