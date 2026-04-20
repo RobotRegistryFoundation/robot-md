@@ -5,6 +5,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.0] — 2026-04-19
+
+### Added — closes the Claude-triad gap spec §1–§10
+
+- **`physics.poses`** in manifest + `robot-md pose teach <name> <path>` CLI verb. `arm.home` backend capability now targets `physics.poses.ready` when present (gap §1).
+- **`capability_contracts`** with six precondition kinds (`pose_taught`, `extrinsic_present`, `ik_provider_set`, `workspace_declared`, `learned_skill_ok`, `backend_resolved`). `execute_capability` gates on them; read-only caps bypass (§3 / §10).
+- **`vision.object_descriptors`** (`hsv` + `hsv_roi` detectors) and the `vision.find` MCP tool — descriptor id → camera-frame XYZ (§6).
+- **`learned_skills`** top-level array + MCP `record_skill` tool + three new MCP resources (`robot-md://<name>/{learned_skills, calibration_status, poses}`, all `application/json`) (§7).
+- **`discover`** MCP tool — declarative `capture` + `detect` + `probe_direction` pipeline (§8).
+- **`physics.workspace`** bounds with per-axis mm ranges (§2).
+- **`physics.solver.ik_provider`** + **`ik_frame`** schema fields (§5).
+- **`publish-discovery`** now emits `calibration_status` + `learned_skills_summary` — Mobile operators see real status without MCP (§9).
+- Generated **`CLAUDE.md`** renders new "Named poses" and "Known skills & blockers" sections.
+- **so-arm101 preset** ships `red_lego` + `white_bowl` object descriptors out of the box.
+- Init phase `teach_poses` offers to record `ready` on TTY.
+
+### Changed
+
+- `calibration_status` resource now actually inspects `physics.kinematics[].zero_pose_steps` instead of unconditionally reporting `"ok"`.
+- Backend `detect_objects(descriptors=…)` routes through `robot_md.detectors.hsv` instead of returning `[]`.
+- `execute_capability` precondition gate runs AFTER estop (estop always wins); read-only capabilities bypass both gates.
+
+### Compatibility
+
+All new fields are optional. v0.5.0 manifests validate and run unchanged. v0.6.0 deprecates the stowaway `extensions.x-learned-skills` pattern in favor of the top-level `learned_skills:` block.
+
+---
+
 ## v0.5.0 — 2026-04-19
 
 ### Added
