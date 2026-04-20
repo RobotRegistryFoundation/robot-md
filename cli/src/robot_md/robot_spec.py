@@ -61,6 +61,7 @@ class SolverCamera:
     primary_stream: str
     mount: str
     extrinsic: tuple[float, ...] | None
+    extrinsic_source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -219,6 +220,7 @@ class RobotSpec:
                 primary_stream=c["primary_stream"],
                 mount=c["mount"],
                 extrinsic=tuple(c["extrinsic"]) if c.get("extrinsic") else None,
+                extrinsic_source=c.get("extrinsic_source"),
             )
             for c in (solver.get("cameras") or [])
         )

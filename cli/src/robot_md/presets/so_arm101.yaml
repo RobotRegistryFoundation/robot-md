@@ -25,6 +25,19 @@ physics:
       tip_offset_mm: [30, 0, 0]  # tool-frame +x (becomes -z when wrist points down)
       open_steps: 1700
       close_steps: 1200
+    # v0.6.1: IK + default extrinsic so `arm.pick` works without manual calibration.
+    ik_provider: inhouse-so-arm101
+    ik_frame: ready
+    cameras:
+      - driver_id: oakd
+        primary_stream: rgb
+        mount: world
+        # Default extrinsic (6-vec tx, ty, tz, rx, ry, rz in mm/radians):
+        # OAK-D on tripod 400mm in front of arm base, 300mm above tabletop,
+        # pitched 30° down, facing the workspace. Users with different mounts
+        # should run `robot-md calibrate --hand-eye`.
+        extrinsic: [400.0, 0.0, 300.0, 0.0, 0.5235987755982988, 3.141592653589793]
+        extrinsic_source: preset_default
   kinematics:
     - id: shoulder_pan
       axis: z

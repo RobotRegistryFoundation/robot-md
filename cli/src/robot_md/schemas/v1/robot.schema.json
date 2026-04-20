@@ -214,6 +214,11 @@
                     "items": { "type": "number" },
                     "minItems": 6,
                     "maxItems": 6
+                  },
+                  "extrinsic_source": {
+                    "type": ["string", "null"],
+                    "enum": ["preset_default", "hand_eye_calibrated", "user_declared", null],
+                    "description": "Provenance of extrinsic. `preset_default`: shipped guess. `hand_eye_calibrated`: from `robot-md calibrate --hand-eye`. `user_declared`: edited by hand."
                   }
                 },
                 "additionalProperties": false
