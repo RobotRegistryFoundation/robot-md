@@ -65,7 +65,7 @@ class InvocationLog:
         pending: dict[str, dict] = {}
         pairs: list[tuple[dict, dict]] = []
         try:
-            with p.open("r") as f:
+            with p.open("r", encoding="utf-8", errors="replace") as f:
                 for raw in f:
                     raw = raw.strip()
                     if not raw:
@@ -93,8 +93,6 @@ class InvocationLog:
 
         # Keep only last n pairs, append oldest-first so the ring ends up
         # with newest at the right end (matches runtime append order).
-        from robot_md.mcp.invocation_record import InvocationRecord
-
         for call_evt, result_evt in pairs[-n:]:
             try:
                 rec = InvocationRecord.from_event_pair(call_evt, result_evt)
