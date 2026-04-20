@@ -265,3 +265,103 @@ def test_template_motion_row_points_at_execute_capability(tmp_path):
     # The "Pick up the X" row should mention execute_capability so Claude
     # knows which tool to call for physical motion.
     assert "execute_capability" in text
+
+
+def test_claude_md_lists_ready_pose():
+    """Named poses appear in generated CLAUDE.md."""
+    from robot_md.claude_md import render_claude_md
+    from robot_md.parser import parse_text
+
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics:
+  type: arm
+  dof: 6
+  poses:
+    ready:
+      joints: {shoulder_pan: 1950, gripper: 1700}
+      source: taught
+      taught_at: '2026-04-19'
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+
+## Identity
+test.
+
+## What bob Can Do
+test.
+
+## Safety Gates
+test.
+"""
+    md = render_claude_md(parse_text(text))
+    # Either an H2 "Named poses" section, or `ready` + joints referenced.
+    assert "ready" in md, "ready pose name should appear"
+    assert "shoulder_pan" in md or "1950" in md, "at least one joint or step count"
+
+
+def test_claude_md_surfaces_learned_skill_blockers():
+    """Blocked / blocked_by entries surface in CLAUDE.md so the agent sees them."""
+    from robot_md.claude_md import render_claude_md
+    from robot_md.parser import parse_text
+
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+learned_skills:
+  - id: red_lego_pick
+    status: blocked
+    blocked_by: [no_poses_ready, hand_eye_missing]
+---
+# bob
+
+## Identity
+test.
+
+## What bob Can Do
+test.
+
+## Safety Gates
+test.
+"""
+    md = render_claude_md(parse_text(text))
+    assert "red_lego_pick" in md
+    # Must surface the blockers specifically — this is the signal.
+    assert "no_poses_ready" in md
+    assert "blocked" in md.lower()
+
+
+def test_claude_md_omits_pose_section_when_empty():
+    """No poses declared => no dedicated Named-poses heading."""
+    from robot_md.claude_md import render_claude_md
+    from robot_md.parser import parse_text
+
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+
+## Identity
+test.
+
+## What bob Can Do
+test.
+
+## Safety Gates
+test.
+"""
+    md = render_claude_md(parse_text(text))
+    assert "Named poses" not in md

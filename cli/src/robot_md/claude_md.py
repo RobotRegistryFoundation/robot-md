@@ -14,7 +14,8 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from robot_md.parser import parse_file
+from robot_md.parser import ParsedRobotMd, parse_file
+from robot_md.robot_spec import RobotSpec
 
 # Template is packaged at the repo root, not inside src/. Look for it
 # relative to this file's parent.parent (src/robot_md/ → src/ → repo root).
@@ -103,13 +104,16 @@ def _load_template() -> str:
     return _TEMPLATE_INLINE
 
 
-def render_claude_md(manifest_path: Path) -> str:
+def render_claude_md(source: Path | str | ParsedRobotMd) -> str:
     """Render a CLAUDE.md body tailored to a specific ROBOT.md.
 
-    Reads the manifest, substitutes {{ROBOT_NAME}}, {{RRN}}, declared
-    HITL gates, and driver summary into the template.
+    Accepts either a filesystem path to a ROBOT.md (str or Path) or a
+    pre-parsed ``ParsedRobotMd``. Substitutes {{ROBOT_NAME}}, {{RRN}},
+    declared HITL gates, and driver summary into the template, and
+    splices in "Named poses" and "Known skills & blockers" sections
+    whenever the spec declares any.
     """
-    parsed = parse_file(manifest_path)
+    parsed = source if isinstance(source, ParsedRobotMd) else parse_file(source)
     fm = parsed.frontmatter or {}
     md = fm.get("metadata") or {}
     safety = fm.get("safety") or {}
@@ -149,7 +153,58 @@ def render_claude_md(manifest_path: Path) -> str:
     text = text.replace("{{HOSTNAME}}", md.get("device_id") or robot_name)
     text = text.replace("{{TESTS_DIR}}", "tests/")
     text = text.replace("{{DATE}}", date.today().isoformat())
+
+    # Splice in poses + learned-skill sections derived from the typed spec.
+    # These must appear AFTER the core capabilities/safety content but BEFORE
+    # the trailing "Conventions" and "Escalation" sections, so agents read
+    # them in the same visual band as other declared-state summaries.
+    spec = RobotSpec.from_parsed(parsed)
+    extra_sections = _render_pose_and_skill_sections(spec)
+    if extra_sections:
+        anchor = "## Conventions for this project"
+        if anchor in text:
+            text = text.replace(anchor, extra_sections + anchor, 1)
+        else:
+            # No anchor found — append before the final horizontal rule if any,
+            # otherwise at the end.
+            text = text.rstrip() + "\n\n" + extra_sections.rstrip() + "\n"
     return text
+
+
+def _render_pose_and_skill_sections(spec: RobotSpec) -> str:
+    """Build markdown for the Named-poses and Known-skills H2 sections.
+
+    Each section is omitted entirely when its underlying collection is
+    empty. Returns "" when there is nothing to surface.
+    """
+    chunks: list[str] = []
+
+    poses = spec.physics.poses
+    if poses:
+        lines = ["## Named poses", ""]
+        for name, p in poses.items():
+            src = f" (source: {p.source})" if p.source else ""
+            desc = f" — {p.description}" if p.description else ""
+            joints_str = ", ".join(f"{k}={v}" for k, v in p.joints.items())
+            suffix = f": {joints_str}" if joints_str else ""
+            lines.append(f"- `{name}`{src}{desc}{suffix}")
+        chunks.append("\n".join(lines))
+
+    learned = spec.learned_skills
+    if learned:
+        lines = ["## Known skills & blockers", ""]
+        for s in learned:
+            bits = [f"**{s.id}**", f"status=`{s.status}`"]
+            if s.blocked_by:
+                bits.append("blocked_by=[" + ", ".join(s.blocked_by) + "]")
+            if s.notes:
+                bits.append(f"— {s.notes}")
+            lines.append("- " + " ".join(bits))
+        chunks.append("\n".join(lines))
+
+    if not chunks:
+        return ""
+    return "\n\n".join(chunks) + "\n\n"
 
 
 # Sentinels used to delimit our block inside an existing CLAUDE.md so re-runs
