@@ -43,14 +43,50 @@ def _hsv_mask(hsv: np.ndarray, params: dict[str, Any]) -> np.ndarray:
     return cv2.inRange(hsv, (0, s_min, v_min), (180, s_max, v_max))
 
 
-def detect_hsv(rgb_bgr: np.ndarray, *, params: dict[str, Any]) -> tuple[int, int, int] | None:
+def _depth_mask(depth_frame: np.ndarray, params: dict[str, Any]) -> np.ndarray | None:
+    """Return a uint8 mask where depth is within [min_depth_mm, max_depth_mm].
+
+    Returns None when no bounds are declared in params (depth ignored).
+    """
+    min_d = params.get("min_depth_mm")
+    max_d = params.get("max_depth_mm")
+    if min_d is None and max_d is None:
+        return None
+    lo = int(min_d) if min_d is not None else 0
+    hi = int(max_d) if max_d is not None else 65535
+    return ((depth_frame >= lo) & (depth_frame <= hi)).astype(np.uint8) * 255
+
+
+def detect_hsv(
+    rgb_bgr: np.ndarray,
+    *,
+    params: dict[str, Any],
+    depth_frame: np.ndarray | None = None,
+) -> tuple[int, int, int] | None:
+    """Color-mask detector with optional depth filtering.
+
+    When ``depth_frame`` is provided AND ``params`` declares
+    ``min_depth_mm`` / ``max_depth_mm``, the output mask is the joint
+    (color AND depth). Otherwise depth is ignored (backward compatible).
+    """
     hsv = cv2.cvtColor(rgb_bgr, cv2.COLOR_BGR2HSV)
     mask = _hsv_mask(hsv, params)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
+
+    if depth_frame is not None:
+        dmask = _depth_mask(depth_frame, params)
+        if dmask is not None:
+            mask = cv2.bitwise_and(mask, dmask)
+
     return _largest_centroid(mask, min_area=int(params.get("min_area", 200)))
 
 
-def detect_hsv_roi(rgb_bgr: np.ndarray, *, params: dict[str, Any]) -> tuple[int, int, int] | None:
+def detect_hsv_roi(
+    rgb_bgr: np.ndarray,
+    *,
+    params: dict[str, Any],
+    depth_frame: np.ndarray | None = None,
+) -> tuple[int, int, int] | None:
     roi = params.get("roi") or {}
     u_min = int(roi.get("u_min", 0))
     u_max = int(roi.get("u_max", rgb_bgr.shape[1]))
@@ -61,7 +97,14 @@ def detect_hsv_roi(rgb_bgr: np.ndarray, *, params: dict[str, Any]) -> tuple[int,
     mask = _hsv_mask(hsv, params)
     roi_mask = np.zeros_like(mask)
     roi_mask[v_min:v_max, u_min:u_max] = 255
-    return _largest_centroid(mask & roi_mask, min_area=int(params.get("min_area", 1000)))
+    mask = mask & roi_mask
+
+    if depth_frame is not None:
+        dmask = _depth_mask(depth_frame, params)
+        if dmask is not None:
+            mask = cv2.bitwise_and(mask, dmask)
+
+    return _largest_centroid(mask, min_area=int(params.get("min_area", 1000)))
 
 
 DETECTORS = {"hsv": detect_hsv, "hsv_roi": detect_hsv_roi}
