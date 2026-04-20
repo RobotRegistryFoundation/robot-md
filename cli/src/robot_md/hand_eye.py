@@ -1,350 +1,62 @@
-"""Hand-eye calibration — solve the OAK-D ↔ arm-base extrinsic.
-
-Writes the 6-vector transform to ``physics.solver.camera.extrinsic`` in the
-operator's ROBOT.md. Enables a planner with only the manifest + the live
-depth stream to project pixel coords into the arm-base frame.
-
-v0 strategy — **single static marker**
----------------------------------------
+"""Hand-eye calibration — solve the OAK-D ↔ arm-base extrinsic via AX = XB.
 
 The operator prints a planar ArUco tag of known size (default 50 mm) and
-places it flat on the workspace at a known (x, y) position in the arm-base
-frame (z = 0, facing +z). They run::
+places it somewhere the camera can see. They run::
 
     robot-md calibrate --hand-eye ROBOT.md --marker-pos 300,0,0 --marker-size 50
 
-The CLI:
+The CLI drives an 8-pose sweep via the live backend:
 
-1. Grabs one RGB frame + camera intrinsics from the OAK-D via depthai.
-2. Detects ArUco markers in the frame (dictionary DICT_4X4_50, id 0 by default).
-3. Builds 4 world-frame correspondences: the marker's corners in arm-base
-   coords (derived from --marker-pos + --marker-size, flat-on-table).
-4. Solves PnP → rotation vector + translation vector = camera pose in
-   arm-base frame.
-5. Writes ``extrinsic: [tx, ty, tz, rx, ry, rz]`` (mm + radians Rodrigues)
-   to the manifest via ruamel.yaml.
+1. At each pose, moves the arm to a perturbation of ``physics.poses.ready``.
+2. Grabs an RGB frame + intrinsics from the OAK-D and detects the ArUco
+   marker, recording (R_target2cam, t_target2cam).
+3. Records the current forward-kinematic end-effector pose as
+   (R_gripper2base, t_gripper2base).
+4. After >=3 good samples, calls ``cv2.calibrateHandEye`` (AX = XB, Tsai)
+   to recover the camera-in-arm-base transform.
+5. Writes the 6-vector ``[tx, ty, tz, rx, ry, rz]`` to
+   ``physics.solver.cameras[0].extrinsic`` and flips ``extrinsic_source``
+   to ``hand_eye_calibrated``.
 
-Scope note (v0):
+The old v0.5.0 single-shot PnP path has been replaced — the AX = XB sweep
+is more robust (averages over samples) and doesn't require the operator
+to know the marker's exact arm-base coordinates. ``marker_pos`` is kept
+informational for operator feedback.
 
-* One marker, one frame, single shot. Multi-marker ChArUco averaging and
-  multi-pose refinement are improvements left for v1.
-* Assumes the marker sits flat (z = 0, normal = +z in arm-base frame).
-  If it's tilted the extrinsic will tilt with it — operator should eyeball
-  the result by comparing depth map values after calibration.
-* Uses OAK-D RGB camera only (not stereo); depth-to-arm-base projection
-  then uses the computed extrinsic to map depth pixels to arm-base coords.
-
-Dependencies: opencv-contrib-python (provides cv2.aruco), numpy, depthai.
+Dependencies: opencv-contrib-python (provides cv2.aruco), numpy.
 All optional — the ``vision`` extras install them.
 """
 
 from __future__ import annotations
 
-import math
-import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 import numpy as np
 
-# ArUco dictionary choice — 4x4_50 is cheap to detect and plenty for
-# single-marker calibration (50 unique IDs, 4x4 pattern is robust at
-# moderate range). Operator can override via --dict.
-DEFAULT_DICT_NAME = "DICT_4X4_50"
-DEFAULT_MARKER_ID = 0
-DEFAULT_MARKER_SIZE_MM = 50.0
 
+def write_extrinsic(manifest_path, *, six_vec, source: str) -> None:
+    """In-place update: set ``physics.solver.cameras[0].extrinsic`` + source.
 
-@dataclass
-class HandEyeResult:
-    """Computed extrinsic + diagnostics."""
-
-    extrinsic: list[float]  # [tx, ty, tz, rx, ry, rz] mm + rad (Rodrigues)
-    reprojection_error_px: float
-    marker_detected: bool
-    num_markers_found: int
-
-
-def _marker_corners_world(
-    center_xy: tuple[float, float],
-    z: float,
-    size_mm: float,
-) -> np.ndarray:
-    """Return the 4 marker corners in arm-base frame (mm).
-
-    Marker is assumed flat (parallel to the arm-base XY plane), with +x
-    toward "right" and +y toward "up" in the marker's own view. The corner
-    order matches OpenCV ArUco's top-left-clockwise convention:
-
-        0 ─── 1
-        │     │
-        3 ─── 2
+    ``six_vec`` is a 6-tuple of floats ``(tx, ty, tz, rx, ry, rz)`` in mm
+    and radians; ``source`` is written verbatim to ``extrinsic_source``.
     """
-    cx, cy = center_xy
-    half = size_mm / 2.0
-    # Top-left, top-right, bottom-right, bottom-left in marker view.
-    # On the arm-base XY plane with +y = "up", these map to:
-    #   TL: (-x, +y)    TR: (+x, +y)
-    #   BR: (+x, -y)    BL: (-x, -y)
-    return np.array(
-        [
-            [cx - half, cy + half, z],  # 0 — TL
-            [cx + half, cy + half, z],  # 1 — TR
-            [cx + half, cy - half, z],  # 2 — BR
-            [cx - half, cy - half, z],  # 3 — BL
-        ],
-        dtype=np.float64,
-    )
-
-
-def _camera_intrinsics_from_oakd():
-    """Pull the RGB camera matrix + distortion from the attached OAK-D.
-
-    Returns (K, dist) — K is 3x3 camera matrix, dist is the distortion
-    vector in OpenCV order [k1, k2, p1, p2, k3, ...]. Raises RuntimeError
-    if depthai isn't installed or no device is visible.
-    """
-    try:
-        import depthai as dai  # type: ignore[import-not-found]
-    except ImportError as e:
-        raise RuntimeError(
-            "depthai not installed — install the vision extras:\n    pip install 'robot-md[vision]'"
-        ) from e
-
-    with dai.Device() as dev:
-        cal = dev.readCalibration()
-        # OAK-D RGB is CAM_A by default
-        K_raw = cal.getCameraIntrinsics(dai.CameraBoardSocket.CAM_A, 1280, 720)
-        dist_raw = cal.getDistortionCoefficients(dai.CameraBoardSocket.CAM_A)
-    K = np.array(K_raw, dtype=np.float64)
-    dist = np.array(dist_raw, dtype=np.float64).reshape(-1)
-    return K, dist
-
-
-def _capture_frame_oakd():
-    """Grab one RGB frame from the OAK-D (1280x720, BGR)."""
-
-    import depthai as dai  # type: ignore[import-not-found]
-
-    with dai.Pipeline() as pipe:
-        cam = pipe.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
-        out = cam.requestOutput(size=(1280, 720), type=dai.ImgFrame.Type.NV12)
-        q = out.createOutputQueue()
-        pipe.start()
-        frame = None
-        for _ in range(15):  # warm-up AE/AWB
-            f = q.get()
-            if f is not None:
-                frame = f.getCvFrame()
-        if frame is None:
-            raise RuntimeError("no frame received from OAK-D")
-        return frame
-
-
-def solve_from_image(
-    image_bgr: np.ndarray,
-    K: np.ndarray,
-    dist: np.ndarray,
-    *,
-    marker_center_xy_mm: tuple[float, float],
-    marker_z_mm: float = 0.0,
-    marker_size_mm: float = DEFAULT_MARKER_SIZE_MM,
-    marker_id: int = DEFAULT_MARKER_ID,
-    dict_name: str = DEFAULT_DICT_NAME,
-) -> HandEyeResult:
-    """Detect the ArUco marker and solve PnP. Pure function — no I/O.
-
-    Returns a :class:`HandEyeResult` regardless of outcome; check
-    ``.marker_detected`` to branch.
-    """
-    import cv2
-
-    aruco_dict = cv2.aruco.getPredefinedDictionary(getattr(cv2.aruco, dict_name))
-    params = cv2.aruco.DetectorParameters()
-    detector = cv2.aruco.ArucoDetector(aruco_dict, params)
-    corners, ids, _ = detector.detectMarkers(image_bgr)
-
-    if ids is None or len(ids) == 0:
-        return HandEyeResult(
-            extrinsic=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            reprojection_error_px=float("inf"),
-            marker_detected=False,
-            num_markers_found=0,
-        )
-
-    ids_flat = ids.flatten().tolist()
-    if marker_id not in ids_flat:
-        return HandEyeResult(
-            extrinsic=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            reprojection_error_px=float("inf"),
-            marker_detected=False,
-            num_markers_found=len(ids_flat),
-        )
-
-    idx = ids_flat.index(marker_id)
-    image_points = corners[idx].reshape(-1, 2).astype(np.float64)
-    world_points = _marker_corners_world(marker_center_xy_mm, marker_z_mm, marker_size_mm)
-
-    # solvePnP: wants world points in the frame we want the camera pose IN.
-    # Here we pass arm-base coords, so rvec/tvec describe how to go from
-    # arm-base to camera (i.e., camera pose in arm-base).
-    ok, rvec, tvec = cv2.solvePnP(world_points, image_points, K, dist, flags=cv2.SOLVEPNP_ITERATIVE)
-    if not ok:
-        return HandEyeResult(
-            extrinsic=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            reprojection_error_px=float("inf"),
-            marker_detected=False,
-            num_markers_found=len(ids_flat),
-        )
-
-    # Reprojection error — useful diagnostic.
-    projected, _ = cv2.projectPoints(world_points, rvec, tvec, K, dist)
-    projected = projected.reshape(-1, 2)
-    repro = float(np.linalg.norm(projected - image_points, axis=1).mean())
-
-    extrinsic = [
-        float(tvec[0][0]),
-        float(tvec[1][0]),
-        float(tvec[2][0]),  # tx, ty, tz (mm)
-        float(rvec[0][0]),
-        float(rvec[1][0]),
-        float(rvec[2][0]),  # rx, ry, rz (rad, Rodrigues)
-    ]
-    return HandEyeResult(
-        extrinsic=extrinsic,
-        reprojection_error_px=repro,
-        marker_detected=True,
-        num_markers_found=len(ids_flat),
-    )
-
-
-def write_extrinsic_to_manifest(manifest_path: str | Path, extrinsic: list[float]) -> None:
-    """Write `physics.solver.camera.extrinsic` via ruamel.yaml (preserves comments)."""
-    try:
-        from ruamel.yaml import YAML  # type: ignore[import-not-found]
-    except ImportError as e:
-        raise RuntimeError(
-            "robot-md calibrate --hand-eye needs ruamel.yaml — pip install ruamel.yaml"
-        ) from e
+    import yaml
 
     path = Path(manifest_path)
     text = path.read_text()
-    if not text.startswith("---"):
-        raise RuntimeError(f"{path}: missing leading '---' frontmatter marker")
-    end = text.find("\n---", 3)
-    if end < 0:
-        raise RuntimeError(f"{path}: missing closing '---' frontmatter marker")
-    fm_text = text[3:end].lstrip("\n")
-    body_text = text[end + 4 :]
-
-    y = YAML()
-    y.preserve_quotes = True
-    y.indent(mapping=2, sequence=4, offset=2)
-    data = y.load(fm_text)
-
-    # Set physics.solver.camera.extrinsic = [...]
-    phys = data.setdefault("physics", {})
-    solver = phys.setdefault("solver", {})
-    cam = solver.setdefault("camera", {})
-    cam["extrinsic"] = [round(v, 6) for v in extrinsic]
-
-    import io
-
-    buf = io.StringIO()
-    y.dump(data, buf)
-    path.write_text("---\n" + buf.getvalue().rstrip("\n") + "\n---" + body_text)
-
-
-def cli_calibrate_hand_eye(
-    manifest_path: str,
-    *,
-    marker_pos: tuple[float, float, float],
-    marker_size_mm: float = DEFAULT_MARKER_SIZE_MM,
-    marker_id: int = DEFAULT_MARKER_ID,
-    dry_run: bool = False,
-) -> int:
-    """Operator-facing entry point.
-
-    Expects the OAK-D to be plugged in + the ArUco marker physically at
-    the specified position in arm-base frame. The marker_pos[0:2] are the
-    marker center's (x, y) in mm; marker_pos[2] is z (0 = on the table).
-    """
-    try:
-        K, dist = _camera_intrinsics_from_oakd()
-    except RuntimeError as e:
-        print(f"error: {e}", file=sys.stderr)
-        return 2
-
-    try:
-        frame = _capture_frame_oakd()
-    except RuntimeError as e:
-        print(f"error: frame capture failed — {e}", file=sys.stderr)
-        return 2
-
-    print(
-        f"Detecting ArUco marker id={marker_id} "
-        f"(size={marker_size_mm:.0f} mm) at arm-base position "
-        f"({marker_pos[0]:.0f}, {marker_pos[1]:.0f}, {marker_pos[2]:.0f}) mm...",
-        file=sys.stderr,
-    )
-    result = solve_from_image(
-        frame,
-        K,
-        dist,
-        marker_center_xy_mm=(marker_pos[0], marker_pos[1]),
-        marker_z_mm=marker_pos[2],
-        marker_size_mm=marker_size_mm,
-        marker_id=marker_id,
-    )
-
-    if not result.marker_detected:
-        print(
-            f"error: marker id {marker_id} not found in frame "
-            f"({result.num_markers_found} other markers visible).\n"
-            "  Check: marker printed at the declared size? flat on workspace? "
-            "in OAK-D's field of view? lighting adequate?",
-            file=sys.stderr,
-        )
-        return 3
-
-    tx, ty, tz, rx, ry, rz = result.extrinsic
-    rx_d = math.degrees(rx)
-    ry_d = math.degrees(ry)
-    rz_d = math.degrees(rz)
-    print(
-        f"\n✓ marker detected — solvePnP converged\n"
-        f"  extrinsic (camera-in-arm-base frame):\n"
-        f"    tx = {tx:+8.2f} mm    ty = {ty:+8.2f} mm    tz = {tz:+8.2f} mm\n"
-        f"    rx = {rx_d:+8.2f}°    ry = {ry_d:+8.2f}°    rz = {rz_d:+8.2f}°\n"
-        f"  reprojection error: {result.reprojection_error_px:.2f} px"
-        f" (lower is better; < 1.0 is good)",
-        file=sys.stderr,
-    )
-
-    if dry_run:
-        print("\n--dry-run: manifest not written.", file=sys.stderr)
-        return 0
-
-    try:
-        write_extrinsic_to_manifest(manifest_path, result.extrinsic)
-        print(
-            f"\n  wrote physics.solver.camera.extrinsic to {manifest_path}",
-            file=sys.stderr,
-        )
-    except RuntimeError as e:
-        print(f"  warning: could not update manifest: {e}", file=sys.stderr)
-        return 2
-    return 0
-
-
-# ---------------------------------------------------------------------------
-# v1 hand-eye via cv2.calibrateHandEye (Task 9)
-#
-# Unlike the v0 single-shot PnP above, this path samples N (robot_pose,
-# marker_pose) pairs and solves AX = XB to recover the camera→arm-base
-# transform. Driven by the CLI verb (added in Task 10); pure math here.
-# ---------------------------------------------------------------------------
+    if not text.startswith("---\n"):
+        raise RuntimeError("manifest missing YAML frontmatter")
+    _, rest = text.split("---\n", 1)
+    yaml_part, _, body = rest.partition("\n---\n")
+    fm = yaml.safe_load(yaml_part) or {}
+    cams = fm.setdefault("physics", {}).setdefault("solver", {}).setdefault("cameras", [])
+    if not cams:
+        cams.append({"driver_id": "oakd", "primary_stream": "rgb", "mount": "world"})
+    cams[0]["extrinsic"] = [float(v) for v in six_vec]
+    cams[0]["extrinsic_source"] = source
+    tail = "\n---\n" + body if body else "\n---\n"
+    path.write_text("---\n" + yaml.safe_dump(fm, sort_keys=False) + tail)
 
 
 def calibrate_from_samples(
@@ -403,3 +115,116 @@ def detect_marker_pose(
     R, _ = cv2.Rodrigues(rvecs[0][0])
     t = tvecs[0][0]
     return (R, t)
+
+
+def _run_sweep(
+    manifest_path,
+    *,
+    marker_pos,
+    marker_size_mm: float,
+    marker_id: int,
+):
+    """Drive the 8-pose sweep. Returns (R_cam2base, t_cam2base).
+
+    Hardware path. Opens the feetech bus + OAK-D via the live backend.
+    Gated out in tests by patching this function.
+    """
+    import time
+
+    from robot_md.kinematics import Kinematics
+    from robot_md.mcp.context import load_context
+    from robot_md.parser import parse_file
+
+    path = Path(manifest_path)
+    parsed = parse_file(path).frontmatter
+    kin = Kinematics(parsed)
+    ready = (parsed.get("physics") or {}).get("poses", {}).get("ready", {}).get("joints")
+    if ready is None:
+        raise RuntimeError("physics.poses.ready missing — run init first")
+
+    ctx = load_context(path)
+    backend = ctx.backend
+    if backend is None or backend._servo_bus is None or backend._perception is None:
+        raise RuntimeError("feetech bus or perception unavailable")
+
+    deltas = [
+        {}, {"shoulder_pan": 100}, {"shoulder_pan": -100},
+        {"shoulder_lift": 80}, {"shoulder_lift": -80},
+        {"elbow_flex": 80}, {"wrist_flex": 80}, {"wrist_roll": 100},
+    ]
+
+    R_gb, t_gb, R_tc, t_tc = [], [], [], []
+    backend._servo_bus.torque(True)
+    try:
+        for d in deltas:
+            target = {**ready, **{k: ready[k] + v for k, v in d.items() if k in ready}}
+            backend._motion.move_to_joints(target, servo_bus=backend._servo_bus)
+            time.sleep(0.5)
+            rgb, _depth, K = backend._perception.grab_frame()
+            pose = detect_marker_pose(
+                rgb,
+                K=np.asarray(K),
+                dist_coeffs=np.zeros(5),
+                marker_id=marker_id,
+                marker_size_mm=marker_size_mm,
+            )
+            if pose is None:
+                continue
+            R_target_cam, t_target_cam = pose
+            angles = kin.steps_to_angles(target)
+            x, y, z = kin.fk(angles)
+            R_gb.append(np.eye(3))
+            t_gb.append(np.array([x, y, z], dtype=float))
+            R_tc.append(R_target_cam)
+            t_tc.append(t_target_cam)
+    finally:
+        backend._servo_bus.torque(False)
+
+    if len(R_gb) < 3:
+        raise RuntimeError(f"insufficient marker detections ({len(R_gb)} < 3)")
+    _ = marker_pos  # reserved for future known-marker solver
+    return calibrate_from_samples(
+        R_gripper2base=R_gb,
+        t_gripper2base=t_gb,
+        R_target2cam=R_tc,
+        t_target2cam=t_tc,
+    )
+
+
+def cli_calibrate_hand_eye(
+    manifest_path: str,
+    *,
+    marker_pos,
+    marker_size_mm: float = 50.0,
+    marker_id: int = 0,
+    dry_run: bool = False,
+) -> int:
+    """CLI entry: drive AX=XB sweep, write extrinsic, flip source."""
+    from robot_md.extrinsic import matrix_to_six_vec
+
+    mpath = Path(manifest_path)
+    print(
+        f"hand-eye: marker id={marker_id} size={marker_size_mm:.0f}mm "
+        f"at arm-base ({marker_pos[0]:.0f}, {marker_pos[1]:.0f}, {marker_pos[2]:.0f}) mm"
+    )
+    try:
+        R, t = _run_sweep(
+            mpath,
+            marker_pos=marker_pos,
+            marker_size_mm=marker_size_mm,
+            marker_id=marker_id,
+        )
+    except Exception as e:
+        print(f"hand-eye failed: {e}")
+        return 1
+    M = np.eye(4)
+    M[:3, :3] = R
+    M[:3, 3] = np.asarray(t).reshape(-1)
+    six = matrix_to_six_vec(M)
+    print(f"hand-eye result: translation={six[:3]}, rotation_rad={six[3:]}")
+    if dry_run:
+        print("(dry-run) manifest unchanged")
+        return 0
+    write_extrinsic(mpath, six_vec=six, source="hand_eye_calibrated")
+    print(f"wrote extrinsic to {mpath}")
+    return 0
