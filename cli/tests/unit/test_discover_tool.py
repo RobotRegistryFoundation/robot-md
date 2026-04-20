@@ -97,3 +97,131 @@ def test_discover_malformed_step_skipped():
     r = discover_tool(ctx, steps=[{}, {"a": {}, "b": {}}])
     assert r["status"] == "ok"
     assert r["results"] == {}
+
+
+def test_discover_probe_direction_reports_shift():
+    """Move 30 steps; white bar shifts from u=150 to u=180 (right) → positive direction."""
+    import cv2
+    import numpy as np
+
+    rgb1 = np.zeros((200, 300, 3), dtype=np.uint8)
+    cv2.rectangle(rgb1, (140, 50), (160, 150), (255, 255, 255), -1)  # at u≈150
+    frame1 = (rgb1, np.full((200, 300), 500, dtype=np.uint16), None)
+
+    rgb2 = np.zeros((200, 300, 3), dtype=np.uint8)
+    cv2.rectangle(rgb2, (170, 50), (190, 150), (255, 255, 255), -1)  # at u≈180 (+30 px)
+    frame2 = (rgb2, np.full((200, 300), 500, dtype=np.uint16), None)
+
+    class _PosBus:
+        def __init__(self):
+            self.written = []
+        def torque(self, on):
+            pass
+        def write_positions(self, p):
+            self.written.append(dict(p))
+        def read_positions(self):
+            return {"shoulder_pan": 2048}
+
+    per = MagicMock()
+    per.grab_frame.side_effect = [frame1, frame2]
+    backend = MagicMock()
+    backend._perception = per
+    backend._servo_bus = _PosBus()
+    ctx = MagicMock()
+    ctx.spec = MagicMock()
+    ctx.spec.vision = VisionBlock(object_descriptors=())
+    ctx.backend = backend
+
+    from robot_md.mcp.tools.discover import discover_tool
+    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    pd = r["results"]["probe_direction"]
+    assert pd["status"] == "ok"
+    assert pd["joint"] == "shoulder_pan"
+    assert pd["delta"] == 30
+    assert pd["px_shift"] > 10
+    assert pd["direction"] == "positive_delta→image_right"
+    # px_per_step rough sanity — 30px / 30 steps ≈ 1.0 (±50%)
+    assert 0.5 < pd["px_per_step"] < 2.0
+
+
+def test_discover_probe_direction_no_hardware():
+    """Missing backend/bus/perception → no_hardware status."""
+    ctx = MagicMock()
+    ctx.backend = None
+    from robot_md.mcp.tools.discover import discover_tool
+    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    assert r["results"]["probe_direction"]["status"] == "no_hardware"
+
+
+def test_discover_probe_direction_no_motion_detected():
+    """Identical before/after frames → no_motion_detected (not a crash)."""
+    import cv2
+    import numpy as np
+
+    rgb = np.zeros((200, 300, 3), dtype=np.uint8)
+    cv2.rectangle(rgb, (140, 50), (160, 150), (255, 255, 255), -1)
+    # Both calls return the SAME frame (numpy copy to avoid identity gotchas).
+    frames = [(rgb.copy(), np.full((200, 300), 500, dtype=np.uint16), None) for _ in range(2)]
+
+    class _NoopBus:
+        def torque(self, on):
+            pass
+        def write_positions(self, p):
+            pass
+        def read_positions(self):
+            return {"shoulder_pan": 2048}
+
+    per = MagicMock()
+    per.grab_frame.side_effect = frames
+    backend = MagicMock()
+    backend._perception = per
+    backend._servo_bus = _NoopBus()
+    ctx = MagicMock()
+    ctx.spec = MagicMock()
+    ctx.spec.vision = VisionBlock(object_descriptors=())
+    ctx.backend = backend
+
+    from robot_md.mcp.tools.discover import discover_tool
+    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    assert r["results"]["probe_direction"]["status"] == "no_motion_detected"
+
+
+def test_discover_probe_direction_returns_bus_to_start():
+    """After probe, the bus must be commanded back to the original position."""
+    import cv2
+    import numpy as np
+
+    rgb1 = np.zeros((200, 300, 3), dtype=np.uint8)
+    cv2.rectangle(rgb1, (140, 50), (160, 150), (255, 255, 255), -1)
+    rgb2 = np.zeros((200, 300, 3), dtype=np.uint8)
+    cv2.rectangle(rgb2, (170, 50), (190, 150), (255, 255, 255), -1)
+
+    class _Bus:
+        def __init__(self):
+            self.written = []
+        def torque(self, on):
+            pass
+        def write_positions(self, p):
+            self.written.append(dict(p))
+        def read_positions(self):
+            return {"shoulder_pan": 2048, "gripper": 1700}
+
+    bus = _Bus()
+    per = MagicMock()
+    per.grab_frame.side_effect = [
+        (rgb1, np.full((200, 300), 500, dtype=np.uint16), None),
+        (rgb2, np.full((200, 300), 500, dtype=np.uint16), None),
+    ]
+    backend = MagicMock()
+    backend._perception = per
+    backend._servo_bus = bus
+    ctx = MagicMock()
+    ctx.spec = MagicMock()
+    ctx.spec.vision = VisionBlock(object_descriptors=())
+    ctx.backend = backend
+
+    from robot_md.mcp.tools.discover import discover_tool
+    discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    # Last write should be the starting positions (return-home).
+    assert bus.written[-1]["shoulder_pan"] == 2048
+    assert bus.written[-1]["gripper"] == 1700
