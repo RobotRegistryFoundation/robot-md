@@ -1,45 +1,26 @@
-"""Capability dispatch: arm.pick / arm.place / arm.reach / vision.describe / status.report.
+"""Capability dispatch for the feetech_depthai reference backend.
 
-Phase 1 scope: `arm.pick` and `arm.place` replay a hardcoded first-demo
-trajectory. Skill-store lookup arrives in Phase 2.
+v0.6.1 pipeline for `arm.pick` / `arm.place`:
+
+    target descriptor → Perception.vision_find → camera_to_base
+    → workspace gate → Kinematics.ik_reach → plan_pick/plan_place
+    → motion.replay (skipped on dry_run)
+
+Returns structured `ExecutionResult(status, trajectory, events, error)` with
+status ∈ {"ok", "blocked", "no_target", "unreachable", "error"} per the
+v0.6.1 capability contract.
 """
 
 from __future__ import annotations
 
 from robot_md.backends.base import ExecutionEvent, ExecutionResult
 from robot_md.backends.feetech_depthai.motion import Waypoint
+from robot_md.extrinsic import camera_to_base
+from robot_md.kinematics import Kinematics, KinematicsError
+from robot_md.trajectory import plan_pick, plan_place
 
-# Hardcoded first-demo waypoints around zero-pose (2048 joints; gripper 1700 open, 1200 closed).
-_ZERO = {
-    "shoulder_pan": 2048,
-    "shoulder_lift": 2048,
-    "elbow_flex": 2048,
-    "wrist_flex": 2048,
-    "wrist_roll": 2048,
-}
-_PICK_OPEN = {**_ZERO, "gripper": 1700}
-_PICK_CLOSED = {**_ZERO, "gripper": 1200}
-_PICK_LIFTED = {**_ZERO, "shoulder_lift": 1928, "gripper": 1200}  # 120 steps up
 
-_HARDCODED_PICK_WAYPOINTS: list[Waypoint] = [
-    Waypoint(t=0.0, joints=_PICK_OPEN),
-    Waypoint(t=0.5, joints=_PICK_OPEN),
-    Waypoint(t=1.1, joints=_PICK_CLOSED),
-    Waypoint(t=1.7, joints=_PICK_LIFTED),
-]
-
-_PLACE_LEFT = {**_ZERO, "shoulder_pan": 2148}
-_PLACE_LEFT_LIFTED = {**_PLACE_LEFT, "shoulder_lift": 1928, "gripper": 1200}
-_PLACE_LEFT_DOWN = {**_PLACE_LEFT, "gripper": 1200}
-_PLACE_LEFT_RELEASE = {**_PLACE_LEFT, "gripper": 1700}
-
-_HARDCODED_PLACE_WAYPOINTS: list[Waypoint] = [
-    Waypoint(t=0.0, joints=_PICK_LIFTED),
-    Waypoint(t=0.7, joints=_PLACE_LEFT_LIFTED),
-    Waypoint(t=1.3, joints=_PLACE_LEFT_DOWN),
-    Waypoint(t=1.8, joints=_PLACE_LEFT_RELEASE),
-    Waypoint(t=2.4, joints=_PICK_OPEN),
-]
+# ---------------------------------------------------------------- dispatch --
 
 
 def dispatch(backend, *, capability: str, args: dict, dry_run: bool, estop) -> ExecutionResult:
@@ -54,10 +35,248 @@ def dispatch(backend, *, capability: str, args: dict, dry_run: bool, estop) -> E
     return handler(backend, args=args, dry_run=dry_run, estop=estop)
 
 
+# ------------------------------------------------------- target-driven pick --
+
+
+def _vision_xyz_cam(backend, descriptor_id: str):
+    """Invoke Perception.vision_find. Returns (status, xyz_cam_mm | None, reason | None)."""
+    if backend._perception is None:
+        return ("error", None, "no_perception")
+    try:
+        res = backend._perception.vision_find(descriptor=descriptor_id)
+    except Exception as e:
+        return ("error", None, f"vision_error: {e}")
+    status = res.get("status")
+    if status == "ok":
+        return ("ok", tuple(res["xyz_cam_mm"]), None)
+    if status == "no_match":
+        return ("no_target", None, f"{descriptor_id}_not_visible")
+    return ("error", None, str(res.get("reason") or status or "vision_unknown_status"))
+
+
+def _workspace_ok(fm: dict, xyz_base_mm) -> bool:
+    ws = (fm.get("physics") or {}).get("workspace") or {}
+    bounds = ws.get("bounds_mm")
+    if not bounds:
+        return True
+    x, y, z = xyz_base_mm
+    for axis, v in (("x", x), ("y", y), ("z", z)):
+        rng = bounds.get(axis)
+        if rng is None:
+            continue
+        lo, hi = rng
+        if not (lo <= v <= hi):
+            return False
+    return True
+
+
+def _descriptor_registered(fm: dict, descriptor_id: str) -> bool:
+    descriptors = ((fm.get("vision") or {}).get("object_descriptors") or [])
+    return any(d.get("id") == descriptor_id for d in descriptors)
+
+
+def _get_extrinsic(fm: dict):
+    cams = (fm.get("physics") or {}).get("solver", {}).get("cameras") or []
+    if not cams:
+        return None
+    return cams[0].get("extrinsic")
+
+
+def _execute_pick_or_place(
+    *,
+    backend,
+    args,
+    dry_run,
+    estop,
+    planner,
+    default_approach_height_mm: float,
+    label: str,
+) -> ExecutionResult:
+    fm = getattr(backend, "raw_frontmatter", None) or {}
+    descriptor_id = args.get("target")
+    if not isinstance(descriptor_id, str):
+        return ExecutionResult(
+            status="blocked",
+            trajectory=None,
+            events=[],
+            error={"reason": "target_required", "label": label},
+        )
+    if not _descriptor_registered(fm, descriptor_id):
+        return ExecutionResult(
+            status="blocked",
+            trajectory=None,
+            events=[],
+            error={"reason": "descriptor_not_declared", "descriptor": descriptor_id},
+        )
+
+    approach_height_mm = float(args.get("approach_height_mm", default_approach_height_mm))
+
+    vstatus, xyz_cam, vreason = _vision_xyz_cam(backend, descriptor_id)
+    if vstatus == "no_target":
+        return ExecutionResult(
+            status="no_target",
+            trajectory=None,
+            events=[],
+            error={"reason": vreason, "descriptor": descriptor_id},
+        )
+    if vstatus == "error":
+        return ExecutionResult(
+            status="error",
+            trajectory=None,
+            events=[],
+            error={"reason": vreason},
+        )
+
+    extrinsic = _get_extrinsic(fm)
+    if extrinsic is None:
+        return ExecutionResult(
+            status="blocked",
+            trajectory=None,
+            events=[],
+            error={"reason": "extrinsic_missing"},
+        )
+    xyz_base = camera_to_base(xyz_cam, extrinsic)
+
+    if not _workspace_ok(fm, xyz_base):
+        return ExecutionResult(
+            status="unreachable",
+            trajectory=None,
+            events=[],
+            error={"reason": "outside_workspace", "xyz_base_mm": xyz_base},
+        )
+
+    try:
+        kin = Kinematics(fm)
+    except KinematicsError as e:
+        return ExecutionResult(
+            status="error",
+            trajectory=None,
+            events=[],
+            error={"reason": f"kinematics_init_failed: {e}"},
+        )
+
+    bus = backend._servo_bus
+    try:
+        start_joints = bus.read_positions() if bus is not None else {}
+    except Exception as e:
+        return ExecutionResult(
+            status="error",
+            trajectory=None,
+            events=[],
+            error={"reason": f"bus_error: {e}"},
+        )
+    if not start_joints:
+        poses = (fm.get("physics") or {}).get("poses") or {}
+        ready = (poses.get("ready") or {}).get("joints") or {}
+        start_joints = dict(ready)
+
+    try:
+        waypoints = planner(
+            start_joints=start_joints,
+            target_base_xyz=xyz_base,
+            approach_height_mm=approach_height_mm,
+            kin=kin,
+        )
+    except KinematicsError as e:
+        return ExecutionResult(
+            status="unreachable",
+            trajectory=None,
+            events=[],
+            error={"reason": "ik_failed", "detail": str(e)},
+        )
+
+    events = [
+        ExecutionEvent(
+            kind="plan",
+            data={
+                "capability": label,
+                "descriptor": descriptor_id,
+                "xyz_base_mm": xyz_base,
+                "approach_height_mm": approach_height_mm,
+                "waypoint_count": len(waypoints),
+            },
+        )
+    ]
+    trajectory = [{"phase": wp.phase, "joints": wp.joints} for wp in waypoints]
+
+    if dry_run:
+        events.append(ExecutionEvent(kind="done", data={"dry_run": True}))
+        return ExecutionResult(status="ok", trajectory=trajectory, events=events, error=None)
+
+    t = 0.0
+    motion_waypoints: list[Waypoint] = []
+    for wp in waypoints:
+        motion_waypoints.append(Waypoint(t=t, joints=wp.joints))
+        t += wp.settle_ms / 1000.0
+
+    try:
+        bus.torque(True)
+        backend._motion.replay(motion_waypoints, servo_bus=bus, estop=estop)
+    except Exception as e:
+        events.append(ExecutionEvent(kind="bus_error", data={"detail": str(e)}))
+        try:
+            bus.torque(False)
+        except Exception:
+            pass
+        return ExecutionResult(
+            status="error",
+            trajectory=trajectory,
+            events=events,
+            error={"reason": "bus_error", "detail": str(e)},
+        )
+    try:
+        bus.torque(False)
+    except Exception:
+        pass
+
+    events.append(ExecutionEvent(kind="done", data={"label": label}))
+    return ExecutionResult(status="ok", trajectory=trajectory, events=events, error=None)
+
+
+def _arm_pick(backend, *, args, dry_run, estop) -> ExecutionResult:
+    return _execute_pick_or_place(
+        backend=backend,
+        args=args,
+        dry_run=dry_run,
+        estop=estop,
+        planner=plan_pick,
+        default_approach_height_mm=40.0,
+        label="arm.pick",
+    )
+
+
+def _arm_place(backend, *, args, dry_run, estop) -> ExecutionResult:
+    return _execute_pick_or_place(
+        backend=backend,
+        args=args,
+        dry_run=dry_run,
+        estop=estop,
+        planner=plan_place,
+        default_approach_height_mm=50.0,
+        label="arm.place",
+    )
+
+
+# ------------------------------------------- arm.reach / arm.home / readers --
+
+
+# Safe fallback joints used by arm.reach when no target is provided; all
+# canonical joints at zero-pose steps with gripper open.
+_REACH_DEFAULT_JOINTS = {
+    "shoulder_pan": 2048,
+    "shoulder_lift": 2048,
+    "elbow_flex": 2048,
+    "wrist_flex": 2048,
+    "wrist_roll": 2048,
+    "gripper": 1700,
+}
+
+
 def _do_replay(backend, *, waypoints, label, args, dry_run, estop) -> ExecutionResult:
     events: list[ExecutionEvent] = [
         ExecutionEvent(
-            kind="plan", data={"capability": label, "args": args, "waypoint_count": len(waypoints)}
+            kind="plan",
+            data={"capability": label, "args": args, "waypoint_count": len(waypoints)},
         ),
     ]
     trajectory = [{"t": wp.t, "joints": wp.joints} for wp in waypoints]
@@ -78,30 +297,8 @@ def _do_replay(backend, *, waypoints, label, args, dry_run, estop) -> ExecutionR
     return ExecutionResult(status="ok", trajectory=trajectory, events=events, error=None)
 
 
-def _arm_pick(backend, *, args, dry_run, estop) -> ExecutionResult:
-    return _do_replay(
-        backend,
-        waypoints=_HARDCODED_PICK_WAYPOINTS,
-        label="arm.pick",
-        args=args,
-        dry_run=dry_run,
-        estop=estop,
-    )
-
-
-def _arm_place(backend, *, args, dry_run, estop) -> ExecutionResult:
-    return _do_replay(
-        backend,
-        waypoints=_HARDCODED_PLACE_WAYPOINTS,
-        label="arm.place",
-        args=args,
-        dry_run=dry_run,
-        estop=estop,
-    )
-
-
 def _arm_reach(backend, *, args, dry_run, estop) -> ExecutionResult:
-    wps = [Waypoint(t=0.0, joints=_PICK_OPEN)]
+    wps = [Waypoint(t=0.0, joints=dict(_REACH_DEFAULT_JOINTS))]
     return _do_replay(
         backend, waypoints=wps, label="arm.reach", args=args, dry_run=dry_run, estop=estop
     )

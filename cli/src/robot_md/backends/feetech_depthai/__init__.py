@@ -18,8 +18,15 @@ class FeetechDepthaiBackend(CapabilityBackend):
         self._servo_bus = None
         self._perception = None
         self._motion = None
+        # Populated from `spec.raw_yaml` in `open()`; holds the full parsed
+        # frontmatter dict so capability handlers can read blocks not surfaced
+        # by the typed RobotSpec view (e.g. the raw workspace bounds or the
+        # solver.cameras extrinsic as-authored).
+        self.raw_frontmatter: dict | None = None
 
     def open(self, spec: RobotSpec) -> None:
+        import yaml
+
         from robot_md.backends.feetech_depthai.motion import Motion
         from robot_md.backends.feetech_depthai.perception import Perception
         from robot_md.backends.feetech_depthai.servo import ServoBus
@@ -29,6 +36,10 @@ class FeetechDepthaiBackend(CapabilityBackend):
                 "feetech_depthai backend refuses to open: safety.max_joint_velocity_dps is required"
             )
         self._spec = spec
+        try:
+            self.raw_frontmatter = yaml.safe_load(spec.raw_yaml) or {}
+        except Exception:
+            self.raw_frontmatter = {}
         self._servo_bus = ServoBus.from_spec(spec)
         self._servo_bus.open()
         self._motion = Motion.from_spec(spec)
@@ -51,6 +62,7 @@ class FeetechDepthaiBackend(CapabilityBackend):
         self._perception = None
         self._motion = None
         self._spec = None
+        self.raw_frontmatter = None
 
     def capabilities(self) -> frozenset[str]:
         return frozenset(

@@ -123,6 +123,63 @@ class Perception:
                 out.append({"id": d.id, "pixel": [u, v], "area_px2": area})
         return out
 
+    def vision_find(self, *, descriptor: str, spec: Any = None) -> dict:
+        """Find a single named descriptor in the current frame.
+
+        Returns a dict with `status` ∈ {"ok", "no_match", "error"}. When `ok`,
+        also sets `xyz_cam_mm` as a (x, y, z) tuple in camera frame (mm).
+        Uses the HSV detector registry + pinhole back-projection, sampling a
+        patch of depth pixels around the centroid for robustness against
+        stereo holes (mirrors `mcp.tools.vision_find.vision_find_tool`).
+        """
+        from robot_md.detectors.hsv import DETECTORS
+
+        active_spec = spec if spec is not None else getattr(self, "_spec", None)
+        if active_spec is None:
+            return {"status": "error", "descriptor": descriptor, "reason": "no_spec"}
+        vision = getattr(active_spec, "vision", None)
+        if vision is None:
+            return {"status": "error", "descriptor": descriptor, "reason": "no_vision_block"}
+        descr = vision.find(descriptor) if hasattr(vision, "find") else None
+        if descr is None:
+            return {"status": "error", "descriptor": descriptor, "reason": "descriptor_not_declared"}
+
+        fn = DETECTORS.get(descr.detector)
+        if fn is None:
+            return {"status": "error", "descriptor": descriptor,
+                    "reason": f"detector_unknown:{descr.detector}"}
+
+        frame = self.grab_frame()
+        if frame is None:
+            return {"status": "error", "descriptor": descriptor, "reason": "no_frame"}
+        rgb, depth, K = frame
+        hit = fn(rgb, params=descr.params)
+        if hit is None:
+            return {"status": "no_match", "descriptor": descriptor}
+        u, v, area = hit
+
+        import numpy as np
+
+        # Patch-based depth sampling — median of valid pixels around (u, v)
+        # survives stereo holes better than a single-pixel lookup.
+        r = min(15, max(3, int((area ** 0.5) // 4)))
+        h, w = depth.shape
+        patch = depth[max(0, v - r): min(h, v + r + 1),
+                      max(0, u - r): min(w, u + r + 1)].astype(np.float32)
+        valid = patch[patch > 0]
+        if valid.size == 0:
+            return {"status": "no_match", "descriptor": descriptor, "reason": "invalid_depth"}
+        depth_mm = float(np.median(valid))
+        xyz = _pixel_to_3d(u, v, depth_mm, K)
+        return {
+            "status": "ok",
+            "descriptor": descriptor,
+            "xyz_cam_mm": xyz,
+            "pixel": (int(u), int(v)),
+            "depth_mm": depth_mm,
+            "area_px2": area,
+        }
+
 
 def _pixel_to_3d(u: int, v: int, depth_mm: float, K: Any) -> tuple[float, float, float]:
     """Back-project a pixel + depth into camera-frame XYZ (mm)."""
