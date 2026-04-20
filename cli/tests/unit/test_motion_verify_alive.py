@@ -59,3 +59,19 @@ def test_verify_alive_multiple_missing(fixtures_dir):
     assert report.alive is False
     assert set(report.missing) == {"shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"}
     bus.torque.assert_called_once_with(False)
+
+
+def test_verify_alive_bus_exception_torques_off_and_reports_all_missing(fixtures_dir):
+    """When the bus itself fails (read_positions raises), verify_alive
+    treats every expected servo as missing, torques off the bus, and
+    returns alive=False. This is the worst-case path and must leave the
+    arm in a safe state."""
+    motion = Motion.from_spec(_spec(fixtures_dir))
+    bus = MagicMock()
+    bus.read_positions.side_effect = RuntimeError("bus timeout")
+    expected = {"shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"}
+    report = motion.verify_alive(bus, expected_ids=expected)
+    assert report.alive is False
+    assert set(report.missing) == expected
+    assert report.missing == sorted(report.missing)  # sort-order contract
+    bus.torque.assert_called_once_with(False)
