@@ -106,6 +106,22 @@
             "required": ["joints"]
           }
         },
+        "workspace": {
+          "type": "object",
+          "description": "Reachable envelope, relative to a named pose.",
+          "properties": {
+            "from_pose": {"type": "string"},
+            "bounds_mm": {
+              "type": "object",
+              "properties": {
+                "x": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+                "y": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+                "z": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
+              }
+            },
+            "note": {"type": "string"}
+          }
+        },
         "solver": {
           "type": "object",
           "description": "Baseline IK metadata — enough for a planner to compute forward/inverse kinematics from ROBOT.md alone, without an external URDF. Populated by `robot-md autodetect` (deterministic fields) + `robot-md calibrate` (physical fields).",

@@ -271,3 +271,44 @@ learned_skills:
     assert s.blocked_by == ()
     assert s.notes is None
     assert s.recorded_at is None
+
+
+def test_spec_surfaces_workspace():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics:
+  type: arm
+  dof: 6
+  workspace:
+    from_pose: ready
+    bounds_mm: {x: [-200, 200], y: [50, 300], z: [0, 150]}
+    note: 'Tabletop'
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    ws = spec.physics.workspace
+    assert ws is not None
+    assert ws.from_pose == "ready"
+    assert ws.bounds_mm["x"] == (-200.0, 200.0)
+    assert ws.bounds_mm["z"] == (0.0, 150.0)
+    assert ws.note == "Tabletop"
+
+
+def test_spec_workspace_none_when_absent():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    assert spec.physics.workspace is None

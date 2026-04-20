@@ -120,6 +120,13 @@ class MetadataBlock:
 
 
 @dataclass(frozen=True)
+class Workspace:
+    from_pose: str | None
+    bounds_mm: dict[str, tuple[float, float]]
+    note: str | None
+
+
+@dataclass(frozen=True)
 class PhysicsBlock:
     type: str
     dof: int
@@ -127,6 +134,7 @@ class PhysicsBlock:
     solver: dict
     cameras: tuple[SolverCamera, ...]
     poses: dict[str, PoseDef]
+    workspace: Workspace | None
 
 
 @dataclass(frozen=True)
@@ -227,6 +235,20 @@ class RobotSpec:
             if isinstance(p, dict)
         }
 
+        ws_raw = physics.get("workspace")
+        workspace: Workspace | None = None
+        if isinstance(ws_raw, dict):
+            b = ws_raw.get("bounds_mm") or {}
+            bounds: dict[str, tuple[float, float]] = {}
+            for k, v in b.items():
+                if isinstance(v, list) and len(v) == 2:
+                    bounds[k] = (float(v[0]), float(v[1]))
+            workspace = Workspace(
+                from_pose=ws_raw.get("from_pose"),
+                bounds_mm=bounds,
+                note=ws_raw.get("note"),
+            )
+
         contracts_raw = fm.get("capability_contracts") or {}
         capability_contracts: dict[str, CapabilityContract] = {}
         for cap, c in contracts_raw.items():
@@ -269,10 +291,10 @@ class RobotSpec:
             if isinstance(s, dict)
         )
 
-        workspace = safety.get("workspace_bounds_m")
+        safety_ws = safety.get("workspace_bounds_m")
         workspace_tuple: tuple[float, float, float] | None = None
-        if workspace and len(workspace) == 3:
-            workspace_tuple = (float(workspace[0]), float(workspace[1]), float(workspace[2]))
+        if safety_ws and len(safety_ws) == 3:
+            workspace_tuple = (float(safety_ws[0]), float(safety_ws[1]), float(safety_ws[2]))
 
         brain_block: BrainBlock | None = None
         if isinstance(brain, dict):
@@ -306,6 +328,7 @@ class RobotSpec:
                 solver=dict(solver),
                 cameras=cams,
                 poses=poses,
+                workspace=workspace,
             ),
             drivers=tuple(drivers),
             safety=SafetyBlock(
