@@ -505,6 +505,10 @@
   @keyframes blink{ 50%{opacity:0} }
 
   .C-term.lit .C-line{ opacity:1; transform:none }
+  @media (prefers-reduced-motion: reduce){ .C-term .C-line{ opacity:1; transform:none; transition:none } }
+</style>
+<noscript><style>.C-term .C-line{opacity:1;transform:none}</style></noscript>
+<style>
 
   .C-sig{ display:grid; grid-template-columns: auto 1fr auto; gap:24px; align-items:center; padding:16px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); margin-top: 12px }
   .C-sig .nm{ font-family:var(--sans); font-weight:700; font-size:34px; letter-spacing:-.03em; line-height:1 }
@@ -1118,13 +1122,9 @@ pick up the red lego and place it in the bowl
       else if (el.classList.contains('banner')) t += 300;
       else                                      t += 260;
     });
-    if ('IntersectionObserver' in window){
-      new IntersectionObserver(function(entries){
-        entries.forEach(function(e){ if (e.isIntersecting) term.classList.add('lit'); });
-      }, {threshold: 0.15}).observe(term);
-    } else {
-      term.classList.add('lit');
-    }
+    // Reveal immediately so the terminal never renders empty, even if an
+    // observer never fires (e.g. element already in viewport on load).
+    requestAnimationFrame(function(){ term.classList.add('lit'); });
   })();
 </script>
 
