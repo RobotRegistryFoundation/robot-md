@@ -51,3 +51,55 @@ def test_robot_spec_round_trip_preserves_extrinsic_source():
     cams = spec.physics.cameras
     assert len(cams) >= 1
     assert cams[0].extrinsic_source == "preset_default"
+
+
+def test_workspace_declared_with_bounds():
+    data = _load()
+    ws = data["physics"].get("workspace")
+    assert ws is not None
+    bounds = ws.get("bounds_mm")
+    assert bounds is not None
+    for axis in ("x", "y", "z"):
+        assert axis in bounds
+        lo, hi = bounds[axis]
+        assert lo < hi
+
+
+def test_workspace_covers_default_ready_target():
+    """Target (200, 0, 50) must be inside declared workspace."""
+    data = _load()
+    bounds = data["physics"]["workspace"]["bounds_mm"]
+    assert bounds["x"][0] <= 200 <= bounds["x"][1]
+    assert bounds["y"][0] <= 0 <= bounds["y"][1]
+    assert bounds["z"][0] <= 50 <= bounds["z"][1]
+
+
+def test_capability_contracts_arm_pick():
+    data = _load()
+    contracts = data.get("capability_contracts") or {}
+    pick = contracts.get("arm.pick")
+    assert pick is not None
+    precondition_kinds = [p.get("kind") for p in pick.get("preconditions", [])]
+    assert set(precondition_kinds) >= {
+        "pose_taught",
+        "extrinsic_present",
+        "ik_provider_set",
+        "workspace_declared",
+        "backend_resolved",
+    }
+
+
+def test_capability_contracts_arm_place():
+    data = _load()
+    contracts = data.get("capability_contracts") or {}
+    place = contracts.get("arm.place")
+    assert place is not None
+
+
+def test_capability_contracts_arm_home():
+    data = _load()
+    contracts = data.get("capability_contracts") or {}
+    home = contracts.get("arm.home")
+    assert home is not None
+    kinds = [p.get("kind") for p in home.get("preconditions", [])]
+    assert "pose_taught" in kinds

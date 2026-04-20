@@ -93,6 +93,15 @@ physics:
       servo_id: 6
       encoder_sign: 1
       zero_pose_steps: 1200      # close position default
+  workspace:
+    from_pose: ready
+    bounds_mm:
+      x: [-200, 340]
+      y: [-340, 340]
+      z: [0, 250]
+    note: >-
+      Tabletop manipulation envelope centered on arm base. Outside this box,
+      arm.pick / arm.place will return status=unreachable.
 
 drivers:
   - id: arm_servos
@@ -127,6 +136,59 @@ capabilities:
   - arm.reach
   - arm.home
   - status.report
+
+capability_contracts:
+  arm.pick:
+    args:
+      target:
+        kind: object_descriptor_ref
+        required: true
+      approach_height_mm:
+        kind: float
+        default: 40
+    returns:
+      status:
+        kind: enum
+        values: [ok, blocked, error, no_target, unreachable]
+    preconditions:
+      - kind: pose_taught
+        name: ready
+      - kind: extrinsic_present
+        name: cameras[0]
+      - kind: ik_provider_set
+      - kind: workspace_declared
+      - kind: backend_resolved
+
+  arm.place:
+    args:
+      target:
+        kind: object_descriptor_ref
+        required: true
+      approach_height_mm:
+        kind: float
+        default: 50
+    returns:
+      status:
+        kind: enum
+        values: [ok, blocked, error, no_target, unreachable]
+    preconditions:
+      - kind: pose_taught
+        name: ready
+      - kind: extrinsic_present
+        name: cameras[0]
+      - kind: ik_provider_set
+      - kind: workspace_declared
+      - kind: backend_resolved
+
+  arm.home:
+    returns:
+      status:
+        kind: enum
+        values: [ok, blocked, error]
+    preconditions:
+      - kind: pose_taught
+        name: ready
+      - kind: backend_resolved
 
 safety:
   p66_enabled: true
