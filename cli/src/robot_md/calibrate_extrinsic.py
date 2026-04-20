@@ -7,11 +7,13 @@ marker; the gripper tip is the fiducial, positioned by FK.
 from __future__ import annotations
 
 import random
+import time
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
 
+from robot_md.gripper_silhouette import find_via_motion_delta
 from robot_md.kinematics import Kinematics
 
 
@@ -82,6 +84,77 @@ def plan_sweep(
             f"widen workspace bounds or reduce n_poses"
         )
     return poses
+
+
+def capture_via_wrist_wiggle(
+    bus: Any,
+    camera: Any,
+    kin: Kinematics,
+    pose: dict[str, float],
+    *,
+    wiggle_rad: float = 0.15,
+    settle_s: float = 0.4,
+) -> tuple[dict[str, float] | None, np.ndarray | None, float]:
+    """Capture a gripper observation by wiggling ONLY wrist_flex between
+    two depth frames.
+
+    Moves the arm to ``pose``, captures ``depth_A``, shifts wrist_flex by
+    ±``wiggle_rad`` (sign chosen to stay within joint limits), captures
+    ``depth_B``, and returns the motion-delta centroid.
+
+    Because only wrist_flex moved between frames, the centroid is the
+    gripper's silhouette — not a forearm-dominated average, which is the
+    failure mode of pose-to-pose motion delta used in v0.7.3.
+
+    Returns ``(wiggled_pose, centroid_cam, confidence)``. On failure
+    (joint missing, both directions outside limits, camera grab failed,
+    motion cluster too small) returns ``(None, None, 0.0)``.
+    """
+    wrist = kin.by_id.get("wrist_flex")
+    if wrist is None:
+        return None, None, 0.0
+
+    base_angle = pose.get("wrist_flex", 0.0)
+    lo, hi = wrist.limits_rad
+    if base_angle + wiggle_rad <= hi:
+        delta = wiggle_rad
+    elif base_angle - wiggle_rad >= lo:
+        delta = -wiggle_rad
+    else:
+        return None, None, 0.0
+
+    wiggled_pose = dict(pose)
+    wiggled_pose["wrist_flex"] = base_angle + delta
+
+    pose_steps = {
+        jid: kin.by_id[jid].rad_to_steps(rad)
+        for jid, rad in pose.items()
+        if jid in kin.by_id
+    }
+    wiggled_steps = dict(pose_steps)
+    wiggled_steps["wrist_flex"] = kin.by_id["wrist_flex"].rad_to_steps(
+        wiggled_pose["wrist_flex"]
+    )
+
+    start_steps = bus.read_positions()
+    bus.interpolate(start_steps, pose_steps, hz=30, estop=None)
+    time.sleep(settle_s)
+    frame_a = camera.grab_frame()
+    if frame_a is None:
+        return None, None, 0.0
+    _rgb_a, depth_a, K = frame_a
+
+    bus.interpolate(pose_steps, wiggled_steps, hz=30, estop=None)
+    time.sleep(settle_s)
+    frame_b = camera.grab_frame()
+    if frame_b is None:
+        return None, None, 0.0
+    _rgb_b, depth_b, _K_b = frame_b
+
+    centroid, confidence = find_via_motion_delta(depth_a, depth_b, K)
+    if centroid is None:
+        return None, None, 0.0
+    return wiggled_pose, centroid, confidence
 
 
 def solve(samples: list[Sample]) -> tuple[list[float], float]:

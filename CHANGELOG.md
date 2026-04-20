@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased] — v0.7.4 (wrist-wiggle calibration primitive)
+
+### Added
+
+- **`calibrate_extrinsic.capture_via_wrist_wiggle(bus, camera, kin, pose)`** — new primary detector for the calibration sweep. At each target pose, moves the arm to the pose, captures `depth_A`, shifts *only* `wrist_flex` by ±0.15 rad, captures `depth_B`, and returns the motion-delta centroid. Because only `wrist_flex` moves between frames, the centroid is the gripper silhouette in isolation — not a forearm-dominated weighted centroid, which is the failure mode that held v0.7.3 to a 128mm residual on physical hardware.
+- Wiggle direction is chosen to stay within `wrist_flex` joint limits; if neither +Δ nor −Δ fits, the pose is skipped and the caller falls back to `find_in_depth`.
+
+### Changed
+
+- **`phase_calibrate_extrinsic` uses wrist-wiggle as primary detector.** Replaces the pose-to-pose motion delta introduced in v0.7.3. Projection-based `find_in_depth` remains as fallback when the wiggle confidence is below 0.2 (gripper out of frame, joint at limit, etc.).
+
+### Compatibility
+
+- No schema changes. v0.7.x manifests load unchanged.
+
+---
+
 ## [0.7.3] — 2026-04-20
 
 ### Added — extrinsic-free bootstrap for calibration
