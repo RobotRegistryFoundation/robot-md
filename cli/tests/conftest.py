@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -42,7 +43,9 @@ def pytest_addoption(parser):
 def pytest_collection_modifyitems(config, items):
     if config.getoption("--run-hardware", default=False):
         return
-    skip_hw = pytest.mark.skip(reason="hardware tests require --run-hardware")
+    if os.environ.get("RM_HARDWARE") == "1":
+        return
+    skip_hw = pytest.mark.skip(reason="hardware tests require --run-hardware or RM_HARDWARE=1")
     for item in items:
         if "hardware" in item.keywords:
             item.add_marker(skip_hw)
