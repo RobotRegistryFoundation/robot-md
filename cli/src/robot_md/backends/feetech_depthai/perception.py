@@ -32,6 +32,19 @@ class Perception:
         cam = next(iter(spec.physics.cameras), None)
         return cls(driver_id=cam.driver_id if cam else "none", _spec=spec)
 
+    def probe(self) -> dict[str, bool]:
+        """Shallow hardware probe — reports stream availability without opening hardware.
+
+        Returns ``{"rgb": bool, "depth": bool}``. When ``driver_id`` is not
+        "none" (i.e. a real camera was declared in the manifest), both streams
+        are considered plausibly available. The check is intentionally
+        conservative: it reflects the manifest declaration, not a live device
+        test, so doctor stays side-effect-free. A deeper runtime probe would
+        require ``open()``/``close()`` which is unsuitable in doctor context.
+        """
+        available = self.driver_id != "none"
+        return {"rgb": available, "depth": available}
+
     def open(self) -> None:
         try:
             import depthai as dai

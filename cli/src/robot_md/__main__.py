@@ -366,6 +366,19 @@ def unregister(
         raise typer.Exit(code=rc)
 
 
+def _hardware_present() -> bool:
+    """Heuristic: return True if any /dev/ttyACM* device is visible.
+
+    Used by ``--hardware auto`` to decide whether to attempt hardware checks.
+    Conservative by design — only triggers when a serial device is plugged in;
+    does not probe USB or depthai directly. This keeps doctor side-effect-free
+    on machines without hardware attached.
+    """
+    import glob as _glob
+
+    return bool(_glob.glob("/dev/ttyACM*"))
+
+
 @app.command()
 def doctor(
     path: Path | None = typer.Option(
@@ -378,6 +391,14 @@ def doctor(
     ),
     json_out: bool = typer.Option(
         False, "--json", help="Emit results as JSON instead of a rich table."
+    ),
+    hardware: str = typer.Option(
+        "auto",
+        "--hardware",
+        help="Hardware checks: auto | on | off. "
+        "auto runs checks when /dev/ttyACM* is present; "
+        "on forces checks even without detected hardware; "
+        "off skips hardware checks entirely.",
     ),
 ) -> None:
     """Diagnose the local environment + manifest.
@@ -395,9 +416,56 @@ def doctor(
       robot-md doctor --path examples/bob.ROBOT.md
       robot-md doctor --strict --json          # CI-friendly
     """
-    from robot_md.doctor import counts, exit_code, run_all
+    from robot_md.doctor import CheckResult, counts, exit_code, run_all
 
     results = run_all(path)
+
+    # Optional hardware checks — converted to CheckResult so they appear in
+    # both the rich table and --json output.
+    should_hw = hardware == "on" or (hardware == "auto" and _hardware_present())
+    if should_hw:
+        try:
+            from robot_md.backends.feetech_depthai.doctor import hw_checks
+            from robot_md.backends.feetech_depthai.servo import ServoBus
+            from robot_md.backends.feetech_depthai.perception import Perception
+            from robot_md.robot_spec import RobotSpec
+            from robot_md.parser import parse_file as _parse_file
+
+            if path is None:
+                results.append(
+                    CheckResult(
+                        "hardware checks",
+                        "hardware",
+                        "skip",
+                        "no manifest path — pass --path to enable",
+                    )
+                )
+            else:
+                spec = RobotSpec.from_parsed(_parse_file(path))
+                expected_ids = {
+                    j["id"]
+                    for j in spec.physics.kinematics
+                    if isinstance(j, dict) and "id" in j
+                }
+                bus = ServoBus.from_spec(spec)
+                cam = Perception.from_spec(spec)
+                bus.open()
+                try:
+                    hw = hw_checks(bus=bus, camera=cam, expected_servo_ids=expected_ids)
+                    for c_hw in hw:
+                        # Map hw Check status to doctor CheckResult status:
+                        # "info" maps to "skip" (non-actionable), rest pass through.
+                        doctor_status = c_hw.status if c_hw.status != "info" else "skip"
+                        results.append(
+                            CheckResult(c_hw.name, "hardware", doctor_status, c_hw.message)
+                        )
+                finally:
+                    bus.close()
+        except Exception as e:
+            results.append(
+                CheckResult("hardware checks", "hardware", "skip", f"skipped: {e}")
+            )
+
     c = counts(results)
 
     if json_out:

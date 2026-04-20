@@ -56,6 +56,10 @@ def _skip(name: str, bucket: str, detail: str) -> CheckResult:
     return CheckResult(name, bucket, "skip", detail)
 
 
+def _info(name: str, bucket: str, detail: str) -> CheckResult:
+    return CheckResult(name, bucket, "info", detail)
+
+
 # ----------------------------------------------------------------- 1. install
 
 
@@ -292,6 +296,17 @@ def check_calibration(fm: dict | None) -> list[CheckResult]:
         ))
     else:
         out.append(_pass("extrinsic source", "calibration", "calibrated or user-declared"))
+
+    # Surface extrinsic_residual_mm from the first camera entry when present.
+    cam0 = cams[0] if cams else {}
+    residual = cam0.get("extrinsic_residual_mm")
+    if residual is not None:
+        out.append(_info(
+            "extrinsic residual",
+            "calibration",
+            f"{residual} mm",
+        ))
+
     return out
 
 
