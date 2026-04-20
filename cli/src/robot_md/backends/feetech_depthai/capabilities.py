@@ -214,20 +214,14 @@ def _execute_pick_or_place(
         backend._motion.replay(motion_waypoints, servo_bus=bus, estop=estop)
     except Exception as e:
         events.append(ExecutionEvent(kind="bus_error", data={"detail": str(e)}))
-        try:
-            bus.torque(False)
-        except Exception:
-            pass
         return ExecutionResult(
             status="error",
             trajectory=trajectory,
             events=events,
             error={"reason": "bus_error", "detail": str(e)},
         )
-    try:
-        bus.torque(False)
-    except Exception:
-        pass
+    # Torque stays on after successful motion — the arm holds the final pose.
+    # Callers that want limp (teach-mode, shutdown) should drop torque explicitly.
 
     events.append(ExecutionEvent(kind="done", data={"label": label}))
     return ExecutionResult(status="ok", trajectory=trajectory, events=events, error=None)
@@ -287,11 +281,9 @@ def _do_replay(backend, *, waypoints, label, args, dry_run, estop) -> ExecutionR
 
     bus = backend._servo_bus
     motion = backend._motion
-    try:
-        bus.torque(True)
-        motion.replay(waypoints, servo_bus=bus, estop=estop)
-    finally:
-        bus.torque(False)
+    bus.torque(True)
+    motion.replay(waypoints, servo_bus=bus, estop=estop)
+    # Torque stays on after successful motion — arm holds the final pose.
 
     events.append(ExecutionEvent(kind="done", data={"label": label}))
     return ExecutionResult(status="ok", trajectory=trajectory, events=events, error=None)

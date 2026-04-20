@@ -70,7 +70,9 @@ def test_compute_ready_pose_gripper_defaults_to_open():
 
 
 def test_compute_ready_pose_uses_default_target_when_omitted():
-    """Default target is (200, 0, 50) mm per spec."""
+    """Default target is (200, 0, 20) mm — keeps wrist_flex well inside the
+    ±90° declared limit on SO-ARM101 (was (200, 0, 50) but that produced
+    wrist_flex=94.7°, beyond the servo's mechanical envelope)."""
     a = compute_ready_pose(_so_arm101_frontmatter())
-    b = compute_ready_pose(_so_arm101_frontmatter(), target_mm=(200, 0, 50))
+    b = compute_ready_pose(_so_arm101_frontmatter(), target_mm=(200, 0, 20))
     assert a == b

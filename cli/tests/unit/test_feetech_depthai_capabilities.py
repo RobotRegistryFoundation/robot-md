@@ -139,11 +139,15 @@ def test_vision_describe_grabs_a_frame():
     b._perception.grab_frame.assert_called_once()
 
 
-def test_arm_pick_torque_on_then_off():
+def test_arm_pick_torques_on_and_holds():
+    """After successful arm.pick, torque stays on so the arm holds the lifted object.
+
+    Callers that want limp (shutdown, teach-mode) drop torque explicitly.
+    """
     b = _backend()
     dispatch(b, capability="arm.pick", args={"target": "lego"}, dry_run=False, estop=_estop())
     torque_calls = [c.args[0] for c in b._servo_bus.torque.call_args_list]
-    assert torque_calls == [True, False]
+    assert torque_calls == [True]
 
 
 def test_arm_home_uses_poses_ready_when_present():
@@ -190,5 +194,6 @@ def test_arm_home_invokes_motion_replay_when_not_dry_run():
     res = dispatch(b, capability="arm.home", args={}, dry_run=False, estop=_estop())
     assert res.status == "ok"
     b._motion.replay.assert_called_once()
+    # Torque stays on after successful motion so the arm holds the ready pose.
     torque_calls = [c.args[0] for c in b._servo_bus.torque.call_args_list]
-    assert torque_calls == [True, False]
+    assert torque_calls == [True]

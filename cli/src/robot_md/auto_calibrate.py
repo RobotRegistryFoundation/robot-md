@@ -15,7 +15,7 @@ from robot_md.kinematics import Kinematics, KinematicsError
 def compute_ready_pose(
     parsed: Any,
     *,
-    target_mm: tuple[float, float, float] = (200.0, 0.0, 50.0),
+    target_mm: tuple[float, float, float] = (200.0, 0.0, 20.0),
 ) -> dict[str, int] | None:
     """Solve IK for `target_mm` and return per-joint encoder step targets.
 

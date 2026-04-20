@@ -93,6 +93,21 @@ physics:
       servo_id: 6
       encoder_sign: 1
       zero_pose_steps: 1200      # close position default
+  poses:
+    ready:
+      description: >-
+        Forward-extended pose with gripper pointing horizontally — keeps
+        wrist_flex near center so the STS3215 can hold indefinitely
+        against gravity. Pick motions solve their own gripper-down geometry
+        from here via IK.
+      joints:
+        shoulder_pan: 2048
+        shoulder_lift: 1800
+        elbow_flex: 2300
+        wrist_flex: 2048
+        wrist_roll: 2048
+        gripper: 1700
+      source: declared
   workspace:
     from_pose: ready
     bounds_mm:

@@ -241,12 +241,26 @@ class Kinematics:
         # For tool_x = (0, 0, -1) we need Σθ = π/2.
         wrist_flex = (math.pi / 2) - shoulder_lift - elbow_flex
 
-        return {
+        solved = {
             "shoulder_pan": pan,
             "shoulder_lift": shoulder_lift,
             "elbow_flex": elbow_flex,
             "wrist_flex": wrist_flex,
         }
+        # Enforce declared joint limits — a solved angle outside the mechanical
+        # envelope would stall or damage the servo.
+        for name, angle in solved.items():
+            j = self.by_id.get(name)
+            if j is None:
+                continue
+            lo, hi = j.limits_rad
+            if not (lo <= angle <= hi):
+                raise KinematicsError(
+                    f"ik target unreachable within joint limits: {name}="
+                    f"{math.degrees(angle):+.1f}° outside "
+                    f"[{math.degrees(lo):+.1f}, {math.degrees(hi):+.1f}]°"
+                )
+        return solved
 
     # ------------------------------------------------------------ helpers
 
