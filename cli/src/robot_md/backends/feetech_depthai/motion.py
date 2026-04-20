@@ -42,7 +42,21 @@ class Motion:
         if not waypoints:
             return
         if len(waypoints) == 1:
-            servo_bus.write_positions(waypoints[0].joints)
+            # Interpolate from current position to the single target so servos
+            # actually reach it before the caller torques off. A plain goal
+            # write returns immediately; STS3215 at default speed can take
+            # ~1s to cross a large delta.
+            start = servo_bus.read_positions()
+            if start:
+                servo_bus.interpolate(
+                    start,
+                    waypoints[0].joints,
+                    hz=hz,
+                    max_steps_per_tick=max_steps_per_tick,
+                    estop=estop,
+                )
+            else:
+                servo_bus.write_positions(waypoints[0].joints)
             return
         for i in range(len(waypoints) - 1):
             if estop.is_set():

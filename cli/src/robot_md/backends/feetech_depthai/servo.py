@@ -135,7 +135,7 @@ class ServoBus:
         ticks = max(1, (max_delta + max_steps_per_tick - 1) // max_steps_per_tick)
         dt = 1.0 / hz
         for i in range(1, ticks + 1):
-            if estop.is_set():
+            if estop is not None and estop.is_set():
                 return
             alpha = i / ticks
             for n, d in deltas.items():
