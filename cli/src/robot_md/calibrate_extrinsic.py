@@ -68,7 +68,11 @@ def plan_sweep(
             cfg = kin.ik_reach((x, y, z))
         except Exception:
             continue
-        risk = kin.analyze_envelope(cfg, duration_ms=1000)
+        # Sweep poses are transient (held only long enough for one frame
+        # capture, << 500ms), so use duration_ms=200 — far below
+        # TRANSIENT_MS. Using 1000ms here would reject IK-reachable poses
+        # on real ±90° limits that are totally safe when held briefly.
+        risk = kin.analyze_envelope(cfg, duration_ms=200)
         if risk.level != "ok":
             continue
         poses.append(cfg)
