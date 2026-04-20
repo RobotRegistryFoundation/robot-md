@@ -83,6 +83,26 @@ def build_server(ctx: McpContext):
 
         return vision_find_tool(ctx, descriptor_id=descriptor_id)
 
+    @server.tool()
+    def record_skill(
+        skill_id: str,
+        status: str = "ok",
+        validated: list[str] | None = None,
+        blocked_by: list[str] | None = None,
+        notes: str | None = None,
+    ) -> dict:
+        """Append/upsert a learned_skills[] entry on the served ROBOT.md."""
+        from robot_md.mcp.tools.record_skill import record_skill_tool
+
+        return record_skill_tool(
+            ctx,
+            skill_id=skill_id,
+            status=status,
+            validated=validated,
+            blocked_by=blocked_by,
+            notes=notes,
+        )
+
     robot_name = ctx.spec.metadata.robot_name if ctx.spec else "robot"
 
     @server.resource(f"robot-md://{robot_name}/learned_skills")
