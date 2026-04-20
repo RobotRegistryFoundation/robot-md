@@ -73,9 +73,12 @@ def _do_detect(ctx: Any, frame, payload: dict) -> dict:
 
 
 def _do_probe(ctx: Any, payload: dict) -> dict:
-    """Move one joint by delta, image-diff before/after, report px shift + direction."""
-    import contextlib
+    """Move one joint by delta, image-diff before/after, report px shift + direction.
 
+    Returns a status dict; never raises. Safety: refuses to write when the bus
+    didn't report a position for the probed joint (closed bus or non-responding
+    servo) — avoids commanding an absolute move anchored at a fabricated 2048.
+    """
     import cv2
     import numpy as np
 
@@ -93,44 +96,59 @@ def _do_probe(ctx: Any, payload: dict) -> dict:
     if f_before is None:
         return {"status": "no_frame_before"}
 
-    current = bus.read_positions() if hasattr(bus, "read_positions") else {}
-    target = dict(current)
-    target[joint] = int(current.get(joint, 2048)) + delta
-
-    bus.torque(True)
     try:
+        current = bus.read_positions() if hasattr(bus, "read_positions") else {}
+    except Exception as e:
+        return {"status": "bus_error", "error": str(e)}
+
+    if joint not in current:
+        # Closed bus or non-responding servo. Refuse to write — a fabricated
+        # absolute target could yank the arm.
+        return {"status": "no_position_read", "joint": joint}
+
+    target = dict(current)
+    target[joint] = int(current[joint]) + delta
+
+    f_after = None
+    try:
+        bus.torque(True)
         bus.write_positions(target)
         f_after = per.grab_frame()
+    except Exception as e:
+        return {"status": "bus_error", "error": str(e)}
     finally:
-        # Best-effort return to the starting position.
+        # Best-effort return to starting position.
+        import contextlib
         with contextlib.suppress(Exception):
             bus.write_positions(current)
 
     if f_after is None:
         return {"status": "no_frame_after"}
 
-    rgb_before = cv2.cvtColor(f_before[0], cv2.COLOR_BGR2GRAY)
-    rgb_after = cv2.cvtColor(f_after[0], cv2.COLOR_BGR2GRAY)
-    diff = cv2.absdiff(rgb_before, rgb_after)
-    _, th = cv2.threshold(diff, 30, 255, cv2.THRESH_BINARY)
-    col_sum = th.sum(axis=0)
-    xs = np.arange(len(col_sum))
-    total = int(col_sum.sum())
-    if total == 0:
+    # Centroid-diff formula: threshold before and after independently, compute
+    # the u-centroid of each white mask, difference gives signed pixel shift.
+    def _u_centroid(bgr) -> float | None:
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+        _, th = cv2.threshold(gray, 30, 255, cv2.THRESH_BINARY)
+        col_sum = th.sum(axis=0)
+        total = int(col_sum.sum())
+        if total == 0:
+            return None
+        xs = np.arange(len(col_sum), dtype=np.float64)
+        return float((xs * col_sum).sum() / total)
+
+    c_before = _u_centroid(f_before[0])
+    c_after = _u_centroid(f_after[0])
+    if c_before is None or c_after is None:
         return {"status": "no_motion_detected"}
 
-    # Split motion mass left-of-center vs right-of-center to infer direction.
-    cx = rgb_before.shape[1] / 2
-    lmass = int(col_sum[xs < cx].sum())
-    rmass = int(col_sum[xs >= cx].sum())
-
-    # Empirical px-shift: the "after" column-range minus the "before" column-range.
-    cols_active = xs[col_sum > 0]
-    if cols_active.size == 0:
+    signed = c_after - c_before
+    px_shift = round(abs(signed))
+    if px_shift == 0:
         return {"status": "no_motion_detected"}
-    px_shift = int((cols_active.max() - cols_active.min()) // 2)
+
     direction = (
-        "positive_delta→image_right" if rmass >= lmass else "positive_delta→image_left"
+        "positive_delta→image_right" if signed >= 0 else "positive_delta→image_left"
     )
     return {
         "status": "ok",

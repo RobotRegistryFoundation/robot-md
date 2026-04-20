@@ -225,3 +225,151 @@ def test_discover_probe_direction_returns_bus_to_start():
     # Last write should be the starting positions (return-home).
     assert bus.written[-1]["shoulder_pan"] == 2048
     assert bus.written[-1]["gripper"] == 1700
+
+
+def test_discover_probe_direction_empty_read_returns_no_position_read():
+    """Bus returns {} → status=no_position_read; NO write before restore."""
+    import cv2
+    import numpy as np
+
+    rgb = np.zeros((200, 300, 3), dtype=np.uint8)
+    cv2.rectangle(rgb, (140, 50), (160, 150), (255, 255, 255), -1)
+
+    class _EmptyReadBus:
+        def __init__(self):
+            self.written = []
+        def torque(self, on):
+            pass
+        def write_positions(self, p):
+            self.written.append(dict(p))
+        def read_positions(self):
+            return {}  # closed bus
+
+    per = MagicMock()
+    per.grab_frame.return_value = (rgb, np.full((200, 300), 500, dtype=np.uint16), None)
+    backend = MagicMock()
+    backend._perception = per
+    bus = _EmptyReadBus()
+    backend._servo_bus = bus
+    ctx = MagicMock()
+    ctx.spec = MagicMock()
+    ctx.spec.vision = VisionBlock(object_descriptors=())
+    ctx.backend = backend
+
+    from robot_md.mcp.tools.discover import discover_tool
+    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    assert r["results"]["probe_direction"]["status"] == "no_position_read"
+    # Critical: no write should have happened.
+    assert bus.written == []
+
+
+def test_discover_probe_direction_partial_read_no_joint_returns_no_position_read():
+    """Bus returns partial dict without the probed joint → no_position_read."""
+    import cv2
+    import numpy as np
+
+    rgb = np.zeros((200, 300, 3), dtype=np.uint8)
+    cv2.rectangle(rgb, (140, 50), (160, 150), (255, 255, 255), -1)
+
+    class _PartialBus:
+        def __init__(self):
+            self.written = []
+        def torque(self, on):
+            pass
+        def write_positions(self, p):
+            self.written.append(dict(p))
+        def read_positions(self):
+            return {"gripper": 1700}  # shoulder_pan omitted
+
+    per = MagicMock()
+    per.grab_frame.return_value = (rgb, np.full((200, 300), 500, dtype=np.uint16), None)
+    backend = MagicMock()
+    backend._perception = per
+    bus = _PartialBus()
+    backend._servo_bus = bus
+    ctx = MagicMock()
+    ctx.spec = MagicMock()
+    ctx.spec.vision = VisionBlock(object_descriptors=())
+    ctx.backend = backend
+
+    from robot_md.mcp.tools.discover import discover_tool
+    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    assert r["results"]["probe_direction"]["status"] == "no_position_read"
+    assert bus.written == []
+
+
+def test_discover_probe_direction_torque_raise_does_not_escape():
+    """Any bus exception converts to a status, not a raise."""
+    import cv2
+    import numpy as np
+
+    rgb = np.zeros((200, 300, 3), dtype=np.uint8)
+    cv2.rectangle(rgb, (140, 50), (160, 150), (255, 255, 255), -1)
+
+    class _TorqueExplodesBus:
+        def torque(self, on):
+            raise RuntimeError("bus closed")
+        def write_positions(self, p):
+            pass
+        def read_positions(self):
+            return {"shoulder_pan": 2048}
+
+    per = MagicMock()
+    per.grab_frame.return_value = (rgb, np.full((200, 300), 500, dtype=np.uint16), None)
+    backend = MagicMock()
+    backend._perception = per
+    backend._servo_bus = _TorqueExplodesBus()
+    ctx = MagicMock()
+    ctx.spec = MagicMock()
+    ctx.spec.vision = VisionBlock(object_descriptors=())
+    ctx.backend = backend
+
+    from robot_md.mcp.tools.discover import discover_tool
+    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    # Must not raise. Status is a failure marker.
+    pd = r["results"]["probe_direction"]
+    assert pd["status"] in ("bus_error", "no_frame_after")
+
+
+def test_discover_probe_direction_px_shift_is_centroid_diff_not_width_times_two():
+    """A 100px-wide bar shifted 30px must report ~30, not ~65 (bar_width + shift bug)."""
+    import cv2
+    import numpy as np
+
+    # 100-px wide bar shifted by 30 px.
+    rgb1 = np.zeros((200, 400, 3), dtype=np.uint8)
+    cv2.rectangle(rgb1, (100, 50), (200, 150), (255, 255, 255), -1)  # u centroid ≈ 150
+    rgb2 = np.zeros((200, 400, 3), dtype=np.uint8)
+    cv2.rectangle(rgb2, (130, 50), (230, 150), (255, 255, 255), -1)  # u centroid ≈ 180
+
+    class _Bus:
+        def __init__(self):
+            self.written = []
+        def torque(self, on):
+            pass
+        def write_positions(self, p):
+            self.written.append(dict(p))
+        def read_positions(self):
+            return {"shoulder_pan": 2048}
+
+    per = MagicMock()
+    per.grab_frame.side_effect = [
+        (rgb1, np.full((200, 400), 500, dtype=np.uint16), None),
+        (rgb2, np.full((200, 400), 500, dtype=np.uint16), None),
+    ]
+    backend = MagicMock()
+    backend._perception = per
+    backend._servo_bus = _Bus()
+    ctx = MagicMock()
+    ctx.spec = MagicMock()
+    ctx.spec.vision = VisionBlock(object_descriptors=())
+    ctx.backend = backend
+
+    from robot_md.mcp.tools.discover import discover_tool
+    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    pd = r["results"]["probe_direction"]
+    assert pd["status"] == "ok"
+    # With the correct centroid-diff formula, px_shift ≈ 30. With the old
+    # (max-min)//2 bug this would report ≈ 65 for a 100px bar.
+    assert 20 < pd["px_shift"] < 45, f"px_shift={pd['px_shift']} — centroid-diff regression?"
+    assert pd["direction"] == "positive_delta→image_right"
