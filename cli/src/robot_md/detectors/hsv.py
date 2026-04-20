@@ -44,7 +44,11 @@ def _hsv_mask(hsv: np.ndarray, params: dict[str, Any]) -> np.ndarray:
 
 
 def _depth_mask(depth_frame: np.ndarray, params: dict[str, Any]) -> np.ndarray | None:
-    """Return a uint8 mask where depth is within [min_depth_mm, max_depth_mm].
+    """Return a uint8 mask where depth is within [min_depth_mm, max_depth_mm]
+    OR unknown (value 0). Stereo depth has holes on textureless surfaces
+    (painted LEGO, matte table); we accept unknown-depth pixels so the
+    color match can survive and let the caller resolve the real depth
+    from surrounding valid pixels at resolve-time.
 
     Returns None when no bounds are declared in params (depth ignored).
     """
@@ -54,7 +58,9 @@ def _depth_mask(depth_frame: np.ndarray, params: dict[str, Any]) -> np.ndarray |
         return None
     lo = int(min_d) if min_d is not None else 0
     hi = int(max_d) if max_d is not None else 65535
-    return ((depth_frame >= lo) & (depth_frame <= hi)).astype(np.uint8) * 255
+    unknown = depth_frame == 0
+    in_range = (depth_frame >= lo) & (depth_frame <= hi)
+    return (unknown | in_range).astype(np.uint8) * 255
 
 
 def detect_hsv(

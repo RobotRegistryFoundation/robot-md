@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.2] — 2026-04-20
+
+### Fixed — stereo-hole survival in HSV + vision.find
+
+- **`_depth_mask` now accepts unknown-depth pixels (value 0).** Stereo depth sensors produce holes on textureless or highly reflective surfaces; painted LEGOs and matte tabletops are common offenders. Previously `detect_hsv(..., depth_frame=depth)` with workspace-derived bounds rejected every hole pixel, turning a clean color match into `no_match` because the joint (color ∧ depth) mask was empty. The mask now includes both in-range AND unknown-depth pixels, leaving real depth rejection to the resolve step.
+- **`vision_find` patch-median filters to the workspace depth band.** When the centroid pixel has zero depth and a 30m ceiling is visible through the stereo hole, the raw patch median locked onto the ceiling (30 000 mm), producing camera-frame XYZ that was geometrically nonsense. The patch is now filtered to pixels inside the declared workspace depth band before median, so the reported depth is the target's tabletop neighbors (~400 mm) rather than the far background.
+
+Together these two fixes unblock `vision.find("red_lego")` on physical OAK-D + tabletop LEGO setups where the LEGO surface itself produces no depth measurement.
+
+### Known issues (carried from v0.7.0)
+
+- Bootstrap-extrinsic cliff in `phase_calibrate_extrinsic` is unchanged — still tracked for v0.8 (motion-delta or fiducial-assisted bootstrap). Workaround documented in v0.7.1 changelog entry still applies.
+
+### Compatibility
+
+- v0.7.1 manifests validate and load unchanged. No schema changes. Both fixes are backward-compatible behavior improvements.
+
+---
+
 ## [0.7.1] — 2026-04-20
 
 ### Fixed

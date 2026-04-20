@@ -213,12 +213,25 @@ class Perception:
         import numpy as np
 
         # Patch-based depth sampling — median of valid pixels around (u, v)
-        # survives stereo holes better than a single-pixel lookup.
+        # survives stereo holes better than a single-pixel lookup. When
+        # depth bounds are active, filter the patch to in-band pixels first
+        # so the median reports the target (sitting on the tabletop) not
+        # the wall behind it — the LEGO centroid often has zero depth
+        # (stereo hole on matte surface) and a raw median picks up the
+        # ~30m ceiling visible through the hole.
         r = min(15, max(3, int((area ** 0.5) // 4)))
         h, w = depth.shape
         patch = depth[max(0, v - r): min(h, v + r + 1),
                       max(0, u - r): min(w, u + r + 1)].astype(np.float32)
         valid = patch[patch > 0]
+        min_d = descriptor_params_effective.get("min_depth_mm")
+        max_d = descriptor_params_effective.get("max_depth_mm")
+        if valid.size > 0 and (min_d is not None or max_d is not None):
+            lo_f = float(min_d) if min_d is not None else 0.0
+            hi_f = float(max_d) if max_d is not None else 65535.0
+            in_band = valid[(valid >= lo_f) & (valid <= hi_f)]
+            if in_band.size > 0:
+                valid = in_band
         if valid.size == 0:
             return {"status": "no_match", "descriptor": descriptor, "reason": "invalid_depth"}
         depth_mm = float(np.median(valid))
