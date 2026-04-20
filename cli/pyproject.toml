@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robot-md"
-version = "0.7.2"
+version = "0.7.3"
 description = "ROBOT.md — a single self-describing file so Claude can safely operate your robot."
 readme = "../README.md"
 requires-python = ">=3.10"

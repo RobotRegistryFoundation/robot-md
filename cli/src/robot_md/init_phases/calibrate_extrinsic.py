@@ -92,7 +92,7 @@ def phase_calibrate_extrinsic(
             write_extrinsic,
             CalibrationError,
         )
-        from robot_md.gripper_silhouette import find_in_depth
+        from robot_md.gripper_silhouette import find_in_depth, find_via_motion_delta
         from robot_md.kinematics import Kinematics
         import numpy as np
 
@@ -101,6 +101,7 @@ def phase_calibrate_extrinsic(
         poses = plan_sweep(fm, workspace, n_poses=n_poses, seed=0)
 
         samples: list[Sample] = []
+        prev_depth: np.ndarray | None = None
         for pose in poses:
             # Convert rad dict to step dict for the servo bus.
             step_cfg = {
@@ -119,16 +120,30 @@ def phase_calibrate_extrinsic(
             _rgb, depth, K = frame
             tip_base = np.array(kin.fk(pose), dtype=float)
 
-            # Initial guess for where the gripper should appear in camera frame:
-            # project base-frame tip through the current (preset-default) extrinsic.
-            from robot_md.extrinsic import six_vec_to_matrix
-            current_ext = fm["physics"]["solver"]["cameras"][0]["extrinsic"]
-            T = six_vec_to_matrix(current_ext)  # camera→base matrix
-            tip_base_h = np.append(tip_base, 1.0)
-            tip_cam_guess = (np.linalg.inv(T) @ tip_base_h)[:3][None, :]
+            # Primary detector: motion-delta vs previous frame. Extrinsic-free
+            # — works even when the preset-default projection is hundreds of
+            # pixels off from the physical camera mount. First pose has no
+            # previous frame, so we only capture it as a baseline.
+            centroid = None
+            confidence = 0.0
+            if prev_depth is not None:
+                centroid, confidence = find_via_motion_delta(prev_depth, depth, K)
 
-            centroid, confidence = find_in_depth(depth, K, tip_cam_guess, search_radius_mm=60)
-            if centroid is None or confidence < 0.3:
+            # Fallback: projection-based search using the current extrinsic.
+            # Useful on rigs where the preset is already close enough.
+            if centroid is None or confidence < 0.2:
+                from robot_md.extrinsic import six_vec_to_matrix
+                current_ext = fm["physics"]["solver"]["cameras"][0]["extrinsic"]
+                T = six_vec_to_matrix(current_ext)  # camera→base matrix
+                tip_base_h = np.append(tip_base, 1.0)
+                tip_cam_guess = (np.linalg.inv(T) @ tip_base_h)[:3][None, :]
+                centroid, confidence = find_in_depth(
+                    depth, K, tip_cam_guess, search_radius_mm=60
+                )
+
+            prev_depth = depth
+
+            if centroid is None or confidence < 0.2:
                 continue
             samples.append(
                 Sample(joints=pose, tip_cam=centroid, tip_base=tip_base, confidence=confidence)

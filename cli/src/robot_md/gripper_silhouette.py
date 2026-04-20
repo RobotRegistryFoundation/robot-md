@@ -109,3 +109,73 @@ def find_in_depth(
     n = pts.shape[0]
     confidence = min(1.0, n / 50.0) * (1.0 - min(1.0, float(std.max()) / 20.0))
     return centroid, float(confidence)
+
+
+# Motion-delta bootstrap: find the gripper in depth_curr by comparing to
+# depth_prev without any dependency on a prior extrinsic guess. Between
+# two sweep poses the gripper moves the farthest (largest moment arm), so
+# its pixels see the largest depth change. A SIGNED delta is required —
+# |delta| would mix "arm arrived here" (depth_curr < depth_prev) with
+# "arm used to be here, now showing background" (depth_curr > depth_prev)
+# into a single centroid between the two positions, which is not the
+# gripper's current location. We keep only the "arrived" pixels so the
+# centroid and depth reflect the arm's position in depth_curr.
+_MOTION_HIGH_THRESHOLD_MM = 60
+
+
+def find_via_motion_delta(
+    depth_prev: np.ndarray,
+    depth_curr: np.ndarray,
+    K: np.ndarray,
+    *,
+    threshold_mm: float = _MOTION_HIGH_THRESHOLD_MM,
+    min_cluster_px: int = 50,
+) -> tuple[np.ndarray | None, float]:
+    """Locate the gripper in `depth_curr` by comparing to `depth_prev`.
+
+    Assumes the only thing moving between frames is the arm, and that
+    the gripper has the largest moment arm. Uses a SIGNED depth delta:
+    only pixels where ``depth_curr`` is closer than ``depth_prev`` by
+    more than ``threshold_mm`` count as "arm arrived here". The centroid
+    of those pixels, at their current depth, is the gripper's current
+    camera-frame position (consistently biased toward whatever part of
+    the arm moved into the pixel — solver absorbs the bias).
+
+    Extrinsic-free; used to bootstrap calibration when the preset-
+    projection path fails.
+    """
+    if depth_prev.shape != depth_curr.shape:
+        return None, 0.0
+
+    valid = (depth_prev > 0) & (depth_curr > 0)
+    if not valid.any():
+        return None, 0.0
+
+    # Signed delta — positive means depth got closer (arm arrived).
+    closer = depth_prev.astype(np.int32) - depth_curr.astype(np.int32)
+    mask = valid & (closer > threshold_mm)
+    if int(mask.sum()) < min_cluster_px:
+        return None, 0.0
+
+    ys, xs = np.where(mask)
+    u_c = float(xs.mean())
+    v_c = float(ys.mean())
+
+    # Median depth in the arrived-arm region, taken from depth_curr.
+    region_depths = depth_curr[ys, xs]
+    region_valid = region_depths[region_depths > 0]
+    if region_valid.size == 0:
+        return None, 0.0
+    z = float(np.median(region_valid))
+    if z <= 0:
+        return None, 0.0
+
+    fx, fy = float(K[0, 0]), float(K[1, 1])
+    cx, cy = float(K[0, 2]), float(K[1, 2])
+    x = (u_c - cx) * z / fx
+    y = (v_c - cy) * z / fy
+
+    # Confidence scales with cluster size, capped at 1.0 for clusters
+    # ≥500 pixels (typical gripper silhouette at ~500mm standoff).
+    confidence = min(1.0, float(xs.size) / 500.0)
+    return np.array([x, y, z], dtype=float), confidence

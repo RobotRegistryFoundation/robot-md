@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.3] — 2026-04-20
+
+### Added — extrinsic-free bootstrap for calibration
+
+- **`gripper_silhouette.find_via_motion_delta(depth_prev, depth_curr, K)`.** Primary detector for `phase_calibrate_extrinsic`; locates the arm in `depth_curr` by comparing to `depth_prev` using a signed-delta filter — pixels where depth got meaningfully closer are the "arm arrived here" cluster. No projection through any extrinsic, so the 570-pixel bootstrap gap that killed v0.7.0–.2 on non-canonical camera mounts is gone. Solver absorbs any consistent bias from the centroid not being exactly the gripper tip.
+
+### Changed
+
+- **`phase_calibrate_extrinsic` uses motion-delta first, projection as fallback.** First pose is captured only as a baseline for the delta comparison; remaining poses produce samples via motion-delta. When motion-delta confidence is below 0.2 (e.g., arm didn't actually move between poses because IK happened to produce nearly-equal configs), the phase falls back to the v0.7.x projection-based `find_in_depth` search. Confidence threshold loosened from 0.3 to 0.2 to accommodate the slightly noisier motion-delta observations.
+
+### Known issues (resolved from v0.7.0–.2)
+
+- **Bootstrap cliff — CLOSED.** The issue that blocked real-hardware calibration (see CHANGELOG [0.7.1] known issues) is fixed by this release.
+
+### Compatibility
+
+- v0.7.2 manifests validate and load unchanged. No schema changes.
+
+---
+
 ## [0.7.2] — 2026-04-20
 
 ### Fixed — stereo-hole survival in HSV + vision.find
