@@ -272,7 +272,30 @@ def check_drivers(fm: dict[str, Any] | None) -> list[CheckResult]:
     return out
 
 
-# ----------------------------------------------------------------- 5. keystore
+# ------------------------------------------------------------- 5. calibration
+
+
+def check_calibration(fm: dict | None) -> list[CheckResult]:
+    """§ 6: Calibration provenance — warn on preset-default extrinsics."""
+    out: list[CheckResult] = []
+    if fm is None:
+        return out
+    cams = ((fm.get("physics") or {}).get("solver") or {}).get("cameras") or []
+    if not cams:
+        return out  # silent — camera-free robots skip this bucket
+    offenders = [i for i, c in enumerate(cams) if c.get("extrinsic_source") == "preset_default"]
+    if offenders:
+        out.append(_warn(
+            "extrinsic source",
+            "calibration",
+            "preset default — run `robot-md calibrate --hand-eye ROBOT.md` for precision",
+        ))
+    else:
+        out.append(_pass("extrinsic source", "calibration", "calibrated or user-declared"))
+    return out
+
+
+# ----------------------------------------------------------------- 6. keystore
 
 
 def check_keystore() -> list[CheckResult]:
@@ -327,6 +350,7 @@ def run_all(path: Path | None = None) -> list[CheckResult]:
     results.extend(m_results)
     results.extend(check_network(fm))
     results.extend(check_drivers(fm))
+    results.extend(check_calibration(fm))
     results.extend(check_keystore())
     return results
 
