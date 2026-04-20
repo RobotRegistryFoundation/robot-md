@@ -89,6 +89,25 @@ drivers:
     model: STS3215
     count: 6
 
+vision:
+  object_descriptors:
+    - id: red_lego
+      detector: hsv
+      params:
+        h_ranges: [[0, 10], [170, 180]]
+        s_min: 110
+        v_min: 80
+        min_area: 500
+    - id: white_bowl
+      detector: hsv_roi
+      params:
+        s_max: 80
+        v_min: 100
+        min_area: 3000
+        roi:
+          u_max: 450
+          v_max: 360
+
 capabilities:
   - arm.pick
   - arm.place

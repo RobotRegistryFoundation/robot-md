@@ -211,3 +211,20 @@ def test_unknown_preset_name_fails_cleanly(tmp_path):
     rc = non_interactive(out, robot_name="x", preset_name="not-a-real-preset", force=True)
     assert rc != 0
     assert not out.exists()
+
+
+def test_so_arm101_preset_ships_object_descriptors(presets):
+    """Preset so_arm101 declares red_lego + white_bowl by default."""
+    so = next(p for p in presets if p.name == "so_arm101")
+    vision = so.data.get("vision") or {}
+    descs = vision.get("object_descriptors") or []
+    ids = {d["id"] for d in descs}
+    assert "red_lego" in ids, f"missing red_lego; have {ids}"
+    assert "white_bowl" in ids, f"missing white_bowl; have {ids}"
+    # Spot-check shape: each declares a detector + params.
+    red = next(d for d in descs if d["id"] == "red_lego")
+    assert red["detector"] == "hsv"
+    assert "h_ranges" in red["params"]
+    bowl = next(d for d in descs if d["id"] == "white_bowl")
+    assert bowl["detector"] == "hsv_roi"
+    assert "roi" in bowl["params"]
