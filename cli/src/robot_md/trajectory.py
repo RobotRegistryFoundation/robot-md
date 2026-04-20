@@ -42,6 +42,7 @@ def _plan_core(
     gripper_bottom: int,
     gripper_bottom_phase: str,
     gripper_lift: int,
+    hold_ms: int = 1000,
 ) -> list[Waypoint]:
     if descent_slices < 1:
         raise ValueError("descent_slices must be >= 1")
@@ -65,6 +66,15 @@ def _plan_core(
         waypoints.append(Waypoint(phase="descent", joints=slice_steps))
         prev = slice_steps
 
+    # Pre-flight envelope check at the grasp/place pose — this is the config
+    # held under load for hold_ms.  Convert steps back to angles for analysis.
+    grasp_angles = kin.steps_to_angles({k: v for k, v in prev.items() if k in kin.by_id})
+    risk = kin.analyze_envelope(grasp_angles, duration_ms=hold_ms)
+    if risk.level == "out_of_limits":
+        raise KinematicsError(f"ik solution out of limits: {risk.reason}")
+    if risk.level == "latch_warning":
+        raise KinematicsError(f"ik solution at latch_warning: {risk.reason}")
+
     bottom_steps = {**prev, "gripper": gripper_bottom}
     waypoints.append(Waypoint(phase=gripper_bottom_phase, joints=bottom_steps))
 
@@ -80,8 +90,14 @@ def plan_pick(
     approach_height_mm: float,
     kin: Kinematics,
     descent_slices: int = 5,
+    hold_ms: int = 1000,
 ) -> list[Waypoint]:
-    """Pick: approach (gripper open) -> descent (open) -> close -> lift (closed)."""
+    """Pick: approach (gripper open) -> descent (open) -> close -> lift (closed).
+
+    ``hold_ms`` is the duration the arm will hold the grasp pose under load.
+    Passed to ``analyze_envelope`` to detect STS3215 latch risk before
+    returning the plan.  Default 1000ms matches a typical grasp hold.
+    """
     grip = kin.gripper_open_steps if kin.gripper_open_steps is not None else 1700
     close = kin.gripper_close_steps if kin.gripper_close_steps is not None else 1200
     return _plan_core(
@@ -94,6 +110,7 @@ def plan_pick(
         gripper_bottom=close,
         gripper_bottom_phase="grasp_close",
         gripper_lift=close,
+        hold_ms=hold_ms,
     )
 
 
@@ -104,8 +121,14 @@ def plan_place(
     approach_height_mm: float,
     kin: Kinematics,
     descent_slices: int = 5,
+    hold_ms: int = 1000,
 ) -> list[Waypoint]:
-    """Place: approach (gripper closed) -> descent (closed) -> open -> lift (open)."""
+    """Place: approach (gripper closed) -> descent (closed) -> open -> lift (open).
+
+    ``hold_ms`` is the duration the arm holds the place pose under load.
+    Passed to ``analyze_envelope`` to detect STS3215 latch risk before
+    returning the plan.  Default 1000ms matches a typical place hold.
+    """
     grip_open = kin.gripper_open_steps if kin.gripper_open_steps is not None else 1700
     grip_closed = kin.gripper_close_steps if kin.gripper_close_steps is not None else 1200
     return _plan_core(
@@ -118,4 +141,5 @@ def plan_place(
         gripper_bottom=grip_open,
         gripper_bottom_phase="grasp_open",
         gripper_lift=grip_open,
+        hold_ms=hold_ms,
     )

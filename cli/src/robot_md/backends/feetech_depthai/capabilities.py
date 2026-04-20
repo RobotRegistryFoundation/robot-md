@@ -178,11 +178,19 @@ def _execute_pick_or_place(
             kin=kin,
         )
     except KinematicsError as e:
+        msg = str(e)
+        lower = msg.lower()
+        if "latch_warning" in lower:
+            reason = "envelope_risk"
+        elif "out of limits" in lower:
+            reason = "joint_limit"
+        else:
+            reason = "ik_failed"
         return ExecutionResult(
             status="unreachable",
             trajectory=None,
             events=[],
-            error={"reason": "ik_failed", "detail": str(e)},
+            error={"reason": reason, "detail": msg},
         )
 
     events = [

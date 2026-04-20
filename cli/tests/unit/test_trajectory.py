@@ -98,3 +98,64 @@ def test_plan_place_opens_gripper_at_bottom():
     wps = plan_place(start_joints=start, target_base_xyz=(180, 80, 60), approach_height_mm=50, kin=kin, descent_slices=5)
     release = next(w for w in wps if w.phase == "grasp_open")
     assert release.joints["gripper"] == 1700
+
+
+def _latch_fm():
+    """Frontmatter designed so (200, 0, 5) with sustained hold trips latch_warning."""
+    return {
+        "physics": {
+            "solver": {
+                "convention": "DH",
+                "encoder": {"steps_per_rev": 4096},
+                "gripper": {
+                    "joint_id": "gripper",
+                    "tip_offset_mm": [30.0, 0.0, 0.0],
+                    "open_steps": 1700,
+                    "close_steps": 1200,
+                },
+            },
+            "kinematics": [
+                {"id": "shoulder_pan",  "axis": "z", "a_mm": 0.0,   "d_mm": 30.0, "limits_deg": [-180, 180]},
+                {"id": "shoulder_lift", "axis": "y", "a_mm": 120.0, "d_mm": 0.0,  "limits_deg": [-90, 90]},
+                {"id": "elbow_flex",    "axis": "y", "a_mm": 120.0, "d_mm": 0.0,  "limits_deg": [-90, 90]},
+                {"id": "wrist_flex",    "axis": "y", "a_mm": 60.0,  "d_mm": 0.0,  "limits_deg": [-90, 90]},
+                {"id": "wrist_roll",    "axis": "x", "a_mm": 0.0,   "d_mm": 30.0, "limits_deg": [-180, 180]},
+                {"id": "gripper",       "axis": "y", "a_mm": 0.0,   "d_mm": 0.0,  "limits_deg": [-90, 90]},
+            ],
+        }
+    }
+
+
+def test_plan_pick_rejects_latch_warning():
+    """If the grasp pose triggers analyze_envelope latch_warning (e.g., sustained
+    wrist_flex >85% envelope), plan_pick raises KinematicsError.
+
+    Target (190, 0, 15) with approach_height_mm=20 puts wrist_flex at ~80°
+    (88% of 90° envelope) across all descent slices.  With hold_ms=2000 that
+    is a sustained hold → latch_warning fires at the grasp pose.
+    """
+    from robot_md.kinematics import KinematicsError
+
+    fm = _latch_fm()
+    kin = Kinematics(fm)
+    start = {
+        "shoulder_pan": 2048,
+        "shoulder_lift": 2048,
+        "elbow_flex": 2048,
+        "wrist_flex": 2048,
+        "wrist_roll": 2048,
+        "gripper": 1700,
+    }
+    try:
+        plan_pick(
+            start_joints=start,
+            target_base_xyz=(190.0, 0.0, 15.0),
+            approach_height_mm=20.0,
+            kin=kin,
+            hold_ms=2000,
+        )
+    except KinematicsError as e:
+        msg = str(e).lower()
+        assert "latch" in msg or "envelope" in msg, f"unexpected message: {e}"
+        return
+    raise AssertionError("expected KinematicsError('latch_warning')")
