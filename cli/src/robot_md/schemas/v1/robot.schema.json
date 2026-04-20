@@ -217,8 +217,12 @@
                   },
                   "extrinsic_source": {
                     "type": ["string", "null"],
-                    "enum": ["preset_default", "hand_eye_calibrated", "user_declared", null],
-                    "description": "Provenance of extrinsic. `preset_default`: shipped guess. `hand_eye_calibrated`: from `robot-md calibrate --hand-eye`. `user_declared`: edited by hand."
+                    "enum": ["preset_default", "hand_eye_calibrated", "gripper_silhouette_calibrated", "user_declared", null],
+                    "description": "Provenance of extrinsic. `preset_default`: shipped guess. `hand_eye_calibrated`: legacy hand-eye. `gripper_silhouette_calibrated`: from `robot-md calibrate --extrinsic`. `user_declared`: edited by hand."
+                  },
+                  "extrinsic_residual_mm": {
+                    "type": "number",
+                    "description": "Mean residual (mm) from the last calibration; written by calibrate --extrinsic."
                   }
                 },
                 "additionalProperties": false
