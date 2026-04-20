@@ -103,6 +103,17 @@ def build_server(ctx: McpContext):
             notes=notes,
         )
 
+    @server.tool()
+    def discover(steps: list[dict]) -> dict:
+        """Run the declarative discovery pipeline.
+
+        Supported steps: capture, detect, probe_direction. See
+        docs/superpowers/specs/2026-04-19-claude-triad-gap-analysis.md §8.
+        """
+        from robot_md.mcp.tools.discover import discover_tool
+
+        return discover_tool(ctx, steps=steps)
+
     from robot_md.mcp.resources import _sanitize_robot_name
 
     robot_name = _sanitize_robot_name(
