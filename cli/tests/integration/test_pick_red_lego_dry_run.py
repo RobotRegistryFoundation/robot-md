@@ -148,12 +148,10 @@ def test_v061_pipeline_end_to_end(tmp_path: Path):
     bus.torque = MagicMock()
     perception = MagicMock()
     # Camera-frame XYZ chosen to land inside the preset-default workspace
-    # (base-frame ~(97, 0, 125)) after the so-arm101 default extrinsic
-    # [400, 0, 300, 0, π/6, π] is applied. See Task 12 plan notes: the
-    # preset-default extrinsic is a placeholder until hand-eye calibration
-    # runs, so the purely geometric workspace mapping is what matters here.
+    # after the so-arm101 default extrinsic (OAK-D at (400, 0, 300) looking
+    # at (200, 0, 0)) maps it into base frame. (0, 0, 340) → ~(211, 0, 17).
     perception.vision_find.return_value = {
-        "status": "ok", "descriptor": "red_lego", "xyz_cam_mm": (350.0, 0.0, 0.0),
+        "status": "ok", "descriptor": "red_lego", "xyz_cam_mm": (0.0, 0.0, 340.0),
     }
     backend = B(raw_frontmatter=fm, _servo_bus=bus, _motion=MagicMock(), _perception=perception)
 

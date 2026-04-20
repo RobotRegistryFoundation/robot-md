@@ -36,7 +36,7 @@ physics:
         # OAK-D on tripod 400mm in front of arm base, 300mm above tabletop,
         # pitched 30° down, facing the workspace. Users with different mounts
         # should run `robot-md calibrate --hand-eye`.
-        extrinsic: [400.0, 0.0, 300.0, 0.0, 0.5235987755982988, 3.141592653589793]
+        extrinsic: [400.0, 0.0, 300.0, -2.553590050042226, 0.0, 1.5707963267948966]
         extrinsic_source: preset_default
   kinematics:
     - id: shoulder_pan
