@@ -560,8 +560,8 @@
   <div class="C-term" id="termC">
     <div class="C-term-head">
       <div class="bulbs"><i></i><i></i><i></i></div>
-      <span class="path">~/bob · robot-md v0.6.0</span>
-      <span class="tag">● one command · manifest + MCP + skill + calibration</span>
+      <span class="path">~/bob · robot-md v0.6.2</span>
+      <span class="tag">● one command · manifest + MCP + skill + auto-calibrate + arm.pick</span>
     </div>
     <div class="C-term-body" id="termCBody">
       <div class="C-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md &amp;&amp; robot-md init my-bob --preset so-arm101 \
@@ -590,20 +590,21 @@
       <div class="C-line out"><span class="mute">→</span> sign check j1…j6 ........................................... <span class="ok">6 / 6 confirmed</span></div>
       <div class="C-line ask"><span class="q">Pose arm at declared zero and press Enter to record zero_pose_steps.</span></div>
       <div class="C-line out"><span class="mute">→</span> zero_pose_steps written · comments preserved by ruamel ...... <span class="ok">ok</span></div>
+      <div class="C-line out"><span class="mute">→</span> auto-calibrate <code style="color:#ffb88c">ready</code> from DH + IK · solved for (200, 0, 50)mm ... <span class="ok">6 joints</span></div>
 
       <div class="C-line banner">▸ ready · bob @ RRN-000000000173 · rcan.dev/r/RRN-000000000173</div>
       <div class="C-line step"><span class="bullet">▸</span> hint: <span style="color:#ffb88c">robot-md dashboard serve</span> opens 127.0.0.1:8091 for live servo + OAK-D + tool-call log.</div>
 
       <div class="C-line prompt" style="margin-top:10px"><span class="p">$</span><span class="cmd">claude</span></div>
-      <div class="C-line out"><span class="mute">›</span> <span class="v">bob</span> is online. Teach the <code style="color:#ffb88c">ready</code> pose so I can pick things up?</div>
-      <div class="C-line out">yes<span class="C-cursor"></span></div>
+      <div class="C-line out"><span class="mute">›</span> <span class="v">bob</span> is online. <code style="color:#ffb88c">ready</code> pose auto-calibrated. What should I pick?</div>
+      <div class="C-line out">pick the red lego and place it in the bowl<span class="C-cursor"></span></div>
     </div>
   </div>
 
   <div class="C-sig">
     <div class="nm">ROBOT<span class="dot">.</span><span class="md">md</span></div>
     <div class="sub">
-      <b>v0.6.0 · one command.</b> Manifest, MCP server, skill, and arm calibration — all from <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">robot-md init</code>. Headless? same command, <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">--non-interactive</code>.
+      <b>v0.6.2 · one command → actuatable robot.</b> Manifest, MCP server, skill, calibration, and an auto-solved <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">ready</code> pose — all from <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">robot-md init</code>. Then <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">arm.pick(target)</code> closes the loop: descriptor → vision → IK → motion. Headless? same command, <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">--non-interactive</code>.
     </div>
     <a class="more" href="#spec">How it works →</a>
   </div>
@@ -962,14 +963,11 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
 <span class="c">· 3 tools: validate, render, doctor_summary</span>
 <span class="c">· 4 slash commands: /brief-me  /check-safety  /explain-capability  /manifest-status</span>
 
-<span class="w">› bob is online. Teach the `ready` pose so I can pick things up?</span>
-yes
-<span class="ok">✓ physics.poses.ready taught (6 joints)</span>
-
-<span class="w">› Ready. What should bob do first?</span>
+<span class="w">› bob is online. `ready` pose auto-calibrated from DH + IK. What should I pick?</span>
 pick up the red lego and place it in the bowl
-<span class="ok">✓ discover → red_lego @ (-62, +25, +522) mm, white_bowl @ (-210, +10, +480) mm</span>
-<span class="ok">✓ execute_capability arm.pick(target: red_lego) · arm.place(target: white_bowl) · ok</span>
+<span class="ok">✓ vision.find(red_lego) → (−62, +25, +522) mm · vision.find(white_bowl) → (−210, +10, +480) mm</span>
+<span class="ok">✓ execute_capability arm.pick(target: red_lego) · approach → descent → grasp → lift · ok</span>
+<span class="ok">✓ execute_capability arm.place(target: white_bowl) · approach → descent → open → lift · ok</span>
 <span class="c"># Claude operates the robot via the Bash tool + MCP — English in, motion out.</span>
 </pre>
       </div>
@@ -1103,7 +1101,7 @@ pick up the red lego and place it in the bowl
 <footer class="wrap foot">
   <div>ROBOT.md · © 2026 craigm26 · Standalone · OpenCastor optional</div>
   <div>Hosted on Cloudflare Pages · Edge‑served · No cookies, no trackers</div>
-  <div>robotmd.dev · robot-md 0.6.0 · robot-md-mcp 0.2.1 · built 2026‑04‑19</div>
+  <div>robotmd.dev · robot-md 0.6.2 · robot-md-mcp 0.2.1 · built 2026‑04‑20</div>
 </footer>
 
 <script>
