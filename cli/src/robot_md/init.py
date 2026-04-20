@@ -406,6 +406,7 @@ _PHASE_NAMES = (
     "phase_calibrate_sign",
     "phase_calibrate_zero",
     "phase_auto_calibrate_ready",
+    "phase_calibrate_extrinsic",
     "phase_teach_poses",
 )
 
@@ -481,6 +482,7 @@ def default_flow(
     phase_calibrate_sign = _self.phase_calibrate_sign  # type: ignore[attr-defined]
     phase_calibrate_zero = _self.phase_calibrate_zero  # type: ignore[attr-defined]
     phase_auto_calibrate_ready = _self.phase_auto_calibrate_ready  # type: ignore[attr-defined]
+    phase_calibrate_extrinsic = _self.phase_calibrate_extrinsic  # type: ignore[attr-defined]
     phase_teach_poses = _self.phase_teach_poses  # type: ignore[attr-defined]
 
     scan = scan_system()
@@ -552,6 +554,19 @@ def default_flow(
     # Phase 6.5: auto-calibrate `ready` from DH params (no hardware).
     if do_auto_calibrate:
         results.append(phase_auto_calibrate_ready(manifest_path=out_path))
+
+    # Phase 6.7: extrinsic calibration — interactive prompt; skips cleanly when
+    # non-interactive, no camera, or no actuatable bus.  default_flow opens no
+    # hardware, so bus=None and camera=None always; the phase's own guards
+    # (no_camera, no_actuatable_bus) fire and produce a clean "skipped" result.
+    results.append(
+        phase_calibrate_extrinsic(
+            out_path,
+            bus=None,
+            camera=None,
+            interactive=sys.stdin.isatty(),
+        )
+    )
 
     # Phase 7: teach poses (opt-in, TTY-only).
     if do_teach_poses:
