@@ -31,7 +31,10 @@ def _follower():
 def _leader():
     return Preset(
         name="so_arm101_leader",
-        match={"drivers": {"protocol": "feetech", "count": 6}},
+        match={
+            "drivers": {"protocol": "feetech", "count": 6},
+            "name_hints": ["leader"],
+        },
         data={},
     )
 
@@ -101,3 +104,35 @@ def test_pick_best_prefers_leader_on_leader_rig():
     chosen = pick_best(presets, scan)
     assert chosen is not None
     assert chosen.preset.name == "so_arm101_leader"
+
+
+def test_hostname_leader_flips_pick_to_leader(monkeypatch):
+    """On a host whose HOSTNAME contains 'leader' but whose device label
+    does NOT, so_arm101_leader wins: +10 protocol +5 count +3 hostname
+    = 18, vs so_arm101 at +10 +5 +0 = 15 (no 'leader' in label, so
+    negative_hints is silent)."""
+    monkeypatch.setattr(
+        "socket.gethostname",
+        lambda: "leader-bench-01",
+    )
+    scan = _Scan(
+        [_Dev("probe", "feetech", "Feetech bus on /dev/ttyACM0 (6 servos)", "/dev/ttyACM0")]
+    )
+    follower = match_score(_follower(), scan)
+    leader = match_score(_leader(), scan)
+    assert follower.score == 15
+    assert leader.score == 18
+    assert pick_best([_follower(), _leader()], scan).preset.name == "so_arm101_leader"
+
+
+def test_alphabetical_tiebreak_is_deterministic(monkeypatch):
+    """With both presets scoring identically on a canonical follower rig
+    (no 'leader' in label or hostname), the alphabetical tiebreak
+    returns so_arm101 regardless of input order."""
+    monkeypatch.setattr("socket.gethostname", lambda: "bench-01")
+    scan = _Scan(
+        [_Dev("probe", "feetech", "Feetech bus on /dev/ttyACM0 (6 servos)", "/dev/ttyACM0")]
+    )
+    a = pick_best([_follower(), _leader()], scan)
+    b = pick_best([_leader(), _follower()], scan)
+    assert a.preset.name == b.preset.name == "so_arm101"

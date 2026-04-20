@@ -80,6 +80,8 @@ def match_score(preset: Preset, scan: Any) -> MatchResult:
     records with .protocol / .bus / .label / .path / .vid / .pid. Heuristic:
 
       +10 if any device matches `match.drivers.protocol`
+      +5  if any device label contains `(N servos)` matching `match.drivers.count`
+      -5  per `match.negative_hints` word found in any device label
       +5  if any PCI device's label contains a `match.pci_hints` string
       +5  if any USB device's label contains a `match.usb_hints` string
       +3  if the hostname contains a `match.name_hints` string
@@ -176,11 +178,12 @@ def pick_best(presets: list[Preset], scan: Any) -> MatchResult | None:
     # (even weakly), don't substitute the fallback.
     if fallback is not None and top_score == 0:
         return fallback
-    # Secondary tiebreaker: prefer the preset with more declared match rules
-    # (more specific = more keys in the match dict).  A preset that declares
-    # `negative_hints` is more precisely tailored than one that doesn't;
-    # stable sort preserves original ordering for truly equal specificity.
-    top.sort(key=lambda r: -len(r.preset.match))
+    # Tiebreak deterministically by preset name — keeps pick_best
+    # reproducible when two presets genuinely score the same on a given
+    # rig (the canonical case: so_arm101 vs so_arm101_leader on a
+    # follower bench where neither `negative_hints` nor `name_hints`
+    # fires because the label/hostname lacks "leader").
+    top.sort(key=lambda r: r.preset.name)
     return top[0]
 
 
