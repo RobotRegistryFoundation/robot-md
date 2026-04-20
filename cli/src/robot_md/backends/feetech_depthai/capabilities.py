@@ -43,7 +43,7 @@ def _vision_xyz_cam(backend, descriptor_id: str):
     if backend._perception is None:
         return ("error", None, "no_perception")
     try:
-        res = backend._perception.vision_find(descriptor=descriptor_id)
+        res = backend._perception.vision_find(descriptor=descriptor_id, spec=backend._spec)
     except Exception as e:
         return ("error", None, f"vision_error: {e}")
     status = res.get("status")

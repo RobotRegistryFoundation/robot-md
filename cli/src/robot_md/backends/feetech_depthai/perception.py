@@ -25,11 +25,12 @@ class Perception:
     _depth_q: Any = None
     _rgb_w: int = RGB_SIZE[0]
     _rgb_h: int = RGB_SIZE[1]
+    _spec: Any = None  # stashed so vision_find can resolve descriptors without the caller re-passing
 
     @classmethod
     def from_spec(cls, spec: RobotSpec) -> Perception:
         cam = next(iter(spec.physics.cameras), None)
-        return cls(driver_id=cam.driver_id if cam else "none")
+        return cls(driver_id=cam.driver_id if cam else "none", _spec=spec)
 
     def open(self) -> None:
         try:
