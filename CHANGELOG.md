@@ -5,6 +5,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.1] — 2026-04-20
+
+### Added
+
+- **Auto-calibrate ready pose.** `robot-md init` on SO-ARM101 now solves a canonical `ready` pose from DH params via the in-house IK solver and writes it to `physics.poses.ready` automatically — no `pose teach` step required. Opt out with the internal `do_auto_calibrate=False` flag.
+- **Default camera extrinsic.** `so-arm101` preset ships a default 6-vec extrinsic for the canonical OAK-D-on-tripod mount. Tracked via the new `physics.solver.cameras[].extrinsic_source: preset_default` field.
+- **`arm.pick(target)` end-to-end.** The stub is replaced with a real pipeline: `target` (descriptor ID) → `vision.find` → `camera_to_base` → workspace bounds check → `ik_reach` → hybrid trajectory (joint-space approach, cartesian descent, grasp, lift) → `motion.replay`. Same shape for `arm.place(target)`.
+- **Hand-eye calibration (opt-in).** `robot-md calibrate --hand-eye ROBOT.md --marker-pos x,y,z` drives an 8-pose ArUco sweep and writes a refined extrinsic, flipping `extrinsic_source` to `hand_eye_calibrated`. Uses `cv2.calibrateHandEye` (Tsai).
+- **Doctor warning for preset-default extrinsic.** `robot-md doctor` now warns (not errors) when extrinsic is still a preset guess, pointing users at the hand-eye verb.
+- **Capability contracts for arm.pick / arm.place / arm.home.** so-arm101 preset declares preconditions (`pose_taught:ready`, `extrinsic_present`, `ik_provider_set`, `workspace_declared`, `backend_resolved`) that the v0.6.0 evaluator enforces.
+- **Workspace bounds on the so-arm101 preset.** `physics.workspace.bounds_mm` declares the reachable envelope so arm.pick can refuse targets outside it before motion.
+- **Pure extrinsic math module (`robot_md.extrinsic`).** `six_vec_to_matrix`, `matrix_to_six_vec`, `camera_to_base`, `from_mount`. XYZ extrinsic Euler convention.
+- **Trajectory planner (`robot_md.trajectory`).** `plan_pick` / `plan_place` return ordered `Waypoint(phase, joints, settle_ms)` lists with cartesian linear descent.
+- **OAK-D driver declared on the so-arm101 preset** (`drivers[].id=oakd, protocol=depthai`) so the camera driver_id cross-reference validates.
+
+### Changed
+
+- `physics.solver.ik_provider` set to `inhouse-so-arm101` on the so-arm101 preset (activates the in-house 3-link planar IK solver already present since v0.5.0).
+- Feetech backend's `_arm_pick` / `_arm_place` no longer replay hardcoded waypoints; both are target-driven through the new trajectory planner.
+- `hand_eye.py` replaces the v0.5.0 single-shot PnP path with the AX=XB sweep; `write_extrinsic` now writes to `physics.solver.cameras[0].extrinsic` (plural) with provenance tracking.
+
+### Compatibility
+
+- v0.6.0 manifests validate and load unchanged.
+- Manually-taught `physics.poses.ready` from v0.6.0 is preserved during re-init (auto-calibrate is idempotent when `ready` already exists).
+
+### Known issues
+
+- The preset-default extrinsic's rotation is a geometric placeholder — it validates and passes all unit tests but does not match a realistic "camera looking down at tabletop" orientation. Users who need accuracy beyond the LEGO-scale tolerance should run `robot-md calibrate --hand-eye`. The doctor warning points at this.
+
+---
+
 ## [0.6.0] — 2026-04-19
 
 ### Added — closes the Claude-triad gap spec §1–§10
