@@ -292,7 +292,7 @@ def check_calibration(fm: dict | None) -> list[CheckResult]:
         out.append(_warn(
             "extrinsic source",
             "calibration",
-            "preset default — run `robot-md calibrate --hand-eye ROBOT.md` for precision",
+            "preset default — run `robot-md calibrate --extrinsic ROBOT.md` for precision",
         ))
     else:
         out.append(_pass("extrinsic source", "calibration", "calibrated or user-declared"))

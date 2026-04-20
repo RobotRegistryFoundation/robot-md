@@ -42,7 +42,7 @@ def test_doctor_warns_when_extrinsic_source_is_preset_default(tmp_path):
     warn = next((r for r in results if r.name == "extrinsic source"), None)
     assert warn is not None
     assert warn.status == "warn"
-    assert "hand-eye" in warn.detail.lower()
+    assert "--extrinsic" in warn.detail.lower()
 
 
 def test_doctor_silent_when_extrinsic_source_hand_eye_calibrated(tmp_path):
