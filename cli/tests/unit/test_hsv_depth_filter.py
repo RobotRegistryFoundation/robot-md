@@ -25,7 +25,7 @@ def _depth_wall_left(shape=(400, 600)):
     return d
 
 
-RED_PARAMS = {"h_min": 0, "h_max": 10, "s_min": 100, "v_min": 80}
+RED_PARAMS = {"h_ranges": [[0, 10], [170, 180]], "s_min": 100, "v_min": 80}
 
 
 def test_detect_hsv_without_depth_returns_centroid():
@@ -69,4 +69,42 @@ def test_detect_hsv_accepts_depth_without_bounds_is_noop():
     depth = _depth_tabletop()
     a = detect_hsv(frame, params=RED_PARAMS)
     b = detect_hsv(frame, params=RED_PARAMS, depth_frame=depth)
+    assert a == b
+
+
+def test_detect_hsv_roi_with_depth_bounds_excludes_wall():
+    """ROI path must apply depth filter the same way — ROI mask AND color mask
+    AND depth mask — so an 8m wall pixel inside the ROI window is still
+    excluded when bounds declare tabletop-only depth."""
+    from robot_md.detectors.hsv import detect_hsv_roi
+
+    frame = _solid_red_frame()          # all red
+    depth = _depth_wall_left()          # left half wall (8000mm), right half tabletop (400mm)
+
+    params = {
+        **RED_PARAMS,
+        "roi": {"u_min": 100, "u_max": 500, "v_min": 100, "v_max": 300},
+        "min_depth_mm": 300,
+        "max_depth_mm": 500,
+    }
+    centroid = detect_hsv_roi(frame, params=params, depth_frame=depth)
+
+    assert centroid is not None
+    u, v, _ = centroid
+    # ROI spans u ∈ [100, 500], but depth filter excludes u < 300 (the wall).
+    # Effective region is u ∈ [300, 500]. Centroid should live there.
+    assert 300 < u < 500
+    assert 100 < v < 300
+
+
+def test_detect_hsv_roi_accepts_depth_without_bounds_is_noop():
+    """ROI detector with depth_frame but no min/max bounds returns same result as no depth."""
+    from robot_md.detectors.hsv import detect_hsv_roi
+
+    frame = _solid_red_frame()
+    depth = _depth_tabletop()
+    params = {**RED_PARAMS, "roi": {"u_min": 100, "u_max": 500, "v_min": 100, "v_max": 300}}
+
+    a = detect_hsv_roi(frame, params=params)
+    b = detect_hsv_roi(frame, params=params, depth_frame=depth)
     assert a == b
