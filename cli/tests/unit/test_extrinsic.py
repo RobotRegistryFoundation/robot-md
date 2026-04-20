@@ -54,3 +54,28 @@ def test_camera_to_base_with_from_mount_projects_origin_to_position():
     M = from_mount(position_mm=(400, 0, 300), look_at_mm=(200, 0, 0))
     result = camera_to_base((0, 0, 0), M)
     assert result == pytest.approx((400, 0, 300), abs=1e-6)
+
+
+def test_from_mount_raises_on_coincident_points():
+    with pytest.raises(ValueError, match="cannot coincide"):
+        from_mount(position_mm=(100, 0, 0), look_at_mm=(100, 0, 0))
+
+
+def test_from_mount_raises_when_look_direction_parallel_to_up():
+    # Camera at (0, 0, 100) looking straight down at origin; up=(0,0,1) is parallel.
+    with pytest.raises(ValueError, match="parallel to up"):
+        from_mount(position_mm=(0, 0, 100), look_at_mm=(0, 0, 0), up=(0, 0, 1))
+
+
+def test_rotation_and_translation_compose_correctly():
+    """Point at (10, 0, 0) in camera frame, camera at (100, 0, 0) in base
+    with 90° z-rotation, should land at (100, 10, 0) in base (rotation
+    applied before translation in a camera→base transform)."""
+    M = six_vec_to_matrix((100, 0, 0, 0, 0, math.pi / 2))
+    result = camera_to_base((10, 0, 0), M)
+    assert result == pytest.approx((100, 10, 0), abs=1e-9)
+
+
+def test_six_vec_to_matrix_rejects_wrong_length():
+    with pytest.raises(ValueError, match="exactly 6"):
+        six_vec_to_matrix((1, 2, 3, 4, 5))

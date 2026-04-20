@@ -1,8 +1,10 @@
 """Extrinsic math: 6-vec ↔ 4x4, point transformation, mount builder.
 
-Manifest stores extrinsic as a 6-vector [tx, ty, tz, rx, ry, rz] in mm/radians
-(XYZ Euler, intrinsic, extrinsic-right-handed). The math here converts to a 4x4
-homogeneous matrix for point transformation.
+Manifest stores extrinsic as a 6-vector `[tx, ty, tz, rx, ry, rz]` in mm/radians.
+Rotations are **extrinsic XYZ Euler** (world-fixed axes: rotate `rx` about world
+x, then `ry` about world y, then `rz` about world z), equivalent to
+`R = Rz @ Ry @ Rx` applied to column vectors. The same convention is used for
+both serialization and deserialization, so round-trips are exact.
 
 Convention: the 4x4 `M` is camera→base. Given a point `p_cam` in camera frame,
 `p_base = M @ [p_cam, 1]`.
@@ -18,10 +20,12 @@ import numpy as np
 def six_vec_to_matrix(vec):
     """[tx, ty, tz, rx, ry, rz] → 4x4 camera→base homogeneous matrix.
 
-    Rotations are intrinsic XYZ Euler: rx about x, then ry about (rotated) y,
-    then rz about (twice-rotated) z. Equivalent to R = Rz @ Ry @ Rx when
-    applied to column vectors.
+    Rotations are extrinsic XYZ Euler (world-fixed axes: rotate rx about world
+    x, then ry about world y, then rz about world z). Applied to column vectors
+    this composes as `R = Rz @ Ry @ Rx`.
     """
+    if len(vec) != 6:
+        raise ValueError(f"six-vec must have exactly 6 elements, got {len(vec)}")
     tx, ty, tz, rx, ry, rz = [float(v) for v in vec]
     cx, sx = math.cos(rx), math.sin(rx)
     cy, sy = math.cos(ry), math.sin(ry)
@@ -75,6 +79,8 @@ def from_mount(*, position_mm, look_at_mm, up=(0, 0, 1)):
 
     The camera sits at `position_mm` in base frame, with its +z optical axis
     pointing toward `look_at_mm`, and `up` aligned with the world up.
+    `up` defaults to base-frame +z; callers whose robot uses a different up
+    axis must pass it explicitly.
 
     Camera convention: +z = forward (optical axis), +x = right, +y = down
     (OpenCV-compatible).
