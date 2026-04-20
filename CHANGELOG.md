@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.3] — 2026-04-20
+
+### Fixed — hardware bring-up lessons
+
+First hardware bring-up of the v0.6.2 pipeline on a real SO-ARM101 + OAK-D exposed five bugs. All shipped here; `arm.home` now actually moves the arm and holds it.
+
+- **`Perception._spec` stash.** `Perception.from_spec` plucked only `driver_id` from the spec and dropped the reference, so direct callers of `Perception.vision_find(descriptor=...)` got `{'status': 'error', 'reason': 'no_spec'}`. Arm.pick worked through a different code path; debugging calls and non-backend callers broke. `from_spec` now keeps the full spec; `_vision_xyz_cam` also passes it explicitly.
+- **Single-waypoint motion.** `motion.replay` for a single-waypoint trajectory was firing a one-shot goal write and returning immediately. Callers (`_do_replay`, `_execute_pick_or_place`) then dropped torque in a `finally` block before STS3215 servos crossed their deltas — net: arm.home reported ok but the arm barely moved. Single-waypoint path now interpolates from the current read-back position, and the existing multi-waypoint path guards `estop=None` so direct Python callers don't crash.
+- **Torque-hold after successful motion.** Capability dispatch previously dropped torque unconditionally in a `finally` block, so the arm went limp after every `arm.home` / `arm.pick`. Torque now stays on after a successful motion — the arm holds the final pose. Callers that want limp (teach-mode, shutdown) drop torque explicitly.
+- **IK joint-limit enforcement.** `Kinematics.ik_reach` solved for gripper-pointing-down but didn't check the solved angles against each joint's declared `limits_rad`. On SO-ARM101, the tabletop target `(200, 0, 50)` produced `wrist_flex = 94.7°` — beyond the ±90° envelope. The servo stalled, tripped into overload protection, and stopped responding on the bus. `ik_reach` now raises `KinematicsError` with a specific reason when any solved angle is out of envelope.
+- **SO-ARM101 preset ships a safe `ready` pose.** Even within the ±90° limit, ik_reach puts wrist_flex near 80° for most tabletop targets — sustained gravity load at that angle trips the STS3215. The preset now ships `physics.poses.ready` with all joints near center (gripper forward, wrist neutral); `phase_auto_calibrate_ready` sees it and skips IK. Arm.pick still solves gripper-down geometry at motion time, transiently — the problem was only holding that pose indefinitely.
+
+### Changed
+
+- `auto_calibrate.compute_ready_pose` default target moved from `(200, 0, 50)` to `(200, 0, 20)` so fallback IK on presets without a declared `ready` stays within ±90° envelopes.
+- Schema reminder: `physics.poses.<name>.source` accepts `declared | taught | solved_from_dh` — the preset's ready pose now uses `declared`.
+
+### Compatibility
+
+- v0.6.2 manifests validate and load unchanged. Re-init against the so-arm101 preset to pick up the safe `ready` pose, or copy the `physics.poses.ready` block from `presets/so_arm101.yaml` into an existing manifest by hand.
+
+---
+
 ## [0.6.2] — 2026-04-20
 
 ### Fixed

@@ -47,16 +47,36 @@ def test_replay_empty_trajectory_is_noop(fixtures_dir):
     bus.interpolate.assert_not_called()
 
 
-def test_replay_single_waypoint_writes_positions_once(fixtures_dir):
+def test_replay_single_waypoint_interpolates_from_current_position(fixtures_dir):
+    """Single-waypoint replay reads current position then interpolates so
+    servos actually reach target before the caller drops torque."""
     motion = Motion.from_spec(_spec(fixtures_dir))
     bus = MagicMock()
+    bus.read_positions.return_value = {"shoulder_pan": 2048}
     estop = MagicMock()
     estop.is_set.return_value = False
 
     wp = Waypoint(t=0.0, joints={"shoulder_pan": 2200})
     motion.replay([wp], servo_bus=bus, estop=estop)
-    bus.interpolate.assert_not_called()
+    bus.read_positions.assert_called_once()
+    bus.interpolate.assert_called_once()
+    args = bus.interpolate.call_args.args
+    assert args[0] == {"shoulder_pan": 2048}
+    assert args[1] == {"shoulder_pan": 2200}
+
+
+def test_replay_single_waypoint_falls_back_to_write_when_read_empty(fixtures_dir):
+    """If read_positions returns nothing, fall back to one-shot write so we
+    don't leave the servo uncommanded."""
+    motion = Motion.from_spec(_spec(fixtures_dir))
+    bus = MagicMock()
+    bus.read_positions.return_value = {}
+    estop = MagicMock()
+
+    wp = Waypoint(t=0.0, joints={"shoulder_pan": 2200})
+    motion.replay([wp], servo_bus=bus, estop=estop)
     bus.write_positions.assert_called_once_with({"shoulder_pan": 2200})
+    bus.interpolate.assert_not_called()
 
 
 def test_replay_respects_hz_from_trajectory(fixtures_dir):

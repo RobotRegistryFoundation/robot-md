@@ -66,7 +66,10 @@ def test_overwrites_with_force(tmp_path):
     from robot_md.init_phases import phase_write_manifest
 
     out = tmp_path / "ROBOT.md"
-    out.write_text("old\n")
+    # Sentinel that won't collide with the preset body (which contains words
+    # like "hold", "old", etc.).
+    sentinel = "ZZZ-SENTINEL-CONTENT-ZZZ"
+    out.write_text(sentinel + "\n")
 
     result = phase_write_manifest(
         out_path=out,
@@ -77,7 +80,7 @@ def test_overwrites_with_force(tmp_path):
     )
 
     assert result.status == "ok"
-    assert "old" not in out.read_text()
+    assert sentinel not in out.read_text()
 
 
 def test_unknown_preset_returns_failed(tmp_path):
