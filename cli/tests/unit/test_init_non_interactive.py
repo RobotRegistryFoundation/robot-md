@@ -54,7 +54,9 @@ def test_non_interactive_writes_manifest_only(tmp_path, monkeypatch):
         ],
     )
 
-    err_detail = result.output + (result.stderr if hasattr(result, "stderr") else "")
+    # click 8.x: result.stderr raises ValueError when stderr isn't separately
+    # captured. Access stderr_bytes directly to stay resilient.
+    err_detail = result.output + ((result.stderr_bytes or b"").decode("utf-8", "replace"))
     assert result.exit_code == 0, err_detail
     assert out.exists()
     text = out.read_text()
