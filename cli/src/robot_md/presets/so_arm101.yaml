@@ -110,6 +110,9 @@ drivers:
     baud_rate: 1000000
     model: STS3215
     count: 6
+  - id: oakd
+    protocol: depthai
+    model: OAK-D
 
 vision:
   object_descriptors:
