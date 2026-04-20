@@ -108,3 +108,44 @@ def detect_hsv_roi(
 
 
 DETECTORS = {"hsv": detect_hsv, "hsv_roi": detect_hsv_roi}
+
+
+def workspace_depth_bounds(
+    workspace_bounds: dict[str, list[float]],
+    extrinsic_6vec: list[float],
+    *,
+    margin_mm: float = 30.0,
+) -> tuple[float, float]:
+    """Project the 8 corners of the workspace cuboid into camera frame and
+    return (min_depth, max_depth) suitable for an HSV detector's depth
+    filter.
+
+    workspace_bounds: {'x': [lo, hi], 'y': [lo, hi], 'z': [lo, hi]} in base frame (mm).
+    extrinsic_6vec:   [tx, ty, tz, rx, ry, rz] — camera pose in base frame.
+    margin_mm:        symmetric slop added to both bounds.
+
+    Returns (min_depth, max_depth) in millimeters, both >= 0.
+
+    Depth is computed as the Euclidean distance from the camera origin to each
+    workspace corner in camera frame, which matches the physical interpretation
+    of sensor-measured depth range for arbitrarily-oriented cameras.
+    """
+    import numpy as np
+    from robot_md.extrinsic import six_vec_to_matrix
+
+    T_cam_in_base = six_vec_to_matrix(extrinsic_6vec)
+    T_base_in_cam = np.linalg.inv(T_cam_in_base)
+
+    xs = workspace_bounds["x"]
+    ys = workspace_bounds["y"]
+    zs = workspace_bounds["z"]
+    corners = np.array(
+        [[x, y, z, 1.0] for x in xs for y in ys for z in zs],
+        dtype=float,
+    )  # shape (8, 4)
+
+    corners_cam = (T_base_in_cam @ corners.T).T[:, :3]  # (8, 3)
+    depths = np.linalg.norm(corners_cam, axis=1)
+    lo = max(0.0, float(depths.min()) - margin_mm)
+    hi = max(lo + 1.0, float(depths.max()) + margin_mm)
+    return lo, hi

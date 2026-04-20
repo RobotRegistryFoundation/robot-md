@@ -154,7 +154,35 @@ class Perception:
         if frame is None:
             return {"status": "error", "descriptor": descriptor, "reason": "no_frame"}
         rgb, depth, K = frame
-        hit = fn(rgb, params=descr.params)
+
+        # Auto-derive depth bounds from workspace + extrinsic when not already set.
+        descriptor_params_effective = dict(descr.params)
+        ignore_ws = bool(descriptor_params_effective.get("ignore_workspace_bounds"))
+        has_manual_bounds = (
+            descriptor_params_effective.get("min_depth_mm") is not None
+            or descriptor_params_effective.get("max_depth_mm") is not None
+        )
+        if not ignore_ws and not has_manual_bounds:
+            try:
+                from robot_md.detectors.hsv import workspace_depth_bounds
+
+                active_spec_for_ws = spec if spec is not None else getattr(self, "_spec", None)
+                cam0 = active_spec_for_ws.physics.cameras[0]
+                extrinsic = cam0.extrinsic
+                ws = active_spec_for_ws.physics.workspace
+                if extrinsic is not None and ws is not None and ws.bounds_mm:
+                    lo, hi = workspace_depth_bounds(ws.bounds_mm, list(extrinsic))
+                    descriptor_params_effective["min_depth_mm"] = lo
+                    descriptor_params_effective["max_depth_mm"] = hi
+            except (KeyError, TypeError, AttributeError, IndexError):
+                pass  # workspace or extrinsic missing — skip depth filter silently
+
+        depth_frame_for_detector = depth if (
+            descriptor_params_effective.get("min_depth_mm") is not None
+            or descriptor_params_effective.get("max_depth_mm") is not None
+        ) else None
+
+        hit = fn(rgb, params=descriptor_params_effective, depth_frame=depth_frame_for_detector)
         if hit is None:
             return {"status": "no_match", "descriptor": descriptor}
         u, v, area = hit
