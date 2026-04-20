@@ -5,6 +5,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.6.2] — 2026-04-20
+
+### Fixed
+
+- **Preset default extrinsic rotation.** The `so-arm101` preset shipped in v0.6.1 with a 6-vec whose rotation pointed the camera +z axis up-and-back (into the ceiling) instead of at the workspace. Replaced with the result of `from_mount(position=(400, 0, 300), look_at=(200, 0, 0))` — camera +z now points at the workspace center, so typical tabletop detections map to reachable grasp targets in the base frame.
+- **Dependency pin for `typer<0.17`.** typer 0.17+ defines `TyperChoice(click.Choice[ParamTypeValue])`, which requires `click.Choice` to be subscriptable. click 8.x (shipped on Python 3.13) does not support that; the subscription raises `TypeError` at import time, tripping pytest collection for anything that imports typer. Pinned to the last 0.16.x line until click 9 is widespread.
+- **`CliRunner.stderr` access.** `test_init_non_interactive` used `hasattr(result, "stderr")` which is True on click 8.x Result, but accessing the property raises when stderr wasn't separately captured. Switched to `result.stderr_bytes` directly.
+
+### Changed
+
+- Site hero + §05 demo updated to reflect the v0.6.1 auto-calibrate + `arm.pick` story; the hero's phase [5/5] no longer prompts "teach `ready` pose" (it's auto-solved), and §05 shows the full `arm.pick` → `arm.place` phase decomposition.
+
+### Compatibility
+
+- v0.6.1 manifests validate and load unchanged. If you want the corrected extrinsic for an existing manifest, re-init against the preset or overwrite `physics.solver.cameras[0].extrinsic` by hand with `[400, 0, 300, -2.5536, 0, 1.5708]`.
+
+---
+
 ## [0.6.1] — 2026-04-20
 
 ### Added
