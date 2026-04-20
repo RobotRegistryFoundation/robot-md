@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.7.1] — 2026-04-20
+
+### Fixed
+
+- **`Perception.open()` missing from production calibration flows.** `Perception.from_spec()` constructs a lazy object whose DepthAI pipeline is only started by `open()`. The `calibrate --extrinsic` CLI path and the `default_flow` init hardware-open block both forgot to call it, so `grab_frame()` returned `None` on every sweep pose and `find_in_depth` had no data to match against. Unit + integration tests used `MagicMock` cameras so the gap didn't surface until the first real hardware run. Fix adds `cam.open()` after `from_spec()` and `cam.close()` on cleanup in both production paths and the two opt-in hardware tests.
+
+### Known issues (carried from v0.7.0)
+
+- **Bootstrap-extrinsic cliff.** `phase_calibrate_extrinsic` projects `tip_base` through the current (preset-default) extrinsic to seed `find_in_depth`'s pixel-space search window. On physical camera mounts that differ significantly from the canonical `(400, 0, 300) → (200, 0, 0)` tripod assumed by the preset, the seed pixel is hundreds of pixels away from the actual gripper and no `search_radius_mm` closes the gap. For rigs in this state the calibration sweep returns `failed: only 0/n poses produced usable observations`. Workaround: write the extrinsic manually into `physics.solver.cameras[0].extrinsic` and set `extrinsic_source: user_declared`. A proper bootstrap (motion-delta or fiducial-assisted) is scoped for v0.8 — see `docs/superpowers/specs/2026-04-20-v0.8-v0.9-roadmap.md`.
+
+### Compatibility
+
+- v0.7.0 manifests validate and load unchanged. No schema changes.
+
+---
+
 ## [0.7.0] — 2026-04-20
 
 ### Added
