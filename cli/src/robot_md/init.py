@@ -102,6 +102,31 @@ def match_score(preset: Preset, scan: Any) -> MatchResult:
                     reasons.append(f"driver protocol={want_proto!r}")
                     break
 
+    # Driver servo-count match (+5 when preset declares count matching a scan device)
+    if "drivers" in m and isinstance(m["drivers"], dict):
+        want_count = m["drivers"].get("count")
+        if want_count is not None:
+            import re
+
+            want_count = int(want_count)
+            for d in devices:
+                label = getattr(d, "label", "") or ""
+                # Scan labels embed the count as "(N servos)"; extract.
+                mo = re.search(r"\((\d+)\s+servos?\)", label)
+                if mo and int(mo.group(1)) == want_count:
+                    score += 5
+                    reasons.append(f"servo count={want_count}")
+                    break
+
+    # Negative hints — each hit in any device label subtracts 5.
+    for hint in m.get("negative_hints", []) or []:
+        for d in devices:
+            label = (getattr(d, "label", "") or "").lower()
+            if hint.lower() in label:
+                score -= 5
+                reasons.append(f"negative hint {hint!r}")
+                break
+
     # PCI hints — match against PCI devices' labels
     for hint in m.get("pci_hints", []) or []:
         for d in devices:
@@ -151,6 +176,11 @@ def pick_best(presets: list[Preset], scan: Any) -> MatchResult | None:
     # (even weakly), don't substitute the fallback.
     if fallback is not None and top_score == 0:
         return fallback
+    # Secondary tiebreaker: prefer the preset with more declared match rules
+    # (more specific = more keys in the match dict).  A preset that declares
+    # `negative_hints` is more precisely tailored than one that doesn't;
+    # stable sort preserves original ordering for truly equal specificity.
+    top.sort(key=lambda r: -len(r.preset.match))
     return top[0]
 
 

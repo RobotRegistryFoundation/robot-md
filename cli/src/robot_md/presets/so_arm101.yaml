@@ -11,6 +11,7 @@ match:
     protocol: feetech
     count: 6
   # Negative hint: "leader" in the hardware description flips to so_arm101_leader.
+  negative_hints: ["leader"]
 
 physics:
   type: arm
