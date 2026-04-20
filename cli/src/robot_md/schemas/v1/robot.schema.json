@@ -218,7 +218,9 @@
                 },
                 "additionalProperties": false
               }
-            }
+            },
+            "ik_provider": {"type": ["string", "null"]},
+            "ik_frame":    {"type": ["string", "null"]}
           },
           "additionalProperties": true
         }
