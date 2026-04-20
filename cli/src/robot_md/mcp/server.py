@@ -103,9 +103,13 @@ def build_server(ctx: McpContext):
             notes=notes,
         )
 
-    robot_name = ctx.spec.metadata.robot_name if ctx.spec else "robot"
+    from robot_md.mcp.resources import _sanitize_robot_name
 
-    @server.resource(f"robot-md://{robot_name}/learned_skills")
+    robot_name = _sanitize_robot_name(
+        ctx.spec.metadata.robot_name if ctx.spec else None
+    )
+
+    @server.resource(f"robot-md://{robot_name}/learned_skills", mime_type="application/json")
     def _resource_learned_skills() -> str:
         import json
 
@@ -113,7 +117,7 @@ def build_server(ctx: McpContext):
 
         return json.dumps(_ls(ctx), indent=2)
 
-    @server.resource(f"robot-md://{robot_name}/calibration_status")
+    @server.resource(f"robot-md://{robot_name}/calibration_status", mime_type="application/json")
     def _resource_calibration_status() -> str:
         import json
 
@@ -121,7 +125,7 @@ def build_server(ctx: McpContext):
 
         return json.dumps(_cs(ctx), indent=2)
 
-    @server.resource(f"robot-md://{robot_name}/poses")
+    @server.resource(f"robot-md://{robot_name}/poses", mime_type="application/json")
     def _resource_poses() -> str:
         import json
 

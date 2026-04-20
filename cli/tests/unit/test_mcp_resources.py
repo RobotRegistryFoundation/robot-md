@@ -73,3 +73,74 @@ def test_poses_resource_returns_dict():
 def test_poses_resource_empty_dict_when_none():
     r = poses(_ctx())
     assert r == {}
+
+
+def test_calibration_status_zero_missing_when_joints_lack_zero_pose_steps():
+    """If any kinematic joint is missing zero_pose_steps, zero reports 'missing'."""
+    spec = MagicMock()
+    spec.physics.poses = {}
+    spec.physics.cameras = ()
+    spec.physics.solver = {}
+    # Two joints declared: one with zero_pose_steps, one without.
+    spec.physics.kinematics = (
+        {"id": "shoulder_pan", "zero_pose_steps": 2048},
+        {"id": "elbow_flex"},  # missing zero_pose_steps
+    )
+    spec.learned_skills = ()
+    ctx = MagicMock()
+    ctx.spec = spec
+    r = calibration_status(ctx)
+    assert r["zero"] == "missing"
+
+
+def test_calibration_status_zero_ok_when_all_joints_have_zero_pose_steps():
+    spec = MagicMock()
+    spec.physics.poses = {}
+    spec.physics.cameras = ()
+    spec.physics.solver = {}
+    spec.physics.kinematics = (
+        {"id": "a", "zero_pose_steps": 2048},
+        {"id": "b", "zero_pose_steps": 2100},
+    )
+    spec.learned_skills = ()
+    ctx = MagicMock()
+    ctx.spec = spec
+    r = calibration_status(ctx)
+    assert r["zero"] == "ok"
+
+
+def test_calibration_status_zero_missing_when_no_kinematics():
+    """Zero-DoF sensors / non-kinematic robots: no joints to calibrate -> 'missing'."""
+    spec = MagicMock()
+    spec.physics.poses = {}
+    spec.physics.cameras = ()
+    spec.physics.solver = {}
+    spec.physics.kinematics = ()
+    spec.learned_skills = ()
+    ctx = MagicMock()
+    ctx.spec = spec
+    r = calibration_status(ctx)
+    # No kinematics declared — zero cal not meaningful. Report missing.
+    assert r["zero"] == "missing"
+
+
+def test_resources_handle_none_spec():
+    """Builder with ctx.spec=None returns safe empty payloads, does not raise."""
+    ctx = MagicMock()
+    ctx.spec = None
+    expected = {"zero": "missing", "hand_eye": "missing", "poses_ready": "missing"}
+    assert calibration_status(ctx) == expected
+    assert learned_skills(ctx) == []
+    assert poses(ctx) == {}
+
+
+def test_sanitize_robot_name_for_uri():
+    from robot_md.mcp.resources import _sanitize_robot_name
+    assert _sanitize_robot_name("bob") == "bob"
+    assert _sanitize_robot_name("bob-mk2") == "bob-mk2"
+    assert _sanitize_robot_name("bob_01") == "bob_01"
+    assert _sanitize_robot_name("bob cat") == "bob-cat"
+    assert _sanitize_robot_name("a/b") == "a-b"
+    assert _sanitize_robot_name("") == "robot"
+    assert _sanitize_robot_name(None) == "robot"
+    assert _sanitize_robot_name("!!!") == "robot"
