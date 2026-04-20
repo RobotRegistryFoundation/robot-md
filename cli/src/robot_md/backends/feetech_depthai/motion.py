@@ -9,10 +9,22 @@ Forward kinematics and pose-adjust are Phase 4 (hand-eye).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from robot_md.backends.feetech_depthai.servo import ServoBus
 from robot_md.robot_spec import RobotSpec
+
+
+@dataclass
+class AliveReport:
+    """Post-motion servo enumeration result.
+
+    alive:    True iff every expected servo responded on the bus.
+    missing:  servo ids that did not respond (sorted for stable output).
+    """
+
+    alive: bool
+    missing: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -70,3 +82,25 @@ class Motion:
                 max_steps_per_tick=max_steps_per_tick,
                 estop=estop,
             )
+
+    def verify_alive(self, servo_bus, *, expected_ids: set[str]) -> AliveReport:
+        """Read bus enumeration; if any expected servo is missing, torque off
+        the remaining (safety) and return an AliveReport that the caller can
+        turn into a structured error.
+
+        Called after every motion by the dispatch layer. The single observed
+        failure mode in hardware is that a latched STS3215 drops from the bus
+        enumeration entirely (no error response) — we detect by set difference.
+        """
+        try:
+            observed = set(servo_bus.read_positions().keys())
+        except Exception:
+            # Bus-level failure is different from latch — surface as all-missing.
+            servo_bus.torque(False)
+            return AliveReport(alive=False, missing=sorted(expected_ids))
+
+        missing = sorted(expected_ids - observed)
+        if missing:
+            servo_bus.torque(False)
+            return AliveReport(alive=False, missing=missing)
+        return AliveReport(alive=True, missing=[])
