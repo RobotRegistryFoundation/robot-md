@@ -103,9 +103,25 @@ class Perception:
             raise RuntimeError("failed to capture frame from OAK-D")
         return rgb_frame, depth_frame, self.K
 
-    def detect_objects(self) -> list[dict]:
-        """Return [{class, bbox_xyxy, conf}]. Stubbed for now."""
-        return []
+    def detect_objects(self, *, descriptors: list | None = None) -> list[dict]:
+        if not descriptors:
+            return []
+        from robot_md.detectors.hsv import DETECTORS
+
+        frame = self.grab_frame()
+        if frame is None:
+            return []
+        rgb, _depth, _K = frame
+        out: list[dict] = []
+        for d in descriptors:
+            fn = DETECTORS.get(d.detector)
+            if fn is None:
+                continue
+            hit = fn(rgb, params=d.params)
+            if hit is not None:
+                u, v, area = hit
+                out.append({"id": d.id, "pixel": [u, v], "area_px2": area})
+        return out
 
 
 def _pixel_to_3d(u: int, v: int, depth_mm: float, K: Any) -> tuple[float, float, float]:

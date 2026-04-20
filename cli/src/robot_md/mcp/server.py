@@ -76,6 +76,13 @@ def build_server(ctx: McpContext):
             confirm_token=confirm_token,
         )
 
+    @server.tool()
+    def vision_find(descriptor_id: str) -> dict:
+        """Detect one declared object descriptor. Returns camera-frame XYZ (mm)."""
+        from robot_md.mcp.tools.vision_find import vision_find_tool
+
+        return vision_find_tool(ctx, descriptor_id=descriptor_id)
+
     return server
 
 
