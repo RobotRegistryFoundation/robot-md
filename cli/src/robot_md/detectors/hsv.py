@@ -126,9 +126,7 @@ def workspace_depth_bounds(
 
     Returns (min_depth, max_depth) in millimeters, both >= 0.
 
-    Depth is computed as the Euclidean distance from the camera origin to each
-    workspace corner in camera frame, which matches the physical interpretation
-    of sensor-measured depth range for arbitrarily-oriented cameras.
+    Z-depth (camera-frame Z), matching what OAK-D/similar depth cameras store per-pixel.
     """
     import numpy as np
     from robot_md.extrinsic import six_vec_to_matrix
@@ -145,7 +143,7 @@ def workspace_depth_bounds(
     )  # shape (8, 4)
 
     corners_cam = (T_base_in_cam @ corners.T).T[:, :3]  # (8, 3)
-    depths = np.linalg.norm(corners_cam, axis=1)
+    depths = corners_cam[:, 2]  # Z-depth — matches what the depth camera image stores.
     lo = max(0.0, float(depths.min()) - margin_mm)
     hi = max(lo + 1.0, float(depths.max()) + margin_mm)
     return lo, hi
