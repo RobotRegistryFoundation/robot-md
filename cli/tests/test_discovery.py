@@ -112,11 +112,17 @@ def test_write_discovery_creates_parent_dirs(tmp_path):
 
 
 def test_write_discovery_is_deterministic(tmp_path):
-    # Keys sorted → stable output (helpful for CI diffing).
+    # Stable output (helpful for CI diffing): same doc → same bytes, and
+    # top-level keys are sorted. (Nested dicts now exist under
+    # `calibration_status`, so the flat-scan sort check has to look at the
+    # top-level JSON object only.)
     m = _write_bob(tmp_path)
     doc = build_discovery(m, "https://bob.local/ROBOT.md")
-    out = tmp_path / "robot-md.json"
-    write_discovery(doc, out)
-    text = out.read_text()
-    keys = [line.split('"')[1] for line in text.splitlines() if '": ' in line]
-    assert keys == sorted(keys)
+    out_a = tmp_path / "robot-md-a.json"
+    out_b = tmp_path / "robot-md-b.json"
+    write_discovery(doc, out_a)
+    write_discovery(doc, out_b)
+    assert out_a.read_bytes() == out_b.read_bytes()
+    loaded = json.loads(out_a.read_text())
+    top_keys = list(loaded.keys())
+    assert top_keys == sorted(top_keys)
