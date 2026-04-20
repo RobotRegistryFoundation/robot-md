@@ -21,6 +21,7 @@ class PhaseResult:
     detail: dict | None
 
 
+from robot_md.init_phases.auto_calibrate_ready import phase_auto_calibrate_ready  # noqa: E402
 from robot_md.init_phases.calibrate_sign import phase_calibrate_sign  # noqa: E402
 from robot_md.init_phases.calibrate_zero import phase_calibrate_zero  # noqa: E402
 from robot_md.init_phases.install_mcp import phase_install_mcp  # noqa: E402
@@ -32,6 +33,7 @@ from robot_md.init_phases.write_manifest import phase_write_manifest  # noqa: E4
 __all__ = [
     "PhaseResult",
     "PhaseStatus",
+    "phase_auto_calibrate_ready",
     "phase_calibrate_sign",
     "phase_calibrate_zero",
     "phase_install_mcp",

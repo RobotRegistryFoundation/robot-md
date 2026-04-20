@@ -372,6 +372,7 @@ _PHASE_NAMES = (
     "phase_install_skill",
     "phase_calibrate_sign",
     "phase_calibrate_zero",
+    "phase_auto_calibrate_ready",
     "phase_teach_poses",
 )
 
@@ -428,6 +429,7 @@ def default_flow(
     do_install_skill: bool = True,
     do_sign_cal: bool = True,
     do_zero_cal: bool = True,
+    do_auto_calibrate: bool = True,
     do_teach_poses: bool = True,
     do_refresh_claude_md: bool = True,
 ) -> int:
@@ -445,6 +447,7 @@ def default_flow(
     phase_install_skill = _self.phase_install_skill  # type: ignore[attr-defined]
     phase_calibrate_sign = _self.phase_calibrate_sign  # type: ignore[attr-defined]
     phase_calibrate_zero = _self.phase_calibrate_zero  # type: ignore[attr-defined]
+    phase_auto_calibrate_ready = _self.phase_auto_calibrate_ready  # type: ignore[attr-defined]
     phase_teach_poses = _self.phase_teach_poses  # type: ignore[attr-defined]
 
     scan = scan_system()
@@ -512,6 +515,10 @@ def default_flow(
     # Phase 6: zero-pose calibration
     if do_zero_cal:
         results.append(phase_calibrate_zero(out_path))
+
+    # Phase 6.5: auto-calibrate `ready` from DH params (no hardware).
+    if do_auto_calibrate:
+        results.append(phase_auto_calibrate_ready(manifest_path=out_path))
 
     # Phase 7: teach poses (opt-in, TTY-only).
     if do_teach_poses:
