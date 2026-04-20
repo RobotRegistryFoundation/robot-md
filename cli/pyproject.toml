@@ -49,11 +49,9 @@ dev = [
 feetech = [
     "feetech-servo-sdk>=1.0",
 ]
-# Optional: OAK-D camera + ArUco detection for `robot-md calibrate --hand-eye`
-# and `robot-md autodetect`'s camera probe. opencv-contrib-python provides
-# cv2.aruco which is not in the base opencv-python wheel.
+# Optional: OAK-D camera for `robot-md autodetect`'s camera probe
+# and gripper-silhouette extrinsic calibration.
 vision = [
-    "opencv-contrib-python>=4.8",
     "depthai>=3.0",
 ]
 # Optional: feetech_depthai backend for Feetech servo bus + OAK-D perception.

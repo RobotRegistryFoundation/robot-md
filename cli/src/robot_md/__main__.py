@@ -10,6 +10,7 @@ from rich.console import Console
 
 from robot_md import __version__
 from robot_md.autodetect import emit_draft, scan_system
+from robot_md.init_phases import phase_calibrate_extrinsic
 from robot_md.context import emit_context
 from robot_md.parser import ParseError, parse_file
 from robot_md.render import render_yaml
@@ -713,24 +714,20 @@ def calibrate(
         "--sign",
         help="Per-joint: command a small test move, ask operator for direction, set encoder_sign.",
     ),
+    extrinsic: bool = typer.Option(
+        False,
+        "--extrinsic",
+        help="Calibrate camera-to-arm extrinsic via gripper silhouette.",
+    ),
     hand_eye: bool = typer.Option(
         False,
         "--hand-eye",
-        help="ArUco-based camera-to-arm-base extrinsic via OAK-D + a printed marker.",
+        hidden=True,
     ),
-    marker_pos: str | None = typer.Option(
-        None,
-        "--marker-pos",
-        help="`x,y,z` in mm — center of the ArUco marker in arm-base frame.",
-    ),
-    marker_size: float = typer.Option(
-        50.0, "--marker-size", help="Marker side length in mm (default: 50)."
-    ),
-    marker_id: int = typer.Option(0, "--marker-id", help="ArUco id (DICT_4X4_50) — default 0."),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Read encoders / detect marker and print result; do not rewrite the manifest.",
+        help="Read encoders and print result; do not rewrite the manifest.",
     ),
 ) -> None:
     """Populate kinematic-solver physical fields that can't be autodetected.
@@ -743,22 +740,24 @@ def calibrate(
                    operator whether it moved in the positive-convention
                    direction, record `encoder_sign` (+1 or -1) accordingly.
                    Each joint is restored to its original position after.
-
-    Future:
-      --hand-eye   ArUco-based camera-to-arm-base extrinsic, writes
-                   `physics.solver.camera.extrinsic`. (Task #44 follow-up.)
+      --extrinsic  Gripper-silhouette-based camera-to-arm extrinsic, writes
+                   `physics.solver.cameras[0].extrinsic`.
 
     Prerequisite: the arm's serial port must be free — stop any gateway that
     is holding it first (for OpenCastor: `sudo systemctl stop castor-gateway`).
     """
     from robot_md.calibrate import cli_calibrate_sign, cli_calibrate_zero
 
-    if not (zero or sign or hand_eye):
+    if hand_eye:
+        typer.echo("warning: --hand-eye is deprecated; use --extrinsic (removed in v0.8)", err=True)
+        extrinsic = True
+
+    if not (zero or sign or extrinsic):
         err_console.print(
-            "[yellow]calibrate: pick a mode — --zero, --sign, or --hand-eye.[/yellow]\n"
+            "[yellow]calibrate: pick a mode — --zero, --sign, or --extrinsic.[/yellow]\n"
             "  robot-md calibrate --zero ROBOT.md\n"
             "  robot-md calibrate --sign ROBOT.md\n"
-            "  robot-md calibrate --hand-eye --marker-pos 300,0,0 ROBOT.md"
+            "  robot-md calibrate --extrinsic ROBOT.md"
         )
         raise typer.Exit(code=2)
 
@@ -771,32 +770,37 @@ def calibrate(
         rc = cli_calibrate_sign(str(path))
         if rc != 0:
             raise typer.Exit(code=rc)
-    if hand_eye:
-        if not marker_pos:
-            err_console.print(
-                "[red]✗[/red] --hand-eye requires --marker-pos x,y,z (mm in arm-base frame)."
-            )
-            raise typer.Exit(code=2)
+    if extrinsic:
+        bus = None
+        cam = None
         try:
-            xyz = tuple(float(v.strip()) for v in marker_pos.split(","))
-            if len(xyz) != 3:
-                raise ValueError
-        except ValueError:
-            err_console.print(
-                f"[red]✗[/red] --marker-pos must be `x,y,z` (three floats), got {marker_pos!r}"
-            )
-            raise typer.Exit(code=2) from None
-        from robot_md.hand_eye import cli_calibrate_hand_eye
+            from robot_md.backends.feetech_depthai.servo import ServoBus
+            from robot_md.backends.feetech_depthai.perception import Perception
+            from robot_md.parser import parse_file
+            from robot_md.robot_spec import RobotSpec
 
-        rc = cli_calibrate_hand_eye(
-            str(path),
-            marker_pos=xyz,
-            marker_size_mm=marker_size,
-            marker_id=marker_id,
-            dry_run=dry_run,
-        )
-        if rc != 0:
-            raise typer.Exit(code=rc)
+            spec = RobotSpec.from_parsed(parse_file(path))
+            try:
+                bus = ServoBus.from_spec(spec)
+                bus.open()
+            except Exception as e:
+                typer.echo(f"could not open servo bus: {e}", err=True)
+                bus = None
+            try:
+                cam = Perception.from_spec(spec)
+            except Exception as e:
+                typer.echo(f"could not open camera: {e}", err=True)
+                cam = None
+        except Exception as e:
+            typer.echo(f"could not load manifest: {e}", err=True)
+        result = phase_calibrate_extrinsic(path, bus=bus, camera=cam, interactive=True)
+        typer.echo(result.message)
+        if bus is not None:
+            try:
+                bus.close()
+            except Exception:
+                pass
+        raise typer.Exit(0 if result.status in ("ok", "skipped") else 1)
 
 
 @app.command("calibrate-intrinsic")
