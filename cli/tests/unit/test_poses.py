@@ -205,3 +205,69 @@ safety: {estop: {software: true, response_ms: 100}}
     spec = RobotSpec.from_parsed(parse_text(text))
     assert spec.vision.object_descriptors == ()
     assert spec.vision.find("anything") is None
+
+
+def test_spec_surfaces_learned_skills():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+learned_skills:
+  - id: red_lego_pick.2026-04-19
+    status: blocked
+    validated: [scene_capture, hsv_red]
+    blocked_by: [forward_home_pose_missing]
+    notes: 'Vision chain works.'
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    ls = spec.learned_skills
+    assert len(ls) == 1
+    assert ls[0].id == "red_lego_pick.2026-04-19"
+    assert ls[0].status == "blocked"
+    assert "hsv_red" in ls[0].validated
+    assert "forward_home_pose_missing" in ls[0].blocked_by
+    assert ls[0].notes == "Vision chain works."
+
+
+def test_spec_learned_skills_empty_when_absent():
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    assert spec.learned_skills == ()
+
+
+def test_spec_learned_skills_defaults():
+    """Minimal entry (only id) should yield default status, empty tuples."""
+    text = """---
+rcan_version: '3.0'
+metadata: {robot_name: bob}
+physics: {type: arm, dof: 6}
+drivers: [{id: arm, protocol: feetech}]
+capabilities: [status.report]
+safety: {estop: {software: true, response_ms: 100}}
+learned_skills:
+  - id: minimal
+---
+# bob
+"""
+    spec = RobotSpec.from_parsed(parse_text(text))
+    s = spec.learned_skills[0]
+    assert s.id == "minimal"
+    assert s.status == "ok"
+    assert s.validated == ()
+    assert s.blocked_by == ()
+    assert s.notes is None
+    assert s.recorded_at is None
