@@ -108,17 +108,22 @@ class Perception:
         if not descriptors:
             return []
         from robot_md.detectors.hsv import DETECTORS
+        from robot_md.detectors.depth import DEPTH_DETECTORS
 
         frame = self.grab_frame()
         if frame is None:
             return []
-        rgb, _depth, _K = frame
+        rgb, depth, K = frame
         out: list[dict] = []
         for d in descriptors:
-            fn = DETECTORS.get(d.detector)
-            if fn is None:
-                continue
-            hit = fn(rgb, params=d.params)
+            if d.detector in DEPTH_DETECTORS:
+                fn = DEPTH_DETECTORS[d.detector]
+                hit = fn(depth, K, params=d.params)
+            else:
+                fn = DETECTORS.get(d.detector)
+                if fn is None:
+                    continue
+                hit = fn(rgb, params=d.params)
             if hit is not None:
                 u, v, area = hit
                 out.append({"id": d.id, "pixel": [u, v], "area_px2": area})
@@ -134,6 +139,7 @@ class Perception:
         stereo holes (mirrors `mcp.tools.vision_find.vision_find_tool`).
         """
         from robot_md.detectors.hsv import DETECTORS
+        from robot_md.detectors.depth import DEPTH_DETECTORS
 
         active_spec = spec if spec is not None else getattr(self, "_spec", None)
         if active_spec is None:
@@ -145,7 +151,8 @@ class Perception:
         if descr is None:
             return {"status": "error", "descriptor": descriptor, "reason": "descriptor_not_declared"}
 
-        fn = DETECTORS.get(descr.detector)
+        is_depth_detector = descr.detector in DEPTH_DETECTORS
+        fn = DEPTH_DETECTORS.get(descr.detector) if is_depth_detector else DETECTORS.get(descr.detector)
         if fn is None:
             return {"status": "error", "descriptor": descriptor,
                     "reason": f"detector_unknown:{descr.detector}"}
@@ -182,7 +189,10 @@ class Perception:
             or descriptor_params_effective.get("max_depth_mm") is not None
         ) else None
 
-        hit = fn(rgb, params=descriptor_params_effective, depth_frame=depth_frame_for_detector)
+        if is_depth_detector:
+            hit = fn(depth, K, params=descriptor_params_effective)
+        else:
+            hit = fn(rgb, params=descriptor_params_effective, depth_frame=depth_frame_for_detector)
         if hit is None:
             return {"status": "no_match", "descriptor": descriptor}
         u, v, area = hit
