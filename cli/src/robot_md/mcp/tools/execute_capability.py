@@ -151,6 +151,7 @@ def _publish_result(ctx: McpContext, request_id: str, capability: str, result: d
             "capability": capability,
             "status": result.get("status"),
             "request_id": request_id,
+            "error": result.get("error"),
         },
     )
 

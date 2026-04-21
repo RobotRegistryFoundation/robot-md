@@ -150,3 +150,40 @@ def test_execute_capability_precondition_failure_returns_structured(fixtures_dir
     assert pc["kind"] == "extrinsic_present"
     assert pc["suggested_fix"] == "robot-md calibrate --extrinsic"
     assert pc["message"] == "hand-eye extrinsic missing"
+
+
+def test_execute_capability_publishes_error_on_tool_result(fixtures_dir, tmp_path, monkeypatch):
+    """_publish_result must forward the error field so InvocationRecord can
+    read reason/preconditions during live-pair or JSONL backfill."""
+    # Enable the dashboard publisher (unit conftest disables it by default)
+    # and steer HOME to a tmp dir so events.jsonl is isolated.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("ROBOT_MD_DASHBOARD_DISABLED", "0")
+
+    ctx = load_context(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
+    ctx.backend = _PickOnly()
+    ctx.backend.open(ctx.spec)
+
+    # Capture what the publisher saw.
+    published: list[tuple[str, dict]] = []
+    inner = getattr(ctx.publisher, "_inner", ctx.publisher)
+    orig_publish = inner.publish
+
+    def _capture(kind, data):
+        published.append((kind, dict(data)))
+        return orig_publish(kind, data)
+
+    inner.publish = _capture
+
+    r = execute_capability_tool(
+        ctx, capability="arm.throw", args={}, dry_run=False, confirm_token=None
+    )
+    assert r["status"] == "error"
+    assert r["error"]["reason"] == "not_declared"
+
+    results = [(k, d) for k, d in published if k == "tool.result"]
+    assert len(results) == 1
+    kind, data = results[0]
+    assert data["status"] == "error"
+    assert data["error"] is not None
+    assert data["error"]["reason"] == "not_declared"
