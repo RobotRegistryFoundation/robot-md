@@ -8,6 +8,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from mcp.server.fastmcp import Context
+
 from robot_md.mcp.context import McpContext, load_context
 from robot_md.mcp.tools.estop import estop_clear_tool, estop_tool
 from robot_md.mcp.tools.render import render_tool
@@ -104,15 +106,18 @@ def build_server(ctx: McpContext):
         )
 
     @server.tool()
-    def discover(steps: list[dict]) -> dict:
+    def discover(steps: list[dict], mcp_ctx: Context | None = None) -> dict:
         """Run the declarative discovery pipeline.
 
         Supported steps: capture, detect, probe_direction. See
         docs/superpowers/specs/2026-04-19-claude-triad-gap-analysis.md §8.
+
+        FastMCP injects `mcp_ctx` for progress notifications; direct callers
+        may omit it and `report_progress` will be skipped.
         """
         from robot_md.mcp.tools.discover import discover_tool
 
-        return discover_tool(ctx, steps=steps)
+        return discover_tool(ctx, steps=steps, mcp_ctx=mcp_ctx)
 
     from robot_md.mcp.resources import _sanitize_robot_name
 
