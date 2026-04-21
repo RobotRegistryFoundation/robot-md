@@ -20,7 +20,7 @@ import yaml
 
 
 @pytest.mark.integration
-def test_discover_then_vision_find_then_execute(tmp_path):
+async def test_discover_then_vision_find_then_execute(tmp_path):
     from robot_md.backends.base import ExecutionResult
     from robot_md.init import non_interactive
     from robot_md.mcp.context import load_context
@@ -69,7 +69,7 @@ def test_discover_then_vision_find_then_execute(tmp_path):
     ctx.backend = backend
 
     # --- Step A: discover — capture + detect ---
-    disc = discover_tool(ctx, steps=[
+    disc = await discover_tool(ctx, steps=[
         {"capture": {}},
         {"detect": {"descriptors": ["red_lego", "white_bowl"]}},
     ])
