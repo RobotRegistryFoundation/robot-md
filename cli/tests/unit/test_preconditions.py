@@ -1,22 +1,20 @@
-"""Pure-function precondition evaluator."""
+"""Pure-function precondition evaluator — returns list[PreconditionFailure]."""
 from __future__ import annotations
 
 from types import SimpleNamespace
 
-from robot_md.preconditions import evaluate
+from robot_md.preconditions import PreconditionFailure, evaluate
 from robot_md.robot_spec import CapabilityContract, Precondition
 
 
-def _pose_ready_missing_spec():
+def _missing_spec():
     return SimpleNamespace(
-        physics=SimpleNamespace(
-            poses={}, cameras=(), solver={}, workspace=None,
-        ),
+        physics=SimpleNamespace(poses={}, cameras=(), solver={}, workspace=None),
         learned_skills=[],
     )
 
 
-def _pose_ready_present_spec():
+def _present_spec():
     return SimpleNamespace(
         physics=SimpleNamespace(
             poses={"ready": SimpleNamespace(joints={"a": 1}, source="taught")},
@@ -32,38 +30,48 @@ def test_pose_taught_ok():
     contract = CapabilityContract(
         preconditions=(Precondition(kind="pose_taught", name="ready", detail={}),)
     )
-    ok, failed = evaluate(contract, _pose_ready_present_spec(), backend_resolved=True)
+    ok, failed = evaluate(contract, _present_spec(), backend_resolved=True)
     assert ok
     assert failed == []
 
 
-def test_pose_taught_missing():
+def test_pose_taught_missing_returns_structured_failure():
     contract = CapabilityContract(
         preconditions=(Precondition(kind="pose_taught", name="ready", detail={}),)
     )
-    ok, failed = evaluate(contract, _pose_ready_missing_spec(), backend_resolved=True)
+    ok, failed = evaluate(contract, _missing_spec(), backend_resolved=True)
     assert not ok
-    assert any("pose 'ready' not taught" in f for f in failed)
+    assert len(failed) == 1
+    f = failed[0]
+    assert isinstance(f, PreconditionFailure)
+    assert f.kind == "pose_taught"
+    assert f.name == "ready"
+    assert "pose 'ready' not taught" in f.message
+    assert f.suggested_fix == "robot-md pose teach ready"
 
 
-def test_extrinsic_present_missing():
+def test_extrinsic_present_missing_has_calibrate_fix():
     contract = CapabilityContract(
         preconditions=(Precondition(kind="extrinsic_present", name=None, detail={}),)
     )
-    ok, failed = evaluate(contract, _pose_ready_missing_spec(), backend_resolved=True)
+    ok, failed = evaluate(contract, _missing_spec(), backend_resolved=True)
     assert not ok
-    assert any("extrinsic" in f for f in failed)
+    assert failed[0].kind == "extrinsic_present"
+    assert failed[0].suggested_fix == "robot-md calibrate --hand-eye"
 
 
-def test_backend_resolved_false():
+def test_backend_resolved_false_has_driver_check_fix():
     contract = CapabilityContract(
         preconditions=(Precondition(kind="backend_resolved", name=None, detail={}),)
     )
-    ok, _failed = evaluate(contract, _pose_ready_present_spec(), backend_resolved=False)
+    ok, failed = evaluate(contract, _present_spec(), backend_resolved=False)
     assert not ok
+    assert failed[0].kind == "backend_resolved"
+    assert failed[0].suggested_fix is not None
+    assert "drivers" in failed[0].suggested_fix
 
 
-def test_ik_provider_missing():
+def test_ik_provider_missing_has_manifest_fix():
     spec = SimpleNamespace(
         physics=SimpleNamespace(poses={}, cameras=(), solver={}, workspace=None),
         learned_skills=[],
@@ -73,10 +81,12 @@ def test_ik_provider_missing():
     )
     ok, failed = evaluate(contract, spec, backend_resolved=True)
     assert not ok
-    assert any("ik_provider" in f for f in failed)
+    assert failed[0].kind == "ik_provider_set"
+    assert failed[0].suggested_fix is not None
+    assert "ik_provider" in failed[0].suggested_fix
 
 
-def test_workspace_declared_missing():
+def test_workspace_declared_missing_has_manifest_fix():
     spec = SimpleNamespace(
         physics=SimpleNamespace(poses={}, cameras=(), solver={}, workspace=None),
         learned_skills=[],
@@ -86,10 +96,12 @@ def test_workspace_declared_missing():
     )
     ok, failed = evaluate(contract, spec, backend_resolved=True)
     assert not ok
-    assert any("workspace" in f for f in failed)
+    assert failed[0].kind == "workspace_declared"
+    assert failed[0].suggested_fix is not None
+    assert "workspace" in failed[0].suggested_fix
 
 
-def test_learned_skill_ok_missing():
+def test_learned_skill_missing_has_record_fix():
     spec = SimpleNamespace(
         physics=SimpleNamespace(poses={}, cameras=(), solver={}, workspace=None),
         learned_skills=[],
@@ -99,10 +111,12 @@ def test_learned_skill_ok_missing():
     )
     ok, failed = evaluate(contract, spec, backend_resolved=True)
     assert not ok
-    assert any("red_lego_pick" in f for f in failed)
+    assert failed[0].kind == "learned_skill_ok"
+    assert failed[0].name == "red_lego_pick"
+    assert failed[0].suggested_fix == "robot-md record-skill red_lego_pick"
 
 
-def test_learned_skill_blocked_status():
+def test_learned_skill_blocked_has_null_fix():
     spec = SimpleNamespace(
         physics=SimpleNamespace(poses={}, cameras=(), solver={}, workspace=None),
         learned_skills=[SimpleNamespace(id="red_lego_pick", status="blocked")],
@@ -112,22 +126,37 @@ def test_learned_skill_blocked_status():
     )
     ok, failed = evaluate(contract, spec, backend_resolved=True)
     assert not ok
-    assert any("status=blocked" in f for f in failed)
+    assert "status=blocked" in failed[0].message
+    assert failed[0].suggested_fix is None  # no single remediation command
 
 
-def test_multiple_preconditions_all_report():
+def test_unknown_kind_returns_unfixable_structured_failure():
+    contract = CapabilityContract(
+        preconditions=(Precondition(kind="cosmic_rays_ok", name=None, detail={}),)
+    )
+    ok, failed = evaluate(contract, _missing_spec(), backend_resolved=True)
+    assert not ok
+    assert failed[0].kind == "cosmic_rays_ok"
+    assert failed[0].suggested_fix is None
+    assert "unknown precondition kind" in failed[0].message
+
+
+def test_multiple_preconditions_preserve_declared_order():
     contract = CapabilityContract(preconditions=(
         Precondition(kind="pose_taught", name="ready", detail={}),
         Precondition(kind="extrinsic_present", name=None, detail={}),
         Precondition(kind="backend_resolved", name=None, detail={}),
     ))
-    ok, failed = evaluate(contract, _pose_ready_missing_spec(), backend_resolved=False)
+    ok, failed = evaluate(contract, _missing_spec(), backend_resolved=False)
     assert not ok
     assert len(failed) == 3
+    assert [f.kind for f in failed] == [
+        "pose_taught", "extrinsic_present", "backend_resolved"
+    ]
 
 
 def test_empty_contract_passes():
     contract = CapabilityContract(preconditions=())
-    ok, failed = evaluate(contract, _pose_ready_missing_spec(), backend_resolved=True)
+    ok, failed = evaluate(contract, _missing_spec(), backend_resolved=True)
     assert ok
     assert failed == []
