@@ -95,3 +95,19 @@ def poses(ctx: Any) -> dict[str, dict]:
         }
         for name, p in poses_attr.items()
     }
+
+
+def recent_invocations(ctx: Any) -> list[dict]:
+    """Last ≤100 paired tool.call/tool.result invocations, newest-first."""
+    log = getattr(ctx, "invocation_log", None)
+    if log is None:
+        return []
+    return log.snapshot()
+
+
+def recent_errors(ctx: Any) -> list[dict]:
+    """View over recent_invocations filtered to status != 'ok'."""
+    log = getattr(ctx, "invocation_log", None)
+    if log is None:
+        return []
+    return log.snapshot_errors()

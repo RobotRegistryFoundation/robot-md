@@ -144,6 +144,22 @@ def build_server(ctx: McpContext):
 
         return json.dumps(_poses(ctx), indent=2)
 
+    @server.resource(f"robot-md://{robot_name}/recent_invocations", mime_type="application/json")
+    def _resource_recent_invocations() -> str:
+        import json
+
+        from robot_md.mcp.resources import recent_invocations as _ri
+
+        return json.dumps(_ri(ctx), indent=2)
+
+    @server.resource(f"robot-md://{robot_name}/recent_errors", mime_type="application/json")
+    def _resource_recent_errors() -> str:
+        import json
+
+        from robot_md.mcp.resources import recent_errors as _re
+
+        return json.dumps(_re(ctx), indent=2)
+
     return server
 
 
