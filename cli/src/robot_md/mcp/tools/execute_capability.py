@@ -17,9 +17,9 @@ def execute_capability_tool(
     dry_run: bool,
     confirm_token: str | None,
 ) -> dict:
-    if ctx.backend is None:
-        return _error("no_backend", "no backend resolved for any driver")
-
+    # Generate request_id and publish tool.call before any early-exit so
+    # EVERY invocation — even no_backend failures — reaches the InvocationLog
+    # and events.jsonl. Observability must see the call the operator made.
     request_id = f"{capability}-{int(time.time() * 1000)}"
     if getattr(ctx, "publisher", None) is not None:
         ctx.publisher.publish(
@@ -32,6 +32,11 @@ def execute_capability_tool(
                 "request_id": request_id,
             },
         )
+
+    if ctx.backend is None:
+        result = _error("no_backend", "no backend resolved for any driver")
+        _publish_result(ctx, request_id, capability, result)
+        return result
 
     declared = ctx.spec.capabilities if ctx.spec is not None else frozenset()
     if capability not in declared:

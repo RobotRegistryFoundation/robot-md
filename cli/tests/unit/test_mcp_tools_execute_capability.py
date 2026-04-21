@@ -187,3 +187,39 @@ def test_execute_capability_publishes_error_on_tool_result(fixtures_dir, tmp_pat
     assert data["status"] == "error"
     assert data["error"] is not None
     assert data["error"]["reason"] == "not_declared"
+
+
+def test_execute_capability_no_backend_still_publishes(fixtures_dir, tmp_path, monkeypatch):
+    """no_backend is an observability-visible failure: tool.call + tool.result
+    must both reach the publisher so the InvocationLog ring and the JSONL
+    backfill path capture the invocation. Without this the agent has no way
+    to answer 'why did my last pick fail?' when hardware is absent."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("ROBOT_MD_DASHBOARD_DISABLED", "0")
+
+    ctx = load_context(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
+    ctx.backend = None  # simulate unresolved backend
+
+    published: list[tuple[str, dict]] = []
+    inner = getattr(ctx.publisher, "_inner", ctx.publisher)
+    orig_publish = inner.publish
+
+    def _capture(kind, data):
+        published.append((kind, dict(data)))
+        return orig_publish(kind, data)
+
+    inner.publish = _capture
+
+    r = execute_capability_tool(
+        ctx, capability="arm.pick", args={}, dry_run=False, confirm_token=None
+    )
+    assert r["status"] == "error"
+    assert r["error"]["reason"] == "no_backend"
+
+    kinds = [k for k, _ in published]
+    assert "tool.call" in kinds, f"expected tool.call, got {kinds}"
+    assert "tool.result" in kinds, f"expected tool.result, got {kinds}"
+
+    result_events = [d for k, d in published if k == "tool.result"]
+    assert len(result_events) == 1
+    assert result_events[0]["error"]["reason"] == "no_backend"
