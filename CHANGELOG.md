@@ -7,13 +7,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [0.8.0] — 2026-04-20
+
+### Added — MCP observability
+
+- **`recent_invocations` MCP resource** — `robot-md://<robot>/recent_invocations` returns the last ≤100 completed tool invocations (newest-first) for this manifest. Each entry: `{timestamp, tool, capability, args, status, reason, request_id, manifest_path, preconditions}`. Backed by an in-memory ring on `McpContext` that's backfilled at boot from `~/.robot-md/events.jsonl`.
+- **`recent_errors` MCP resource** — `robot-md://<robot>/recent_errors` returns the same shape filtered to `status != "ok"`. Answers "why did my last pick fail?" without shelling out.
+- **Structured precondition failures.** Every `_check_one` branch in `preconditions.evaluate` now returns a `PreconditionFailure(kind, name, message, suggested_fix)`. `suggested_fix` carries an actionable verb hint where one exists (e.g., `robot-md calibrate --extrinsic`) or `null` where remediation requires judgement. MCP clients append the ROBOT.md path when running the hint.
+- **`discover` streaming.** The tool now accepts a FastMCP `Context` and emits one MCP progress notification per step via `await ctx.report_progress(i, total, step_name)`. Dashboard substrate also receives `discover.step.begin` / `discover.step.end` events so long `discover` sweeps (multi-second arm motion) report per-step instead of blocking silently.
+
+### Changed (breaking)
+
+- **`execute_capability` error payload for `reason: "precondition"` changes shape.** Old: `{reason, failed: list[str]}`. New: `{reason, preconditions: list[dict]}` where each entry is `{kind, name, message, suggested_fix}`. MCP clients parsing the old `failed` field must read `error.preconditions` instead and render `preconditions[*].message` + `preconditions[*].suggested_fix`.
+- **`robot_md.preconditions.evaluate(...)` return type** changes from `(bool, list[str])` to `(bool, list[PreconditionFailure])`. Direct callers must adapt; the MCP error payload surface is the more common consumer.
+- **`robot_md.mcp.tools.discover.discover_tool` is now an async function.** FastMCP handles async tool functions natively; external MCP clients see no wire-format change. Direct callers of `discover_tool` outside the FastMCP binding must `await` it.
+
+### Fixed
+
+- **`execute_capability` observability.** Previously, `no_backend` failures returned early before publishing `tool.call`/`tool.result`, leaving no record in the InvocationLog or `events.jsonl`. Now every invocation (including `no_backend`) flows through the publisher so the ring and backfill path capture it.
+- **`_publish_result` forwards the `error` field.** Previously stripped the `error` key from the `tool.result` event payload, so both the live fan-out path and the JSONL backfill path landed records with `reason=null` regardless of actual failure. Fixed so `InvocationRecord.from_event_pair` can populate `reason` and `preconditions`.
+
 ### Added (experimental — not wired)
 
 - **`calibrate_extrinsic.capture_via_wrist_wiggle(bus, camera, kin, pose)`** — attempted gripper-isolation primitive. At each target pose, captures `depth_A`, shifts *only* `wrist_flex` by ±0.15 rad, captures `depth_B`, returns the motion-delta centroid. Unit-tested; kept in the module for future use. **Not wired into `phase_calibrate_extrinsic`** — on-rig validation showed the OAK-D depth noise floor exceeds the wiggle signal: zero-commanded-motion `find_via_motion_delta` returned confidence 1.0 with 7,655 "arrived" pixels (>60mm frame-to-frame variation). The ~18mm tip motion from a 0.15-rad wiggle cannot rise above that floor. The v0.7.3 pose-to-pose motion-delta remains the primary detector because its whole-arm transit motion is large enough to out-vote the noise.
 
-### Known limitation
+### Known limitation (from v0.7.3)
 
-- **v0.7.3 residual ceiling unchanged at ~128mm on physical SO-ARM101+OAK-D.** The real fix requires either temporal denoising of depth frames before the delta, or a non-motion-based primitive (3D shape match against known gripper geometry, or colored-fiducial HSV detection). Tracked for v0.8.
+- **v0.7.3 residual ceiling unchanged at ~128mm on physical SO-ARM101+OAK-D.** The real fix requires either temporal denoising of depth frames before the delta, or a non-motion-based primitive (3D shape match against known gripper geometry, or colored-fiducial HSV detection). Tracked for a future milestone.
+
+### Internal
+
+- `robot_md.mcp.invocation_record.InvocationRecord` — immutable record coalesced from paired `tool.call` / `tool.result` events (request_id keyed).
+- `robot_md.mcp.invocation_log.InvocationLog` — per-`McpContext` ring buffer (maxlen=100, thread-safe, backfilled from JSONL at boot).
+- `McpContext.publisher` is wrapped by `_PublisherFanoutWrapper` at `load_context` time — stamps `manifest_path` into every event and appends paired invocations to the ring. All existing `ctx.publisher.publish(...)` call sites are unchanged.
 
 ---
 
