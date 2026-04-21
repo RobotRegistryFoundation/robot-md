@@ -64,9 +64,11 @@ def execute_capability_tool(
     if capability not in read_only:
         contract = ctx.spec.capability_contracts.get(capability) if ctx.spec else None
         if contract is not None and contract.preconditions:
+            from dataclasses import asdict as _asdict
+
             from robot_md.preconditions import evaluate
 
-            ok, failed = evaluate(
+            ok, failures = evaluate(
                 contract, ctx.spec, backend_resolved=ctx.backend is not None
             )
             if not ok:
@@ -74,7 +76,10 @@ def execute_capability_tool(
                     "status": "blocked",
                     "trajectory": None,
                     "events": [],
-                    "error": {"reason": "precondition", "failed": failed},
+                    "error": {
+                        "reason": "precondition",
+                        "preconditions": [_asdict(f) for f in failures],
+                    },
                 }
                 _publish_result(ctx, request_id, capability, result)
                 return result

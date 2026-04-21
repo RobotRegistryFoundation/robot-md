@@ -114,3 +114,39 @@ def test_execute_capability_hitl_gate_blocks_without_token(fixtures_dir):
         ctx, capability="arm.pick", args={}, dry_run=False, confirm_token="anything"
     )
     assert r2["status"] == "ok"
+
+
+def test_execute_capability_precondition_failure_returns_structured(fixtures_dir):
+    """When a declared capability has a precondition that fails, the error
+    shape is {reason: 'precondition', preconditions: list[dict]} with each
+    entry carrying kind/name/message/suggested_fix."""
+    ctx = load_context(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
+    ctx.backend = _PickOnly()
+    ctx.backend.open(ctx.spec)
+
+    # Inject a capability contract that requires the extrinsic to be present.
+    # The fixture manifest doesn't have an extrinsic set (preset_default), so
+    # this should fail the extrinsic_present precondition.
+    from robot_md.robot_spec import CapabilityContract, Precondition
+
+    ctx.spec.capability_contracts["arm.pick"] = CapabilityContract(
+        preconditions=(
+            Precondition(kind="extrinsic_present", name=None, detail={}),
+        )
+    )
+    # Ensure no camera has an extrinsic set so the precondition trips.
+    for cam in ctx.spec.physics.cameras:
+        object.__setattr__(cam, "extrinsic", None)
+
+    r = execute_capability_tool(
+        ctx, capability="arm.pick", args={}, dry_run=False, confirm_token=None
+    )
+    assert r["status"] == "blocked"
+    assert r["error"]["reason"] == "precondition"
+    assert "preconditions" in r["error"]
+    assert "failed" not in r["error"]
+    assert len(r["error"]["preconditions"]) == 1
+    pc = r["error"]["preconditions"][0]
+    assert pc["kind"] == "extrinsic_present"
+    assert pc["suggested_fix"] == "robot-md calibrate --extrinsic"
+    assert pc["message"] == "hand-eye extrinsic missing"
