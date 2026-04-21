@@ -2,7 +2,11 @@
 
 Steps are declarative: [{capture: {}}, {detect: {...}}, {probe_direction: {...}}].
 Per-step failures are reported in the result; the tool never raises.
-Tasks 18 (capture + detect) land first; Task 19 adds probe_direction.
+
+v0.8: emits MCP progress notifications via FastMCP Context.report_progress
+(one per step) and discover.step.begin / discover.step.end events on the
+dashboard substrate. Both channels are best-effort — neither can abort a
+step if reporting itself fails.
 """
 
 from __future__ import annotations
@@ -12,13 +16,23 @@ from typing import Any
 from robot_md.detectors.hsv import DETECTORS
 
 
-def discover_tool(ctx: Any, *, steps: list[dict]) -> dict:
+def discover_tool(
+    ctx: Any,
+    *,
+    steps: list[dict],
+    mcp_ctx: Any | None = None,
+) -> dict:
     results: dict[str, Any] = {}
     frame = None  # cached between steps to avoid re-capturing every tick
-    for step in steps:
+    total = len(steps)
+    for i, step in enumerate(steps):
         if not isinstance(step, dict) or len(step) != 1:
             continue
         (name, payload) = next(iter(step.items()))
+
+        _publish_step(ctx, "begin", name, i, total)
+        _report_progress(mcp_ctx, i, total, name)
+
         if name == "capture":
             frame = _do_capture(ctx)
             if frame is not None:
@@ -33,7 +47,41 @@ def discover_tool(ctx: Any, *, steps: list[dict]) -> dict:
             results["probe_direction"] = _do_probe(ctx, payload)
         else:
             results[name] = {"status": "unknown_step"}
+
+        _publish_step(ctx, "end", name, i, total, status=results.get(name, {}).get("status"))
+
     return {"status": "ok", "results": results}
+
+
+def _report_progress(mcp_ctx: Any | None, i: int, total: int, name: str) -> None:
+    if mcp_ctx is None:
+        return
+    try:
+        mcp_ctx.report_progress(i, total, name)
+    except Exception:
+        # Best-effort — a broken progress channel must never abort a step.
+        pass
+
+
+def _publish_step(
+    ctx: Any,
+    phase: str,
+    name: str,
+    i: int,
+    total: int,
+    *,
+    status: str | None = None,
+) -> None:
+    publisher = getattr(ctx, "publisher", None)
+    if publisher is None:
+        return
+    try:
+        data = {"name": name, "i": i, "total": total}
+        if status is not None:
+            data["status"] = status
+        publisher.publish(f"discover.step.{phase}", data)
+    except Exception:
+        pass
 
 
 def _do_capture(ctx: Any):
