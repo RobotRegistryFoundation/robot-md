@@ -1,4 +1,5 @@
 """Unit tests for InvocationLog.backfill_from_jsonl()."""
+
 from __future__ import annotations
 
 import json
@@ -82,7 +83,9 @@ def test_backfill_honors_n_limit(tmp_path: Path):
     p = tmp_path / "events.jsonl"
     pairs = []
     for i in range(10):
-        pairs.extend([_call(f"r{i}", "/M.md", ts=float(i)), _result(f"r{i}", "/M.md", ts=float(i) + 0.5)])
+        pairs.extend(
+            [_call(f"r{i}", "/M.md", ts=float(i)), _result(f"r{i}", "/M.md", ts=float(i) + 0.5)]
+        )
     _write_jsonl(p, pairs)
     log = InvocationLog(maxlen=100)
     log.backfill_from_jsonl(p, manifest_path="/M.md", n=3)

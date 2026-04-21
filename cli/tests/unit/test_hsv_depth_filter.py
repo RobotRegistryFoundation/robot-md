@@ -1,4 +1,5 @@
 """HSV descriptors filter matches by depth; workspace bounds are the default."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -32,7 +33,7 @@ def test_detect_hsv_without_depth_returns_centroid():
     frame = _solid_red_frame()
     centroid = detect_hsv(frame, params=RED_PARAMS)
     assert centroid is not None
-    u, v, area = centroid
+    u, v, _area = centroid
     assert 250 < u < 350
     assert 150 < v < 250
 
@@ -40,14 +41,14 @@ def test_detect_hsv_without_depth_returns_centroid():
 def test_detect_hsv_with_depth_bounds_excludes_wall():
     frame = _solid_red_frame()
     depth = _depth_wall_left()
-    # Accept only 300–500mm (tabletop).
+    # Accept only 300-500mm (tabletop).
     centroid = detect_hsv(
         frame,
         params={**RED_PARAMS, "min_depth_mm": 300, "max_depth_mm": 500},
         depth_frame=depth,
     )
     assert centroid is not None
-    u, v, _ = centroid
+    u, _v, _ = centroid
     # Centroid must be in the right half (tabletop), not the left (wall).
     assert u > 300
 
@@ -78,8 +79,8 @@ def test_detect_hsv_roi_with_depth_bounds_excludes_wall():
     excluded when bounds declare tabletop-only depth."""
     from robot_md.detectors.hsv import detect_hsv_roi
 
-    frame = _solid_red_frame()          # all red
-    depth = _depth_wall_left()          # left half wall (8000mm), right half tabletop (400mm)
+    frame = _solid_red_frame()  # all red
+    depth = _depth_wall_left()  # left half wall (8000mm), right half tabletop (400mm)
 
     params = {
         **RED_PARAMS,

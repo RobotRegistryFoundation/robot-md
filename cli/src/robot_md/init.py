@@ -15,6 +15,7 @@ Design principles (from spec/autodetect-prefill-roadmap.md):
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -563,10 +564,10 @@ def default_flow(
     cam_for_cal = None
     if interactive:
         try:
-            from robot_md.backends.feetech_depthai.servo import ServoBus
             from robot_md.backends.feetech_depthai.perception import Perception
-            from robot_md.robot_spec import RobotSpec
+            from robot_md.backends.feetech_depthai.servo import ServoBus
             from robot_md.parser import parse_file as _parse_file
+            from robot_md.robot_spec import RobotSpec
 
             spec = RobotSpec.from_parsed(_parse_file(out_path))
             try:
@@ -594,21 +595,15 @@ def default_flow(
 
     # Release hardware if we opened it.
     if bus_for_cal is not None:
-        try:
+        with contextlib.suppress(Exception):
             bus_for_cal.close()
-        except Exception:
-            pass
     if cam_for_cal is not None:
-        try:
+        with contextlib.suppress(Exception):
             cam_for_cal.close()
-        except Exception:
-            pass
 
     # Phase 7: teach poses (opt-in, TTY-only).
     if do_teach_poses:
-        results.append(
-            phase_teach_poses(manifest_path=out_path, interactive=sys.stdin.isatty())
-        )
+        results.append(phase_teach_poses(manifest_path=out_path, interactive=sys.stdin.isatty()))
 
     _print_tally(results, out_path)
     return 0

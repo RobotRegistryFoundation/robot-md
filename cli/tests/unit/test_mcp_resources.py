@@ -1,4 +1,5 @@
 """Pure-function MCP resource builders. Tests do not start FastMCP."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -26,11 +27,18 @@ def test_calibration_status_all_missing():
 
 
 def test_calibration_status_ready_taught():
-    r = calibration_status(_ctx(
-        poses_dict={"ready": PoseDef(
-            joints={"a": 1}, description=None, source="taught", taught_at=None,
-        )}
-    ))
+    r = calibration_status(
+        _ctx(
+            poses_dict={
+                "ready": PoseDef(
+                    joints={"a": 1},
+                    description=None,
+                    source="taught",
+                    taught_at=None,
+                )
+            }
+        )
+    )
     assert r["poses_ready"] == "ok"
 
 
@@ -42,12 +50,20 @@ def test_calibration_status_hand_eye_present():
 
 
 def test_learned_skills_returns_list_of_dicts():
-    r = learned_skills(_ctx(ls=(
-        LearnedSkill(
-            id="x", status="ok",
-            validated=("a","b"), blocked_by=(), notes=None, recorded_at=None,
-        ),
-    )))
+    r = learned_skills(
+        _ctx(
+            ls=(
+                LearnedSkill(
+                    id="x",
+                    status="ok",
+                    validated=("a", "b"),
+                    blocked_by=(),
+                    notes=None,
+                    recorded_at=None,
+                ),
+            )
+        )
+    )
     assert isinstance(r, list)
     assert r[0]["id"] == "x"
     assert r[0]["validated"] == ["a", "b"]
@@ -59,12 +75,18 @@ def test_learned_skills_empty_list_when_none():
 
 
 def test_poses_resource_returns_dict():
-    r = poses(_ctx(poses_dict={
-        "ready": PoseDef(
-            joints={"a": 1}, description="x",
-            source="taught", taught_at="2026-04-19",
+    r = poses(
+        _ctx(
+            poses_dict={
+                "ready": PoseDef(
+                    joints={"a": 1},
+                    description="x",
+                    source="taught",
+                    taught_at="2026-04-19",
+                )
+            }
         )
-    }))
+    )
     assert r["ready"]["joints"] == {"a": 1}
     assert r["ready"]["source"] == "taught"
     assert r["ready"]["taught_at"] == "2026-04-19"
@@ -136,6 +158,7 @@ def test_resources_handle_none_spec():
 
 def test_sanitize_robot_name_for_uri():
     from robot_md.mcp.resources import _sanitize_robot_name
+
     assert _sanitize_robot_name("bob") == "bob"
     assert _sanitize_robot_name("bob-mk2") == "bob-mk2"
     assert _sanitize_robot_name("bob_01") == "bob_01"

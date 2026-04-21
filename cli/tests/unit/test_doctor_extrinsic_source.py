@@ -1,4 +1,5 @@
 """Doctor warns (not errors) when extrinsic is a preset default."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,22 +13,41 @@ def _write(tmp_path: Path, source: str | None, *, include_camera: bool = True) -
     fm = {
         "metadata": {"robot_name": "r"},
         "physics": {
-            "type": "arm", "dof": 1,
+            "type": "arm",
+            "dof": 1,
             "solver": {
                 "convention": "DH",
                 "base_frame": {"up": "z", "forward": "x"},
                 "encoder": {"steps_per_rev": 4096},
-                "gripper": {"joint_id": "g", "tip_offset_mm": [0, 0, 0], "open_steps": 1700, "close_steps": 1200},
+                "gripper": {
+                    "joint_id": "g",
+                    "tip_offset_mm": [0, 0, 0],
+                    "open_steps": 1700,
+                    "close_steps": 1200,
+                },
             },
-            "kinematics": [{"id": "g", "axis": "y", "a_mm": 0, "d_mm": 0, "zero_pose_steps": 1200, "encoder_sign": 1}],
+            "kinematics": [
+                {
+                    "id": "g",
+                    "axis": "y",
+                    "a_mm": 0,
+                    "d_mm": 0,
+                    "zero_pose_steps": 1200,
+                    "encoder_sign": 1,
+                }
+            ],
         },
         "drivers": [{"id": "s", "protocol": "feetech", "port": "/dev/null"}],
         "capabilities": [],
         "safety": {"estop": {"software": True}},
     }
     if include_camera:
-        cam = {"driver_id": "o", "primary_stream": "rgb", "mount": "world",
-               "extrinsic": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]}
+        cam = {
+            "driver_id": "o",
+            "primary_stream": "rgb",
+            "mount": "world",
+            "extrinsic": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        }
         if source is not None:
             cam["extrinsic_source"] = source
         fm["physics"]["solver"]["cameras"] = [cam]

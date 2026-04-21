@@ -94,9 +94,7 @@ def test_pick_best_prefers_minimal_when_all_scores_zero(presets):
 
     r = pick_best(presets, Scan())
     assert r is not None
-    assert r.preset.name == "minimal", (
-        f"expected minimal on all-zero scan, got {r.preset.name}"
-    )
+    assert r.preset.name == "minimal", f"expected minimal on all-zero scan, got {r.preset.name}"
     assert r.score == 0
 
 

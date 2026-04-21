@@ -1,4 +1,5 @@
 """Pure-function precondition evaluator — returns list[PreconditionFailure]."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -159,17 +160,17 @@ def test_unknown_kind_returns_unfixable_structured_failure():
 
 
 def test_multiple_preconditions_preserve_declared_order():
-    contract = CapabilityContract(preconditions=(
-        Precondition(kind="pose_taught", name="ready", detail={}),
-        Precondition(kind="extrinsic_present", name=None, detail={}),
-        Precondition(kind="backend_resolved", name=None, detail={}),
-    ))
+    contract = CapabilityContract(
+        preconditions=(
+            Precondition(kind="pose_taught", name="ready", detail={}),
+            Precondition(kind="extrinsic_present", name=None, detail={}),
+            Precondition(kind="backend_resolved", name=None, detail={}),
+        )
+    )
     ok, failed = evaluate(contract, _missing_spec(), backend_resolved=False)
     assert not ok
     assert len(failed) == 3
-    assert [f.kind for f in failed] == [
-        "pose_taught", "extrinsic_present", "backend_resolved"
-    ]
+    assert [f.kind for f in failed] == ["pose_taught", "extrinsic_present", "backend_resolved"]
 
 
 def test_empty_contract_passes():

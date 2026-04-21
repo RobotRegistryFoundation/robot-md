@@ -1,4 +1,5 @@
 """Kabsch-style rigid-body solve for camera→base extrinsic from (tip_cam, tip_base) pairs."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -28,7 +29,7 @@ def test_solve_recovers_extrinsic_no_noise():
     samples = _synthesize_samples(gt, n=8, noise_mm=0.0)
     extrinsic, residual = solve(samples)
     assert residual < 0.1
-    for a, b in zip(extrinsic, gt):
+    for a, b in zip(extrinsic, gt, strict=False):
         assert abs(a - b) < 0.01
 
 

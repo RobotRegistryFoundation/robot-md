@@ -130,9 +130,7 @@ def test_execute_capability_precondition_failure_returns_structured(fixtures_dir
     from robot_md.robot_spec import CapabilityContract, Precondition
 
     ctx.spec.capability_contracts["arm.pick"] = CapabilityContract(
-        preconditions=(
-            Precondition(kind="extrinsic_present", name=None, detail={}),
-        )
+        preconditions=(Precondition(kind="extrinsic_present", name=None, detail={}),)
     )
     # Ensure no camera has an extrinsic set so the precondition trips.
     for cam in ctx.spec.physics.cameras:
@@ -183,7 +181,7 @@ def test_execute_capability_publishes_error_on_tool_result(fixtures_dir, tmp_pat
 
     results = [(k, d) for k, d in published if k == "tool.result"]
     assert len(results) == 1
-    kind, data = results[0]
+    _kind, data = results[0]
     assert data["status"] == "error"
     assert data["error"] is not None
     assert data["error"]["reason"] == "not_declared"

@@ -1,4 +1,5 @@
 """record_skill MCP tool: upsert learned_skills[] entry preserving prose body."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock

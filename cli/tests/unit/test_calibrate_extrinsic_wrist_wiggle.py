@@ -4,6 +4,7 @@ Between depth_A and depth_B only wrist_flex moves, so the motion-delta centroid
 is pure gripper. Defends against the 128mm-residual ceiling in v0.7.3 where
 pose-to-pose motion delta centroided whichever arm segment dominated motion.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -17,15 +18,49 @@ def _so_arm101_fm():
             "solver": {
                 "convention": "DH",
                 "encoder": {"steps_per_rev": 4096},
-                "gripper": {"tip_offset_mm": [30.0, 0.0, 0.0], "open_steps": 1700, "close_steps": 1200},
+                "gripper": {
+                    "tip_offset_mm": [30.0, 0.0, 0.0],
+                    "open_steps": 1700,
+                    "close_steps": 1200,
+                },
             },
             "kinematics": [
-                {"id": "shoulder_pan",   "axis": "z", "a_mm": 0.0,   "d_mm": 30.0, "limits_deg": [-180, 180]},
-                {"id": "shoulder_lift",  "axis": "y", "a_mm": 120.0, "d_mm": 0.0,  "limits_deg": [-90, 90]},
-                {"id": "elbow_flex",     "axis": "y", "a_mm": 120.0, "d_mm": 0.0,  "limits_deg": [-90, 90]},
-                {"id": "wrist_flex",     "axis": "y", "a_mm": 60.0,  "d_mm": 0.0,  "limits_deg": [-90, 90]},
-                {"id": "wrist_roll",     "axis": "x", "a_mm": 0.0,   "d_mm": 30.0, "limits_deg": [-180, 180]},
-                {"id": "gripper",        "axis": "y", "a_mm": 0.0,   "d_mm": 0.0,  "limits_deg": [-90, 90]},
+                {
+                    "id": "shoulder_pan",
+                    "axis": "z",
+                    "a_mm": 0.0,
+                    "d_mm": 30.0,
+                    "limits_deg": [-180, 180],
+                },
+                {
+                    "id": "shoulder_lift",
+                    "axis": "y",
+                    "a_mm": 120.0,
+                    "d_mm": 0.0,
+                    "limits_deg": [-90, 90],
+                },
+                {
+                    "id": "elbow_flex",
+                    "axis": "y",
+                    "a_mm": 120.0,
+                    "d_mm": 0.0,
+                    "limits_deg": [-90, 90],
+                },
+                {
+                    "id": "wrist_flex",
+                    "axis": "y",
+                    "a_mm": 60.0,
+                    "d_mm": 0.0,
+                    "limits_deg": [-90, 90],
+                },
+                {
+                    "id": "wrist_roll",
+                    "axis": "x",
+                    "a_mm": 0.0,
+                    "d_mm": 30.0,
+                    "limits_deg": [-180, 180],
+                },
+                {"id": "gripper", "axis": "y", "a_mm": 0.0, "d_mm": 0.0, "limits_deg": [-90, 90]},
             ],
             "workspace": {"bounds_mm": {"x": [-200, 340], "y": [-340, 340], "z": [0, 250]}},
         }
@@ -46,8 +81,14 @@ def _blob_depth(shape=(400, 600), center=(300, 200), radius=20, depth_mm=500, bg
 
 class _FakeBus:
     def __init__(self, joint_ids=None):
-        self._positions = {"shoulder_pan": 2048, "shoulder_lift": 2048, "elbow_flex": 2048,
-                           "wrist_flex": 2048, "wrist_roll": 2048, "gripper": 2048}
+        self._positions = {
+            "shoulder_pan": 2048,
+            "shoulder_lift": 2048,
+            "elbow_flex": 2048,
+            "wrist_flex": 2048,
+            "wrist_roll": 2048,
+            "gripper": 2048,
+        }
         self.interpolate_calls: list[tuple[dict, dict]] = []
 
     def read_positions(self):
@@ -84,6 +125,7 @@ def _pose_mid():
 def test_wiggle_returns_centroid_for_motion_between_frames():
     """Blob at (200,200) in A, (260,200) in B → arrived pixels centroid near B."""
     from robot_md.kinematics import Kinematics
+
     kin = Kinematics(_so_arm101_fm())
     K = _K()
     depth_a = _blob_depth(center=(200, 200), depth_mm=500)
@@ -92,7 +134,7 @@ def test_wiggle_returns_centroid_for_motion_between_frames():
     cam = _FakeCamera([(None, depth_a, K), (None, depth_b, K)])
 
     result = capture_via_wrist_wiggle(bus, cam, kin, _pose_mid())
-    wiggled_pose, centroid, confidence = result
+    _wiggled_pose, centroid, confidence = result
     assert centroid is not None, "expected detection from wiggle"
     u = centroid[0] * K[0, 0] / centroid[2] + K[0, 2]
     v = centroid[1] * K[1, 1] / centroid[2] + K[1, 2]
@@ -104,6 +146,7 @@ def test_wiggle_returns_centroid_for_motion_between_frames():
 def test_wiggle_returns_wiggled_pose_with_wrist_flex_shifted():
     """Returned pose dict must reflect the post-wiggle wrist_flex angle."""
     from robot_md.kinematics import Kinematics
+
     kin = Kinematics(_so_arm101_fm())
     K = _K()
     depth_a = _blob_depth(center=(200, 200))
@@ -125,6 +168,7 @@ def test_wiggle_returns_wiggled_pose_with_wrist_flex_shifted():
 def test_wiggle_returns_none_when_wrist_flex_missing():
     """Kinematics without wrist_flex joint → (None, None, 0.0)."""
     from robot_md.kinematics import Kinematics
+
     fm = _so_arm101_fm()
     fm["physics"]["kinematics"] = [
         j for j in fm["physics"]["kinematics"] if j["id"] != "wrist_flex"
@@ -140,6 +184,7 @@ def test_wiggle_returns_none_when_wrist_flex_missing():
 def test_wiggle_uses_negative_delta_near_upper_limit():
     """Pose at upper limit of wrist_flex → wiggle picks -Δ, not +Δ."""
     from robot_md.kinematics import Kinematics
+
     kin = Kinematics(_so_arm101_fm())
     K = _K()
     depth_a = _blob_depth(center=(200, 200))
@@ -163,6 +208,7 @@ def test_wiggle_uses_negative_delta_near_upper_limit():
 def test_wiggle_returns_none_when_both_directions_exceed_limits():
     """Wrist at a limit with no room either side → (None, None, 0.0)."""
     from robot_md.kinematics import Kinematics
+
     fm = _so_arm101_fm()
     # Shrink wrist_flex envelope to ±0.05 rad so 0.15-rad wiggle can't fit either direction.
     for j in fm["physics"]["kinematics"]:
@@ -180,6 +226,7 @@ def test_wiggle_returns_none_when_both_directions_exceed_limits():
 def test_wiggle_returns_none_when_camera_grab_fails():
     """camera.grab_frame() returning None at either step → (None, None, 0.0)."""
     from robot_md.kinematics import Kinematics
+
     kin = Kinematics(_so_arm101_fm())
     bus = _FakeBus()
     # Only one frame available; second grab returns None.
@@ -192,13 +239,16 @@ def test_wiggle_returns_none_when_camera_grab_fails():
 def test_wiggle_issues_two_interpolate_calls():
     """First call: move-to-pose. Second call: wiggle wrist_flex by ±Δ."""
     from robot_md.kinematics import Kinematics
+
     kin = Kinematics(_so_arm101_fm())
     K = _K()
     bus = _FakeBus()
-    cam = _FakeCamera([
-        (None, _blob_depth(center=(200, 200)), K),
-        (None, _blob_depth(center=(260, 200)), K),
-    ])
+    cam = _FakeCamera(
+        [
+            (None, _blob_depth(center=(200, 200)), K),
+            (None, _blob_depth(center=(260, 200)), K),
+        ]
+    )
 
     capture_via_wrist_wiggle(bus, cam, kin, _pose_mid(), wiggle_rad=0.15)
     assert len(bus.interpolate_calls) == 2, (

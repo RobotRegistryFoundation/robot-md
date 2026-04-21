@@ -61,9 +61,9 @@ def hw_checks(
         Check(
             "depth_stream",
             "pass" if probe.get("depth") else "error",
-            "depth stream present" if probe.get("depth") else (
-                "depth stream unavailable; depth-aware detectors will fail"
-            ),
+            "depth stream present"
+            if probe.get("depth")
+            else ("depth stream unavailable; depth-aware detectors will fail"),
         )
     )
     return checks

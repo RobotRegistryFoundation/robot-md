@@ -1,4 +1,5 @@
 """Discovery payload includes calibration_status + learned_skills_summary."""
+
 from __future__ import annotations
 
 from robot_md.discovery import build_discovery

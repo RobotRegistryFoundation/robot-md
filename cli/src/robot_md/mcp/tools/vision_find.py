@@ -44,10 +44,11 @@ def vision_find_tool(ctx: Any, *, descriptor_id: str) -> dict:
     # Clamp so huge detections don't median across background. A 31x31
     # patch (r=15) is enough for robust depth-hole filling without
     # sampling beyond the object.
-    r = min(15, max(3, int((area ** 0.5) // 4)))
+    r = min(15, max(3, int((area**0.5) // 4)))
     h, w = depth.shape
-    patch = depth[max(0, v - r): min(h, v + r + 1),
-                  max(0, u - r): min(w, u + r + 1)].astype(np.float32)
+    patch = depth[max(0, v - r) : min(h, v + r + 1), max(0, u - r) : min(w, u + r + 1)].astype(
+        np.float32
+    )
     valid = patch[patch > 0]
     depth_mm = float(np.median(valid)) if valid.size else float("nan")
     xyz = _pixel_to_3d(u, v, depth_mm, K)

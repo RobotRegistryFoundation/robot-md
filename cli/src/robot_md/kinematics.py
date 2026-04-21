@@ -335,7 +335,7 @@ class Kinematics:
                     joint=name,
                     angle_rad=angle,
                     reason=(
-                        f"{name}={math.degrees(angle):.1f}° is {ratio*100:.0f}% of "
+                        f"{name}={math.degrees(angle):.1f}° is {ratio * 100:.0f}% of "
                         f"envelope ±{math.degrees(limit):.1f}° — STS3215 latch risk"
                     ),
                 )

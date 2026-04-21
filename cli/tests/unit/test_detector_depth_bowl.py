@@ -1,4 +1,5 @@
 """Depth-first detector for bowl/cylinder/plane shapes."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -11,7 +12,9 @@ def _flat_table_depth(shape=(400, 600)):
     return np.full(shape, 500, dtype=np.uint16)
 
 
-def _table_with_bowl(shape=(400, 600), center=(300, 200), radius=40, depth_table=500, depth_rim=470):
+def _table_with_bowl(
+    shape=(400, 600), center=(300, 200), radius=40, depth_table=500, depth_rim=470
+):
     """A round bowl-shaped depression on a table — rim (ring) closer than table, interior clear."""
     d = _flat_table_depth(shape)
     yy, xx = np.ogrid[: shape[0], : shape[1]]
@@ -30,7 +33,12 @@ def test_bowl_detected_on_table():
     result = detect_depth_shape(
         depth,
         K,
-        params={"shape": "bowl", "min_diameter_mm": 40, "max_diameter_mm": 150, "z_range_mm": [460, 490]},
+        params={
+            "shape": "bowl",
+            "min_diameter_mm": 40,
+            "max_diameter_mm": 150,
+            "z_range_mm": [460, 490],
+        },
     )
     assert result is not None
     u, v, _area = result
@@ -44,7 +52,12 @@ def test_no_bowl_when_only_flat_table():
     result = detect_depth_shape(
         depth,
         K,
-        params={"shape": "bowl", "min_diameter_mm": 40, "max_diameter_mm": 150, "z_range_mm": [400, 520]},
+        params={
+            "shape": "bowl",
+            "min_diameter_mm": 40,
+            "max_diameter_mm": 150,
+            "z_range_mm": [400, 520],
+        },
     )
     assert result is None
 
@@ -56,6 +69,11 @@ def test_z_range_excludes_out_of_workspace_objects():
     result = detect_depth_shape(
         depth,
         K,
-        params={"shape": "bowl", "min_diameter_mm": 40, "max_diameter_mm": 150, "z_range_mm": [400, 520]},
+        params={
+            "shape": "bowl",
+            "min_diameter_mm": 40,
+            "max_diameter_mm": 150,
+            "z_range_mm": [400, 520],
+        },
     )
     assert result is None

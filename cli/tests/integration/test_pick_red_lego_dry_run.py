@@ -6,6 +6,7 @@ Uses a faked perception + servo bus. Validates the plumbing (manifest → contex
 Also hosts the v0.6.1 end-to-end pick-red-lego test (no hardware) that
 exercises init + auto-calibrate + arm.pick descriptor → IK → trajectory.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -38,14 +39,20 @@ async def test_discover_then_vision_find_then_execute(tmp_path):
     write_pose_to_manifest(
         manifest,
         name="ready",
-        joints={"shoulder_pan": 1950, "shoulder_lift": 1700, "elbow_flex": 2400,
-                "wrist_flex": 2048, "wrist_roll": 2048, "gripper": 1700},
+        joints={
+            "shoulder_pan": 1950,
+            "shoulder_lift": 1700,
+            "elbow_flex": 2400,
+            "wrist_flex": 2048,
+            "wrist_roll": 2048,
+            "gripper": 1700,
+        },
     )
 
     # 3. Load context + swap in fake backend hardware.
     ctx = load_context(manifest)
     rgb = np.full((720, 1280, 3), 240, dtype=np.uint8)
-    cv2.rectangle(rgb, (500, 380), (600, 440), (40, 40, 220), -1)   # red lego right-center
+    cv2.rectangle(rgb, (500, 380), (600, 440), (40, 40, 220), -1)  # red lego right-center
     cv2.rectangle(rgb, (50, 100), (400, 350), (230, 230, 230), -1)  # bowl upper-left
     depth = np.full((720, 1280), 500, dtype=np.uint16)
     K = np.array([[979.0, 0, 666.0], [0, 979.0, 348.0], [0, 0, 1.0]])
@@ -69,10 +76,13 @@ async def test_discover_then_vision_find_then_execute(tmp_path):
     ctx.backend = backend
 
     # --- Step A: discover — capture + detect ---
-    disc = await discover_tool(ctx, steps=[
-        {"capture": {}},
-        {"detect": {"descriptors": ["red_lego", "white_bowl"]}},
-    ])
+    disc = await discover_tool(
+        ctx,
+        steps=[
+            {"capture": {}},
+            {"detect": {"descriptors": ["red_lego", "white_bowl"]}},
+        ],
+    )
     assert disc["status"] == "ok"
     det = disc["results"]["detect"]
     assert det["red_lego"]["status"] == "ok"
@@ -104,8 +114,8 @@ def test_v061_pipeline_end_to_end(tmp_path: Path):
     v0.6.1 pipeline: auto-calibrated ready pose → extrinsic → IK →
     trajectory → dispatch.
     """
-    from robot_md.init import default_flow
     from robot_md.backends.feetech_depthai.capabilities import _arm_pick
+    from robot_md.init import default_flow
     from robot_md.init_phases import PhaseResult
 
     @dataclass
@@ -121,18 +131,25 @@ def test_v061_pipeline_end_to_end(tmp_path: Path):
     def _stub_phase(name):
         def _inner(*a, **kw):
             return PhaseResult(phase=name, status="skipped", message="", detail={})
+
         return _inner
 
-    with patch("robot_md.init.phase_register", _stub_phase("register")), \
-         patch("robot_md.init.phase_install_mcp", _stub_phase("install_mcp")), \
-         patch("robot_md.init.phase_install_skill", _stub_phase("install_skill")), \
-         patch("robot_md.init.phase_calibrate_sign", _stub_phase("calibrate_sign")), \
-         patch("robot_md.init.phase_calibrate_zero", _stub_phase("calibrate_zero")), \
-         patch("robot_md.init.phase_teach_poses", _stub_phase("teach_poses")):
+    with (
+        patch("robot_md.init.phase_register", _stub_phase("register")),
+        patch("robot_md.init.phase_install_mcp", _stub_phase("install_mcp")),
+        patch("robot_md.init.phase_install_skill", _stub_phase("install_skill")),
+        patch("robot_md.init.phase_calibrate_sign", _stub_phase("calibrate_sign")),
+        patch("robot_md.init.phase_calibrate_zero", _stub_phase("calibrate_zero")),
+        patch("robot_md.init.phase_teach_poses", _stub_phase("teach_poses")),
+    ):
         rc = default_flow(
-            out, robot_name="lego-bot", preset_name="so-arm101",
-            do_install_mcp=False, do_install_skill=False,
-            do_register=False, do_refresh_claude_md=False,
+            out,
+            robot_name="lego-bot",
+            preset_name="so-arm101",
+            do_install_mcp=False,
+            do_install_skill=False,
+            do_register=False,
+            do_refresh_claude_md=False,
         )
     assert rc == 0, f"init failed rc={rc}"
 
@@ -151,7 +168,9 @@ def test_v061_pipeline_end_to_end(tmp_path: Path):
     # after the so-arm101 default extrinsic (OAK-D at (400, 0, 300) looking
     # at (200, 0, 0)) maps it into base frame. (0, 0, 340) → ~(211, 0, 17).
     perception.vision_find.return_value = {
-        "status": "ok", "descriptor": "red_lego", "xyz_cam_mm": (0.0, 0.0, 340.0),
+        "status": "ok",
+        "descriptor": "red_lego",
+        "xyz_cam_mm": (0.0, 0.0, 340.0),
     }
     backend = B(raw_frontmatter=fm, _servo_bus=bus, _motion=MagicMock(), _perception=perception)
 

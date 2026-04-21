@@ -289,11 +289,13 @@ def check_calibration(fm: dict | None) -> list[CheckResult]:
         return out  # silent — camera-free robots skip this bucket
     offenders = [i for i, c in enumerate(cams) if c.get("extrinsic_source") == "preset_default"]
     if offenders:
-        out.append(_warn(
-            "extrinsic source",
-            "calibration",
-            "preset default — run `robot-md calibrate --extrinsic ROBOT.md` for precision",
-        ))
+        out.append(
+            _warn(
+                "extrinsic source",
+                "calibration",
+                "preset default — run `robot-md calibrate --extrinsic ROBOT.md` for precision",
+            )
+        )
     else:
         out.append(_pass("extrinsic source", "calibration", "calibrated or user-declared"))
 
@@ -301,11 +303,13 @@ def check_calibration(fm: dict | None) -> list[CheckResult]:
     cam0 = cams[0] if cams else {}
     residual = cam0.get("extrinsic_residual_mm")
     if residual is not None:
-        out.append(_info(
-            "extrinsic residual",
-            "calibration",
-            f"{residual} mm",
-        ))
+        out.append(
+            _info(
+                "extrinsic residual",
+                "calibration",
+                f"{residual} mm",
+            )
+        )
 
     return out
 

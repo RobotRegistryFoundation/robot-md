@@ -1,4 +1,5 @@
 """Tests for the publisher-wrapping manifest-stamp + fan-out hook."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -157,7 +158,12 @@ def test_pending_calls_expire_after_ttl(tmp_path: Path, monkeypatch):
 
     ctx.publisher.publish(
         "tool.call",
-        {"tool": "execute_capability", "capability": "arm.pick", "args": {}, "request_id": "orphan"},
+        {
+            "tool": "execute_capability",
+            "capability": "arm.pick",
+            "args": {},
+            "request_id": "orphan",
+        },
     )
     assert "orphan" in ctx._pending_calls  # parked
 
@@ -167,7 +173,12 @@ def test_pending_calls_expire_after_ttl(tmp_path: Path, monkeypatch):
     # A new call at t1 triggers the sweep inside _maybe_pair_and_log.
     ctx.publisher.publish(
         "tool.call",
-        {"tool": "execute_capability", "capability": "arm.place", "args": {}, "request_id": "fresh"},
+        {
+            "tool": "execute_capability",
+            "capability": "arm.place",
+            "args": {},
+            "request_id": "fresh",
+        },
     )
     assert "orphan" not in ctx._pending_calls
     assert "fresh" in ctx._pending_calls
@@ -196,24 +207,32 @@ def test_load_context_wires_fanout_and_backfills(tmp_path: Path, monkeypatch):
 
     # Pre-seed events.jsonl with a paired invocation for this manifest.
     call = {
-        "kind": "tool.call", "ts": 1.0,
+        "kind": "tool.call",
+        "ts": 1.0,
         "data": {
-            "tool": "execute_capability", "capability": "arm.pick",
-            "args": {}, "request_id": "pre_r1", "manifest_path": manifest_path_str,
+            "tool": "execute_capability",
+            "capability": "arm.pick",
+            "args": {},
+            "request_id": "pre_r1",
+            "manifest_path": manifest_path_str,
         },
     }
     result = {
-        "kind": "tool.result", "ts": 2.0,
+        "kind": "tool.result",
+        "ts": 2.0,
         "data": {
-            "tool": "execute_capability", "capability": "arm.pick",
-            "status": "ok", "request_id": "pre_r1", "manifest_path": manifest_path_str,
+            "tool": "execute_capability",
+            "capability": "arm.pick",
+            "status": "ok",
+            "request_id": "pre_r1",
+            "manifest_path": manifest_path_str,
         },
     }
     with events_path.open("w") as f:
         f.write(_json.dumps(call) + "\n")
         f.write(_json.dumps(result) + "\n")
 
-    from robot_md.mcp.context import load_context, _PublisherFanoutWrapper
+    from robot_md.mcp.context import _PublisherFanoutWrapper, load_context
 
     ctx = load_context(fix)
     try:

@@ -9,7 +9,6 @@ Pure functions. No I/O. The backend executes the resulting waypoints.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from robot_md.kinematics import Kinematics, KinematicsError
 

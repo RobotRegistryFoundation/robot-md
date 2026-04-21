@@ -28,35 +28,43 @@ def test_learned_skills_optional():
 
 
 def test_learned_skills_accepts_entry():
-    jsonschema.validate(_m({
-        "learned_skills": [
+    jsonschema.validate(
+        _m(
             {
-                "id": "red_lego_pick.2026-04-19",
-                "status": "blocked",
-                "validated": ["scene_capture"],
-                "blocked_by": ["forward_home_pose_missing"],
-                "notes": "Vision chain works.",
+                "learned_skills": [
+                    {
+                        "id": "red_lego_pick.2026-04-19",
+                        "status": "blocked",
+                        "validated": ["scene_capture"],
+                        "blocked_by": ["forward_home_pose_missing"],
+                        "notes": "Vision chain works.",
+                    }
+                ]
             }
-        ]
-    }), SCHEMA)
+        ),
+        SCHEMA,
+    )
 
 
 def test_learned_skills_status_enum_rejected():
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(_m({
-            "learned_skills": [{"id": "x", "status": "excellent"}]
-        }), SCHEMA)
+        jsonschema.validate(_m({"learned_skills": [{"id": "x", "status": "excellent"}]}), SCHEMA)
 
 
 def test_learned_skills_requires_id():
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(_m({
-            "learned_skills": [{"status": "ok"}]  # missing id
-        }), SCHEMA)
+        jsonschema.validate(
+            _m(
+                {
+                    "learned_skills": [{"status": "ok"}]  # missing id
+                }
+            ),
+            SCHEMA,
+        )
 
 
 def test_learned_skills_accepts_all_three_statuses():
     for status in ["ok", "blocked", "degraded"]:
-        jsonschema.validate(_m({
-            "learned_skills": [{"id": f"s.{status}", "status": status}]
-        }), SCHEMA)
+        jsonschema.validate(
+            _m({"learned_skills": [{"id": f"s.{status}", "status": status}]}), SCHEMA
+        )

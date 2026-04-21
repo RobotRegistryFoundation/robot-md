@@ -73,9 +73,7 @@ def execute_capability_tool(
 
             from robot_md.preconditions import evaluate
 
-            ok, failures = evaluate(
-                contract, ctx.spec, backend_resolved=ctx.backend is not None
-            )
+            ok, failures = evaluate(contract, ctx.spec, backend_resolved=ctx.backend is not None)
             if not ok:
                 result = {
                     "status": "blocked",

@@ -89,7 +89,7 @@ def _workspace_ok(fm: dict, xyz_base_mm) -> bool:
 
 
 def _descriptor_registered(fm: dict, descriptor_id: str) -> bool:
-    descriptors = ((fm.get("vision") or {}).get("object_descriptors") or [])
+    descriptors = (fm.get("vision") or {}).get("object_descriptors") or []
     return any(d.get("id") == descriptor_id for d in descriptors)
 
 

@@ -1,4 +1,5 @@
 """RobotSpec parses physics.poses into PoseDef dict."""
+
 from __future__ import annotations
 
 import yaml

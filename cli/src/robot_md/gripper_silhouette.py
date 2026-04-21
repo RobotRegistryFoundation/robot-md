@@ -40,12 +40,14 @@ def expected_points(
     # Since we don't have full tool-frame orientation here, approximate by
     # offsetting ±5mm in y and ±3mm in z from tip. Good enough for depth
     # matching at ~500mm standoff where pixel footprint >> 5mm.
-    offsets = np.array([
-        [0, 0, 0],
-        [0, 5, 0],
-        [0, -5, 0],
-        [0, 0, 3],
-    ])
+    offsets = np.array(
+        [
+            [0, 0, 0],
+            [0, 5, 0],
+            [0, -5, 0],
+            [0, 0, 3],
+        ]
+    )
     return tip_base[None, :] + offsets
 
 
@@ -70,11 +72,11 @@ def find_in_depth(
     cx, cy = float(K[0, 2]), float(K[1, 2])
     if center[2] <= 0:
         return None, 0.0
-    u0 = int(round(fx * center[0] / center[2] + cx))
-    v0 = int(round(fy * center[1] / center[2] + cy))
+    u0 = round(fx * center[0] / center[2] + cx)
+    v0 = round(fy * center[1] / center[2] + cy)
 
     # Convert search radius from mm to pixels at that depth.
-    radius_px = int(round((search_radius_mm / center[2]) * fx))
+    radius_px = round((search_radius_mm / center[2]) * fx)
     radius_px = max(radius_px, 8)
 
     h, w = depth_frame.shape[:2]

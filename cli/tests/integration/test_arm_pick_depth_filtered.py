@@ -18,11 +18,9 @@ Without depth filtering both blobs are visible (same HSV signature, same
 area). With depth filtering the wall blob is masked to zero and only the
 tabletop centroid survives.
 """
+
 from __future__ import annotations
 
-from pathlib import Path
-from dataclasses import dataclass
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import numpy as np
@@ -42,27 +40,33 @@ def test_arm_pick_depth_filtered_ignores_8m_wall(tmp_path):
     # ------------------------------------------------------------------ #
     from robot_md.init import default_flow
     from robot_md.init_phases import PhaseResult
-    from robot_md.mcp.context import load_context
-    from robot_md.robot_spec import RobotSpec
     from robot_md.parser import parse_file
+    from robot_md.robot_spec import RobotSpec
 
     out = tmp_path / "ROBOT.md"
 
     def _stub_phase(name):
         def _inner(*a, **kw):
             return PhaseResult(phase=name, status="skipped", message="", detail={})
+
         return _inner
 
-    with patch("robot_md.init.phase_register", _stub_phase("register")), \
-         patch("robot_md.init.phase_install_mcp", _stub_phase("install_mcp")), \
-         patch("robot_md.init.phase_install_skill", _stub_phase("install_skill")), \
-         patch("robot_md.init.phase_calibrate_sign", _stub_phase("calibrate_sign")), \
-         patch("robot_md.init.phase_calibrate_zero", _stub_phase("calibrate_zero")), \
-         patch("robot_md.init.phase_teach_poses", _stub_phase("teach_poses")):
+    with (
+        patch("robot_md.init.phase_register", _stub_phase("register")),
+        patch("robot_md.init.phase_install_mcp", _stub_phase("install_mcp")),
+        patch("robot_md.init.phase_install_skill", _stub_phase("install_skill")),
+        patch("robot_md.init.phase_calibrate_sign", _stub_phase("calibrate_sign")),
+        patch("robot_md.init.phase_calibrate_zero", _stub_phase("calibrate_zero")),
+        patch("robot_md.init.phase_teach_poses", _stub_phase("teach_poses")),
+    ):
         rc = default_flow(
-            out, robot_name="depth-test-bot", preset_name="so-arm101",
-            do_install_mcp=False, do_install_skill=False,
-            do_register=False, do_refresh_claude_md=False,
+            out,
+            robot_name="depth-test-bot",
+            preset_name="so-arm101",
+            do_install_mcp=False,
+            do_install_skill=False,
+            do_register=False,
+            do_refresh_claude_md=False,
         )
     assert rc == 0, f"init failed rc={rc}"
 
@@ -87,8 +91,8 @@ def test_arm_pick_depth_filtered_ignores_8m_wall(tmp_path):
     #    HSV params: h_ranges [[0,10],[170,180]], s_min=110, v_min=80.    #
     #    BGR (0,0,220) → HSV (0, 255, 220) → passes both h-ranges.       #
     # ------------------------------------------------------------------ #
-    TABLETOP_DEPTH_MM = 450   # inside auto-derived bounds (~45–612 mm)
-    WALL_DEPTH_MM     = 8000  # far outside bounds
+    TABLETOP_DEPTH_MM = 450  # inside auto-derived bounds (~45-612 mm)
+    WALL_DEPTH_MM = 8000  # far outside bounds
 
     rgb = np.zeros((400, 600, 3), dtype=np.uint8)
     # Tabletop LEGO blob — center (300, 200).
@@ -101,7 +105,7 @@ def test_arm_pick_depth_filtered_ignores_8m_wall(tmp_path):
 
     # Intrinsic matrix (simple pinhole, cx=300 cy=200 so tabletop center
     # projects to the optical center when depth is queried).
-    K = np.array([[600., 0., 300.], [0., 600., 200.], [0., 0., 1.]])
+    K = np.array([[600.0, 0.0, 300.0], [0.0, 600.0, 200.0], [0.0, 0.0, 1.0]])
 
     # ------------------------------------------------------------------ #
     # 3. Instantiate real Perception, stub only grab_frame.               #

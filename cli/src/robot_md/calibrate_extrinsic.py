@@ -127,14 +127,10 @@ def capture_via_wrist_wiggle(
     wiggled_pose["wrist_flex"] = base_angle + delta
 
     pose_steps = {
-        jid: kin.by_id[jid].rad_to_steps(rad)
-        for jid, rad in pose.items()
-        if jid in kin.by_id
+        jid: kin.by_id[jid].rad_to_steps(rad) for jid, rad in pose.items() if jid in kin.by_id
     }
     wiggled_steps = dict(pose_steps)
-    wiggled_steps["wrist_flex"] = kin.by_id["wrist_flex"].rad_to_steps(
-        wiggled_pose["wrist_flex"]
-    )
+    wiggled_steps["wrist_flex"] = kin.by_id["wrist_flex"].rad_to_steps(wiggled_pose["wrist_flex"])
 
     start_steps = bus.read_positions()
     bus.interpolate(start_steps, pose_steps, hz=30, estop=None)
@@ -209,8 +205,9 @@ def write_extrinsic(
     """Write extrinsic + provenance into manifest's physics.solver.cameras[0].
     Preserves comments via ruamel.yaml.
     """
-    from pathlib import Path
     import io
+    from pathlib import Path
+
     from ruamel.yaml import YAML
 
     p = Path(manifest_path)

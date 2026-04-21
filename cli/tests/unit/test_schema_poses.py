@@ -1,4 +1,5 @@
 """Schema v1 accepts optional physics.poses with named joint dicts."""
+
 from __future__ import annotations
 
 import json
@@ -30,16 +31,18 @@ def test_poses_block_is_optional():
 
 
 def test_poses_block_accepts_named_poses():
-    m = _min_manifest({
-        "poses": {
-            "ready": {
-                "description": "arm extended forward",
-                "joints": {"shoulder_pan": 2048, "shoulder_lift": 1600},
-                "source": "taught",
-                "taught_at": "2026-04-19",
+    m = _min_manifest(
+        {
+            "poses": {
+                "ready": {
+                    "description": "arm extended forward",
+                    "joints": {"shoulder_pan": 2048, "shoulder_lift": 1600},
+                    "source": "taught",
+                    "taught_at": "2026-04-19",
+                }
             }
         }
-    })
+    )
     jsonschema.validate(m, SCHEMA)
 
 

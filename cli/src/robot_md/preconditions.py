@@ -49,9 +49,7 @@ def evaluate(
     return (not failed, failed)
 
 
-def _check_one(
-    p: Precondition, spec: Any, *, backend_resolved: bool
-) -> PreconditionFailure | None:
+def _check_one(p: Precondition, spec: Any, *, backend_resolved: bool) -> PreconditionFailure | None:
     kind = p.kind
     if kind == "backend_resolved":
         if backend_resolved:

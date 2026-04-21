@@ -45,9 +45,7 @@ def write_pose_to_manifest(
     physics["poses"] = poses
     fm["physics"] = physics
 
-    manifest_path.write_text(
-        "---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n" + parsed.body
-    )
+    manifest_path.write_text("---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n" + parsed.body)
 
 
 def teach_pose(

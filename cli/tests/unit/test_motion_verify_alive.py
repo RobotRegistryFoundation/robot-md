@@ -1,4 +1,5 @@
 """Post-motion watchdog detects dropped servos and contains damage."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -23,7 +24,14 @@ def test_verify_alive_all_present(fixtures_dir):
         "wrist_roll": 2048,
         "gripper": 1700,
     }
-    expected = {"shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"}
+    expected = {
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper",
+    }
     report = motion.verify_alive(bus, expected_ids=expected)
     assert isinstance(report, AliveReport)
     assert report.alive is True
@@ -42,7 +50,14 @@ def test_verify_alive_detects_missing_servo_and_torques_off_remaining(fixtures_d
         "wrist_roll": 2048,
         "gripper": 1700,
     }
-    expected = {"shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"}
+    expected = {
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper",
+    }
     report = motion.verify_alive(bus, expected_ids=expected)
     assert report.alive is False
     assert report.missing == ["wrist_flex"]
@@ -54,7 +69,14 @@ def test_verify_alive_multiple_missing(fixtures_dir):
     motion = Motion.from_spec(_spec(fixtures_dir))
     bus = MagicMock()
     bus.read_positions.return_value = {"shoulder_pan": 2048, "gripper": 1700}
-    expected = {"shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"}
+    expected = {
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper",
+    }
     report = motion.verify_alive(bus, expected_ids=expected)
     assert report.alive is False
     assert set(report.missing) == {"shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"}
@@ -69,7 +91,14 @@ def test_verify_alive_bus_exception_torques_off_and_reports_all_missing(fixtures
     motion = Motion.from_spec(_spec(fixtures_dir))
     bus = MagicMock()
     bus.read_positions.side_effect = RuntimeError("bus timeout")
-    expected = {"shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"}
+    expected = {
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper",
+    }
     report = motion.verify_alive(bus, expected_ids=expected)
     assert report.alive is False
     assert set(report.missing) == expected

@@ -4,14 +4,10 @@ The phase must be invoked on every init path (including non-interactive /
 no-hardware runs) so it can return its own 'skipped' result — the ordering
 contract is visible to other phases (e.g., doctor warns on preset_default).
 """
+
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from robot_md.init_phases import PhaseResult
-
 
 # ---------------------------------------------------------------------------
 # helpers (mirrored from test_init_auto_calibrate_ready.py)
@@ -180,6 +176,7 @@ def test_default_flow_attempts_hardware_open_for_interactive_extrinsic(tmp_path,
     """When stdin is a TTY and ServoBus/Perception resolve, default_flow should
     pass the opened bus and camera to phase_calibrate_extrinsic."""
     from unittest.mock import MagicMock
+
     from robot_md import init
 
     fake_bus = MagicMock()

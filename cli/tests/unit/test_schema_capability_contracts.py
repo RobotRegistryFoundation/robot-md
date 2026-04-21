@@ -28,22 +28,32 @@ def test_contracts_block_is_optional():
 
 
 def test_contracts_accepts_precondition_list():
-    jsonschema.validate(_m({
-        "capability_contracts": {
-            "arm.pick": {
-                "preconditions": [
-                    {"kind": "pose_taught", "name": "ready"},
-                    {"kind": "extrinsic_present"},
-                ]
+    jsonschema.validate(
+        _m(
+            {
+                "capability_contracts": {
+                    "arm.pick": {
+                        "preconditions": [
+                            {"kind": "pose_taught", "name": "ready"},
+                            {"kind": "extrinsic_present"},
+                        ]
+                    }
+                }
             }
-        }
-    }), SCHEMA)
+        ),
+        SCHEMA,
+    )
 
 
 def test_contracts_rejects_unknown_precondition_kind():
     with pytest.raises(jsonschema.ValidationError):
-        jsonschema.validate(_m({
-            "capability_contracts": {
-                "arm.pick": {"preconditions": [{"kind": "wishful_thinking"}]}
-            }
-        }), SCHEMA)
+        jsonschema.validate(
+            _m(
+                {
+                    "capability_contracts": {
+                        "arm.pick": {"preconditions": [{"kind": "wishful_thinking"}]}
+                    }
+                }
+            ),
+            SCHEMA,
+        )

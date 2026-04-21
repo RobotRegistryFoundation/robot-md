@@ -1,9 +1,10 @@
 """Pre-flight envelope analysis rejects trajectories likely to latch the STS3215."""
+
 from __future__ import annotations
 
 import math
 
-from robot_md.kinematics import Kinematics, KinematicsError
+from robot_md.kinematics import Kinematics
 
 
 def _so_arm101_spec():
@@ -16,12 +17,60 @@ def _so_arm101_spec():
                 "gripper": {"joint_id": "gripper", "tip_offset_mm": [30, 0, 0]},
             },
             "kinematics": [
-                {"id": "shoulder_pan",  "axis": "z", "a_mm": 0,   "d_mm": 60, "limits_deg": [-180, 180], "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "shoulder_lift", "axis": "y", "a_mm": 125, "d_mm": 0,  "limits_deg": [-180, 180], "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "elbow_flex",    "axis": "y", "a_mm": 125, "d_mm": 0,  "limits_deg": [-180, 180], "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "wrist_flex",    "axis": "y", "a_mm": 60,  "d_mm": 0,  "limits_deg": [-90, 90],   "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "wrist_roll",    "axis": "x", "a_mm": 0,   "d_mm": 0,  "limits_deg": [-180, 180], "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "gripper",       "axis": "y", "a_mm": 0,   "d_mm": 0,  "limits_deg": [-180, 180], "zero_pose_steps": 1200, "encoder_sign": 1},
+                {
+                    "id": "shoulder_pan",
+                    "axis": "z",
+                    "a_mm": 0,
+                    "d_mm": 60,
+                    "limits_deg": [-180, 180],
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "shoulder_lift",
+                    "axis": "y",
+                    "a_mm": 125,
+                    "d_mm": 0,
+                    "limits_deg": [-180, 180],
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "elbow_flex",
+                    "axis": "y",
+                    "a_mm": 125,
+                    "d_mm": 0,
+                    "limits_deg": [-180, 180],
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "wrist_flex",
+                    "axis": "y",
+                    "a_mm": 60,
+                    "d_mm": 0,
+                    "limits_deg": [-90, 90],
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "wrist_roll",
+                    "axis": "x",
+                    "a_mm": 0,
+                    "d_mm": 0,
+                    "limits_deg": [-180, 180],
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "gripper",
+                    "axis": "y",
+                    "a_mm": 0,
+                    "d_mm": 0,
+                    "limits_deg": [-180, 180],
+                    "zero_pose_steps": 1200,
+                    "encoder_sign": 1,
+                },
             ],
         },
     }

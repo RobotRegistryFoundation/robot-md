@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from pathlib import Path
 
@@ -10,8 +11,8 @@ from rich.console import Console
 
 from robot_md import __version__
 from robot_md.autodetect import emit_draft, scan_system
-from robot_md.init_phases import phase_calibrate_extrinsic
 from robot_md.context import emit_context
+from robot_md.init_phases import phase_calibrate_extrinsic
 from robot_md.parser import ParseError, parse_file
 from robot_md.render import render_yaml
 from robot_md.validate import (
@@ -426,10 +427,10 @@ def doctor(
     if should_hw:
         try:
             from robot_md.backends.feetech_depthai.doctor import hw_checks
-            from robot_md.backends.feetech_depthai.servo import ServoBus
             from robot_md.backends.feetech_depthai.perception import Perception
-            from robot_md.robot_spec import RobotSpec
+            from robot_md.backends.feetech_depthai.servo import ServoBus
             from robot_md.parser import parse_file as _parse_file
+            from robot_md.robot_spec import RobotSpec
 
             if path is None:
                 results.append(
@@ -443,9 +444,7 @@ def doctor(
             else:
                 spec = RobotSpec.from_parsed(_parse_file(path))
                 expected_ids = {
-                    j["id"]
-                    for j in spec.physics.kinematics
-                    if isinstance(j, dict) and "id" in j
+                    j["id"] for j in spec.physics.kinematics if isinstance(j, dict) and "id" in j
                 }
                 bus = ServoBus.from_spec(spec)
                 cam = Perception.from_spec(spec)
@@ -462,9 +461,7 @@ def doctor(
                 finally:
                     bus.close()
         except Exception as e:
-            results.append(
-                CheckResult("hardware checks", "hardware", "skip", f"skipped: {e}")
-            )
+            results.append(CheckResult("hardware checks", "hardware", "skip", f"skipped: {e}"))
 
     c = counts(results)
 
@@ -842,8 +839,8 @@ def calibrate(
         bus = None
         cam = None
         try:
-            from robot_md.backends.feetech_depthai.servo import ServoBus
             from robot_md.backends.feetech_depthai.perception import Perception
+            from robot_md.backends.feetech_depthai.servo import ServoBus
             from robot_md.parser import parse_file
             from robot_md.robot_spec import RobotSpec
 
@@ -865,15 +862,11 @@ def calibrate(
         result = phase_calibrate_extrinsic(path, bus=bus, camera=cam, interactive=True)
         typer.echo(result.message)
         if bus is not None:
-            try:
+            with contextlib.suppress(Exception):
                 bus.close()
-            except Exception:
-                pass
         if cam is not None:
-            try:
+            with contextlib.suppress(Exception):
                 cam.close()
-            except Exception:
-                pass
         raise typer.Exit(0 if result.status in ("ok", "skipped") else 1)
 
 

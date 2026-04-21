@@ -1,4 +1,5 @@
 """CLI: robot-md pose teach <name> <path> writes physics.poses[name]."""
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -35,9 +36,7 @@ def test_pose_teach_writes_named_pose(tmp_path):
     )
     runner = CliRunner()
     with patch("robot_md.__main__._open_feetech_bus", return_value=_FakeBus()):
-        result = runner.invoke(
-            app, ["pose", "teach", "ready", str(manifest), "--yes"]
-        )
+        result = runner.invoke(app, ["pose", "teach", "ready", str(manifest), "--yes"])
     assert result.exit_code == 0, result.output
     fm = yaml.safe_load(manifest.read_text().split("---")[1])
     assert fm["physics"]["poses"]["ready"]["joints"]["shoulder_pan"] == 2048

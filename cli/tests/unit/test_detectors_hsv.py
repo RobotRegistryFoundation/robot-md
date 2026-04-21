@@ -1,4 +1,5 @@
 """Pure HSV detector — input ndarrays, output centroid + area."""
+
 from __future__ import annotations
 
 import cv2

@@ -1,4 +1,5 @@
 """Pure extrinsic math: 6-vec ↔ 4x4, camera_to_base, from_mount."""
+
 from __future__ import annotations
 
 import math

@@ -73,8 +73,17 @@ def phase_calibrate_extrinsic(
             detail={"reason": "already_calibrated", "source": source},
         )
 
-    answer = (input("Calibrate camera-to-arm alignment now? The arm will move through "
-                    f"{n_poses} poses. [Y/n] ") or "y").strip().lower()
+    answer = (
+        (
+            input(
+                "Calibrate camera-to-arm alignment now? The arm will move through "
+                f"{n_poses} poses. [Y/n] "
+            )
+            or "y"
+        )
+        .strip()
+        .lower()
+    )
     if answer.startswith("n"):
         return PhaseResult(
             phase="calibrate_extrinsic",
@@ -85,16 +94,17 @@ def phase_calibrate_extrinsic(
 
     # Real sweep.
     try:
+        import numpy as np
+
         from robot_md.calibrate_extrinsic import (
+            CalibrationError,
             Sample,
             plan_sweep,
             solve,
             write_extrinsic,
-            CalibrationError,
         )
         from robot_md.gripper_silhouette import find_in_depth, find_via_motion_delta
         from robot_md.kinematics import Kinematics
-        import numpy as np
 
         workspace = fm["physics"]["workspace"]["bounds_mm"]
         kin = Kinematics(fm)
@@ -133,13 +143,12 @@ def phase_calibrate_extrinsic(
             # Useful on rigs where the preset is already close enough.
             if centroid is None or confidence < 0.2:
                 from robot_md.extrinsic import six_vec_to_matrix
+
                 current_ext = fm["physics"]["solver"]["cameras"][0]["extrinsic"]
                 T = six_vec_to_matrix(current_ext)  # camera→base matrix
                 tip_base_h = np.append(tip_base, 1.0)
                 tip_cam_guess = (np.linalg.inv(T) @ tip_base_h)[:3][None, :]
-                centroid, confidence = find_in_depth(
-                    depth, K, tip_cam_guess, search_radius_mm=60
-                )
+                centroid, confidence = find_in_depth(depth, K, tip_cam_guess, search_radius_mm=60)
 
             prev_depth = depth
 
@@ -163,7 +172,11 @@ def phase_calibrate_extrinsic(
 
         six_vec, residual = solve(samples)
         if residual > 15.0:
-            ans = (input(f"Calibration residual {residual:.1f}mm is high. Accept? [y/N] ") or "n").strip().lower()
+            ans = (
+                (input(f"Calibration residual {residual:.1f}mm is high. Accept? [y/N] ") or "n")
+                .strip()
+                .lower()
+            )
             if not ans.startswith("y"):
                 return PhaseResult(
                     phase="calibrate_extrinsic",

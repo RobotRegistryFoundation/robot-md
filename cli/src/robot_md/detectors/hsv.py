@@ -135,6 +135,7 @@ def workspace_depth_bounds(
     Z-depth (camera-frame Z), matching what OAK-D/similar depth cameras store per-pixel.
     """
     import numpy as np
+
     from robot_md.extrinsic import six_vec_to_matrix
 
     T_cam_in_base = six_vec_to_matrix(extrinsic_6vec)

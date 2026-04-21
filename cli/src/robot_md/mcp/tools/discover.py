@@ -11,6 +11,7 @@ step if reporting itself fails.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from robot_md.detectors.hsv import DETECTORS
@@ -56,11 +57,9 @@ async def discover_tool(
 async def _report_progress(mcp_ctx: Any | None, i: int, total: int, name: str) -> None:
     if mcp_ctx is None:
         return
-    try:
+    # Best-effort — a broken progress channel must never abort a step.
+    with contextlib.suppress(Exception):
         await mcp_ctx.report_progress(i, total, name)
-    except Exception:
-        # Best-effort — a broken progress channel must never abort a step.
-        pass
 
 
 def _publish_step(
@@ -167,6 +166,7 @@ def _do_probe(ctx: Any, payload: dict) -> dict:
     finally:
         # Best-effort return to starting position.
         import contextlib
+
         with contextlib.suppress(Exception):
             bus.write_positions(current)
 
@@ -195,9 +195,7 @@ def _do_probe(ctx: Any, payload: dict) -> dict:
     if px_shift == 0:
         return {"status": "no_motion_detected"}
 
-    direction = (
-        "positive_delta→image_right" if signed >= 0 else "positive_delta→image_left"
-    )
+    direction = "positive_delta→image_right" if signed >= 0 else "positive_delta→image_left"
     return {
         "status": "ok",
         "joint": joint,

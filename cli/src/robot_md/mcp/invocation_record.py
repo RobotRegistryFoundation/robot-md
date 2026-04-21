@@ -23,22 +23,18 @@ class InvocationRecord:
     preconditions: list[dict] = field(default_factory=list)
 
     @classmethod
-    def from_event_pair(cls, call_evt: dict, result_evt: dict) -> "InvocationRecord":
+    def from_event_pair(cls, call_evt: dict, result_evt: dict) -> InvocationRecord:
         call_data = call_evt.get("data", {})
         result_data = result_evt.get("data", {})
 
         call_rid = call_data.get("request_id")
         result_rid = result_data.get("request_id")
         if call_rid != result_rid:
-            raise ValueError(
-                f"request_id mismatch: call={call_rid!r} result={result_rid!r}"
-            )
+            raise ValueError(f"request_id mismatch: call={call_rid!r} result={result_rid!r}")
 
         err = result_data.get("error") or {}
         reason = err.get("reason") if isinstance(err, dict) else None
-        preconditions = (
-            list(err.get("preconditions") or []) if reason == "precondition" else []
-        )
+        preconditions = list(err.get("preconditions") or []) if reason == "precondition" else []
 
         return cls(
             timestamp=float(result_evt.get("ts", 0.0)),

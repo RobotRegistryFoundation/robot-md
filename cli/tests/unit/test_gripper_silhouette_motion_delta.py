@@ -1,4 +1,5 @@
 """Tests for find_via_motion_delta — the v0.7.3 extrinsic-free bootstrap."""
+
 from __future__ import annotations
 
 import numpy as np

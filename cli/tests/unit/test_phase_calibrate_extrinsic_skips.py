@@ -1,5 +1,6 @@
 """Phase must skip cleanly in non-interactive, no-camera, no-bus, and
 already-calibrated cases."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,9 +15,12 @@ def _manifest(tmp_path: Path, extrinsic_source: str = "preset_default") -> Path:
         "---\n"
         "metadata:\n  robot_name: bob\n"
         "physics:\n"
-        "  workspace:\n    bounds_mm:\n      x: [-200, 340]\n      y: [-340, 340]\n      z: [0, 250]\n"
+        "  workspace:\n    bounds_mm:\n"
+        "      x: [-200, 340]\n      y: [-340, 340]\n      z: [0, 250]\n"
         "  solver:\n    cameras:\n"
-        f"      - driver_id: oakd\n        extrinsic: [400.0, 0.0, 300.0, -2.55, 0.0, 1.57]\n        extrinsic_source: {extrinsic_source}\n"
+        "      - driver_id: oakd\n"
+        "        extrinsic: [400.0, 0.0, 300.0, -2.55, 0.0, 1.57]\n"
+        f"        extrinsic_source: {extrinsic_source}\n"
         "---\n\n# bob\n"
     )
     return p

@@ -1,4 +1,5 @@
 """Unit tests for discover_tool streaming — report_progress + discover.step.* events."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace

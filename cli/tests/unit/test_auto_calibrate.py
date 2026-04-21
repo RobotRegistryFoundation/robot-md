@@ -1,7 +1,6 @@
 """compute_ready_pose: IK-based joint-step computation from DH params."""
-from __future__ import annotations
 
-import math
+from __future__ import annotations
 
 import pytest
 
@@ -26,12 +25,54 @@ def _so_arm101_frontmatter():
                 "ik_provider": "inhouse-so-arm101",
             },
             "kinematics": [
-                {"id": "shoulder_pan", "axis": "z", "a_mm": 0, "d_mm": 60, "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "shoulder_lift", "axis": "y", "a_mm": 125, "d_mm": 0, "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "elbow_flex", "axis": "y", "a_mm": 125, "d_mm": 0, "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "wrist_flex", "axis": "y", "a_mm": 60, "d_mm": 0, "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "wrist_roll", "axis": "x", "a_mm": 30, "d_mm": 0, "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "gripper", "axis": "y", "a_mm": 0, "d_mm": 0, "zero_pose_steps": 1200, "encoder_sign": 1},
+                {
+                    "id": "shoulder_pan",
+                    "axis": "z",
+                    "a_mm": 0,
+                    "d_mm": 60,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "shoulder_lift",
+                    "axis": "y",
+                    "a_mm": 125,
+                    "d_mm": 0,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "elbow_flex",
+                    "axis": "y",
+                    "a_mm": 125,
+                    "d_mm": 0,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "wrist_flex",
+                    "axis": "y",
+                    "a_mm": 60,
+                    "d_mm": 0,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "wrist_roll",
+                    "axis": "x",
+                    "a_mm": 30,
+                    "d_mm": 0,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "gripper",
+                    "axis": "y",
+                    "a_mm": 0,
+                    "d_mm": 0,
+                    "zero_pose_steps": 1200,
+                    "encoder_sign": 1,
+                },
             ],
         }
     }
@@ -40,7 +81,14 @@ def _so_arm101_frontmatter():
 def test_compute_ready_pose_returns_all_joint_ids():
     steps = compute_ready_pose(_so_arm101_frontmatter(), target_mm=(200, 0, 50))
     assert steps is not None
-    assert set(steps.keys()) >= {"shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"}
+    assert set(steps.keys()) >= {
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper",
+    }
     for v in steps.values():
         assert isinstance(v, int)
 

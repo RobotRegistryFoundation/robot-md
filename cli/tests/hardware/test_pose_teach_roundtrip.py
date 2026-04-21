@@ -9,6 +9,7 @@ Operator pre-conditions BEFORE running this test:
     (gripper over workspace, reachable to tabletop).
 The test will record that pose, then command a move to (2048,...) and back.
 """
+
 from __future__ import annotations
 
 import time
@@ -25,7 +26,10 @@ def test_pose_teach_then_home_matches(tmp_path):
 
     manifest = tmp_path / "ROBOT.md"
     rc = non_interactive(
-        manifest, robot_name="bob-hardware", preset_name="so-arm101", force=True,
+        manifest,
+        robot_name="bob-hardware",
+        preset_name="so-arm101",
+        force=True,
     )
     assert rc == 0
     ctx = load_context(manifest)
@@ -49,7 +53,11 @@ def test_pose_teach_then_home_matches(tmp_path):
 
     # 4. Execute arm.home (dry_run=False — this actually moves the arm).
     r = execute_capability_tool(
-        ctx2, capability="arm.home", args={}, dry_run=False, confirm_token=None,
+        ctx2,
+        capability="arm.home",
+        args={},
+        dry_run=False,
+        confirm_token=None,
     )
     assert r["status"] == "ok", f"execute_capability arm.home failed: {r}"
 
@@ -58,6 +66,4 @@ def test_pose_teach_then_home_matches(tmp_path):
     final = bus.read_positions()
     for joint, target in taught.items():
         delta = abs(final.get(joint, -99999) - target)
-        assert delta < 30, (
-            f"joint {joint}: target={target} final={final.get(joint)} delta={delta}"
-        )
+        assert delta < 30, f"joint {joint}: target={target} final={final.get(joint)} delta={delta}"

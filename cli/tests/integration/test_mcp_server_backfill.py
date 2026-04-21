@@ -44,18 +44,20 @@ def _spawn(manifest: Path, home: Path):
     # PYTHONPATH so imports still resolve under the fake HOME.
     src_dir = str(Path(__file__).resolve().parents[2] / "src")
     import site
+
     # user-site first so its pydantic/typing_extensions shadow the older
     # system site-packages copies (matching the parent process's sys.path).
-    parent_paths = [src_dir, site.getusersitepackages()] + [
-        p for p in site.getsitepackages() if p
-    ]
+    parent_paths = [src_dir, site.getusersitepackages()] + [p for p in site.getsitepackages() if p]
     existing_pp = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = os.pathsep.join(
         [p for p in parent_paths if p] + ([existing_pp] if existing_pp else [])
     )
     return subprocess.Popen(
         [VENV_PY, "-m", "robot_md.mcp.server", str(manifest)],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
     )
 
 
@@ -63,7 +65,9 @@ def _handshake(proc):
     init = _rpc(
         proc,
         {
-            "jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
             "params": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {},
@@ -81,7 +85,9 @@ def _call_execute_capability(proc, capability: str) -> dict:
     return _rpc(
         proc,
         {
-            "jsonrpc": "2.0", "id": 99, "method": "tools/call",
+            "jsonrpc": "2.0",
+            "id": 99,
+            "method": "tools/call",
             "params": {
                 "name": "execute_capability",
                 "arguments": {"capability": capability, "args": {}, "dry_run": False},
@@ -94,7 +100,9 @@ def _read_recent_errors(proc, robot_name: str) -> list[dict]:
     r = _rpc(
         proc,
         {
-            "jsonrpc": "2.0", "id": 100, "method": "resources/read",
+            "jsonrpc": "2.0",
+            "id": 100,
+            "method": "resources/read",
             "params": {"uri": f"robot-md://{robot_name}/recent_errors"},
         },
     )
@@ -105,10 +113,10 @@ def _read_recent_errors(proc, robot_name: str) -> list[dict]:
 
 def _robot_name_from_fixture(fixture_path: Path) -> str:
     """Mirror _sanitize_robot_name behaviour for the fixture."""
-    import re
     from robot_md.mcp.resources import _sanitize_robot_name
     from robot_md.parser import parse_file
     from robot_md.robot_spec import RobotSpec
+
     spec = RobotSpec.from_parsed(parse_file(fixture_path))
     return _sanitize_robot_name(spec.metadata.robot_name)
 

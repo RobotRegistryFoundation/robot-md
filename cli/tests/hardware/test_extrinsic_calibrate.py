@@ -7,21 +7,20 @@ Pre-conditions (operator):
 - OAK-D connected via USB
 - Arm in its stowed position (no collision risk when sweep runs)
 """
-from __future__ import annotations
 
-from pathlib import Path
+from __future__ import annotations
 
 import pytest
 
 
 @pytest.mark.hardware
 def test_real_extrinsic_sweep_produces_small_residual(tmp_path, monkeypatch):
-    from robot_md.init_phases import phase_calibrate_extrinsic
-    from robot_md.backends.feetech_depthai.servo import ServoBus
     from robot_md.backends.feetech_depthai.perception import Perception
+    from robot_md.backends.feetech_depthai.servo import ServoBus
+    from robot_md.init import default_flow
+    from robot_md.init_phases import phase_calibrate_extrinsic
     from robot_md.parser import parse_file
     from robot_md.robot_spec import RobotSpec
-    from robot_md.init import default_flow
 
     # Seed a fresh manifest from the so-arm101 preset.
     manifest = tmp_path / "ROBOT.md"
@@ -45,7 +44,11 @@ def test_real_extrinsic_sweep_produces_small_residual(tmp_path, monkeypatch):
     cam.open()
     try:
         result = phase_calibrate_extrinsic(
-            manifest, bus=bus, camera=cam, interactive=True, n_poses=6,
+            manifest,
+            bus=bus,
+            camera=cam,
+            interactive=True,
+            n_poses=6,
         )
         assert result.status == "ok", f"{result.status}: {result.message}"
         assert result.detail["residual_mm"] < 10.0, result.detail

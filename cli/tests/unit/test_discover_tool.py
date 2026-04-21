@@ -1,4 +1,5 @@
 """discover: declarative scene-discovery pipeline. Capture + detect steps."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -13,19 +14,25 @@ from robot_md.robot_spec import ObjectDescriptor, VisionBlock
 def _ctx_with_two_descriptors():
     rgb = np.full((200, 300, 3), 240, dtype=np.uint8)
     cv2.rectangle(rgb, (150, 80), (200, 140), (40, 40, 220), -1)  # red @right
-    cv2.rectangle(rgb, (20, 20), (60, 60), (230, 230, 230), -1)   # upper-left light
+    cv2.rectangle(rgb, (20, 20), (60, 60), (230, 230, 230), -1)  # upper-left light
     depth = np.full((200, 300), 500, dtype=np.uint16)
     K = np.array([[500.0, 0, 150.0], [0, 500.0, 100.0], [0, 0, 1.0]])
     per = MagicMock()
     per.grab_frame.return_value = (rgb, depth, K)
 
     spec = MagicMock()
-    spec.vision = VisionBlock(object_descriptors=(
-        ObjectDescriptor("red_lego", "hsv",
-                         {"h_ranges": [[0, 10], [170, 180]], "s_min": 80, "v_min": 80}),
-        ObjectDescriptor("white_bowl", "hsv_roi",
-                         {"s_max": 80, "v_min": 100, "roi": {"u_max": 150, "v_max": 120}}),
-    ))
+    spec.vision = VisionBlock(
+        object_descriptors=(
+            ObjectDescriptor(
+                "red_lego", "hsv", {"h_ranges": [[0, 10], [170, 180]], "s_min": 80, "v_min": 80}
+            ),
+            ObjectDescriptor(
+                "white_bowl",
+                "hsv_roi",
+                {"s_max": 80, "v_min": 100, "roi": {"u_max": 150, "v_max": 120}},
+            ),
+        )
+    )
     ctx = MagicMock()
     ctx.spec = spec
     ctx.backend._perception = per
@@ -58,10 +65,13 @@ async def test_discover_capture_no_backend():
 
 async def test_discover_detect_finds_both():
     ctx = _ctx_with_two_descriptors()
-    r = await discover_tool(ctx, steps=[
-        {"capture": {}},
-        {"detect": {"descriptors": ["red_lego", "white_bowl"]}},
-    ])
+    r = await discover_tool(
+        ctx,
+        steps=[
+            {"capture": {}},
+            {"detect": {"descriptors": ["red_lego", "white_bowl"]}},
+        ],
+    )
     assert r["status"] == "ok"
     det = r["results"]["detect"]
     assert det["red_lego"]["status"] == "ok"
@@ -115,10 +125,13 @@ async def test_discover_probe_direction_reports_shift():
     class _PosBus:
         def __init__(self):
             self.written = []
+
         def torque(self, on):
             pass
+
         def write_positions(self, p):
             self.written.append(dict(p))
+
         def read_positions(self):
             return {"shoulder_pan": 2048}
 
@@ -133,7 +146,10 @@ async def test_discover_probe_direction_reports_shift():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+
+    r = await discover_tool(
+        ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}]
+    )
     pd = r["results"]["probe_direction"]
     assert pd["status"] == "ok"
     assert pd["joint"] == "shoulder_pan"
@@ -149,7 +165,10 @@ async def test_discover_probe_direction_no_hardware():
     ctx = MagicMock()
     ctx.backend = None
     from robot_md.mcp.tools.discover import discover_tool
-    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+
+    r = await discover_tool(
+        ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}]
+    )
     assert r["results"]["probe_direction"]["status"] == "no_hardware"
 
 
@@ -166,8 +185,10 @@ async def test_discover_probe_direction_no_motion_detected():
     class _NoopBus:
         def torque(self, on):
             pass
+
         def write_positions(self, p):
             pass
+
         def read_positions(self):
             return {"shoulder_pan": 2048}
 
@@ -182,7 +203,10 @@ async def test_discover_probe_direction_no_motion_detected():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+
+    r = await discover_tool(
+        ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}]
+    )
     assert r["results"]["probe_direction"]["status"] == "no_motion_detected"
 
 
@@ -199,10 +223,13 @@ async def test_discover_probe_direction_returns_bus_to_start():
     class _Bus:
         def __init__(self):
             self.written = []
+
         def torque(self, on):
             pass
+
         def write_positions(self, p):
             self.written.append(dict(p))
+
         def read_positions(self):
             return {"shoulder_pan": 2048, "gripper": 1700}
 
@@ -221,6 +248,7 @@ async def test_discover_probe_direction_returns_bus_to_start():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
+
     await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     # Last write should be the starting positions (return-home).
     assert bus.written[-1]["shoulder_pan"] == 2048
@@ -238,10 +266,13 @@ async def test_discover_probe_direction_empty_read_returns_no_position_read():
     class _EmptyReadBus:
         def __init__(self):
             self.written = []
+
         def torque(self, on):
             pass
+
         def write_positions(self, p):
             self.written.append(dict(p))
+
         def read_positions(self):
             return {}  # closed bus
 
@@ -257,7 +288,10 @@ async def test_discover_probe_direction_empty_read_returns_no_position_read():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+
+    r = await discover_tool(
+        ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}]
+    )
     assert r["results"]["probe_direction"]["status"] == "no_position_read"
     # Critical: no write should have happened.
     assert bus.written == []
@@ -274,10 +308,13 @@ async def test_discover_probe_direction_partial_read_no_joint_returns_no_positio
     class _PartialBus:
         def __init__(self):
             self.written = []
+
         def torque(self, on):
             pass
+
         def write_positions(self, p):
             self.written.append(dict(p))
+
         def read_positions(self):
             return {"gripper": 1700}  # shoulder_pan omitted
 
@@ -293,7 +330,10 @@ async def test_discover_probe_direction_partial_read_no_joint_returns_no_positio
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+
+    r = await discover_tool(
+        ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}]
+    )
     assert r["results"]["probe_direction"]["status"] == "no_position_read"
     assert bus.written == []
 
@@ -309,8 +349,10 @@ async def test_discover_probe_direction_torque_raise_does_not_escape():
     class _TorqueExplodesBus:
         def torque(self, on):
             raise RuntimeError("bus closed")
+
         def write_positions(self, p):
             pass
+
         def read_positions(self):
             return {"shoulder_pan": 2048}
 
@@ -325,7 +367,10 @@ async def test_discover_probe_direction_torque_raise_does_not_escape():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+
+    r = await discover_tool(
+        ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}]
+    )
     # Must not raise. Status is a failure marker.
     pd = r["results"]["probe_direction"]
     assert pd["status"] in ("bus_error", "no_frame_after")
@@ -345,10 +390,13 @@ async def test_discover_probe_direction_px_shift_is_centroid_diff_not_width_time
     class _Bus:
         def __init__(self):
             self.written = []
+
         def torque(self, on):
             pass
+
         def write_positions(self, p):
             self.written.append(dict(p))
+
         def read_positions(self):
             return {"shoulder_pan": 2048}
 
@@ -366,7 +414,10 @@ async def test_discover_probe_direction_px_shift_is_centroid_diff_not_width_time
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+
+    r = await discover_tool(
+        ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}]
+    )
     pd = r["results"]["probe_direction"]
     assert pd["status"] == "ok"
     # With the correct centroid-diff formula, px_shift ≈ 30. With the old

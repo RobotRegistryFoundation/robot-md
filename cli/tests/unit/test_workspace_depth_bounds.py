@@ -1,4 +1,5 @@
 """Derive camera-frame depth bounds from declared workspace bounds + extrinsic."""
+
 from __future__ import annotations
 
 from robot_md.detectors.hsv import workspace_depth_bounds
@@ -11,8 +12,8 @@ def test_workspace_depth_bounds_camera_at_tripod_looking_down():
     workspace_bounds = {"x": [-200, 340], "y": [-340, 340], "z": [0, 250]}
     extrinsic_6vec = [400.0, 0.0, 300.0, -2.5536, 0.0, 1.5708]
     lo, hi = workspace_depth_bounds(workspace_bounds, extrinsic_6vec)
-    assert 0 <= lo <= 100         # near corners very close to camera Z axis
-    assert 550 <= hi <= 650       # far corners ~580 + ~30 margin
+    assert 0 <= lo <= 100  # near corners very close to camera Z axis
+    assert 550 <= hi <= 650  # far corners ~580 + ~30 margin
     assert hi > lo
 
 

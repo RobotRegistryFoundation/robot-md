@@ -45,7 +45,5 @@ def record_skill_tool(
         ls.append(entry)
     fm["learned_skills"] = ls
 
-    path.write_text(
-        "---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n" + parsed.body
-    )
+    path.write_text("---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n" + parsed.body)
     return {"status": "ok", "skill_id": skill_id, "count": len(ls)}

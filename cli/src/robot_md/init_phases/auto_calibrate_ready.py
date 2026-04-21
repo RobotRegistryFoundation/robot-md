@@ -68,9 +68,7 @@ def phase_auto_calibrate_ready(*, manifest_path: Path) -> PhaseResult:
     physics["poses"] = poses
     fm["physics"] = physics
 
-    manifest_path.write_text(
-        "---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n" + parsed.body
-    )
+    manifest_path.write_text("---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n" + parsed.body)
     return PhaseResult(
         phase="auto_calibrate_ready",
         status="ok",

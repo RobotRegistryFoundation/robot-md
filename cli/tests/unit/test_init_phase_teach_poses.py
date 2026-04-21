@@ -1,4 +1,5 @@
 """phase_teach_poses skips on non-interactive, teaches 'ready' on TTY."""
+
 from __future__ import annotations
 
 from unittest.mock import patch

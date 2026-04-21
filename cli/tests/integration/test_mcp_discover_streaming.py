@@ -29,9 +29,7 @@ def _build_env(home: Path) -> dict:
     env["PYTHONUNBUFFERED"] = "1"
     env["HOME"] = str(home)
     src_dir = str(Path(__file__).resolve().parents[2] / "src")
-    parent_paths = [src_dir, site.getusersitepackages()] + [
-        p for p in site.getsitepackages() if p
-    ]
+    parent_paths = [src_dir, site.getusersitepackages()] + [p for p in site.getsitepackages() if p]
     existing_pp = env.get("PYTHONPATH", "")
     env["PYTHONPATH"] = os.pathsep.join(
         [p for p in parent_paths if p] + ([existing_pp] if existing_pp else [])
@@ -72,17 +70,25 @@ def test_discover_emits_per_step_progress(fixtures_dir, tmp_path):
     env = _build_env(tmp_path)
     proc = subprocess.Popen(
         [VENV_PY, "-m", "robot_md.mcp.server", str(manifest)],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
     )
     try:
-        _send(proc, {
-            "jsonrpc": "2.0", "id": 1, "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "test", "version": "0"},
+        _send(
+            proc,
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "test", "version": "0"},
+                },
             },
-        })
+        )
         try:
             _read_until_response(proc, 1)
         except RuntimeError:
@@ -91,14 +97,19 @@ def test_discover_emits_per_step_progress(fixtures_dir, tmp_path):
         _send(proc, {"jsonrpc": "2.0", "method": "notifications/initialized"})
 
         # Two steps -> expect at least 2 progress notifications.
-        _send(proc, {
-            "jsonrpc": "2.0", "id": 42, "method": "tools/call",
-            "params": {
-                "name": "discover",
-                "arguments": {"steps": [{"capture": {}}, {"detect": {"descriptors": []}}]},
-                "_meta": {"progressToken": "tok-42"},
+        _send(
+            proc,
+            {
+                "jsonrpc": "2.0",
+                "id": 42,
+                "method": "tools/call",
+                "params": {
+                    "name": "discover",
+                    "arguments": {"steps": [{"capture": {}}, {"detect": {"descriptors": []}}]},
+                    "_meta": {"progressToken": "tok-42"},
+                },
             },
-        })
+        )
         reply, progress = _read_until_response(proc, 42, timeout_s=10.0)
         assert "result" in reply, f"discover call failed: {reply}"
         # Every progress notification for this call must carry the token.

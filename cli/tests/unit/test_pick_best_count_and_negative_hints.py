@@ -1,4 +1,5 @@
 """Preset scoring must break the so_arm101 vs so_arm101_leader tie."""
+
 from __future__ import annotations
 
 from robot_md.init import Preset, match_score, pick_best

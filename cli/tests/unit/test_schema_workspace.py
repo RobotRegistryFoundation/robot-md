@@ -30,11 +30,18 @@ def test_workspace_optional():
 
 
 def test_workspace_accepts_bounds_mm():
-    jsonschema.validate(_m({"workspace": {
-        "from_pose": "ready",
-        "bounds_mm": {"x": [-200, 200], "y": [50, 300], "z": [0, 150]},
-        "note": "Tabletop manipulation envelope.",
-    }}), SCHEMA)
+    jsonschema.validate(
+        _m(
+            {
+                "workspace": {
+                    "from_pose": "ready",
+                    "bounds_mm": {"x": [-200, 200], "y": [50, 300], "z": [0, 150]},
+                    "note": "Tabletop manipulation envelope.",
+                }
+            }
+        ),
+        SCHEMA,
+    )
 
 
 def test_workspace_accepts_only_one_axis():

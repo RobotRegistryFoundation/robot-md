@@ -121,9 +121,7 @@ def build_server(ctx: McpContext):
 
     from robot_md.mcp.resources import _sanitize_robot_name
 
-    robot_name = _sanitize_robot_name(
-        ctx.spec.metadata.robot_name if ctx.spec else None
-    )
+    robot_name = _sanitize_robot_name(ctx.spec.metadata.robot_name if ctx.spec else None)
 
     @server.resource(f"robot-md://{robot_name}/learned_skills", mime_type="application/json")
     def _resource_learned_skills() -> str:

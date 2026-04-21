@@ -1,4 +1,5 @@
 """execute_capability returns status=blocked when a precondition fails."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -64,10 +65,7 @@ def test_execute_capability_blocks_when_pose_missing(tmp_path):
     )
     assert result["status"] == "blocked"
     assert result["error"]["reason"] == "precondition"
-    assert any(
-        "pose 'ready' not taught" in p["message"]
-        for p in result["error"]["preconditions"]
-    )
+    assert any("pose 'ready' not taught" in p["message"] for p in result["error"]["preconditions"])
 
 
 def test_execute_capability_passes_when_contract_absent(tmp_path):
@@ -79,7 +77,10 @@ def test_execute_capability_passes_when_contract_absent(tmp_path):
     ctx.backend.capabilities.return_value = frozenset({"arm.pick"})
     ctx.backend.read_only_capabilities = frozenset()
     ctx.backend.execute.return_value = ExecutionResult(
-        status="ok", trajectory=[], events=[], error=None,
+        status="ok",
+        trajectory=[],
+        events=[],
+        error=None,
     )
     # Safety.hitl_gates will match nothing for "arm.pick" unless declared.
     result = execute_capability_tool(
@@ -133,15 +134,17 @@ def test_precondition_bypassed_for_readonly_capability(tmp_path):
         "safety:\n"
         "  estop: {software: true, response_ms: 100}\n"
         "  max_joint_velocity_dps: 180\n"
-        "---\n"
-        + _BODY
+        "---\n" + _BODY
     )
     ctx = _load(p)
     ctx.backend = _MM()
     ctx.backend.capabilities.return_value = frozenset({"status.report"})
     ctx.backend.read_only_capabilities = frozenset({"status.report"})
     ctx.backend.execute.return_value = ExecutionResult(
-        status="ok", trajectory=[], events=[], error=None,
+        status="ok",
+        trajectory=[],
+        events=[],
+        error=None,
     )
     result = _exec(ctx, capability="status.report", args={}, dry_run=False, confirm_token=None)
     assert result["status"] == "ok", f"read-only cap should bypass precondition, got {result}"

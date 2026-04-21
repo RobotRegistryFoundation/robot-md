@@ -9,11 +9,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from robot_md.mcp.invocation_log import InvocationLog
+from robot_md.mcp.invocation_record import InvocationRecord
 from robot_md.parser import ParsedRobotMd, parse_file
 from robot_md.validate import VALID
 from robot_md.validate import validate as validate_parsed
-from robot_md.mcp.invocation_log import InvocationLog
-from robot_md.mcp.invocation_record import InvocationRecord
 
 
 class EstopFlag:
@@ -70,7 +70,7 @@ class _PublisherFanoutWrapper:
     unchanged.
     """
 
-    def __init__(self, ctx: "McpContext", inner: Any) -> None:
+    def __init__(self, ctx: McpContext, inner: Any) -> None:
         self._ctx = ctx
         self._inner = inner
 
@@ -96,6 +96,7 @@ class _PublisherFanoutWrapper:
             self._maybe_pair_and_log(kind, stamped)
         except Exception:
             import logging
+
             logging.getLogger(__name__).exception("fanout: log append failed")
         self._inner.publish(kind, stamped)
 
@@ -128,14 +129,13 @@ class _PublisherFanoutWrapper:
     def _sweep_expired_locked(self) -> None:
         now = time.time()
         expired = [
-            rid for rid, v in self._ctx._pending_calls.items()
-            if now - v["ts"] > _PENDING_TTL_S
+            rid for rid, v in self._ctx._pending_calls.items() if now - v["ts"] > _PENDING_TTL_S
         ]
         for rid in expired:
             self._ctx._pending_calls.pop(rid, None)
 
 
-def _install_publisher_fanout(ctx: "McpContext") -> None:
+def _install_publisher_fanout(ctx: McpContext) -> None:
     """Wrap ctx.publisher in place. Safe to call multiple times (idempotent)."""
     if isinstance(ctx.publisher, _PublisherFanoutWrapper):
         return

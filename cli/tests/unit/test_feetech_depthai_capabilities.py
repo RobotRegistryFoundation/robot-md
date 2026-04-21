@@ -34,25 +34,64 @@ def _pick_fm() -> dict:
                 ],
             },
             "kinematics": [
-                {"id": "shoulder_pan", "axis": "z", "a_mm": 0, "d_mm": 60,
-                 "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "shoulder_lift", "axis": "y", "a_mm": 125, "d_mm": 0,
-                 "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "elbow_flex", "axis": "y", "a_mm": 125, "d_mm": 0,
-                 "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "wrist_flex", "axis": "y", "a_mm": 60, "d_mm": 0,
-                 "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "wrist_roll", "axis": "x", "a_mm": 0, "d_mm": 0,
-                 "zero_pose_steps": 2048, "encoder_sign": 1},
-                {"id": "gripper", "axis": "y", "a_mm": 0, "d_mm": 0,
-                 "zero_pose_steps": 1200, "encoder_sign": 1},
+                {
+                    "id": "shoulder_pan",
+                    "axis": "z",
+                    "a_mm": 0,
+                    "d_mm": 60,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "shoulder_lift",
+                    "axis": "y",
+                    "a_mm": 125,
+                    "d_mm": 0,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "elbow_flex",
+                    "axis": "y",
+                    "a_mm": 125,
+                    "d_mm": 0,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "wrist_flex",
+                    "axis": "y",
+                    "a_mm": 60,
+                    "d_mm": 0,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "wrist_roll",
+                    "axis": "x",
+                    "a_mm": 0,
+                    "d_mm": 0,
+                    "zero_pose_steps": 2048,
+                    "encoder_sign": 1,
+                },
+                {
+                    "id": "gripper",
+                    "axis": "y",
+                    "a_mm": 0,
+                    "d_mm": 0,
+                    "zero_pose_steps": 1200,
+                    "encoder_sign": 1,
+                },
             ],
             "workspace": {"bounds_mm": {"x": [-200, 340], "y": [-340, 340], "z": [0, 250]}},
         },
         "vision": {
             "object_descriptors": [
-                {"id": "lego", "detector": "hsv",
-                 "params": {"h_ranges": [[0, 10]], "s_min": 110, "v_min": 80, "min_area": 500}}
+                {
+                    "id": "lego",
+                    "detector": "hsv",
+                    "params": {"h_ranges": [[0, 10]], "s_min": 110, "v_min": 80, "min_area": 500},
+                }
             ]
         },
     }
@@ -99,9 +138,7 @@ def test_unknown_capability_returns_error():
 
 def test_arm_pick_invokes_motion_replay():
     b = _backend()
-    res = dispatch(
-        b, capability="arm.pick", args={"target": "lego"}, dry_run=False, estop=_estop()
-    )
+    res = dispatch(b, capability="arm.pick", args={"target": "lego"}, dry_run=False, estop=_estop())
     assert res.status == "ok", res.error
     b._motion.replay.assert_called_once()
     _, kwargs = b._motion.replay.call_args
@@ -207,9 +244,7 @@ def test_arm_home_returns_servo_latched_on_dropped_servo():
     off remaining servos internally, and the caller knows to power-cycle."""
     b = _backend()
     # Simulate wrist_flex dropping from bus enumeration after motion.
-    b._motion.verify_alive.return_value = AliveReport(
-        alive=False, missing=["wrist_flex"]
-    )
+    b._motion.verify_alive.return_value = AliveReport(alive=False, missing=["wrist_flex"])
 
     res = dispatch(b, capability="arm.home", args={}, dry_run=False, estop=_estop())
 
@@ -228,13 +263,9 @@ def test_arm_home_returns_servo_latched_on_dropped_servo():
 def test_arm_pick_returns_servo_latched_on_dropped_servo():
     """Same watchdog contract as arm.home but for the pick dispatcher."""
     b = _backend()
-    b._motion.verify_alive.return_value = AliveReport(
-        alive=False, missing=["wrist_flex"]
-    )
+    b._motion.verify_alive.return_value = AliveReport(alive=False, missing=["wrist_flex"])
 
-    res = dispatch(
-        b, capability="arm.pick", args={"target": "lego"}, dry_run=False, estop=_estop()
-    )
+    res = dispatch(b, capability="arm.pick", args={"target": "lego"}, dry_run=False, estop=_estop())
 
     assert res.status == "error"
     assert res.error["reason"] == "servo_latched"
@@ -245,9 +276,7 @@ def test_arm_pick_returns_servo_latched_on_dropped_servo():
 def test_arm_place_returns_servo_latched_on_dropped_servo():
     """Same watchdog contract as arm.home but for the place dispatcher."""
     b = _backend()
-    b._motion.verify_alive.return_value = AliveReport(
-        alive=False, missing=["wrist_flex"]
-    )
+    b._motion.verify_alive.return_value = AliveReport(alive=False, missing=["wrist_flex"])
 
     res = dispatch(
         b, capability="arm.place", args={"target": "lego"}, dry_run=False, estop=_estop()

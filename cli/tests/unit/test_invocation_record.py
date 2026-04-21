@@ -1,4 +1,5 @@
 """Unit tests for InvocationRecord + from_event_pair()."""
+
 from __future__ import annotations
 
 import pytest
@@ -61,9 +62,7 @@ def test_from_event_pair_precondition_failure():
             }
         ],
     }
-    rec = InvocationRecord.from_event_pair(
-        _call_evt(), _result_evt(status="blocked", error=err)
-    )
+    rec = InvocationRecord.from_event_pair(_call_evt(), _result_evt(status="blocked", error=err))
     assert rec.status == "blocked"
     assert rec.reason == "precondition"
     assert len(rec.preconditions) == 1
@@ -91,9 +90,7 @@ def test_from_event_pair_raw_exec_error():
 
 def test_from_event_pair_mismatched_request_id_raises():
     with pytest.raises(ValueError, match="request_id mismatch"):
-        InvocationRecord.from_event_pair(
-            _call_evt(request_id="r1"), _result_evt(request_id="r2")
-        )
+        InvocationRecord.from_event_pair(_call_evt(request_id="r1"), _result_evt(request_id="r2"))
 
 
 def test_from_event_pair_non_execute_capability_has_null_capability():

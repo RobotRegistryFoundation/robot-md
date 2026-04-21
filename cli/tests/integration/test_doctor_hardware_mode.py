@@ -1,5 +1,6 @@
 """`robot-md doctor --hardware=on` with a synthetic bus missing a servo
 surfaces a warn (not pass). End-to-end through the typer CLI."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -14,6 +15,7 @@ from robot_md.init_phases import PhaseResult
 def _stub_phase(name):
     def _inner(*a, **kw):
         return PhaseResult(phase=name, status="skipped", message="", detail={})
+
     return _inner
 
 
@@ -89,10 +91,8 @@ def test_doctor_warns_on_servo_missing(tmp_path):
 
     # The warn must mention either the missing servo name OR the check name.
     assert "wrist_flex" in lower or "servo_enumeration" in lower, (
-        f"expected hardware warn in output — exit={result.exit_code}\n"
-        f"stdout+stderr:\n{out}"
+        f"expected hardware warn in output — exit={result.exit_code}\nstdout+stderr:\n{out}"
     )
     assert "warn" in lower or "missing" in lower or "latch" in lower, (
-        f"expected warn/missing/latch language — exit={result.exit_code}\n"
-        f"stdout+stderr:\n{out}"
+        f"expected warn/missing/latch language — exit={result.exit_code}\nstdout+stderr:\n{out}"
     )

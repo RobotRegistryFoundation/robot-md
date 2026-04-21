@@ -41,7 +41,7 @@ def detect_depth_shape(
         return None
 
     # Largest connected component in the depth band.
-    num, labels, stats, centroids = cv2.connectedComponentsWithStats(mask, 8)
+    num, _labels, stats, centroids = cv2.connectedComponentsWithStats(mask, 8)
     if num <= 1:
         return None
     best_idx = 1 + int(stats[1:, cv2.CC_STAT_AREA].argmax())
@@ -51,8 +51,10 @@ def detect_depth_shape(
 
     # Diameter estimate: project the component's bounding-box width into mm at
     # the centroid depth. fx = K[0,0].
-    depth_at_center = float(depth_frame[v_px, u_px]) if depth_frame[v_px, u_px] > 0 else float(
-        depth_frame[band].mean()
+    depth_at_center = (
+        float(depth_frame[v_px, u_px])
+        if depth_frame[v_px, u_px] > 0
+        else float(depth_frame[band].mean())
     )
     fx = float(K[0, 0])
     bbox_w_px = int(stats[best_idx, cv2.CC_STAT_WIDTH])

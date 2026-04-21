@@ -1,4 +1,5 @@
 """Unit tests for recent_invocations + recent_errors resource builders."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace

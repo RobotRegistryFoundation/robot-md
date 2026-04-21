@@ -43,9 +43,7 @@ def calibration_status(ctx: Any) -> dict[str, str]:
 
     # hand_eye extrinsic
     cams = getattr(getattr(spec, "physics", None), "cameras", ()) or ()
-    hand_eye = (
-        "ok" if (cams and any(getattr(c, "extrinsic", None) for c in cams)) else "missing"
-    )
+    hand_eye = "ok" if (cams and any(getattr(c, "extrinsic", None) for c in cams)) else "missing"
 
     # zero_pose_steps — inspect per-joint. 'ok' only if every declared
     # kinematic joint carries a non-None zero_pose_steps. Missing if any
@@ -54,6 +52,7 @@ def calibration_status(ctx: Any) -> dict[str, str]:
     if not kin:
         zero = "missing"
     else:
+
         def _has_zero(j: Any) -> bool:
             if isinstance(j, dict):
                 return j.get("zero_pose_steps") is not None

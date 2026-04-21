@@ -1,4 +1,5 @@
 """vision.find resolves an object_descriptor id to a 3-D camera-frame point."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -24,13 +25,15 @@ def _ctx_with_descriptor_and_frame():
     backend._perception = per
 
     spec = MagicMock()
-    spec.vision = VisionBlock(object_descriptors=(
-        ObjectDescriptor(
-            id="red_lego",
-            detector="hsv",
-            params={"h_ranges": [[0, 10], [170, 180]], "s_min": 80, "v_min": 80},
-        ),
-    ))
+    spec.vision = VisionBlock(
+        object_descriptors=(
+            ObjectDescriptor(
+                id="red_lego",
+                detector="hsv",
+                params={"h_ranges": [[0, 10], [170, 180]], "s_min": 80, "v_min": 80},
+            ),
+        )
+    )
 
     ctx = MagicMock()
     ctx.backend = backend
@@ -92,9 +95,9 @@ def test_vision_find_unknown_detector():
     from robot_md.robot_spec import ObjectDescriptor, VisionBlock
 
     spec = _MM()
-    spec.vision = VisionBlock(object_descriptors=(
-        ObjectDescriptor(id="mystery", detector="unknown_kind", params={}),
-    ))
+    spec.vision = VisionBlock(
+        object_descriptors=(ObjectDescriptor(id="mystery", detector="unknown_kind", params={}),)
+    )
     ctx = _MM()
     ctx.backend = _MM()
     ctx.spec = spec
@@ -111,9 +114,11 @@ def test_vision_find_no_perception():
     from robot_md.robot_spec import ObjectDescriptor, VisionBlock
 
     spec = _MM()
-    spec.vision = VisionBlock(object_descriptors=(
-        ObjectDescriptor(id="x", detector="hsv", params={"h_ranges": [[0, 10]]}),
-    ))
+    spec.vision = VisionBlock(
+        object_descriptors=(
+            ObjectDescriptor(id="x", detector="hsv", params={"h_ranges": [[0, 10]]}),
+        )
+    )
     ctx = _MM()
     ctx.backend = _MM(spec=None)  # has backend, but configure _perception absent
     # MagicMock auto-creates attributes, so explicitly remove _perception:
@@ -150,10 +155,13 @@ def test_vision_find_depth_patch_is_clamped():
     backend = _MM()
     backend._perception = per
     spec = _MM()
-    spec.vision = VisionBlock(object_descriptors=(
-        ObjectDescriptor("red_lego", "hsv",
-                         {"h_ranges": [[0, 10], [170, 180]], "s_min": 80, "v_min": 80}),
-    ))
+    spec.vision = VisionBlock(
+        object_descriptors=(
+            ObjectDescriptor(
+                "red_lego", "hsv", {"h_ranges": [[0, 10], [170, 180]], "s_min": 80, "v_min": 80}
+            ),
+        )
+    )
     ctx = _MM()
     ctx.backend = backend
     ctx.spec = spec

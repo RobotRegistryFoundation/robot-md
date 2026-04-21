@@ -25,7 +25,9 @@ class Perception:
     _depth_q: Any = None
     _rgb_w: int = RGB_SIZE[0]
     _rgb_h: int = RGB_SIZE[1]
-    _spec: Any = None  # stashed so vision_find can resolve descriptors without the caller re-passing
+    _spec: Any = (
+        None  # stashed so vision_find can resolve descriptors without the caller re-passing
+    )
 
     @classmethod
     def from_spec(cls, spec: RobotSpec) -> Perception:
@@ -120,8 +122,8 @@ class Perception:
     def detect_objects(self, *, descriptors: list | None = None) -> list[dict]:
         if not descriptors:
             return []
-        from robot_md.detectors.hsv import DETECTORS
         from robot_md.detectors.depth import DEPTH_DETECTORS
+        from robot_md.detectors.hsv import DETECTORS
 
         frame = self.grab_frame()
         if frame is None:
@@ -151,8 +153,8 @@ class Perception:
         patch of depth pixels around the centroid for robustness against
         stereo holes (mirrors `mcp.tools.vision_find.vision_find_tool`).
         """
-        from robot_md.detectors.hsv import DETECTORS
         from robot_md.detectors.depth import DEPTH_DETECTORS
+        from robot_md.detectors.hsv import DETECTORS
 
         active_spec = spec if spec is not None else getattr(self, "_spec", None)
         if active_spec is None:
@@ -162,13 +164,24 @@ class Perception:
             return {"status": "error", "descriptor": descriptor, "reason": "no_vision_block"}
         descr = vision.find(descriptor) if hasattr(vision, "find") else None
         if descr is None:
-            return {"status": "error", "descriptor": descriptor, "reason": "descriptor_not_declared"}
+            return {
+                "status": "error",
+                "descriptor": descriptor,
+                "reason": "descriptor_not_declared",
+            }
 
         is_depth_detector = descr.detector in DEPTH_DETECTORS
-        fn = DEPTH_DETECTORS.get(descr.detector) if is_depth_detector else DETECTORS.get(descr.detector)
+        fn = (
+            DEPTH_DETECTORS.get(descr.detector)
+            if is_depth_detector
+            else DETECTORS.get(descr.detector)
+        )
         if fn is None:
-            return {"status": "error", "descriptor": descriptor,
-                    "reason": f"detector_unknown:{descr.detector}"}
+            return {
+                "status": "error",
+                "descriptor": descriptor,
+                "reason": f"detector_unknown:{descr.detector}",
+            }
 
         frame = self.grab_frame()
         if frame is None:
@@ -197,10 +210,14 @@ class Perception:
             except (KeyError, TypeError, AttributeError, IndexError):
                 pass  # workspace or extrinsic missing — skip depth filter silently
 
-        depth_frame_for_detector = depth if (
-            descriptor_params_effective.get("min_depth_mm") is not None
-            or descriptor_params_effective.get("max_depth_mm") is not None
-        ) else None
+        depth_frame_for_detector = (
+            depth
+            if (
+                descriptor_params_effective.get("min_depth_mm") is not None
+                or descriptor_params_effective.get("max_depth_mm") is not None
+            )
+            else None
+        )
 
         if is_depth_detector:
             hit = fn(depth, K, params=descriptor_params_effective)
@@ -219,10 +236,11 @@ class Perception:
         # the wall behind it — the LEGO centroid often has zero depth
         # (stereo hole on matte surface) and a raw median picks up the
         # ~30m ceiling visible through the hole.
-        r = min(15, max(3, int((area ** 0.5) // 4)))
+        r = min(15, max(3, int((area**0.5) // 4)))
         h, w = depth.shape
-        patch = depth[max(0, v - r): min(h, v + r + 1),
-                      max(0, u - r): min(w, u + r + 1)].astype(np.float32)
+        patch = depth[max(0, v - r) : min(h, v + r + 1), max(0, u - r) : min(w, u + r + 1)].astype(
+            np.float32
+        )
         valid = patch[patch > 0]
         min_d = descriptor_params_effective.get("min_depth_mm")
         max_d = descriptor_params_effective.get("max_depth_mm")

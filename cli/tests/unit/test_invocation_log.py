@@ -1,9 +1,8 @@
 """Unit tests for InvocationLog ring buffer."""
+
 from __future__ import annotations
 
 import threading
-
-import pytest
 
 from robot_md.mcp.invocation_log import InvocationLog
 from robot_md.mcp.invocation_record import InvocationRecord
