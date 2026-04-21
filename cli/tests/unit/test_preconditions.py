@@ -57,7 +57,7 @@ def test_extrinsic_present_missing_has_calibrate_fix():
     ok, failed = evaluate(contract, _missing_spec(), backend_resolved=True)
     assert not ok
     assert failed[0].kind == "extrinsic_present"
-    assert failed[0].suggested_fix == "robot-md calibrate --hand-eye"
+    assert failed[0].suggested_fix == "robot-md calibrate --extrinsic"
 
 
 def test_backend_resolved_false_has_driver_check_fix():
@@ -101,7 +101,9 @@ def test_workspace_declared_missing_has_manifest_fix():
     assert "workspace" in failed[0].suggested_fix
 
 
-def test_learned_skill_missing_has_record_fix():
+def test_learned_skill_missing_has_null_fix():
+    """No single CLI command records a skill (skill recording is via the
+    MCP record_skill tool, not a CLI verb). suggested_fix is None."""
     spec = SimpleNamespace(
         physics=SimpleNamespace(poses={}, cameras=(), solver={}, workspace=None),
         learned_skills=[],
@@ -113,7 +115,8 @@ def test_learned_skill_missing_has_record_fix():
     assert not ok
     assert failed[0].kind == "learned_skill_ok"
     assert failed[0].name == "red_lego_pick"
-    assert failed[0].suggested_fix == "robot-md record-skill red_lego_pick"
+    assert "red_lego_pick" in failed[0].message
+    assert failed[0].suggested_fix is None
 
 
 def test_learned_skill_blocked_has_null_fix():
@@ -128,6 +131,20 @@ def test_learned_skill_blocked_has_null_fix():
     assert not ok
     assert "status=blocked" in failed[0].message
     assert failed[0].suggested_fix is None  # no single remediation command
+
+
+def test_learned_skill_without_name_returns_structured_failure():
+    """Precondition with kind=learned_skill_ok but name=None should emit
+    a structured failure with None fix."""
+    contract = CapabilityContract(
+        preconditions=(Precondition(kind="learned_skill_ok", name=None, detail={}),)
+    )
+    ok, failed = evaluate(contract, _missing_spec(), backend_resolved=True)
+    assert not ok
+    assert failed[0].kind == "learned_skill_ok"
+    assert failed[0].name is None
+    assert "missing 'name'" in failed[0].message
+    assert failed[0].suggested_fix is None
 
 
 def test_unknown_kind_returns_unfixable_structured_failure():

@@ -15,6 +15,20 @@ from robot_md.robot_spec import CapabilityContract, Precondition
 
 @dataclass(frozen=True)
 class PreconditionFailure:
+    """Structured precondition-failure record for MCP clients.
+
+    Fields:
+    - kind: the precondition-kind string from the capability contract
+      (e.g., 'extrinsic_present'). Machine-actionable.
+    - name: optional parameter for the precondition (e.g., the pose name
+      for 'pose_taught', or the skill id for 'learned_skill_ok').
+    - message: human-readable description of what's missing.
+    - suggested_fix: verb-form CLI hint when a single command remediates
+      the failure (e.g., 'robot-md pose teach ready'). The caller is
+      expected to append the robot's ROBOT.md path when executing. None
+      when no single remediation command exists.
+    """
+
     kind: str
     name: str | None
     message: str
@@ -67,7 +81,7 @@ def _check_one(
                 kind=kind,
                 name=None,
                 message="hand-eye extrinsic missing",
-                suggested_fix="robot-md calibrate --hand-eye",
+                suggested_fix="robot-md calibrate --extrinsic",
             )
         return None
     if kind == "ik_provider_set":
@@ -105,7 +119,7 @@ def _check_one(
                 kind=kind,
                 name=required_id,
                 message=f"learned skill '{required_id}' not recorded",
-                suggested_fix=f"robot-md record-skill {required_id}",
+                suggested_fix=None,
             )
         status = getattr(found, "status", "ok")
         if status != "ok":
