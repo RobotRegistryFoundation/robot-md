@@ -92,6 +92,36 @@
             "additionalProperties": true
           }
         },
+        "poses": {
+          "type": "object",
+          "description": "Named joint-space poses. 'ready' is the manipulation home if present.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string" },
+              "joints": { "type": "object", "additionalProperties": { "type": "integer" } },
+              "source": { "type": "string", "enum": ["declared", "taught", "solved_from_dh"] },
+              "taught_at": { "type": "string" }
+            },
+            "required": ["joints"]
+          }
+        },
+        "workspace": {
+          "type": "object",
+          "description": "Reachable envelope, relative to a named pose.",
+          "properties": {
+            "from_pose": {"type": "string"},
+            "bounds_mm": {
+              "type": "object",
+              "properties": {
+                "x": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+                "y": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+                "z": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
+              }
+            },
+            "note": {"type": "string"}
+          }
+        },
         "solver": {
           "type": "object",
           "description": "Baseline IK metadata — enough for a planner to compute forward/inverse kinematics from ROBOT.md alone, without an external URDF. Populated by `robot-md autodetect` (deterministic fields) + `robot-md calibrate` (physical fields).",
@@ -184,16 +214,45 @@
                     "items": { "type": "number" },
                     "minItems": 6,
                     "maxItems": 6
+                  },
+                  "extrinsic_source": {
+                    "type": ["string", "null"],
+                    "enum": ["preset_default", "hand_eye_calibrated", "gripper_silhouette_calibrated", "user_declared", null],
+                    "description": "Provenance of extrinsic. `preset_default`: shipped guess. `hand_eye_calibrated`: legacy hand-eye. `gripper_silhouette_calibrated`: from `robot-md calibrate --extrinsic`. `user_declared`: edited by hand."
+                  },
+                  "extrinsic_residual_mm": {
+                    "type": "number",
+                    "description": "Mean residual (mm) from the last calibration; written by calibrate --extrinsic."
                   }
                 },
                 "additionalProperties": false
               }
-            }
+            },
+            "ik_provider": {"type": ["string", "null"]},
+            "ik_frame":    {"type": ["string", "null"]}
           },
           "additionalProperties": true
         }
       },
       "additionalProperties": true
+    },
+    "vision": {
+      "type": "object",
+      "description": "Perception vocabulary — objects the robot knows how to see.",
+      "properties": {
+        "object_descriptors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "detector", "params"],
+            "properties": {
+              "id":       {"type": "string"},
+              "detector": {"type": "string", "enum": ["hsv", "hsv_roi"]},
+              "params":   {"type": "object"}
+            }
+          }
+        }
+      }
     },
     "drivers": {
       "type": "array",
@@ -432,6 +491,53 @@
         "^x-[a-z0-9_-]+$": { "type": "object" }
       },
       "additionalProperties": false
+    },
+    "capability_contracts": {
+      "type": "object",
+      "description": "Per-capability preconditions and arg/return contracts.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "pose_taught",
+                    "extrinsic_present",
+                    "ik_provider_set",
+                    "workspace_declared",
+                    "learned_skill_ok",
+                    "backend_resolved"
+                  ]
+                },
+                "name": { "type": "string" },
+                "detail": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "learned_skills": {
+      "type": "array",
+      "description": "Append-only skill catalogue — what the robot has empirically demonstrated.",
+      "items": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id":          {"type": "string"},
+          "status":      {"type": "string", "enum": ["ok", "blocked", "degraded"]},
+          "validated":   {"type": "array",  "items": {"type": "string"}},
+          "blocked_by":  {"type": "array",  "items": {"type": "string"}},
+          "notes":       {"type": "string"},
+          "recorded_at": {"type": "string"}
+        }
+      }
     }
   },
   "additionalProperties": true
