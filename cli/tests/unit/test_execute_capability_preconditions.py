@@ -64,7 +64,10 @@ def test_execute_capability_blocks_when_pose_missing(tmp_path):
     )
     assert result["status"] == "blocked"
     assert result["error"]["reason"] == "precondition"
-    assert any("pose 'ready' not taught" in f for f in result["error"]["failed"])
+    assert any(
+        "pose 'ready' not taught" in p["message"]
+        for p in result["error"]["preconditions"]
+    )
 
 
 def test_execute_capability_passes_when_contract_absent(tmp_path):
