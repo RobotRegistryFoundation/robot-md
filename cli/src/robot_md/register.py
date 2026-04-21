@@ -37,7 +37,7 @@ from typing import Any
 
 from robot_md.parser import parse_file
 
-DEFAULT_ENDPOINT = "https://rcan.dev/api/v1/robots"
+DEFAULT_ENDPOINT = "https://rcan.dev/api/v2/robots/register"
 KEYSTORE_DIR = Path.home() / ".robot-md" / "keys"
 
 
@@ -117,40 +117,43 @@ def cli_unregister(
 
 @dataclass
 class MintRequest:
-    """Fields POSTed to RRF. Matches the current v0.1.x live schema."""
+    """Fields POSTed to RRF. Matches the current v2 live schema."""
 
+    name: str
     manufacturer: str
     model: str
-    version: str
-    device_id: str
-    description: str = ""
-    contact_email: str = ""
-    source: str = "robot-md-cli"
-    # Metadata attached to the manifest update on successful mint
-    robot_name: str = ""
+    firmware_version: str
+    rcan_version: str
+    pq_signing_pub: str = ""
+    pq_kid: str = ""
+    ruri: str = ""
+    owner_uid: str = ""
 
     def as_body(self) -> dict[str, Any]:
         # Strip empty optional fields so the server gets a clean payload
         body: dict[str, Any] = {
+            "name": self.name,
             "manufacturer": self.manufacturer,
             "model": self.model,
-            "version": self.version,
-            "device_id": self.device_id,
-            "source": self.source,
+            "firmware_version": self.firmware_version,
+            "rcan_version": self.rcan_version,
         }
-        if self.description:
-            body["description"] = self.description
-        if self.contact_email:
-            body["contact_email"] = self.contact_email
+        if self.pq_signing_pub:
+            body["pq_signing_pub"] = self.pq_signing_pub
+        if self.pq_kid:
+            body["pq_kid"] = self.pq_kid
+        if self.ruri:
+            body["ruri"] = self.ruri
+        if self.owner_uid:
+            body["owner_uid"] = self.owner_uid
         return body
 
 
 @dataclass
 class MintResult:
     rrn: str
-    rcan_uri: str
-    api_key: str | None
-    already_existed: bool
+    registered_at: str
+    record_url: str
     raw: dict[str, Any]
 
 
@@ -160,13 +163,12 @@ class MintResult:
 def _extract_mint_fields(
     manifest_path: Path,
     *,
+    name: str | None,
     manufacturer: str | None,
     model: str | None,
-    version: str | None,
-    device_id: str | None,
-    description: str | None,
-    contact_email: str | None,
-    source: str | None,
+    firmware_version: str | None,
+    rcan_version: str | None,
+    pq_signing_pub: str | None,
 ) -> MintRequest:
     """Build a MintRequest from a parsed ROBOT.md + optional CLI overrides.
 
@@ -186,23 +188,21 @@ def _extract_mint_fields(
         v = flag or meta.get(key) or default
         return str(v).strip() if v else ""
 
-    robot_name = pick(None, "robot_name")
+    robot_name = pick(name, "robot_name")
     if not robot_name:
         raise ValueError("manifest has no metadata.robot_name; add one before registering")
 
     req = MintRequest(
+        name=robot_name,
         manufacturer=pick(manufacturer, "manufacturer"),
         model=pick(model, "model"),
-        version=pick(version, "version", default="1.0"),
-        device_id=pick(device_id, "device_id", default=robot_name),
-        description=pick(description, "description"),
-        contact_email=pick(contact_email, "contact_email") or pick(None, "author"),
-        source=pick(source, "source", default="robot-md-cli"),
-        robot_name=robot_name,
+        firmware_version=pick(firmware_version, "firmware_version", default="1.0"),
+        rcan_version=pick(rcan_version, "rcan_version", default="3.0"),
+        pq_signing_pub=pick(pq_signing_pub, "pq_signing_pub"),
     )
 
     missing: list[str] = []
-    for fld in ("manufacturer", "model", "version", "device_id"):
+    for fld in ("name", "manufacturer", "model", "firmware_version", "rcan_version"):
         if not getattr(req, fld):
             missing.append(fld)
     if missing:
@@ -252,32 +252,13 @@ def post_to_rrf(endpoint: str, body: dict[str, Any], *, timeout: float = 15.0) -
 
     return MintResult(
         rrn=rrn,
-        rcan_uri=obj.get("rcan_uri", ""),
-        api_key=obj.get("api_key"),
-        already_existed=bool(obj.get("already_existed")),
+        registered_at=obj.get("registered_at", ""),
+        record_url=obj.get("record_url", ""),
         raw=obj,
     )
 
 
-def write_apikey(rrn: str, api_key: str) -> Path:
-    """Store the issued API key at ~/.robot-md/keys/<rrn>.apikey, mode 600.
-
-    The RRF returns the raw key exactly once — we don't want to print it to
-    stdout where it might leak into scrollback or CI logs. Saving to a
-    per-RRN file with restrictive permissions is the safe default. Operator
-    can always ``cat`` it when they need it.
-    """
-    KEYSTORE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(KEYSTORE_DIR, 0o700)
-    path = KEYSTORE_DIR / f"{rrn}.apikey"
-    # Write with restrictive perms before content to avoid a race window
-    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w") as fh:
-        fh.write(api_key + "\n")
-    return path
-
-
-def write_rrn_to_manifest(manifest_path: Path, rrn: str, rcan_uri: str) -> None:
+def write_rrn_to_manifest(manifest_path: Path, rrn: str, record_url: str) -> None:
     """Rewrite metadata.rrn and metadata.rcan_uri in the manifest.
 
     Preserves comments + formatting via ruamel.yaml.
@@ -306,8 +287,8 @@ def write_rrn_to_manifest(manifest_path: Path, rrn: str, rcan_uri: str) -> None:
 
     meta = data.setdefault("metadata", {})
     meta["rrn"] = rrn
-    if rcan_uri:
-        meta["rcan_uri"] = rcan_uri
+    if record_url:
+        meta["record_url"] = record_url
 
     import io
 
@@ -323,13 +304,12 @@ def cli_register(
     manifest_path: str,
     *,
     endpoint: str = DEFAULT_ENDPOINT,
+    name: str | None = None,
     manufacturer: str | None = None,
     model: str | None = None,
-    version: str | None = None,
-    device_id: str | None = None,
-    description: str | None = None,
-    contact_email: str | None = None,
-    source: str | None = None,
+    firmware_version: str | None = None,
+    rcan_version: str | None = None,
+    pq_signing_pub: str | None = None,
     dry_run: bool = False,
 ) -> int:
     path = Path(manifest_path)
@@ -349,13 +329,12 @@ def cli_register(
     try:
         req = _extract_mint_fields(
             path,
+            name=name,
             manufacturer=manufacturer,
             model=model,
-            version=version,
-            device_id=device_id,
-            description=description,
-            contact_email=contact_email,
-            source=source,
+            firmware_version=firmware_version,
+            rcan_version=rcan_version,
+            pq_signing_pub=pq_signing_pub,
         )
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
@@ -376,28 +355,20 @@ def cli_register(
         print(f"error: {e}", file=sys.stderr)
         return 3
 
-    if result.already_existed:
+    if result.raw.get("already_existed"):
         print(
-            f"\n(already registered)\n  RRN: {result.rrn}\n  RCAN URI: {result.rcan_uri or '—'}",
+            f"\n(already registered)\n  RRN: {result.rrn}\n  Record URL: {result.record_url or '—'}",
             file=sys.stderr,
         )
     else:
         print(
-            f"\n✓ registered on RRF\n  RRN: {result.rrn}\n  RCAN URI: {result.rcan_uri or '—'}",
-            file=sys.stderr,
-        )
-
-    # Persist API key (only issued on first mint)
-    if result.api_key:
-        key_path = write_apikey(result.rrn, result.api_key)
-        print(
-            f"  API key saved to {key_path} (mode 600). Show it with: cat {key_path}",
+            f"\n✓ registered on RRF\n  RRN: {result.rrn}\n  Record URL: {result.record_url or '—'}",
             file=sys.stderr,
         )
 
     # Update manifest
     try:
-        write_rrn_to_manifest(path, result.rrn, result.rcan_uri)
+        write_rrn_to_manifest(path, result.rrn, result.record_url)
         print(f"  manifest {path} updated with metadata.rrn", file=sys.stderr)
     except RuntimeError as e:
         print(f"  warning: could not update manifest: {e}", file=sys.stderr)
