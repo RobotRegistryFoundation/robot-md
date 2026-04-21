@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ROBOT.md — the one-file declaration for agentic robots</title>
-<meta name="description" content="ROBOT.md is to a robot what CLAUDE.md is to a codebase. One file — YAML + markdown — so a planning LLM can safely operate your robot. Zero flags: bare `robot-md init` is enough; Claude Code drives the follow-up. Speaks the RCAN 3.0+ wire protocol, registers with the Robot Registry Foundation, and is the native robot format for OpenCastor — though none of the three are required.">
+<meta name="description" content="ROBOT.md is to a robot what CLAUDE.md and AGENTS.md are to a codebase. One file — YAML + markdown — so a planning LLM can safely operate a single robot. Zero flags: bare `robot-md init` is enough; Claude Code drives the follow-up. Speaking the RCAN 3.0+ wire protocol and registering with the Robot Registry Foundation are strict requirements. Built for Anthropic surfaces, but flexible enough for any AI agent.">
 <meta name="theme-color" content="#F4EFE6">
 
 <meta property="og:title" content="ROBOT.md — one-file declaration for agentic robots">
-<meta property="og:description" content="The CLAUDE.md of physical machines. One file so the same agent that ships your code can safely drive your arm, your rover, your humanoid.">
+<meta property="og:description" content="The CLAUDE.md of physical machines. One file so Claude Code can safely drive your arm, your rover, your humanoid.">
 <meta property="og:url" content="https://robotmd.dev">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
@@ -482,7 +482,7 @@
   .C-term-head .path{color:#7d776a; margin-left:8px}
   .C-term-head .tag{margin-left:auto; color:var(--accent); font-weight:600}
   .C-term-body{ padding: 22px 26px 26px; min-height: 260px }
-  .C-line{ white-space:pre-wrap; opacity:0; transform:translateY(4px); transition: opacity .22s ease, transform .22s ease }
+  .C-line{ white-space:pre-wrap; }
   .C-line.prompt{ color:#E8E3D3 }
   .C-line.prompt .p{ color:var(--accent); font-weight:600; margin-right:8px }
   .C-line.prompt .cmd{ color:#fff; font-weight:500 }
@@ -503,11 +503,7 @@
   .C-line.banner{ color:#7fb27a; padding: 4px 0 2px }
   .C-cursor{display:inline-block; width:.55em; height:1em; background:var(--accent); vertical-align:text-bottom; animation: blink 1.05s steps(1) infinite; margin-left:2px}
   @keyframes blink{ 50%{opacity:0} }
-
-  .C-term.lit .C-line{ opacity:1; transform:none }
-  @media (prefers-reduced-motion: reduce){ .C-term .C-line{ opacity:1; transform:none; transition:none } }
 </style>
-<noscript><style>.C-term .C-line{opacity:1;transform:none}</style></noscript>
 <style>
 
   .C-sig{ display:grid; grid-template-columns: auto 1fr auto; gap:24px; align-items:center; padding:16px 0; border-top:1px solid var(--rule); border-bottom:1px solid var(--rule); margin-top: 12px }
@@ -541,7 +537,7 @@
       <a href="/status">Status</a>
       <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
     </nav>
-    <div>standalone · OpenCastor optional</div>
+    <div>RCAN & RRF required · OpenCastor optional</div>
   </div>
 </div>
 
@@ -553,8 +549,8 @@
     <span>APRIL 18, 2026</span>
   </div>
   <h1 class="C-head">
-    A robot should <em>introduce itself</em> to the agent.<br>
-    <b>ROBOT.md is how.</b>
+    Configure your robot for <em>Claude Code</em>.<br>
+    <b>One file. One robot.</b>
   </h1>
 
   <div class="C-term" id="termC">
@@ -580,7 +576,7 @@
 
       <div class="C-line phase"><span class="n">[3/5]</span>install MCP server into Claude Code <span style="color:#5a574f">· tty detected</span></div>
       <div class="C-line out"><span class="mute">→</span> <span class="k">claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"</span></div>
-      <div class="C-line out"><span class="mute">→</span> 6 resources · 6 tools <span class="mute">(validate, render, estop, estop_clear, execute_capability, execute_task)</span> · 4 prompts ... <span class="ok">ok</span></div>
+      <div class="C-line out"><span class="mute">→</span> 6 resources · 3 tools <span class="mute">(validate, render, doctor_summary)</span> · 4 prompts ... <span class="ok">ok</span></div>
 
       <div class="C-line phase"><span class="n">[4/5]</span>install <span class="v">using-robot-md</span> skill</div>
       <div class="C-line out"><span class="mute">→</span> copy → <span class="v">~/.claude/skills/using-robot-md/SKILL.md</span> ....... <span class="ok">ok</span></div>
@@ -604,7 +600,7 @@
   <div class="C-sig">
     <div class="nm">ROBOT<span class="dot">.</span><span class="md">md</span></div>
     <div class="sub">
-      <b>v0.6.3 · one command → actuatable robot.</b> Manifest, MCP server, skill, calibration, and an auto-solved <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">ready</code> pose — all from <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">robot-md init</code>. Then <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">arm.pick(target)</code> closes the loop: descriptor → vision → IK → motion. Headless? same command, <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">--non-interactive</code>.
+      <b>v0.6.3 · The CLAUDE.md and AGENTS.md for physical machines.</b> One command wires up a single robot to Claude Code via the <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">robot-md</code> MCP server. While purpose-built for Anthropic's surfaces, ROBOT.md is an open standard that any AI agent can use to understand and safely operate a robot.
     </div>
     <a class="more" href="#spec">How it works →</a>
   </div>
@@ -733,8 +729,8 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
     <div class="sec-head">
       <div class="sec-num">§ 02 — The stack</div>
       <div>
-        <h2 class="sec-title">Four layers. Each independent. Each composable.</h2>
-        <p class="sec-lede">Four independent standards. <b>ROBOT.md</b> declares what the robot <em>is</em>. <b>RCAN</b> is the signed wire protocol fleets <em>speak</em>. <b>Robot Registry Foundation (RRF)</b> is the neutral authority where robots <em>live</em>. <b>OpenCastor</b> is the visual agent-harness editor and swarm orchestrator — optional. Tier 0 runtime is Claude Code itself. Adopt one layer or all four.</p>
+        <h2 class="sec-title">Four layers. Built for Claude Code, powered by open standards.</h2>
+        <p class="sec-lede"><b>ROBOT.md</b> declares what the single robot <em>is</em> to Claude Code. To ensure safety and verifiable identity, it strictly requires two independent foundations: <b>RCAN</b> (the signed wire protocol) and the <b>Robot Registry Foundation (RRF)</b> (permanent identity). <b>OpenCastor</b> (visual editor) is optional. Tier 0 runtime is Claude Code itself.</p>
       </div>
     </div>
 
@@ -773,7 +769,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <article class="companion">
         <h5>Layer 3 · Wire protocol</h5>
         <h4>RCAN 3.0+ — Robot Communication &amp; Addressing Network</h4>
-        <p class="lede">An open protocol that lets robots, gateways, and planners exchange signed, authority‑aware messages without vendor coupling.</p>
+        <p class="lede">An open protocol that lets robots, gateways, and planners exchange signed, authority‑aware messages without vendor coupling. <b>A strict requirement for any valid ROBOT.md.</b></p>
         <ul>
           <li>Signed envelopes with <code>ML‑DSA‑65</code> primary + Ed25519 legacy (L1 only, sunset mid‑cycle).</li>
           <li>Level‑of‑Assurance ladder — every call is classified L0 / L1 / L2, enforced gateway‑side.</li>
@@ -787,7 +783,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <article class="companion">
         <h5>Layer 2 · Registry</h5>
         <h4>Robot Registry Foundation — permanent, neutral robot identity</h4>
-        <p class="lede">RRF issues an <b>RRN</b> (Robot Registration Number) the same way a VIN identifies a car — one robot, one number, forever.</p>
+        <p class="lede">RRF issues an <b>RRN</b> (Robot Registration Number) the same way a VIN identifies a car — one robot, one number, forever. <b>A strict requirement for any valid ROBOT.md.</b></p>
         <ul>
           <li>RRN format: <code>RRN‑000000000001</code> (12‑digit numeric) and <code>rrn://org/category/model/id</code> URI form.</li>
           <li>Public resolver at <code>rcan.dev/r/&lt;rrn&gt;</code> — returns the robot's ROBOT.md, its compliance block, its registry metadata.</li>
@@ -813,7 +809,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <div class="sec-num">§ 03 — Claude, three surfaces (and every other MCP‑aware harness)</div>
       <div>
         <h2 class="sec-title">Wherever the planner runs, the robot is legible.</h2>
-        <p class="sec-lede">A ROBOT.md is meant to be picked up by a planning LLM at the start of every session — from a developer's terminal, from a desktop chat, from a phone in the field. <em>Planner‑agnostic by design:</em> the same file, the same MCP server, works with Claude Code, Claude Desktop, OpenAI Codex CLI, Google Gemini CLI, Cursor, Zed, Cline, Continue.dev — anything that speaks MCP.</p>
+        <p class="sec-lede">A ROBOT.md is meant to be picked up by a planning LLM at the start of every session. <em>Purpose-built for Anthropic:</em> the same file, the same MCP server, works seamlessly with Claude Code, Claude Desktop, and Claude Mobile. <em>Flexible for everyone:</em> much like <code>CLAUDE.md</code> and <code>AGENTS.md</code>, any AI agent or planner (OpenAI, Gemini, Cursor, Cline) can consume this format to operate a robot safely.</p>
       </div>
     </div>
 
@@ -892,7 +888,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <tbody>
         <tr><td><code>rcan_version</code></td><td>string</td><td><span class="req yes">✓</span></td><td>RCAN wire-protocol version — <code>"3.0"</code> covers the 3.x line. 2.1+ accepted; 1.x rejected for EU AI Act gap. See <a href="https://rcan.dev/spec/">rcan.dev/spec</a>.</td></tr>
         <tr><td><code>metadata.robot_name</code></td><td>string</td><td><span class="req yes">✓</span></td><td>Short display name. Must match the body H1. Used in every planner citation.</td></tr>
-        <tr><td><code>metadata.rrn</code></td><td>string</td><td><span class="req rec">★</span></td><td>RRF-assigned identifier (e.g. <code>RRN-000000000001</code>). Empty until <code>robot-md register</code> mints one. Resolves via <code>rcan.dev/r/&lt;rrn&gt;</code>.</td></tr>
+        <tr><td><code>metadata.rrn</code></td><td>string</td><td><span class="req yes">✓</span></td><td>RRF-assigned identifier (e.g. <code>RRN-000000000001</code>). Empty until <code>robot-md register</code> mints one. Resolves via <code>rcan.dev/r/&lt;rrn&gt;</code>.</td></tr>
         <tr><td><code>metadata.rrn_uri</code></td><td>string</td><td><span class="req opt">—</span></td><td>Optional URI form: <code>rrn://&lt;org&gt;/&lt;category&gt;/&lt;model&gt;/&lt;id&gt;</code> — dereferenceable by any RCAN-aware client.</td></tr>
         <tr><td><code>physics.type</code></td><td>enum</td><td><span class="req yes">✓</span></td><td><code>arm</code> · <code>wheeled</code> · <code>tracked</code> · <code>legged</code> · <code>arm+camera</code> · <code>humanoid</code> · <code>sensor</code> · <code>other</code></td></tr>
         <tr><td><code>physics.dof</code></td><td>int</td><td><span class="req yes">✓</span></td><td>Degrees of freedom. <code>0</code> permitted for purely sensory nodes.</td></tr>
@@ -903,9 +899,9 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <tr><td><code>safety.estop</code></td><td>map</td><td><span class="req yes">✓</span></td><td>At minimum: <code>software: true</code> + <code>response_ms</code>. Hardware button recommended for Annex III systems.</td></tr>
         <tr><td><code>safety.hitl_gates</code></td><td>array</td><td><span class="req rec">★</span></td><td>Scopes (<code>destructive</code>, <code>system</code>, …) that require human authorization via RCAN §8 <code>AUTHORIZE</code>.</td></tr>
         <tr><td><code>brain</code></td><td>map</td><td><span class="req rec">★</span></td><td>Planner + reactive model declaration. Task‑routing overrides. Required if the robot uses an LLM in the loop.</td></tr>
-        <tr><td><code>network.rrf_endpoint</code></td><td>string</td><td><span class="req rec">★</span></td><td>RRF resolver — defaults to <code>https://robotregistryfoundation.org</code>. Serves the signed manifest at <code>/r/&lt;rrn&gt;</code> and FRIA at <code>/api/v1/robots/&lt;rrn&gt;/fria</code>.</td></tr>
-        <tr><td><code>network.signing_alg</code></td><td>string</td><td><span class="req rec">★</span></td><td>RCAN 3.0 primary: <code>ml-dsa-65</code> (PQC). <code>ed25519</code> accepted at Level-of-Assurance 1 only; sunset mid-3.x.</td></tr>
-        <tr><td><code>compliance</code></td><td>map</td><td><span class="req rec">★</span></td><td>FRIA URI, ISO 42001 self‑assessment, EU AI Act audit retention. Required for EU deployments.</td></tr>
+        <tr><td><code>network.rrf_endpoint</code></td><td>string</td><td><span class="req yes">✓</span></td><td>RRF resolver — defaults to <code>https://robotregistryfoundation.org</code>. Serves the signed manifest at <code>/r/&lt;rrn&gt;</code> and FRIA at <code>/api/v1/robots/&lt;rrn&gt;/fria</code>.</td></tr>
+        <tr><td><code>network.signing_alg</code></td><td>string</td><td><span class="req yes">✓</span></td><td>RCAN 3.0 primary: <code>ml-dsa-65</code> (PQC). <code>ed25519</code> accepted at Level-of-Assurance 1 only; sunset mid-3.x.</td></tr>
+        <tr><td><code>compliance</code></td><td>map</td><td><span class="req yes">✓</span></td><td>FRIA URI, ISO 42001 self‑assessment, EU AI Act audit retention. Required for EU deployments.</td></tr>
         <tr><td><code>extensions.x-*</code></td><td>map</td><td><span class="req opt">—</span></td><td>Vendor‑specific. Unknown <code>x-*</code> keys must NOT fail validation.</td></tr>
       </tbody>
     </table>
@@ -1063,8 +1059,8 @@ pick up the red lego and place it in the bowl
     <div class="sec-head">
       <div class="sec-num">§ 06 — The rest of the ecosystem</div>
       <div>
-        <h2 class="sec-title">Four standards. Separate roles. Adopt à la carte.</h2>
-        <p class="sec-lede">ROBOT.md stands alone — Claude Code reads it directly, no OpenCastor required. Three siblings extend it: <b>RCAN</b> (the signed wire protocol fleets speak), the <b>Robot Registry Foundation</b> (permanent identity, neutral authority), and <b>OpenCastor</b> (visual agent-harness editor + swarm orchestration). Mix and match.</p>
+        <h2 class="sec-title">Four standards. Separate roles.</h2>
+        <p class="sec-lede">ROBOT.md is designed to configure Claude Code to control a single robot. To ensure safety and verifiable identity, it depends on two independent foundations: <b>RCAN</b> (the signed wire protocol) and the <b>Robot Registry Foundation</b> (permanent identity). <b>OpenCastor</b> (visual agent-harness editor + swarm orchestration) is completely optional.</p>
       </div>
     </div>
 
@@ -1104,27 +1100,7 @@ pick up the red lego and place it in the bowl
   <div>robotmd.dev · robot-md 0.6.3 · robot-md-mcp 0.2.1 · built 2026‑04‑20</div>
 </footer>
 
-<script>
-  // Terminal hero reveal: JS-driven per-line stagger so phase headers,
-  // prompts, and asks get distinct beats (vs. an even tick-tick-tick).
-  (function(){
-    var term = document.getElementById('termC');
-    if (!term) return;
-    var lines = term.querySelectorAll('.C-line');
-    var t = 50;
-    lines.forEach(function(el){
-      el.style.transitionDelay = t + 'ms';
-      if (el.classList.contains('phase'))       t += 420;
-      else if (el.classList.contains('prompt')) t += 520;
-      else if (el.classList.contains('ask'))    t += 380;
-      else if (el.classList.contains('banner')) t += 300;
-      else                                      t += 260;
-    });
-    // Reveal immediately so the terminal never renders empty, even if an
-    // observer never fires (e.g. element already in viewport on load).
-    requestAnimationFrame(function(){ term.classList.add('lit'); });
-  })();
-</script>
+
 
 </body>
 </html>
