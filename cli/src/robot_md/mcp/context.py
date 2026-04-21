@@ -74,6 +74,13 @@ class _PublisherFanoutWrapper:
         self._ctx = ctx
         self._inner = inner
 
+    def __getattr__(self, name: str) -> Any:
+        # Forward any non-overridden attribute (e.g. `stop`, `jsonl_path`,
+        # `ws_port`) to the wrapped publisher so callers that pre-date the
+        # wrapper don't break. Only `publish` is intercepted for stamping
+        # and fan-out; everything else passes through transparently.
+        return getattr(self._inner, name)
+
     def publish(self, kind: str, data: dict) -> None:
         # Copy to avoid mutating the caller's dict; stamp manifest_path.
         stamped = dict(data)

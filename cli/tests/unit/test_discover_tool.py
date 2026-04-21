@@ -32,33 +32,33 @@ def _ctx_with_two_descriptors():
     return ctx
 
 
-def test_discover_empty_steps():
+async def test_discover_empty_steps():
     ctx = _ctx_with_two_descriptors()
-    r = discover_tool(ctx, steps=[])
+    r = await discover_tool(ctx, steps=[])
     assert r["status"] == "ok"
     assert r["results"] == {}
 
 
-def test_discover_capture_step():
+async def test_discover_capture_step():
     ctx = _ctx_with_two_descriptors()
-    r = discover_tool(ctx, steps=[{"capture": {}}])
+    r = await discover_tool(ctx, steps=[{"capture": {}}])
     assert r["status"] == "ok"
     assert r["results"]["capture"]["status"] == "ok"
     # Shape available in the result (h, w, 3).
     assert r["results"]["capture"]["shape"] == [200, 300, 3]
 
 
-def test_discover_capture_no_backend():
+async def test_discover_capture_no_backend():
     ctx = MagicMock()
     ctx.backend = None
-    r = discover_tool(ctx, steps=[{"capture": {}}])
+    r = await discover_tool(ctx, steps=[{"capture": {}}])
     assert r["status"] == "ok"
     assert r["results"]["capture"]["status"] == "no_frame"
 
 
-def test_discover_detect_finds_both():
+async def test_discover_detect_finds_both():
     ctx = _ctx_with_two_descriptors()
-    r = discover_tool(ctx, steps=[
+    r = await discover_tool(ctx, steps=[
         {"capture": {}},
         {"detect": {"descriptors": ["red_lego", "white_bowl"]}},
     ])
@@ -70,36 +70,36 @@ def test_discover_detect_finds_both():
     assert det["white_bowl"]["pixel"][0] < 150  # left side
 
 
-def test_discover_detect_without_capture_auto_captures():
+async def test_discover_detect_without_capture_auto_captures():
     """If detect is called without prior capture, it auto-captures."""
     ctx = _ctx_with_two_descriptors()
-    r = discover_tool(ctx, steps=[{"detect": {"descriptors": ["red_lego"]}}])
+    r = await discover_tool(ctx, steps=[{"detect": {"descriptors": ["red_lego"]}}])
     assert r["results"]["detect"]["red_lego"]["status"] == "ok"
 
 
-def test_discover_unknown_descriptor_reported_not_raised():
+async def test_discover_unknown_descriptor_reported_not_raised():
     ctx = _ctx_with_two_descriptors()
-    r = discover_tool(ctx, steps=[{"detect": {"descriptors": ["nonsense"]}}])
+    r = await discover_tool(ctx, steps=[{"detect": {"descriptors": ["nonsense"]}}])
     assert r["status"] == "ok"  # discovery never raises on per-item failure
     assert r["results"]["detect"]["nonsense"]["status"] == "unknown_descriptor"
 
 
-def test_discover_unknown_step_kind_reported():
+async def test_discover_unknown_step_kind_reported():
     ctx = _ctx_with_two_descriptors()
-    r = discover_tool(ctx, steps=[{"teleport": {"to": "mars"}}])
+    r = await discover_tool(ctx, steps=[{"teleport": {"to": "mars"}}])
     assert r["status"] == "ok"
     assert r["results"]["teleport"]["status"] == "unknown_step"
 
 
-def test_discover_malformed_step_skipped():
+async def test_discover_malformed_step_skipped():
     """A step with zero keys or multiple keys is silently skipped."""
     ctx = _ctx_with_two_descriptors()
-    r = discover_tool(ctx, steps=[{}, {"a": {}, "b": {}}])
+    r = await discover_tool(ctx, steps=[{}, {"a": {}, "b": {}}])
     assert r["status"] == "ok"
     assert r["results"] == {}
 
 
-def test_discover_probe_direction_reports_shift():
+async def test_discover_probe_direction_reports_shift():
     """Move 30 steps; white bar shifts from u=150 to u=180 (right) → positive direction."""
     import cv2
     import numpy as np
@@ -133,7 +133,7 @@ def test_discover_probe_direction_reports_shift():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     pd = r["results"]["probe_direction"]
     assert pd["status"] == "ok"
     assert pd["joint"] == "shoulder_pan"
@@ -144,16 +144,16 @@ def test_discover_probe_direction_reports_shift():
     assert 0.5 < pd["px_per_step"] < 2.0
 
 
-def test_discover_probe_direction_no_hardware():
+async def test_discover_probe_direction_no_hardware():
     """Missing backend/bus/perception → no_hardware status."""
     ctx = MagicMock()
     ctx.backend = None
     from robot_md.mcp.tools.discover import discover_tool
-    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     assert r["results"]["probe_direction"]["status"] == "no_hardware"
 
 
-def test_discover_probe_direction_no_motion_detected():
+async def test_discover_probe_direction_no_motion_detected():
     """Identical before/after frames → no_motion_detected (not a crash)."""
     import cv2
     import numpy as np
@@ -182,11 +182,11 @@ def test_discover_probe_direction_no_motion_detected():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     assert r["results"]["probe_direction"]["status"] == "no_motion_detected"
 
 
-def test_discover_probe_direction_returns_bus_to_start():
+async def test_discover_probe_direction_returns_bus_to_start():
     """After probe, the bus must be commanded back to the original position."""
     import cv2
     import numpy as np
@@ -221,13 +221,13 @@ def test_discover_probe_direction_returns_bus_to_start():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     # Last write should be the starting positions (return-home).
     assert bus.written[-1]["shoulder_pan"] == 2048
     assert bus.written[-1]["gripper"] == 1700
 
 
-def test_discover_probe_direction_empty_read_returns_no_position_read():
+async def test_discover_probe_direction_empty_read_returns_no_position_read():
     """Bus returns {} → status=no_position_read; NO write before restore."""
     import cv2
     import numpy as np
@@ -257,13 +257,13 @@ def test_discover_probe_direction_empty_read_returns_no_position_read():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     assert r["results"]["probe_direction"]["status"] == "no_position_read"
     # Critical: no write should have happened.
     assert bus.written == []
 
 
-def test_discover_probe_direction_partial_read_no_joint_returns_no_position_read():
+async def test_discover_probe_direction_partial_read_no_joint_returns_no_position_read():
     """Bus returns partial dict without the probed joint → no_position_read."""
     import cv2
     import numpy as np
@@ -293,12 +293,12 @@ def test_discover_probe_direction_partial_read_no_joint_returns_no_position_read
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     assert r["results"]["probe_direction"]["status"] == "no_position_read"
     assert bus.written == []
 
 
-def test_discover_probe_direction_torque_raise_does_not_escape():
+async def test_discover_probe_direction_torque_raise_does_not_escape():
     """Any bus exception converts to a status, not a raise."""
     import cv2
     import numpy as np
@@ -325,13 +325,13 @@ def test_discover_probe_direction_torque_raise_does_not_escape():
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     # Must not raise. Status is a failure marker.
     pd = r["results"]["probe_direction"]
     assert pd["status"] in ("bus_error", "no_frame_after")
 
 
-def test_discover_probe_direction_px_shift_is_centroid_diff_not_width_times_two():
+async def test_discover_probe_direction_px_shift_is_centroid_diff_not_width_times_two():
     """A 100px-wide bar shifted 30px must report ~30, not ~65 (bar_width + shift bug)."""
     import cv2
     import numpy as np
@@ -366,7 +366,7 @@ def test_discover_probe_direction_px_shift_is_centroid_diff_not_width_times_two(
     ctx.backend = backend
 
     from robot_md.mcp.tools.discover import discover_tool
-    r = discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
+    r = await discover_tool(ctx, steps=[{"probe_direction": {"joint": "shoulder_pan", "delta": 30}}])
     pd = r["results"]["probe_direction"]
     assert pd["status"] == "ok"
     # With the correct centroid-diff formula, px_shift ≈ 30. With the old
