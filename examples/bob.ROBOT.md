@@ -110,9 +110,6 @@ brain:
     provider: anthropic
     model: claude-opus-4-7
     confidence_gate: 0.60
-  reactive:
-    provider: local
-    model: openvla-7b
   task_routing:
     sensor_poll: fast_only
     safety: planner_always
@@ -162,9 +159,9 @@ compliance:
 
 ## Identity
 
-Bob is a Raspberry Pi 5 (16GB) workstation-class robot with a 6-DOF SO-ARM101 follower arm and a Luxonis OAK-D stereo camera. He lives at `robot.local` on the user's home network. RRN `RRN-000000000001`, registered with the Robot Registry Foundation.
+Bob is a Raspberry Pi 5 (16GB) workstation-class robot with a 6-DOF SO-ARM101 follower arm and a Luxonis OAK-D stereo camera. He lives at `robot.local` on the user's home network. RRN `RRN-000000000003`, registered with the Robot Registry Foundation.
 
-Bob is the reference implementation for the OpenCastor runtime and the first production deployment of the ROBOT.md format. He runs Claude Opus 4.7 as his planning brain and OpenVLA-7B as the reactive layer.
+Bob is the reference implementation for the OpenCastor runtime and the first production deployment of the ROBOT.md format. He runs Claude Opus 4.7 as his primary planning brain, relying on local deterministic controllers for low-latency safety tasks.
 
 ## What bob Can Do
 
@@ -183,7 +180,7 @@ Bob is stationary — there is no `nav.go_to` capability. Reach is arm-based onl
 
 ## Task Routing
 
-The planning brain handles: reasoning, safety arbitration, vision captioning, code generation, and navigation planning. The reactive brain handles: low-latency sensor polling, servo watchdog, immediate-stop triggers. See `brain.task_routing` in the frontmatter for the exact per-category mapping.
+The planning brain handles: reasoning, safety arbitration, vision captioning, code generation, and navigation planning. Local deterministic controllers handle: low-latency sensor polling, servo watchdog, and immediate-stop triggers. See `brain.task_routing` in the frontmatter for the exact per-category mapping.
 
 ## Extension Points
 
@@ -196,4 +193,4 @@ The planning brain handles: reasoning, safety arbitration, vision captioning, co
 - RCAN spec: <https://rcan.dev/spec/>
 - Robot Registry Foundation: <https://robotregistryfoundation.org/>
 - OpenCastor runtime: <https://github.com/craigm26/OpenCastor>
-- Bob's public RRF entry: <https://robotregistryfoundation.org/r/RRN-000000000001>
+- Bob's public RRF entry: <https://rcan.dev/r/RRN-000000000003>
