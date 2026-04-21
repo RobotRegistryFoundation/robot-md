@@ -10,7 +10,7 @@ class _StubMcpContext:
     def __init__(self):
         self.progress_calls: list[tuple[int, int, str]] = []
 
-    def report_progress(self, progress, total, message=None):
+    async def report_progress(self, progress, total, message=None):
         self.progress_calls.append((progress, total, message))
 
 
@@ -26,11 +26,11 @@ def _ctx_no_backend():
     return SimpleNamespace(backend=None, publisher=_FakePublisher())
 
 
-def test_discover_calls_report_progress_once_per_step():
+async def test_discover_calls_report_progress_once_per_step():
     ctx = _ctx_no_backend()
     mcp = _StubMcpContext()
     steps = [{"capture": {}}, {"detect": {"descriptors": []}}]
-    discover_tool(ctx, steps=steps, mcp_ctx=mcp)
+    await discover_tool(ctx, steps=steps, mcp_ctx=mcp)
     assert len(mcp.progress_calls) == 2
     assert mcp.progress_calls[0][0] == 0
     assert mcp.progress_calls[0][1] == 2
@@ -38,10 +38,10 @@ def test_discover_calls_report_progress_once_per_step():
     assert mcp.progress_calls[1][2] == "detect"
 
 
-def test_discover_publishes_step_begin_and_end_events():
+async def test_discover_publishes_step_begin_and_end_events():
     ctx = _ctx_no_backend()
     steps = [{"capture": {}}]
-    discover_tool(ctx, steps=steps, mcp_ctx=None)
+    await discover_tool(ctx, steps=steps, mcp_ctx=None)
     kinds = [e[0] for e in ctx.publisher.events]
     assert kinds == ["discover.step.begin", "discover.step.end"]
     begin_data = ctx.publisher.events[0][1]
@@ -53,34 +53,34 @@ def test_discover_publishes_step_begin_and_end_events():
     assert "status" in end_data
 
 
-def test_discover_works_when_mcp_ctx_is_none():
+async def test_discover_works_when_mcp_ctx_is_none():
     """No FastMCP Context (direct call, tests) → report_progress skipped,
     JSONL events still fire."""
     ctx = _ctx_no_backend()
-    out = discover_tool(ctx, steps=[{"capture": {}}], mcp_ctx=None)
+    out = await discover_tool(ctx, steps=[{"capture": {}}], mcp_ctx=None)
     assert out["status"] == "ok"
     assert any(e[0] == "discover.step.begin" for e in ctx.publisher.events)
 
 
-def test_discover_swallows_report_progress_exceptions():
+async def test_discover_swallows_report_progress_exceptions():
     ctx = _ctx_no_backend()
 
     class _Broken:
-        def report_progress(self, *a, **kw):
+        async def report_progress(self, *a, **kw):
             raise RuntimeError("boom")
 
-    out = discover_tool(ctx, steps=[{"capture": {}}], mcp_ctx=_Broken())
+    out = await discover_tool(ctx, steps=[{"capture": {}}], mcp_ctx=_Broken())
     assert out["status"] == "ok"
 
 
-def test_discover_no_publisher_does_not_crash():
+async def test_discover_no_publisher_does_not_crash():
     """Observability is best-effort — ctx without a publisher still works."""
     ctx = SimpleNamespace(backend=None, publisher=None)
-    out = discover_tool(ctx, steps=[{"capture": {}}], mcp_ctx=None)
+    out = await discover_tool(ctx, steps=[{"capture": {}}], mcp_ctx=None)
     assert out["status"] == "ok"
 
 
-def test_discover_malformed_step_still_counted_for_progress():
+async def test_discover_malformed_step_still_counted_for_progress():
     """A step with >1 key is skipped by the dispatcher but still counts
     toward total/report_progress — otherwise progress drifts."""
     ctx = _ctx_no_backend()
@@ -88,6 +88,6 @@ def test_discover_malformed_step_still_counted_for_progress():
     # A malformed step (not a dict-with-single-key) is silently skipped per
     # the existing v0.7 contract; streaming must not crash on it.
     steps = [{"capture": {}}, "not a dict", {"detect": {"descriptors": []}}]
-    discover_tool(ctx, steps=steps, mcp_ctx=mcp)
+    await discover_tool(ctx, steps=steps, mcp_ctx=mcp)
     # Two valid steps → two progress calls (indices 0 and 2).
     assert [(p[0], p[2]) for p in mcp.progress_calls] == [(0, "capture"), (2, "detect")]

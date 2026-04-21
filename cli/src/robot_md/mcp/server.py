@@ -106,7 +106,7 @@ def build_server(ctx: McpContext):
         )
 
     @server.tool()
-    def discover(steps: list[dict], mcp_ctx: Context | None = None) -> dict:
+    async def discover(steps: list[dict], mcp_ctx: Context | None = None) -> dict:
         """Run the declarative discovery pipeline.
 
         Supported steps: capture, detect, probe_direction. See
@@ -117,7 +117,7 @@ def build_server(ctx: McpContext):
         """
         from robot_md.mcp.tools.discover import discover_tool
 
-        return discover_tool(ctx, steps=steps, mcp_ctx=mcp_ctx)
+        return await discover_tool(ctx, steps=steps, mcp_ctx=mcp_ctx)
 
     from robot_md.mcp.resources import _sanitize_robot_name
 

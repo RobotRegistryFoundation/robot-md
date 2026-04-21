@@ -16,7 +16,7 @@ from typing import Any
 from robot_md.detectors.hsv import DETECTORS
 
 
-def discover_tool(
+async def discover_tool(
     ctx: Any,
     *,
     steps: list[dict],
@@ -31,7 +31,7 @@ def discover_tool(
         (name, payload) = next(iter(step.items()))
 
         _publish_step(ctx, "begin", name, i, total)
-        _report_progress(mcp_ctx, i, total, name)
+        await _report_progress(mcp_ctx, i, total, name)
 
         if name == "capture":
             frame = _do_capture(ctx)
@@ -53,11 +53,11 @@ def discover_tool(
     return {"status": "ok", "results": results}
 
 
-def _report_progress(mcp_ctx: Any | None, i: int, total: int, name: str) -> None:
+async def _report_progress(mcp_ctx: Any | None, i: int, total: int, name: str) -> None:
     if mcp_ctx is None:
         return
     try:
-        mcp_ctx.report_progress(i, total, name)
+        await mcp_ctx.report_progress(i, total, name)
     except Exception:
         # Best-effort — a broken progress channel must never abort a step.
         pass
