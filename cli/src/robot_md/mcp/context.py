@@ -190,7 +190,16 @@ def load_context(manifest_path: Path) -> McpContext:
         events_dir.mkdir(parents=True, exist_ok=True)
         ctx.publisher = EventPublisher(jsonl_path=events_dir / "events.jsonl")
         ctx.publisher.start()
+        _install_publisher_fanout(ctx)
         ctx._command_watcher = _start_command_watcher(ctx, events_dir / "commands.jsonl")
+
+        # Backfill the InvocationLog from the prior JSONL content for this
+        # manifest only. Never raises — missing/malformed file yields empty.
+        ctx.invocation_log.backfill_from_jsonl(
+            events_dir / "events.jsonl",
+            manifest_path=str(manifest_path),
+            n=100,
+        )
 
     return ctx
 

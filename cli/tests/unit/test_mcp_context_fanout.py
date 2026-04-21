@@ -171,3 +171,60 @@ def test_pending_calls_expire_after_ttl(tmp_path: Path, monkeypatch):
     )
     assert "orphan" not in ctx._pending_calls
     assert "fresh" in ctx._pending_calls
+
+
+def test_load_context_wires_fanout_and_backfills(tmp_path: Path, monkeypatch):
+    """load_context must install the fanout wrapper AND backfill the log
+    from ~/.robot-md/events.jsonl for this manifest."""
+    import json as _json
+
+    # Steer the publisher to a temp HOME so events.jsonl is isolated.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # Disable the WS port to avoid port binding during unit tests.
+    monkeypatch.setenv("ROBOT_MD_DASHBOARD_DISABLED", "0")
+
+    events_dir = tmp_path / ".robot-md"
+    events_dir.mkdir()
+    events_path = events_dir / "events.jsonl"
+
+    # Build a fixture manifest path that matches what we'll stamp in the JSONL.
+    # We use a valid fixture manifest from the repo.
+    from pathlib import Path as _P
+
+    fix = _P(__file__).parent.parent / "fixtures" / "robot_md_oak_d_factory_cal.yaml"
+    manifest_path_str = str(fix)
+
+    # Pre-seed events.jsonl with a paired invocation for this manifest.
+    call = {
+        "kind": "tool.call", "ts": 1.0,
+        "data": {
+            "tool": "execute_capability", "capability": "arm.pick",
+            "args": {}, "request_id": "pre_r1", "manifest_path": manifest_path_str,
+        },
+    }
+    result = {
+        "kind": "tool.result", "ts": 2.0,
+        "data": {
+            "tool": "execute_capability", "capability": "arm.pick",
+            "status": "ok", "request_id": "pre_r1", "manifest_path": manifest_path_str,
+        },
+    }
+    with events_path.open("w") as f:
+        f.write(_json.dumps(call) + "\n")
+        f.write(_json.dumps(result) + "\n")
+
+    from robot_md.mcp.context import load_context, _PublisherFanoutWrapper
+
+    ctx = load_context(fix)
+    try:
+        # Fanout installed.
+        assert isinstance(ctx.publisher, _PublisherFanoutWrapper)
+
+        # Backfill replayed the pre-seeded pair.
+        snap = ctx.invocation_log.snapshot()
+        assert any(s["request_id"] == "pre_r1" for s in snap)
+    finally:
+        if ctx.publisher is not None:
+            inner = getattr(ctx.publisher, "_inner", None)
+            if inner is not None and hasattr(inner, "stop"):
+                inner.stop()
