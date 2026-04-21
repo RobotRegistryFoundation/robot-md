@@ -107,6 +107,14 @@ async def test_discover_then_vision_find_then_execute(tmp_path):
 # --------------------------------------------------------------------------- #
 
 
+@pytest.mark.xfail(
+    reason="Hardcoded xyz_cam_mm=(0,0,340) with so-arm101 preset default extrinsic "
+    "maps to base-frame (211, 0, 17) which needs wrist_flex=+104° outside the "
+    "[-90, +90] joint limit. Reproduces at v0.7.3 too — pre-dates v0.8 and is "
+    "tracked for a future rewrite that picks a reachable target or uses a "
+    "calibrated (not preset-default) extrinsic.",
+    strict=True,
+)
 def test_v061_pipeline_end_to_end(tmp_path: Path):
     """End-to-end: robot-md init + arm.pick("red_lego") dry-run succeeds.
 
