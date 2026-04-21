@@ -82,8 +82,14 @@ class _PublisherFanoutWrapper:
         # Fan out paired tool.call / tool.result into the invocation log
         # before forwarding — the JSONL write is what other consumers see
         # anyway, so ordering between log append and JSONL write does not
-        # matter for correctness.
-        self._maybe_pair_and_log(kind, stamped)
+        # matter for correctness. Fan-out failures must never block the
+        # JSONL write: a dashboard event is more important than a ring
+        # bookkeeping slot.
+        try:
+            self._maybe_pair_and_log(kind, stamped)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("fanout: log append failed")
         self._inner.publish(kind, stamped)
 
     def _maybe_pair_and_log(self, kind: str, data: dict) -> None:

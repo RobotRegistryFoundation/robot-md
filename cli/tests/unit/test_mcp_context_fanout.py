@@ -117,3 +117,57 @@ def test_precondition_failure_carries_structured_preconditions(tmp_path: Path):
     snap = ctx.invocation_log.snapshot()
     assert snap[0]["reason"] == "precondition"
     assert snap[0]["preconditions"][0]["suggested_fix"] == "robot-md calibrate --hand-eye"
+
+
+def test_install_fanout_is_idempotent(tmp_path: Path):
+    """Calling _install_publisher_fanout twice must not double-wrap."""
+    from robot_md.mcp.context import _PublisherFanoutWrapper
+
+    ctx = _fresh_ctx(tmp_path)
+    # _fresh_ctx already installed the fanout once — wrapper is in place.
+    assert isinstance(ctx.publisher, _PublisherFanoutWrapper)
+    inner_before = ctx.publisher._inner
+
+    _install_publisher_fanout(ctx)  # second install
+    assert isinstance(ctx.publisher, _PublisherFanoutWrapper)
+    # Same inner — no wrapper-of-wrapper.
+    assert ctx.publisher._inner is inner_before
+
+
+def test_install_fanout_with_none_publisher_is_noop(tmp_path: Path):
+    """When ctx.publisher is None (dashboard disabled), install is a no-op."""
+    manifest = tmp_path / "M.md"
+    manifest.write_text("")
+    ctx = McpContext(manifest_path=manifest, parsed=None)
+    ctx.publisher = None
+
+    _install_publisher_fanout(ctx)
+    assert ctx.publisher is None  # still None, no wrapper constructed
+
+
+def test_pending_calls_expire_after_ttl(tmp_path: Path, monkeypatch):
+    """A tool.call with no matching result older than _PENDING_TTL_S is
+    swept on the next call."""
+    from robot_md.mcp import context as ctx_mod
+
+    ctx = _fresh_ctx(tmp_path)
+    # Freeze time at t0 for the orphan call.
+    times = [1000.0]
+    monkeypatch.setattr(ctx_mod.time, "time", lambda: times[0])
+
+    ctx.publisher.publish(
+        "tool.call",
+        {"tool": "execute_capability", "capability": "arm.pick", "args": {}, "request_id": "orphan"},
+    )
+    assert "orphan" in ctx._pending_calls  # parked
+
+    # Jump forward past the TTL.
+    times[0] = 1000.0 + ctx_mod._PENDING_TTL_S + 1.0
+
+    # A new call at t1 triggers the sweep inside _maybe_pair_and_log.
+    ctx.publisher.publish(
+        "tool.call",
+        {"tool": "execute_capability", "capability": "arm.place", "args": {}, "request_id": "fresh"},
+    )
+    assert "orphan" not in ctx._pending_calls
+    assert "fresh" in ctx._pending_calls
