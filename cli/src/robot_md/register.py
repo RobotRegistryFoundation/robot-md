@@ -42,12 +42,15 @@ from robot_md.ruri import construct_ruri
 from robot_md.signing import generate_keypair, save_keypair, sign_body
 
 DEFAULT_ENDPOINT = "https://rcan.dev/api/v2/robots/register"
-KEYSTORE_DIR = Path.home() / ".robot-md" / "keys"
+
+
+def _keystore_dir() -> Path:
+    return Path.home() / ".robot-md" / "keys"
 
 
 def load_apikey(rrn: str) -> str | None:
     """Return the stored API key for `rrn`, or None if no keystore file."""
-    p = KEYSTORE_DIR / f"{rrn}.apikey"
+    p = _keystore_dir() / f"{rrn}.apikey"
     if not p.exists():
         return None
     return p.read_text().strip() or None
@@ -107,7 +110,7 @@ def cli_unregister(
         print(f"error: {e}", file=sys.stderr)
         return 3
     # Clean up local key file (no longer valid)
-    key_path = KEYSTORE_DIR / f"{rrn}.apikey"
+    key_path = _keystore_dir() / f"{rrn}.apikey"
     if key_path.exists() and api_key is None:
         # Only delete the file if we used the stored one
         key_path.unlink()
@@ -305,14 +308,21 @@ def write_rrn_to_manifest(manifest_path: Path, rrn: str, record_url: str) -> Non
 
 
 def _write_apikey(rrn: str, api_key: str) -> Path:
-    """Persist RRF-issued API key at ~/.robot-md/keys/<rrn>.apikey (mode 600)."""
-    keystore = Path.home() / ".robot-md" / "keys"
+    """Persist RRF-issued API key at ~/.robot-md/keys/<rrn>.apikey (mode 600).
+
+    Atomic via tmp-then-rename + mode-set-before-rename: a SIGTERM mid-write
+    leaves either no file or a fully-mode-600 file, never a world-readable
+    half-written one.
+    """
+    keystore = _keystore_dir()
     keystore.mkdir(parents=True, exist_ok=True)
     with suppress(OSError):
         os.chmod(keystore, 0o700)
     path = keystore / f"{rrn}.apikey"
-    path.write_text(api_key)
-    os.chmod(path, 0o600)
+    tmp = path.with_suffix(".apikey.tmp")
+    tmp.write_text(api_key)
+    os.chmod(tmp, 0o600)
+    tmp.replace(path)
     return path
 
 
