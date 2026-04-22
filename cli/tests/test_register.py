@@ -217,3 +217,57 @@ def test_post_to_rrf_success_parses_mint_result(monkeypatch):
     assert result.rrn == "RRN-000000000099"
     assert result.record_url.endswith("/RRN-000000000099")
     assert result.raw["api_key"] == "secret-xyz"
+
+
+# ---- auto_mint_if_needed (v0.9.1 PATCH flow) ---------------------------
+
+
+def test_auto_mint_noop_when_keystore_has_signing_key(tmp_path, monkeypatch):
+    from robot_md.register import auto_mint_if_needed
+    from robot_md.signing import generate_keypair, save_keypair
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    save_keypair("RRN-000000000099", generate_keypair())
+
+    with patch("robot_md.register.patch_rrf") as p:
+        auto_mint_if_needed("RRN-000000000099", endpoint=DEFAULT_ENDPOINT)
+        assert not p.called  # early-return: no PATCH
+
+
+def test_auto_mint_patches_rrf_when_signing_key_missing(tmp_path, monkeypatch):
+    from robot_md.register import auto_mint_if_needed
+    from robot_md.signing import load_keypair
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    # Pretend the robot has an apikey but no signing key
+    (tmp_path / ".robot-md" / "keys").mkdir(parents=True)
+    (tmp_path / ".robot-md" / "keys" / "RRN-000000000099.apikey").write_text("secret-xyz")
+
+    captured = {}
+    def fake_patch(url, body, api_key, timeout=15.0):
+        captured["url"] = url
+        captured["body"] = body
+        captured["api_key"] = api_key
+        return {"rrn": "RRN-000000000099", "pq_signing_pub": body["pq_signing_pub"],
+                "pq_kid": body["pq_kid"]}
+
+    with patch("robot_md.register.patch_rrf", fake_patch):
+        auto_mint_if_needed("RRN-000000000099", endpoint=DEFAULT_ENDPOINT)
+
+    assert captured["url"].endswith("/RRN-000000000099")
+    assert captured["api_key"] == "secret-xyz"
+    assert "pq_signing_pub" in captured["body"]
+    assert "sig" in captured["body"]
+    # Keypair was saved
+    assert load_keypair("RRN-000000000099") is not None
+
+
+def test_auto_mint_skips_when_no_apikey(tmp_path, monkeypatch):
+    """If the user doesn't have an apikey for the RRN, auto-mint can't PATCH.
+    This is not an error — just a no-op; the command that called auto_mint
+    will surface its own error if it needs the apikey."""
+    from robot_md.register import auto_mint_if_needed
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with patch("robot_md.register.patch_rrf") as p:
+        auto_mint_if_needed("RRN-000000000099", endpoint=DEFAULT_ENDPOINT)
+        assert not p.called

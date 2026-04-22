@@ -88,14 +88,100 @@ def delete_from_rrf(endpoint: str, rrn: str, api_key: str, *, timeout: float = 1
         raise RuntimeError(f"RRF refused delete: {obj['error']}")
 
 
+def patch_rrf(
+    url: str, body: dict[str, Any], api_key: str, *, timeout: float = 15.0,
+) -> dict[str, Any]:
+    """PATCH `url` with `body` (JSON). Bearer-authed via api_key.
+
+    Returns the parsed JSON response. Raises urllib.error.HTTPError on 4xx/5xx.
+    """
+    req = urllib.request.Request(
+        url,
+        method="PATCH",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "robot-md-cli/0.9 (+https://robotmd.dev)",
+        },
+        data=json.dumps(body).encode("utf-8"),
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read())
+
+
+def auto_mint_if_needed(rrn: str, *, endpoint: str = DEFAULT_ENDPOINT) -> None:
+    """If the keystore has an apikey for this RRN but no signing keypair,
+    generate one and PATCH it onto the RRF record. Idempotent no-op when
+    either (a) a signing keypair already exists, or (b) no apikey exists.
+
+    Used by RRF-touching commands (cli_unregister so far) to transparently
+    upgrade pre-v0.9.1 records to RCAN 3.0 signed shape on first contact.
+    """
+    from rcan.crypto import sign_hybrid
+
+    from robot_md.signing import (
+        canonical_json,
+        generate_keypair,
+        load_keypair,
+        save_keypair,
+    )
+
+    if load_keypair(rrn) is not None:
+        return
+    api_key = load_apikey(rrn)
+    if not api_key:
+        return
+
+    kp = generate_keypair()
+    ml_pub_b64 = base64.b64encode(kp.ml_dsa.public_key_bytes).decode()
+
+    # RRF PATCH /v2/robots/<rrn> verifies over canonical {rrn, pq_signing_pub, pq_kid}.
+    signed_payload = {"rrn": rrn, "pq_signing_pub": ml_pub_b64, "pq_kid": kp.pq_kid}
+    message = canonical_json(signed_payload)
+    hs = sign_hybrid(kp.ml_dsa, kp.ed25519_sec, message)
+
+    patch_body = {
+        "pq_signing_pub": ml_pub_b64,
+        "pq_kid": kp.pq_kid,
+        "sig": {
+            "ml_dsa": base64.b64encode(hs.ml_dsa_sig).decode(),
+            "ed25519": base64.b64encode(hs.ed25519_sig).decode(),
+            "ed25519_pub": base64.b64encode(kp.ed25519_pub).decode(),
+        },
+    }
+
+    # DEFAULT_ENDPOINT is .../v2/robots/register; PATCH endpoint is .../v2/robots/<rrn>.
+    patch_url = endpoint.replace("/register", f"/{rrn}")
+    try:
+        patch_rrf(patch_url, patch_body, api_key)
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"auto-mint PATCH failed for {rrn}: {e.code} {body_text.strip()[:300]}"
+        ) from e
+
+    save_keypair(rrn, kp)
+
+
 def cli_unregister(
     rrn: str, *, endpoint: str = DEFAULT_ENDPOINT, api_key: str | None = None
 ) -> int:
     """Operator-facing: `robot-md unregister <RRN>`.
 
+    v0.9.1: Transparently upgrades unsigned RRF records (legacy) before any
+    RRF call by minting a hybrid keypair and PATCHing it on. If the upgrade
+    fails the unregister attempt continues — the user clearly wants the
+    record gone, not a half-signed record.
+
     Reads the API key from `~/.robot-md/keys/<rrn>.apikey` unless `--api-key`
     is supplied. DELETEs the RRF entry. Does NOT touch local ROBOT.md files.
     """
+    try:
+        auto_mint_if_needed(rrn, endpoint=endpoint)
+    except RuntimeError as e:
+        print(f"warning: {e}", file=sys.stderr)
+
     key = api_key or load_apikey(rrn)
     if not key:
         print(
