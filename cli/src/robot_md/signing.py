@@ -120,20 +120,17 @@ def canonical_json(body: dict[str, Any]) -> bytes:
 def sign_body(kp: SigningKeypair, body: dict[str, Any]) -> dict[str, Any]:
     """Return a COPY of body with pq_signing_pub, pq_kid, sig appended.
 
-    The signed message is canonical_json(body) — the body fields only,
-    before pq_signing_pub, pq_kid, and sig are attached. verify_body
-    re-strips all three of those fields before canonicalizing, so the
-    verified message matches what was signed here.
-
-    This matches RRF's verify.ts which verifies over canonicalJson(body)
-    (as confirmed by verify.test.ts and the cross-language fixture).
+    Signs over canonical_json({**body, pq_signing_pub, pq_kid}) — the IDs
+    are PART of the signed message, matching RRF's register.ts and PATCH
+    [rrn]/index.ts wire formats. verify_body strips only `sig` before
+    re-canonicalizing, which recovers the same signed message.
     """
-    message = canonical_json(body)
+    pq_pub_b64 = base64.b64encode(kp.ml_dsa.public_key_bytes).decode()
+    body_with_ids = {**body, "pq_signing_pub": pq_pub_b64, "pq_kid": kp.pq_kid}
+    message = canonical_json(body_with_ids)
     hs = sign_hybrid(kp.ml_dsa, kp.ed25519_sec, message)
     return {
-        **body,
-        "pq_signing_pub": base64.b64encode(kp.ml_dsa.public_key_bytes).decode(),
-        "pq_kid": kp.pq_kid,
+        **body_with_ids,
         "sig": {
             "ml_dsa": base64.b64encode(hs.ml_dsa_sig).decode(),
             "ed25519": base64.b64encode(hs.ed25519_sig).decode(),
@@ -143,12 +140,8 @@ def sign_body(kp: SigningKeypair, body: dict[str, Any]) -> dict[str, Any]:
 
 
 def verify_body(signed: dict[str, Any]) -> bool:
-    """Strip sig/pq_signing_pub/pq_kid, canonicalize body-only, hybrid-verify.
-
-    verify_body strips all three appended fields (sig, pq_signing_pub, pq_kid)
-    before canonicalizing — the verified message is the original body fields
-    only. This matches sign_body's signing scope and matches RRF's verify.ts
-    which verifies over canonicalJson(body) (body-only).
+    """Strip `sig`, canonicalize the rest (INCLUDING pq_signing_pub + pq_kid),
+    hybrid-verify. Matches RRF's wire format for register + PATCH.
     """
     try:
         sig = signed.get("sig")
@@ -157,12 +150,8 @@ def verify_body(signed: dict[str, Any]) -> bool:
         pq_pub_b64 = signed.get("pq_signing_pub")
         if not pq_pub_b64:
             return False
-        # Strip sig, pq_signing_pub, and pq_kid to recover the original body
-        body = {
-            k: v for k, v in signed.items()
-            if k not in ("sig", "pq_signing_pub", "pq_kid")
-        }
-        message = canonical_json(body)
+        rest = {k: v for k, v in signed.items() if k != "sig"}
+        message = canonical_json(rest)
         verify_hybrid(
             ml_dsa_public_key_bytes=base64.b64decode(pq_pub_b64),
             ed25519_public_key_bytes=base64.b64decode(sig["ed25519_pub"]),

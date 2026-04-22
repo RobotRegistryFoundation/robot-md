@@ -28,6 +28,7 @@ from robot_md.signing import (
 )
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "hybrid-fixture.json"
+REGISTER_FIXTURE_PATH = Path(__file__).parent / "fixtures" / "register-fixture.json"
 
 
 def _fixture() -> dict:
@@ -150,14 +151,31 @@ def test_verify_body_rejects_tampered_body_field():
 # ---- cross-language fixture ---------------------------------------------
 
 
-def test_cross_language_fixture_verifies():
-    """Python must also verify the Python-signed fixture it shares with TS."""
+def test_cross_language_fixture_primitive_verify():
+    """Python verify_hybrid must accept the cross-language hybrid-fixture.
+
+    This tests the primitive verify path (what verify.test.ts also tests),
+    NOT the wire format used by sign_body/verify_body — the fixture was
+    generated body-only (Task 1 spike), while sign_body uses body+ids.
+    """
+    from rcan.crypto import HybridSignature, verify_hybrid
     fx = _fixture()
-    # Reconstruct a signed-body dict matching the shape sign_body produces.
-    signed = {
-        **fx["body"],
-        "pq_signing_pub": fx["pq_signing_pub"],
-        "pq_kid": fx["pq_kid"],
-        "sig": fx["sig"],
-    }
+    message = canonical_json(fx["body"])
+    verify_hybrid(
+        ml_dsa_public_key_bytes=base64.b64decode(fx["pq_signing_pub"]),
+        ed25519_public_key_bytes=base64.b64decode(fx["sig"]["ed25519_pub"]),
+        message=message,
+        hybrid_sig=HybridSignature(
+            ml_dsa_sig=base64.b64decode(fx["sig"]["ml_dsa"]),
+            ed25519_sig=base64.b64decode(fx["sig"]["ed25519"]),
+            kid=fx["pq_kid"],
+        ),
+    )  # raises on failure; no assertion needed
+
+
+def test_register_fixture_wire_format_verifies():
+    """verify_body accepts a Python-signed body+ids payload — matches the
+    exact shape robot-md will POST to RRF /v2/robots/register."""
+    fx = json.loads(REGISTER_FIXTURE_PATH.read_text())
+    signed = fx["http_body"]
     assert verify_body(signed) is True
