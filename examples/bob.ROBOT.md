@@ -10,7 +10,6 @@ metadata:
   model: opencastor-rpi5-hailo-soarm101
   version: "1.0"                            # the registered major.minor — see rcan.dev/r/RRN-000000000003
   device_id: bob-001
-  rrn: RRN-000000000003                     # minted 2026-04-15 via `robot-md register`
   rrn_uri: rrn://craigm26/robot/opencastor-rpi5-hailo-soarm101/bob-001
   rcan_uri: rcan://rcan.dev/craigm26/opencastor-rpi5-hailo-soarm101/1-0/bob-001
   ruri: rcan://robot.local:8001/bob         # operator's LAN gateway (RCAN transport)
