@@ -104,6 +104,4 @@ def test_annex_iii_basis_rejects_unknown_value():
     m = _base()
     m["compliance"]["annex_iii_basis"] = "bogus_category"
     errors = _validate_manifest_dict(m)
-    assert any(
-        "annex_iii_basis" in e or "enum" in e.lower() for e in errors
-    ), errors
+    assert any("annex_iii_basis" in e or "enum" in e.lower() for e in errors), errors
