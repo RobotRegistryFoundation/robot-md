@@ -27,7 +27,6 @@ Exit codes: 0 success, 2 operator error, 3 network/server error.
 from __future__ import annotations
 
 import json
-import os
 import sys
 import urllib.error
 import urllib.request
@@ -357,7 +356,9 @@ def cli_register(
 
     if result.raw.get("already_existed"):
         print(
-            f"\n(already registered)\n  RRN: {result.rrn}\n  Record URL: {result.record_url or '—'}",
+            f"\n(already registered)\n"
+            f"  RRN: {result.rrn}\n"
+            f"  Record URL: {result.record_url or '—'}",
             file=sys.stderr,
         )
     else:
