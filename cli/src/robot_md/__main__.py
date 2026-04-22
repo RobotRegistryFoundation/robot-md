@@ -281,51 +281,26 @@ def init(
 @app.command()
 def register(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
-    endpoint: str = typer.Option(
-        "https://rcan.dev/api/v1/robots",
-        "--endpoint",
-        help="RRF mint endpoint. Override for staging / self-hosted.",
-    ),
+    endpoint: str | None = typer.Option(None, "--endpoint",
+        help="RRF mint endpoint. Override for staging / self-hosted."),
+    name: str | None = typer.Option(None, "--name"),
     manufacturer: str | None = typer.Option(None, "--manufacturer"),
     model: str | None = typer.Option(None, "--model"),
-    version: str | None = typer.Option(None, "--version"),
-    device_id: str | None = typer.Option(None, "--device-id"),
-    description: str | None = typer.Option(None, "--description"),
-    contact_email: str | None = typer.Option(None, "--contact-email"),
-    source: str | None = typer.Option(None, "--source"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="Print request body, don't POST."),
+    firmware_version: str | None = typer.Option(None, "--firmware-version"),
+    rcan_version: str | None = typer.Option(None, "--rcan-version"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Sign + print body, don't POST."),
 ) -> None:
-    """Mint an RRN for this robot against the Robot Registry Foundation.
-
-    Resolves manufacturer/model/version/device_id from the manifest's
-    `metadata` block, or from CLI flags if you want to override. POSTs to
-    the live RRF mint endpoint and writes the assigned RRN back into the
-    manifest. Issued API keys are saved to `~/.robot-md/keys/<rrn>.apikey`
-    with mode 600 — never printed.
-
-    Example:
-
-      robot-md register ROBOT.md
-      robot-md register ROBOT.md --contact-email me@example.com
-      robot-md register ROBOT.md --dry-run
-
-    The live endpoint currently speaks the v0.1.x unsigned shape. Signed
-    registration with key-binding at mint time (v0.2 §9.1) will ship as an
-    additive `--signed` flag on this same command once the server-side
-    endpoint lands.
-    """
-    from robot_md.register import cli_register
+    """Mint an RRN on Robot Registry Foundation with signed POST (RCAN 3.0)."""
+    from robot_md.register import DEFAULT_ENDPOINT, cli_register
 
     rc = cli_register(
-        str(path),
-        endpoint=endpoint,
+        path,
+        endpoint=endpoint or DEFAULT_ENDPOINT,
+        name=name,
         manufacturer=manufacturer,
         model=model,
-        version=version,
-        device_id=device_id,
-        description=description,
-        contact_email=contact_email,
-        source=source,
+        firmware_version=firmware_version,
+        rcan_version=rcan_version,
         dry_run=dry_run,
     )
     if rc != 0:

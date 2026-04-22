@@ -1,26 +1,27 @@
-"""Tests for `robot-md register` — manifest field extraction + rewrite.
+"""Tests for `robot-md register` — signed POST + manifest rewrite (v0.9.1).
 
-The live-endpoint POST is exercised via a mocked urlopen; real hits against
+The live RRF endpoint is exercised via mocked urlopen; real hits against
 https://robotregistryfoundation.org would pollute the public registry.
 """
-# ruff: noqa  (entire module skipped pending v0.9.1 rewrite — see skip reason below)
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
 import pytest
 
-# The register.py rewrite in commit c8bfda1 ("feat: add robot configuration
-# example for bob and initial landing page") changed MintRequest fields
-# (dropped `version`/`device_id`/`description`/`contact_email`/`source`; added
-# `firmware_version`/`rcan_version`/`pq_signing_pub`/`pq_kid`/`ruri`/
-# `owner_uid`) and MintResult shape (dropped `api_key`/`already_existed`
-# attributes — now in `raw` dict) without updating these tests. The v0.9.1
-# signing sub-release will touch register.py and rewrite this suite against
-# the current API.
-pytest.skip(
-    "register.py tests stale vs current v2-schema API — rewrite scheduled for v0.9.1",
-    allow_module_level=True,
+pytest.importorskip("ruamel.yaml")
+
+from robot_md.register import (
+    DEFAULT_ENDPOINT,
+    MintRequest,
+    _extract_mint_fields,
+    cli_register,
+    post_to_rrf,
 )
+from robot_md.signing import verify_body
 
 BOB_MIN = """\
 ---
@@ -28,29 +29,17 @@ rcan_version: "3.0"
 metadata:
   robot_name: bob
   manufacturer: craigm26
-  model: opencastor-rpi5-hailo-soarm101
-  version: 1.0
-  author: craigm26@example.com
+  model: opencastor-rpi5-hailo
+  firmware_version: 1.0.0
 physics:
   type: arm
   dof: 6
-  kinematics:
-    - { id: shoulder, axis: z, length_mm: 60 }
 drivers:
   - { id: arm, protocol: feetech, port: /dev/ttyACM0 }
 safety:
   estop: { software: true, response_ms: 100 }
 ---
-
 # bob
-
-## Identity
-Test.
-
-## What bob Can Do
-Test.
-
-## Safety Gates
 Test.
 """
 
@@ -61,262 +50,170 @@ def _write(tmp_path: Path, content: str = BOB_MIN) -> Path:
     return p
 
 
-# ---- field extraction -----------------------------------------------------
+# ---- _extract_mint_fields (current API) ---------------------------------
 
 
 def test_extract_from_manifest(tmp_path):
     path = _write(tmp_path)
     req = _extract_mint_fields(
         path,
-        manufacturer=None,
-        model=None,
-        version=None,
-        device_id=None,
-        description=None,
-        contact_email=None,
-        source=None,
+        name=None, manufacturer=None, model=None,
+        firmware_version=None, rcan_version=None, pq_signing_pub=None,
     )
+    assert req.name == "bob"
     assert req.manufacturer == "craigm26"
-    assert req.model == "opencastor-rpi5-hailo-soarm101"
-    assert req.version == "1.0"
-    # device_id falls back to robot_name
-    assert req.device_id == "bob"
-    # contact_email falls back to author
-    assert req.contact_email == "craigm26@example.com"
-    assert req.source == "robot-md-cli"
+    assert req.model == "opencastor-rpi5-hailo"
+    assert req.firmware_version == "1.0.0"
+    assert req.rcan_version == "3.0"
 
 
 def test_cli_overrides_win(tmp_path):
     path = _write(tmp_path)
     req = _extract_mint_fields(
         path,
-        manufacturer="acme",
-        model="rx-1",
-        version="2.0",
-        device_id="a-1",
-        description="prototype",
-        contact_email="ops@acme.com",
-        source="acme-fleet",
+        name="override-bot", manufacturer="acme", model="rx-1",
+        firmware_version="2.0.0", rcan_version="3.0", pq_signing_pub=None,
     )
+    assert req.name == "override-bot"
     assert req.manufacturer == "acme"
     assert req.model == "rx-1"
-    assert req.version == "2.0"
-    assert req.device_id == "a-1"
-    assert req.description == "prototype"
-    assert req.contact_email == "ops@acme.com"
-    assert req.source == "acme-fleet"
 
 
-def test_missing_required_fields_raises(tmp_path):
-    """Without manufacturer/model and no CLI overrides, we must refuse."""
-    path = tmp_path / "minimal.ROBOT.md"
-    path.write_text(
-        BOB_MIN.replace("manufacturer: craigm26\n  ", "").replace(
-            "model: opencastor-rpi5-hailo-soarm101\n  ", ""
-        )
-    )
-    with pytest.raises(ValueError, match="missing required mint fields"):
-        _extract_mint_fields(
-            path,
-            manufacturer=None,
-            model=None,
-            version=None,
-            device_id=None,
-            description=None,
-            contact_email=None,
-            source=None,
-        )
-
-
-def test_missing_robot_name_is_hard_error(tmp_path):
-    path = tmp_path / "anon.ROBOT.md"
-    path.write_text(BOB_MIN.replace("robot_name: bob", 'robot_name: ""'))
+def test_missing_robot_name_raises(tmp_path):
+    bad = BOB_MIN.replace("robot_name: bob", "robot_name: ")
+    path = _write(tmp_path, bad)
     with pytest.raises(ValueError, match="robot_name"):
-        _extract_mint_fields(
-            path,
-            manufacturer="x",
-            model="y",
-            version="1",
-            device_id="z",
-            description=None,
-            contact_email=None,
-            source=None,
-        )
+        _extract_mint_fields(path, name=None, manufacturer=None, model=None,
+                             firmware_version=None, rcan_version=None, pq_signing_pub=None)
 
 
-def test_as_body_strips_empty_optional(tmp_path):
+# ---- MintRequest shape --------------------------------------------------
+
+
+def test_mint_request_as_body_strips_empty_optionals():
     req = MintRequest(
-        manufacturer="a",
-        model="b",
-        version="1",
-        device_id="c",
-        description="",
-        contact_email="",
-        source="x",
+        name="x", manufacturer="y", model="z",
+        firmware_version="1.0", rcan_version="3.0",
     )
     body = req.as_body()
-    assert "description" not in body
-    assert "contact_email" not in body
-    assert body["manufacturer"] == "a"
-    assert body["source"] == "x"
-
-
-# ---- network (mocked) -----------------------------------------------------
-
-
-def _mock_urlopen_ok(response_json, status=201):
-    """Helper: build a context manager that returns a fake urlopen response."""
-
-    class FakeResponse:
-        def __init__(self, data, code):
-            self._data = data.encode("utf-8") if isinstance(data, str) else data
-            self.status = code
-
-        def read(self):
-            return self._data
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-    text = json.dumps(response_json)
-    return patch(
-        "robot_md.register.urllib.request.urlopen", return_value=FakeResponse(text, status)
-    )
-
-
-def test_post_to_rrf_success():
-    payload = {
-        "rrn": "RRN-000000000999",
-        "rcan_uri": "rrn://test/robot/demo/x",
-        "api_key": "secret-xyz",
-        "already_existed": False,
+    assert body == {
+        "name": "x", "manufacturer": "y", "model": "z",
+        "firmware_version": "1.0", "rcan_version": "3.0",
     }
-    with _mock_urlopen_ok(payload, 201):
-        result = post_to_rrf(DEFAULT_ENDPOINT, {"manufacturer": "a"})
-    assert result.rrn == "RRN-000000000999"
-    assert result.api_key == "secret-xyz"
-    assert result.already_existed is False
+    assert "pq_signing_pub" not in body
 
 
-def test_post_to_rrf_already_existed():
-    payload = {
-        "rrn": "RRN-000000000001",
-        "rcan_uri": "rrn://test/robot/demo/x",
-        "already_existed": True,
-    }
-    with _mock_urlopen_ok(payload, 200):
-        result = post_to_rrf(DEFAULT_ENDPOINT, {"manufacturer": "a"})
-    assert result.rrn == "RRN-000000000001"
-    assert result.already_existed is True
-    assert result.api_key is None
-
-
-def test_post_to_rrf_http_error_wrapped():
-    import urllib.error
-
-    err = urllib.error.HTTPError(
-        DEFAULT_ENDPOINT,
-        400,
-        "Bad Request",
-        {},
-        __import__("io").BytesIO(b'{"error":"missing fields"}'),
+def test_mint_request_as_body_includes_set_optionals():
+    req = MintRequest(
+        name="x", manufacturer="y", model="z",
+        firmware_version="1.0", rcan_version="3.0",
+        pq_signing_pub="pubkey", pq_kid="abcd1234",
+        ruri="rcan://example/y/z/x",
     )
-    with patch("robot_md.register.urllib.request.urlopen", side_effect=err):
-        with pytest.raises(RuntimeError, match="RRF returned 400"):
-            post_to_rrf(DEFAULT_ENDPOINT, {})
+    body = req.as_body()
+    assert body["pq_signing_pub"] == "pubkey"
+    assert body["pq_kid"] == "abcd1234"
+    assert body["ruri"] == "rcan://example/y/z/x"
 
 
-def test_post_to_rrf_missing_rrn_in_response():
-    with _mock_urlopen_ok({"message": "ok"}, 201):
-        with pytest.raises(RuntimeError, match="missing 'rrn'"):
-            post_to_rrf(DEFAULT_ENDPOINT, {})
+# ---- signed register flow (v0.9.1) --------------------------------------
 
 
-# ---- filesystem side-effects ---------------------------------------------
-
-
-def test_write_apikey_mode_600(tmp_path, monkeypatch):
+def test_cli_register_signs_body_before_posting(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
-    import robot_md.register as reg
-
-    monkeypatch.setattr(reg, "KEYSTORE_DIR", tmp_path / ".robot-md" / "keys")
-    p = reg.write_apikey("RRN-000000000999", "secret-xyz")
-    assert p.exists()
-    import stat
-
-    st = p.stat()
-    assert stat.S_IMODE(st.st_mode) == 0o600
-    assert p.read_text().strip() == "secret-xyz"
-
-
-def test_write_rrn_to_manifest_preserves_body_and_comments(tmp_path):
     path = _write(tmp_path)
-    write_rrn_to_manifest(path, "RRN-000000000042", "rrn://test/robot/demo/bob")
-    txt = path.read_text()
-    # New RRN landed
-    assert "rrn: RRN-000000000042" in txt
-    # rcan_uri landed
-    assert "rrn://test/robot/demo/bob" in txt
-    # Body preserved
-    assert "## What bob Can Do" in txt
-    # H1 preserved
-    assert "# bob" in txt
 
+    captured = {}
+    def fake_post(endpoint, body, timeout=15.0):
+        captured["body"] = body
+        from robot_md.register import MintResult
+        return MintResult(
+            rrn="RRN-000000000099",
+            registered_at="2026-04-22T12:00:00Z",
+            record_url="https://robotregistryfoundation.org/v2/robots/RRN-000000000099",
+            raw={"rrn": "RRN-000000000099", "api_key": "secret-xyz"},
+        )
 
-def test_write_rrn_to_manifest_rejects_malformed(tmp_path):
-    path = tmp_path / "bad.md"
-    path.write_text("no frontmatter here")
-    with pytest.raises(RuntimeError, match="frontmatter"):
-        write_rrn_to_manifest(path, "RRN-1", "")
-
-
-# ---- end-to-end dry-run ---------------------------------------------------
-
-
-def test_cli_register_dry_run_no_network(tmp_path, capsys):
-    path = _write(tmp_path)
-    # Dry run must not invoke urlopen at all
-    with patch("robot_md.register.urllib.request.urlopen") as spy:
-        rc = cli_register(str(path), dry_run=True)
-        spy.assert_not_called()
+    with patch("robot_md.register.post_to_rrf", fake_post):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
     assert rc == 0
 
+    body = captured["body"]
+    assert "pq_signing_pub" in body
+    assert "pq_kid" in body
+    assert "sig" in body
+    assert set(body["sig"].keys()) == {"ml_dsa", "ed25519", "ed25519_pub"}
+    # Verify the body self-signs correctly
+    assert verify_body(body) is True
 
-def test_cli_register_end_to_end_with_mocked_network(tmp_path):
+
+def test_cli_register_constructs_ruri_when_absent(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
     path = _write(tmp_path)
-    payload = {
-        "rrn": "RRN-000000000055",
-        "rcan_uri": "rrn://craigm26/robot/opencastor-rpi5-hailo-soarm101/bob",
-        "api_key": "fake-key-xyz",
-        "already_existed": False,
-    }
-    # Redirect keystore to tmp
-    from robot_md import register as reg
 
-    with _mock_urlopen_ok(payload, 201), patch.object(reg, "KEYSTORE_DIR", tmp_path / ".keys"):
-        rc = cli_register(str(path))
-    assert rc == 0
-    # Manifest should now carry the new RRN
-    assert "rrn: RRN-000000000055" in path.read_text()
-    # API key file saved with 600
-    key_path = tmp_path / ".keys" / "RRN-000000000055.apikey"
+    captured = {}
+    def fake_post(endpoint, body, timeout=15.0):
+        captured["body"] = body
+        from robot_md.register import MintResult
+        return MintResult(rrn="RRN-000000000099", registered_at="x",
+                          record_url="u", raw={"api_key": "k"})
+
+    with patch("robot_md.register.post_to_rrf", fake_post):
+        cli_register(path, endpoint=DEFAULT_ENDPOINT)
+
+    assert captured["body"]["ruri"] == (
+        "rcan://robotregistryfoundation.org/craigm26/opencastor-rpi5-hailo/bob"
+    )
+
+
+def test_cli_register_saves_keypair_after_success(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    path = _write(tmp_path)
+
+    def fake_post(endpoint, body, timeout=15.0):
+        from robot_md.register import MintResult
+        return MintResult(rrn="RRN-000000000099", registered_at="x",
+                          record_url="u", raw={"api_key": "k"})
+
+    with patch("robot_md.register.post_to_rrf", fake_post):
+        cli_register(path, endpoint=DEFAULT_ENDPOINT)
+
+    key_path = tmp_path / ".robot-md" / "keys" / "RRN-000000000099.signing.json"
     assert key_path.exists()
-    assert key_path.read_text().strip() == "fake-key-xyz"
-    import stat
-
-    assert stat.S_IMODE(key_path.stat().st_mode) == 0o600
+    apikey_path = tmp_path / ".robot-md" / "keys" / "RRN-000000000099.apikey"
+    assert apikey_path.exists()
 
 
-def test_cli_register_missing_file_returns_2(tmp_path):
-    rc = cli_register(str(tmp_path / "no-such-file.ROBOT.md"), dry_run=True)
-    assert rc == 2
+def test_cli_register_already_registered_raises(tmp_path, monkeypatch):
+    """Running register on a manifest that already has metadata.rrn is an error
+    in v0.9.1 — rotation is a later release."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    content = BOB_MIN.replace(
+        "robot_name: bob",
+        "robot_name: bob\n  rrn: RRN-000000000099",
+    )
+    path = _write(tmp_path, content)
+    rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
+    assert rc != 0
 
 
-def test_cli_register_rejects_missing_fields_with_exit_2(tmp_path):
-    p = tmp_path / "incomplete.ROBOT.md"
-    p.write_text(BOB_MIN.replace("manufacturer: craigm26\n  ", ""))
-    rc = cli_register(str(p), dry_run=True)
-    assert rc == 2
+# ---- post_to_rrf network-layer tests -----------------------------------
+
+
+def test_post_to_rrf_success_parses_mint_result(monkeypatch):
+    response = MagicMock()
+    response.read.return_value = json.dumps({
+        "rrn": "RRN-000000000099",
+        "registered_at": "2026-04-22T12:00:00Z",
+        "record_url": "https://robotregistryfoundation.org/v2/robots/RRN-000000000099",
+        "api_key": "secret-xyz",
+    }).encode()
+    response.status = 201
+    response.__enter__ = lambda s: s
+    response.__exit__ = lambda *a: None
+
+    with patch("urllib.request.urlopen", return_value=response):
+        result = post_to_rrf(DEFAULT_ENDPOINT, {"name": "x"})
+    assert result.rrn == "RRN-000000000099"
+    assert result.record_url.endswith("/RRN-000000000099")
+    assert result.raw["api_key"] == "secret-xyz"

@@ -26,15 +26,20 @@ Exit codes: 0 success, 2 operator error, 3 network/server error.
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from robot_md.parser import parse_file
+from robot_md.ruri import construct_ruri
+from robot_md.signing import generate_keypair, save_keypair, sign_body
 
 DEFAULT_ENDPOINT = "https://rcan.dev/api/v2/robots/register"
 KEYSTORE_DIR = Path.home() / ".robot-md" / "keys"
@@ -299,8 +304,20 @@ def write_rrn_to_manifest(manifest_path: Path, rrn: str, record_url: str) -> Non
 # ------------------------------------------------------------------ cli entry
 
 
+def _write_apikey(rrn: str, api_key: str) -> Path:
+    """Persist RRF-issued API key at ~/.robot-md/keys/<rrn>.apikey (mode 600)."""
+    keystore = Path.home() / ".robot-md" / "keys"
+    keystore.mkdir(parents=True, exist_ok=True)
+    with suppress(OSError):
+        os.chmod(keystore, 0o700)
+    path = keystore / f"{rrn}.apikey"
+    path.write_text(api_key)
+    os.chmod(path, 0o600)
+    return path
+
+
 def cli_register(
-    manifest_path: str,
+    manifest_path: Path | str,
     *,
     endpoint: str = DEFAULT_ENDPOINT,
     name: str | None = None,
@@ -308,72 +325,76 @@ def cli_register(
     model: str | None = None,
     firmware_version: str | None = None,
     rcan_version: str | None = None,
-    pq_signing_pub: str | None = None,
     dry_run: bool = False,
 ) -> int:
+    """Register a ROBOT.md with RRF, signing the POST body (v0.9.1)."""
     path = Path(manifest_path)
     if not path.exists():
         print(f"error: {path} does not exist", file=sys.stderr)
         return 2
 
     parsed = parse_file(path)
-    existing_rrn = str((parsed.frontmatter.get("metadata") or {}).get("rrn") or "").strip()
-    if existing_rrn and existing_rrn != "":
+    meta = parsed.frontmatter.get("metadata") or {}
+    existing_rrn = str(meta.get("rrn") or "").strip()
+    if existing_rrn:
         print(
-            f"note: manifest already has metadata.rrn = {existing_rrn!r}.\n"
-            f"      This registration will look up (not replace) that RRN.\n",
+            f"error: manifest already registered as {existing_rrn}. "
+            f"Key rotation is not supported in v0.9.1.",
             file=sys.stderr,
         )
+        return 2
 
+    # 1. Build MintRequest (validates required fields).
     try:
+        kp = generate_keypair()
         req = _extract_mint_fields(
             path,
-            name=name,
-            manufacturer=manufacturer,
-            model=model,
-            firmware_version=firmware_version,
-            rcan_version=rcan_version,
-            pq_signing_pub=pq_signing_pub,
+            name=name, manufacturer=manufacturer, model=model,
+            firmware_version=firmware_version, rcan_version=rcan_version,
+            pq_signing_pub=base64.b64encode(kp.ml_dsa.public_key_bytes).decode(),
         )
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
 
+    req.pq_kid = kp.pq_kid
+    req.ruri = construct_ruri(parsed.frontmatter)
+
+    # 2. Sign canonical body.
     body = req.as_body()
-    print("--- mint request ---", file=sys.stderr)
-    print(json.dumps(body, indent=2), file=sys.stderr)
-    print(f"--- endpoint: {endpoint} ---", file=sys.stderr)
+    signed = sign_body(kp, body)
 
     if dry_run:
+        print("--- signed mint request ---", file=sys.stderr)
+        print(json.dumps(signed, indent=2), file=sys.stderr)
+        print(f"--- endpoint: {endpoint} ---", file=sys.stderr)
         print("\n--dry-run: not POSTed to RRF.", file=sys.stderr)
         return 0
 
+    # 3. POST.
     try:
-        result = post_to_rrf(endpoint, body)
+        result = post_to_rrf(endpoint, signed)
     except RuntimeError as e:
         print(f"error: {e}", file=sys.stderr)
         return 3
 
-    if result.raw.get("already_existed"):
-        print(
-            f"\n(already registered)\n"
-            f"  RRN: {result.rrn}\n"
-            f"  Record URL: {result.record_url or '—'}",
-            file=sys.stderr,
-        )
-    else:
-        print(
-            f"\n✓ registered on RRF\n  RRN: {result.rrn}\n  Record URL: {result.record_url or '—'}",
-            file=sys.stderr,
-        )
+    # 4. Persist keypair + apikey.
+    save_keypair(result.rrn, kp)
+    api_key = result.raw.get("api_key")
+    if api_key:
+        _write_apikey(result.rrn, api_key)
 
-    # Update manifest
+    # 5. Write RRN back into manifest.
     try:
         write_rrn_to_manifest(path, result.rrn, result.record_url)
-        print(f"  manifest {path} updated with metadata.rrn", file=sys.stderr)
     except RuntimeError as e:
         print(f"  warning: could not update manifest: {e}", file=sys.stderr)
 
+    # 6. Friendly output.
+    print(
+        f"\n✓ registered on RRF\n  RRN: {result.rrn}\n  Record URL: {result.record_url or '—'}",
+        file=sys.stderr,
+    )
     public_url = f"https://rcan.dev/r/{result.rrn}"
-    print(f"\nPublic resolver: {public_url}", file=sys.stderr)
+    print(f"Public resolver: {public_url}", file=sys.stderr)
     return 0

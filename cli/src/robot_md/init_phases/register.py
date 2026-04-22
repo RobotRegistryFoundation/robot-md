@@ -115,9 +115,6 @@ def phase_register(
         str(manifest_path),
         manufacturer=manufacturer,
         model=model,
-        version=version,
-        device_id=device_id,
-        contact_email=contact_email,
     )
     if rc != 0:
         return PhaseResult(

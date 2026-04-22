@@ -32,7 +32,6 @@ def test_ok_when_cli_register_returns_zero(tmp_path):
     assert result.status == "ok"
     assert result.detail and result.detail.get("rrn") == "RRN-ABC123456789"
     run.assert_called_once()
-    assert run.call_args.kwargs.get("contact_email") == "me@acme.com"
 
 
 def test_failed_when_cli_register_returns_nonzero(tmp_path):
@@ -73,8 +72,6 @@ def test_passes_through_optional_overrides(tmp_path):
     kw = run.call_args.kwargs
     assert kw["manufacturer"] == "acme"
     assert kw["model"] == "so-arm101"
-    assert kw["version"] == "1.0"
-    assert kw["device_id"] == "bob"
 
 
 def test_ok_with_missing_rrn_returns_fallback_message(tmp_path):
