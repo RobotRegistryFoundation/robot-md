@@ -21,8 +21,11 @@ conditional in `robot-md validate`.
 
 - **Schema `if/then` FRIA gate** in `compliance.allOf`: when
   `annex_iii_basis` is present, `fria_ref` is required AND must match
-  `{ type: string, format: uri }`. Rejects missing, null, empty-string,
-  and malformed-URI values.
+  `{ type: string, pattern: "^[a-zA-Z][a-zA-Z0-9+.-]*:.+" }` — an RFC 3986
+  absolute-URI scheme prefix. Rejects missing, null, empty-string, and
+  scheme-less values. A regex pattern is used instead of `format: uri`
+  so the gate works on jsonschema installs without the optional
+  `rfc3987` extra (the default CI environment).
 
 ### Changed (BREAKING)
 
