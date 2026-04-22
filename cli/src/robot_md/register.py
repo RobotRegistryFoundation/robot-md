@@ -89,7 +89,11 @@ def delete_from_rrf(endpoint: str, rrn: str, api_key: str, *, timeout: float = 1
 
 
 def patch_rrf(
-    url: str, body: dict[str, Any], api_key: str, *, timeout: float = 15.0,
+    url: str,
+    body: dict[str, Any],
+    api_key: str,
+    *,
+    timeout: float = 15.0,
 ) -> dict[str, Any]:
     """PATCH `url` with `body` (JSON). Bearer-authed via api_key.
 
@@ -445,8 +449,11 @@ def cli_register(
         kp = generate_keypair()
         req = _extract_mint_fields(
             path,
-            name=name, manufacturer=manufacturer, model=model,
-            firmware_version=firmware_version, rcan_version=rcan_version,
+            name=name,
+            manufacturer=manufacturer,
+            model=model,
+            firmware_version=firmware_version,
+            rcan_version=rcan_version,
             pq_signing_pub=base64.b64encode(kp.ml_dsa.public_key_bytes).decode(),
         )
     except ValueError as e:

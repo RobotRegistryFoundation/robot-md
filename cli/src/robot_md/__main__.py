@@ -281,8 +281,9 @@ def init(
 @app.command()
 def register(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
-    endpoint: str | None = typer.Option(None, "--endpoint",
-        help="RRF mint endpoint. Override for staging / self-hosted."),
+    endpoint: str | None = typer.Option(
+        None, "--endpoint", help="RRF mint endpoint. Override for staging / self-hosted."
+    ),
     name: str | None = typer.Option(None, "--name"),
     manufacturer: str | None = typer.Option(None, "--manufacturer"),
     model: str | None = typer.Option(None, "--model"),

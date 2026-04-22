@@ -57,8 +57,12 @@ def test_extract_from_manifest(tmp_path):
     path = _write(tmp_path)
     req = _extract_mint_fields(
         path,
-        name=None, manufacturer=None, model=None,
-        firmware_version=None, rcan_version=None, pq_signing_pub=None,
+        name=None,
+        manufacturer=None,
+        model=None,
+        firmware_version=None,
+        rcan_version=None,
+        pq_signing_pub=None,
     )
     assert req.name == "bob"
     assert req.manufacturer == "craigm26"
@@ -71,8 +75,12 @@ def test_cli_overrides_win(tmp_path):
     path = _write(tmp_path)
     req = _extract_mint_fields(
         path,
-        name="override-bot", manufacturer="acme", model="rx-1",
-        firmware_version="2.0.0", rcan_version="3.0", pq_signing_pub=None,
+        name="override-bot",
+        manufacturer="acme",
+        model="rx-1",
+        firmware_version="2.0.0",
+        rcan_version="3.0",
+        pq_signing_pub=None,
     )
     assert req.name == "override-bot"
     assert req.manufacturer == "acme"
@@ -83,8 +91,15 @@ def test_missing_robot_name_raises(tmp_path):
     bad = BOB_MIN.replace("robot_name: bob", "robot_name: ")
     path = _write(tmp_path, bad)
     with pytest.raises(ValueError, match="robot_name"):
-        _extract_mint_fields(path, name=None, manufacturer=None, model=None,
-                             firmware_version=None, rcan_version=None, pq_signing_pub=None)
+        _extract_mint_fields(
+            path,
+            name=None,
+            manufacturer=None,
+            model=None,
+            firmware_version=None,
+            rcan_version=None,
+            pq_signing_pub=None,
+        )
 
 
 # ---- MintRequest shape --------------------------------------------------
@@ -92,22 +107,32 @@ def test_missing_robot_name_raises(tmp_path):
 
 def test_mint_request_as_body_strips_empty_optionals():
     req = MintRequest(
-        name="x", manufacturer="y", model="z",
-        firmware_version="1.0", rcan_version="3.0",
+        name="x",
+        manufacturer="y",
+        model="z",
+        firmware_version="1.0",
+        rcan_version="3.0",
     )
     body = req.as_body()
     assert body == {
-        "name": "x", "manufacturer": "y", "model": "z",
-        "firmware_version": "1.0", "rcan_version": "3.0",
+        "name": "x",
+        "manufacturer": "y",
+        "model": "z",
+        "firmware_version": "1.0",
+        "rcan_version": "3.0",
     }
     assert "pq_signing_pub" not in body
 
 
 def test_mint_request_as_body_includes_set_optionals():
     req = MintRequest(
-        name="x", manufacturer="y", model="z",
-        firmware_version="1.0", rcan_version="3.0",
-        pq_signing_pub="pubkey", pq_kid="abcd1234",
+        name="x",
+        manufacturer="y",
+        model="z",
+        firmware_version="1.0",
+        rcan_version="3.0",
+        pq_signing_pub="pubkey",
+        pq_kid="abcd1234",
         ruri="rcan://example/y/z/x",
     )
     body = req.as_body()
@@ -124,9 +149,11 @@ def test_cli_register_signs_body_before_posting(tmp_path, monkeypatch):
     path = _write(tmp_path)
 
     captured = {}
+
     def fake_post(endpoint, body, timeout=15.0):
         captured["body"] = body
         from robot_md.register import MintResult
+
         return MintResult(
             rrn="RRN-000000000099",
             registered_at="2026-04-22T12:00:00Z",
@@ -152,11 +179,14 @@ def test_cli_register_constructs_ruri_when_absent(tmp_path, monkeypatch):
     path = _write(tmp_path)
 
     captured = {}
+
     def fake_post(endpoint, body, timeout=15.0):
         captured["body"] = body
         from robot_md.register import MintResult
-        return MintResult(rrn="RRN-000000000099", registered_at="x",
-                          record_url="u", raw={"api_key": "k"})
+
+        return MintResult(
+            rrn="RRN-000000000099", registered_at="x", record_url="u", raw={"api_key": "k"}
+        )
 
     with patch("robot_md.register.post_to_rrf", fake_post):
         cli_register(path, endpoint=DEFAULT_ENDPOINT)
@@ -172,8 +202,10 @@ def test_cli_register_saves_keypair_after_success(tmp_path, monkeypatch):
 
     def fake_post(endpoint, body, timeout=15.0):
         from robot_md.register import MintResult
-        return MintResult(rrn="RRN-000000000099", registered_at="x",
-                          record_url="u", raw={"api_key": "k"})
+
+        return MintResult(
+            rrn="RRN-000000000099", registered_at="x", record_url="u", raw={"api_key": "k"}
+        )
 
     with patch("robot_md.register.post_to_rrf", fake_post):
         cli_register(path, endpoint=DEFAULT_ENDPOINT)
@@ -202,12 +234,14 @@ def test_cli_register_already_registered_raises(tmp_path, monkeypatch):
 
 def test_post_to_rrf_success_parses_mint_result(monkeypatch):
     response = MagicMock()
-    response.read.return_value = json.dumps({
-        "rrn": "RRN-000000000099",
-        "registered_at": "2026-04-22T12:00:00Z",
-        "record_url": "https://robotregistryfoundation.org/v2/robots/RRN-000000000099",
-        "api_key": "secret-xyz",
-    }).encode()
+    response.read.return_value = json.dumps(
+        {
+            "rrn": "RRN-000000000099",
+            "registered_at": "2026-04-22T12:00:00Z",
+            "record_url": "https://robotregistryfoundation.org/v2/robots/RRN-000000000099",
+            "api_key": "secret-xyz",
+        }
+    ).encode()
     response.status = 201
     response.__enter__ = lambda s: s
     response.__exit__ = lambda *a: None
@@ -244,12 +278,16 @@ def test_auto_mint_patches_rrf_when_signing_key_missing(tmp_path, monkeypatch):
     (tmp_path / ".robot-md" / "keys" / "RRN-000000000099.apikey").write_text("secret-xyz")
 
     captured = {}
+
     def fake_patch(url, body, api_key, timeout=15.0):
         captured["url"] = url
         captured["body"] = body
         captured["api_key"] = api_key
-        return {"rrn": "RRN-000000000099", "pq_signing_pub": body["pq_signing_pub"],
-                "pq_kid": body["pq_kid"]}
+        return {
+            "rrn": "RRN-000000000099",
+            "pq_signing_pub": body["pq_signing_pub"],
+            "pq_kid": body["pq_kid"],
+        }
 
     with patch("robot_md.register.patch_rrf", fake_patch):
         auto_mint_if_needed("RRN-000000000099", endpoint=DEFAULT_ENDPOINT)
@@ -267,6 +305,7 @@ def test_auto_mint_skips_when_no_apikey(tmp_path, monkeypatch):
     This is not an error — just a no-op; the command that called auto_mint
     will surface its own error if it needs the apikey."""
     from robot_md.register import auto_mint_if_needed
+
     monkeypatch.setenv("HOME", str(tmp_path))
     with patch("robot_md.register.patch_rrf") as p:
         auto_mint_if_needed("RRN-000000000099", endpoint=DEFAULT_ENDPOINT)

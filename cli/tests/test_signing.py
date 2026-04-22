@@ -157,6 +157,7 @@ def test_cross_language_fixture_primitive_verify():
     generated body-only (Task 1 spike), while sign_body uses body+ids.
     """
     from rcan.crypto import HybridSignature, verify_hybrid
+
     fx = _fixture()
     message = canonical_json(fx["body"])
     verify_hybrid(

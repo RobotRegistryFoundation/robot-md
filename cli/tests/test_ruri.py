@@ -29,8 +29,14 @@ def test_slug_empty_raises():
 
 
 def test_construct_ruri_uses_explicit_metadata_ruri_if_set():
-    m = {"metadata": {"ruri": "rcan://custom/host/arm/a1", "robot_name": "x",
-                      "manufacturer": "y", "model": "z"}}
+    m = {
+        "metadata": {
+            "ruri": "rcan://custom/host/arm/a1",
+            "robot_name": "x",
+            "manufacturer": "y",
+            "model": "z",
+        }
+    }
     assert construct_ruri(m) == "rcan://custom/host/arm/a1"
 
 

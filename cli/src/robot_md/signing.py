@@ -43,7 +43,7 @@ class SigningKeypair:
     ml_dsa: MlDsaKeyPair
     ed25519_pub: bytes  # 32 bytes raw
     ed25519_sec: bytes  # 32 bytes raw
-    pq_kid: str         # first 8 hex of sha256(ml_dsa.public_key_bytes)
+    pq_kid: str  # first 8 hex of sha256(ml_dsa.public_key_bytes)
 
 
 def kid_from_pub(ml_dsa_pub: bytes) -> str:
@@ -113,9 +113,9 @@ def load_keypair(rrn: str) -> SigningKeypair | None:
 
 def canonical_json(body: dict[str, Any]) -> bytes:
     """Deterministic JSON — must match TS `JSON.stringify(sortKeys(obj))`."""
-    return json.dumps(
-        body, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")
+    return json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
+        "utf-8"
+    )
 
 
 def sign_body(kp: SigningKeypair, body: dict[str, Any]) -> dict[str, Any]:
