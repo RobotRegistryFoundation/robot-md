@@ -9,6 +9,38 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.0] — 2026-04-21
+
+First release in the v0.9 RCAN 3.0 compliance theme. See
+`docs/superpowers/specs/2026-04-21-v0.9-rcan-3-compliance-design.md`.
+Spec-strict and additive — no enforcement, no signing yet.
+
+### Added
+
+- **`rcan>=3.0,<4.0` runtime dependency.** Unlocks SDK primitives
+  (`rcan.crypto` hybrid signing, `rcan.manifest.from_manifest`, version
+  constants) for v0.9.1+ work. Not used at runtime in v0.9.0; import-only.
+  rcan-py 3.0.0 published to PyPI 2026-04-21 from
+  `continuonai/rcan-py@v3.0.0`.
+- **`compliance.annex_iii_basis` enum** per rcan-spec §22 — EU AI Act
+  Annex III use-case basis (10 values: `safety_component`, `biometric`,
+  `critical_infrastructure`, `education`, `employment`, `essential_services`,
+  `law_enforcement`, `migration`, `administration_of_justice`,
+  `general_purpose_ai`). Optional in v0.9.0; FRIA gating (require
+  `fria_ref` when set) lands in v0.9.2.
+
+### Compliance status
+
+- `compliance.annex_iii_basis` slot: ✅ present (optional)
+- `compliance.fria_ref`: ✅ present (optional; gated on `annex_iii_basis` in v0.9.2)
+- Signing: ❌ not yet (v0.9.1)
+- §23 Safety Benchmarks emit CLI: ❌ not yet (v0.9.3)
+- §24 IFU / §25 PMM emit CLI: ❌ not yet (v0.9.4)
+- §26 EU Register submission: ❌ not yet (v0.9.5)
+- RCN/RMN/RHN registry IDs: ❌ not yet (v0.9.6)
+
+---
+
 ## [0.8.0] — 2026-04-20
 
 ### Added — MCP observability
