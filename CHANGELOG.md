@@ -9,6 +9,66 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.1] — 2026-04-22
+
+Second release in the v0.9 RCAN 3.0 compliance theme. **Mandatory hybrid
+signing** — every `robot-md register` POST is now signed with ML-DSA-65
++ Ed25519. Pairs with `RobotRegistryFoundation@1.8.0` (deployed
+2026-04-22), which rejects unsigned registrations per RCAN 3.0 §2.2. See
+`docs/superpowers/specs/2026-04-22-v0.9.1-hybrid-signing-design.md`.
+
+### Added
+
+- **`robot_md.signing` module.** `generate_keypair`, `save_keypair`,
+  `load_keypair`, `sign_body`, `verify_body`, `canonical_json`. Wraps
+  `rcan.crypto` (ML-DSA-65 via `dilithium-py`) + `cryptography` (Ed25519).
+  Keystore at `~/.robot-md/keys/<rrn>.signing.json` (mode 600, dir 700,
+  atomic tmp-then-rename writes).
+- **`robot_md.ruri` module.** `construct_ruri(manifest)` builds the
+  spec-mandated `rcan://<host>/<manufacturer>/<model>/<robot_name>` URI
+  (defaulting host to `robotregistryfoundation.org`) when
+  `metadata.ruri` is absent.
+- **`auto_mint_if_needed` + `patch_rrf` in `robot_md.register`.** RRF
+  records that exist with an apikey but no signing key (legacy /
+  pre-v0.9.1) are transparently upgraded via signed PATCH on first
+  contact. Wired into `cli_unregister`.
+
+### Changed (BREAKING)
+
+- **`robot-md register` always signs.** No `--skip-sign` opt-out; per
+  RCAN 3.0 §2.2 unsigned registration is no longer permitted by the
+  reference RRF. Each register: generates a per-RRN hybrid keypair,
+  constructs the RURI if absent, signs the canonical MintRequest body
+  (`{...fields, pq_signing_pub, pq_kid}`), POSTs to RRF, persists
+  keypair + apikey on success.
+- **Already-registered manifests now error (rc=2).** Running register
+  on a manifest with `metadata.rrn` already set is rejected — key
+  rotation is out of scope for v0.9.1 (a later release).
+- **`cli_register` signature.** Drops dead kwargs `version`,
+  `device_id`, `description`, `contact_email`, `source` (none did
+  anything in 0.9.0); adds `--firmware-version`, `--rcan-version`,
+  `--name`. The `__main__.py register` typer command updated to match.
+- **`rcan` extras bumped to `rcan[pq,crypto]>=3.0,<4.0`.** Pulls
+  `dilithium-py>=1.0` and `cryptography>=42.0` as runtime deps so users
+  don't need an extras install.
+
+### Fixed
+
+- `cli/tests/test_register.py` rewritten — was module-skipped in
+  `c07e8b4` (v0.9.0) pending the API update. Now 13 tests covering
+  `_extract_mint_fields`, `MintRequest.as_body()`, signed POST flow,
+  keypair/apikey persistence, already-registered guard, `post_to_rrf`,
+  and the auto-mint PATCH path.
+- `examples/bob.ROBOT.md` cleared stale `RRN-000000000003` (never in
+  prod KV) so fresh clones can register without the new error path.
+
+### Compliance status (delta from 0.9.0)
+
+- Signing: ✅ mandatory (was ❌)
+- Everything else unchanged from 0.9.0.
+
+---
+
 ## [0.9.0] — 2026-04-21
 
 First release in the v0.9 RCAN 3.0 compliance theme. See
