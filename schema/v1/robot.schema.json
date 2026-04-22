@@ -8,8 +8,8 @@
   "properties": {
     "rcan_version": {
       "type": "string",
-      "pattern": "^(2\\.1|2\\.1\\.0|2\\.2|2\\.2\\.0|2\\.2\\.1|3\\.[0-9]+|3\\.[0-9]+\\.[0-9]+)$",
-      "description": "RCAN protocol version. Must be 2.1+; 3.0+ recommended."
+      "pattern": "^3\\.[0-9]+(\\.[0-9]+)?$",
+      "description": "RCAN protocol version. Must be 3.0 or higher (ecosystem policy: RCAN 3.0+ only going forward; 2.x no longer accepted)."
     },
     "schema": {
       "type": "string",
