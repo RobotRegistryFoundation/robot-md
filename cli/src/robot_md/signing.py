@@ -11,9 +11,11 @@ of the existing <rrn>.apikey.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
 import os
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +25,7 @@ from cryptography.hazmat.primitives.asymmetric import ed25519
 from rcan.crypto import (
     HybridSignature,
     MlDsaKeyPair,
+    RCANSignatureError,
     generate_ml_dsa_keypair,
     sign_hybrid,
     verify_hybrid,
@@ -65,10 +68,8 @@ def _keypath(rrn: str) -> Path:
 def save_keypair(rrn: str, kp: SigningKeypair) -> Path:
     keystore_dir = Path.home() / ".robot-md" / "keys"
     keystore_dir.mkdir(parents=True, exist_ok=True)
-    try:
+    with suppress(OSError):
         os.chmod(keystore_dir, KEY_DIR_MODE)
-    except OSError:
-        pass  # best-effort; filesystem may not support (e.g., Windows)
     path = _keypath(rrn)
     data = {
         "rrn": rrn,
@@ -163,5 +164,5 @@ def verify_body(signed: dict[str, Any]) -> bool:
             ),
         )
         return True
-    except Exception:
+    except (RCANSignatureError, KeyError, ValueError, binascii.Error):
         return False

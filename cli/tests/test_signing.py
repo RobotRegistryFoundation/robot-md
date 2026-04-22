@@ -14,8 +14,6 @@ import os
 import stat
 from pathlib import Path
 
-import pytest
-
 from robot_md.signing import (
     SigningKeypair,
     canonical_json,
