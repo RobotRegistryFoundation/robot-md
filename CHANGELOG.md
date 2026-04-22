@@ -9,6 +9,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.2] — 2026-04-22
+
+Third release in the v0.9 RCAN 3.0 compliance theme. **FRIA enforcement**
+per rcan-spec §22: declaring `compliance.annex_iii_basis` now commits the
+operator to a Fundamental Rights Impact Assessment, so
+`compliance.fria_ref` MUST be a non-null URI. Enforced via JSON Schema
+conditional in `robot-md validate`.
+
+### Added
+
+- **Schema `if/then` FRIA gate** in `compliance.allOf`: when
+  `annex_iii_basis` is present, `fria_ref` is required AND must match
+  `{ type: string, format: uri }`. Rejects missing, null, empty-string,
+  and malformed-URI values.
+
+### Changed (BREAKING)
+
+- **`robot-md validate` now enforces `format` annotations** via
+  `jsonschema.Draft202012Validator.FORMAT_CHECKER`. Draft 2020-12 treats
+  `format` as annotation-only by default, so this was a no-op before
+  v0.9.2; now any schema field declared `format: uri` is actually
+  validated (affects `rrf_endpoint`, `compliance.fria_ref`, and the
+  `$id` URI self-reference). Existing shipped manifests were already
+  URI-valid, so no migration is expected.
+- Any manifest that declared `annex_iii_basis` without a matching
+  non-null URI `fria_ref` will now fail validation. v0.9.0-v0.9.1
+  accepted this combination (spec-strict slot without gating).
+
+### Compliance status (delta from 0.9.1)
+
+- `compliance.annex_iii_basis` + `fria_ref` gate: ✅ enforced (was ❌)
+- Everything else unchanged from 0.9.1.
+
+---
+
 ## [0.9.1] — 2026-04-22
 
 Second release in the v0.9 RCAN 3.0 compliance theme. **Mandatory hybrid

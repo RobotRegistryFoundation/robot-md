@@ -52,9 +52,14 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
     # Internal parser markers — strip before schema validation, re-attach after
     _deprecations = fm.pop("_deprecations", None)
 
-    # 1. Schema validation
+    # 1. Schema validation. format_checker enforces JSON Schema `format`
+    # annotations (e.g., `format: uri`) — in Draft 2020-12 these are
+    # annotation-only by default, so without this the FRIA gate (v0.9.2)
+    # can't reject `compliance.fria_ref: "not-a-uri"`.
     schema = _load_schema()
-    validator = jsonschema.Draft202012Validator(schema)
+    validator = jsonschema.Draft202012Validator(
+        schema, format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER
+    )
     schema_errors = sorted(validator.iter_errors(fm), key=lambda e: e.path)
     if schema_errors:
         for err in schema_errors:
