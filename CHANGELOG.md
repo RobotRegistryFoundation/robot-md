@@ -9,6 +9,66 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.5] — 2026-04-23
+
+Sixth release in the v0.9 RCAN 3.0 compliance theme. Completes the §23–§26
+external-artifact emission matrix with §26 EU Register submission
+package emission per EU AI Act Art. 49.
+
+### Added
+
+- **`robot-md emit-eu-register MANIFEST --fria PATH [--opencastor-version VER] [--output OUT] [--sign]`**
+  — build the Art. 49 submission package. Pulls provider identity
+  (manufacturer, author), system identity (rrn, rrn_uri, robot_name,
+  rcan_version), and the Annex III basis from the manifest. References
+  the signed FRIA by basename (submit both files together to the EU AI
+  database). `conformity_status` is hardcoded `"declared"` — the
+  Art. 43 self-declared conformity path.
+- **`robot_md.eu_register` module** — reusable `build_artifact` +
+  `sign_artifact` + `EuRegisterError` sentinel. 11 TDD tests in
+  `cli/tests/test_eu_register.py` covering every MUST field, every
+  missing-prerequisite error, and the signed roundtrip.
+
+### Validation gates (all raise `EuRegisterError`)
+
+- `--fria PATH` must point at an existing file.
+- `metadata.rrn` must be set (register the robot first).
+- `compliance.annex_iii_basis` must be set (§26 applies to high-risk
+  AI only — if not Annex III, this is the wrong artifact).
+- `metadata.manufacturer` and `metadata.author` must both be set
+  (provider identity is MUST per §26).
+
+### Reused (no new primitives)
+
+- `--sign` routes through v0.9.1 `signing.sign_body` like emit-benchmarks,
+  emit-ifu, incidents report. Single signing scheme, five artifact types.
+
+### Completes v0.9.x external-artifact matrix
+
+| Artifact | Command | Shipped |
+|---|---|---|
+| §23 safety benchmark | `emit-benchmarks` | v0.9.3 |
+| §24 IFU (Art. 13(3))  | `emit-ifu` | v0.9.4 |
+| §25 incident record  | `incidents record` | v0.9.4 |
+| §25 Art. 72 report   | `incidents report` | v0.9.4 |
+| §26 EU register pkg  | `emit-eu-register` | v0.9.5 |
+
+All signed via the same hybrid wire format introduced in v0.9.1.
+
+### Out of scope
+
+- `emit-fria` / FRIA document generation inside robot-md — the spec
+  treats FRIA as external (operator-generated), and `--fria` takes an
+  existing file by path. Out of v0.9.x entirely.
+- Automated submission to the EU AI database — Art. 49 requires
+  operator action, not CLI automation.
+
+### Compliance status (delta from 0.9.4)
+
+- §26 EU Register submission CLI: ✅ shipped (was ❌)
+
+---
+
 ## [0.9.4] — 2026-04-22
 
 Fifth release in the v0.9 RCAN 3.0 compliance theme. Adds emission of

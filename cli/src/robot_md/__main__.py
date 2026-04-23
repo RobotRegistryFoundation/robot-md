@@ -452,6 +452,69 @@ def emit_ifu(
         typer.echo(f"wrote {output}", err=True)
 
 
+# ---------------------------------------------------------- §26 EU register
+
+
+@app.command("emit-eu-register")
+def emit_eu_register(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    fria: Path = typer.Option(
+        ...,
+        "--fria",
+        help="Path to a signed rcan-fria-v1 document (referenced by basename in the package).",
+    ),
+    opencastor_version: str | None = typer.Option(
+        None,
+        "--opencastor-version",
+        help="Runtime version for system.opencastor_version. Optional.",
+    ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Write the artifact here. Default: print to stdout."
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
+    ),
+) -> None:
+    """Emit an rcan-eu-register-v1 Art. 49 submission package.
+
+    Requires the manifest to have metadata.rrn, compliance.annex_iii_basis,
+    metadata.manufacturer, and metadata.author. --fria must point at an
+    existing signed rcan-fria-v1 JSON document — the package references
+    it by basename, and both files must be submitted together to the
+    EU AI database.
+    """
+    import json as _json
+
+    from robot_md.eu_register import EuRegisterError, build_artifact, sign_artifact
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    try:
+        artifact = build_artifact(path, fria_path=fria, opencastor_version=opencastor_version)
+    except EuRegisterError as e:
+        typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2) from e
+
+    if sign:
+        rrn = artifact["system"]["rrn"]
+        try:
+            artifact = sign_artifact(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+
+
 # ---------------------------------------------------------- §25 incidents
 
 
