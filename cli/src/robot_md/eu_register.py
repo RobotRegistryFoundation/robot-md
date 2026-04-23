@@ -63,6 +63,10 @@ def _system(fm: dict, opencastor_version: str | None) -> dict:
         "robot_name": meta.get("robot_name") or "",
         "rcan_version": str(fm.get("rcan_version") or "3.0"),
         "opencastor_version": opencastor_version or "",
+        # v0.9.6 — sibling RCAN §21 registry IDs (RCN/RMN/RHN). Empty when absent.
+        "rcn_ids": list(meta.get("rcn_ids") or ()),
+        "rmn": meta.get("rmn") or "",
+        "rhn_ids": list(meta.get("rhn_ids") or ()),
     }
 
 

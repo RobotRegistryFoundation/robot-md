@@ -181,6 +181,29 @@ def test_ifu_performance_embeds_benchmark_ref(tmp_path):
 # ---- signing ----------------------------------------------------
 
 
+def test_ifu_provider_identity_includes_rcn_rmn_rhn_when_present(tmp_path):
+    content = BOB_MIN.replace(
+        "  rrn_uri: rrn://acme/robot/rx-1/bob\n",
+        "  rrn_uri: rrn://acme/robot/rx-1/bob\n"
+        "  rcn_ids:\n    - RCN-000000000001\n    - RCN-000000000002\n"
+        "  rmn: RMN-000000000007\n"
+        "  rhn_ids:\n    - RHN-000000000099\n",
+    )
+    art = build_artifact(_write(tmp_path, content))
+    p = art["provider_identity"]
+    assert p["rcn_ids"] == ["RCN-000000000001", "RCN-000000000002"]
+    assert p["rmn"] == "RMN-000000000007"
+    assert p["rhn_ids"] == ["RHN-000000000099"]
+
+
+def test_ifu_provider_identity_id_fields_default_empty(tmp_path):
+    art = build_artifact(_write(tmp_path))
+    p = art["provider_identity"]
+    assert p["rcn_ids"] == []
+    assert p["rmn"] == ""
+    assert p["rhn_ids"] == []
+
+
 def test_ifu_sign_raises_without_keypair(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     with pytest.raises(RuntimeError, match="no signing keypair"):

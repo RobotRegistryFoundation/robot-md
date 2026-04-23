@@ -97,6 +97,27 @@ def test_opencastor_version_flows_through(tmp_path):
     assert art["system"]["opencastor_version"] == "2026.4.22.0"
 
 
+def test_system_includes_rcn_rmn_rhn_when_present(tmp_path):
+    content = BOB_MIN.replace(
+        "  rrn_uri: rrn://acme/robot/rx-1/bob\n",
+        "  rrn_uri: rrn://acme/robot/rx-1/bob\n"
+        "  rcn_ids:\n    - RCN-000000000001\n"
+        "  rmn: RMN-000000000007\n"
+        "  rhn_ids:\n    - RHN-000000000099\n",
+    )
+    art = build_artifact(_write_manifest(tmp_path, content), fria_path=_write_fria(tmp_path))
+    assert art["system"]["rcn_ids"] == ["RCN-000000000001"]
+    assert art["system"]["rmn"] == "RMN-000000000007"
+    assert art["system"]["rhn_ids"] == ["RHN-000000000099"]
+
+
+def test_system_id_fields_default_empty(tmp_path):
+    art = build_artifact(_write_manifest(tmp_path), fria_path=_write_fria(tmp_path))
+    assert art["system"]["rcn_ids"] == []
+    assert art["system"]["rmn"] == ""
+    assert art["system"]["rhn_ids"] == []
+
+
 def test_fria_ref_uses_basename_not_full_path(tmp_path):
     # Even if --fria is a nested path, the package references by basename.
     nested = tmp_path / "nested" / "dir"

@@ -24,6 +24,23 @@
         "rrn": { "type": "string", "pattern": "^(RRN-[0-9]{12}|)$" },
         "rrn_uri": { "type": "string", "pattern": "^rrn://.+" },
         "ruri": { "type": "string", "pattern": "^rcan://.+" },
+        "rcn_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^RCN-[0-9]{12}$" },
+          "uniqueItems": true,
+          "description": "Robot Component Numbers identifying this robot's constituent components (sensors, actuators, SBC, etc.) as registered on RRF /v2/components. Ships v0.9.6 alongside RMN/RHN for the v1.0.0 compliance declaration."
+        },
+        "rmn": {
+          "type": "string",
+          "pattern": "^RMN-[0-9]{12}$",
+          "description": "Robot Model Number — RRF-registered identity of the underlying platform model (e.g. the reference SKU from which this instance was built)."
+        },
+        "rhn_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^RHN-[0-9]{12}$" },
+          "uniqueItems": true,
+          "description": "Robot Harness Numbers identifying tested harness/cabling configurations this robot conforms to, as registered on RRF /v2/harnesses."
+        },
         "manufacturer": { "type": "string" },
         "model": { "type": "string" },
         "version": { "type": "string" },

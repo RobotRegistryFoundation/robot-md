@@ -74,6 +74,10 @@ def _provider_identity(fm: dict, rcan_version: str) -> dict:
         "rcan_version": rcan_version,
         "agent_provider": brain.get("planning_provider") or "",
         "agent_model": brain.get("planning_model") or "",
+        # v0.9.6 — RCAN §21 sibling registry IDs. Optional; empty when absent.
+        "rcn_ids": list(meta.get("rcn_ids") or ()),
+        "rmn": meta.get("rmn") or "",
+        "rhn_ids": list(meta.get("rhn_ids") or ()),
     }
 
 

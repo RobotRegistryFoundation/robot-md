@@ -9,6 +9,58 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.6] — 2026-04-23
+
+Seventh release in the v0.9 RCAN 3.0 compliance theme. Adds schema
+slots for the three sibling RCAN §21 registry ID types (RCN, RMN, RHN)
+alongside the existing RRN, and surfaces them in the IFU and EU
+register artifacts. Completes success criterion #5 from the v0.9
+umbrella spec.
+
+### Added
+
+- **`metadata.rcn_ids[]`** — array of Robot Component Numbers
+  (`RCN-[0-9]{12}`, unique). Identifies this robot's constituent
+  components (sensors, actuators, SBC, etc.) as registered on RRF
+  `/v2/components/`.
+- **`metadata.rmn`** — single Robot Model Number (`RMN-[0-9]{12}`).
+  Identifies the underlying platform model (reference SKU) from which
+  this instance was built.
+- **`metadata.rhn_ids[]`** — array of Robot Harness Numbers
+  (`RHN-[0-9]{12}`, unique). Identifies tested harness/cabling
+  configurations this robot conforms to.
+- 10 new tests at `cli/tests/unit/test_schema_rcn_rmn_rhn.py` covering
+  optional presence, pattern validation, prefix rejection, digit-count
+  rejection, uniqueness, and co-existence of all three ID types.
+
+### Emitted in
+
+- **§24 IFU `provider_identity`**: adds `rcn_ids`, `rmn`, `rhn_ids`
+  (empty when absent from manifest).
+- **§26 EU register `system`**: adds the same three fields.
+
+Registration POST body intentionally unchanged — RCN/RMN/RHN identify
+entities registered via the separate RRF `/v2/{components,models,
+harnesses}/` endpoints, not re-minted per robot.
+
+### v0.9 compliance ✅ matrix
+
+| Criterion | Status |
+|---|---|
+| Signed register (v0.9.1) | ✅ |
+| FRIA gate (v0.9.2) | ✅ |
+| `annex_iii_basis` enum (v0.9.0) | ✅ |
+| §23–§26 CLI emitters (v0.9.3–v0.9.5) | ✅ |
+| **RCN/RMN/RHN registry IDs** (v0.9.6) | ✅ |
+| `rcan[pq,crypto]>=3.0` runtime dep (v0.9.1) | ✅ |
+| `rcan_version` schema pin (v0.9.0) | ✅ |
+
+All seven success criteria met. **v1.0.0** (the RCAN 3.0 compliance
+declaration tag) is the next release — no new functionality, just the
+declaration + CHANGELOG wrap.
+
+---
+
 ## [0.9.5] — 2026-04-23
 
 Sixth release in the v0.9 RCAN 3.0 compliance theme. Completes the §23–§26
