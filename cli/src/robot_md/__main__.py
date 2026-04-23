@@ -374,6 +374,216 @@ def emit_benchmarks(
         typer.echo(f"wrote {output}", err=True)
 
 
+# ---------------------------------------------------------- §24 IFU emitter
+
+
+@app.command("emit-ifu")
+def emit_ifu(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    description: str | None = typer.Option(
+        None,
+        "--description",
+        help="Intended purpose. Overrides manifest metadata.description.",
+    ),
+    benchmark: Path | None = typer.Option(
+        None,
+        "--benchmark",
+        help="Path to an rcan-safety-benchmark-v1 artifact (from emit-benchmarks). "
+        "Embeds its overall_pass + per-path p95.",
+    ),
+    lifetime: str | None = typer.Option(
+        None,
+        "--lifetime",
+        help="Expected lifetime string. Overrides manifest compliance.expected_lifetime.",
+    ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Write the artifact here. Default: print to stdout."
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
+    ),
+) -> None:
+    """Emit an rcan-ifu-v1 (Art. 13(3) Instructions for Use) artifact.
+
+    Pulls provider identity, intended purpose, capabilities, oversight
+    measures, known risks, expected lifetime, and maintenance requirements
+    from the manifest. When --benchmark is supplied, embeds the §23
+    artifact's pass/fail + per-path p95 latencies. --sign wraps the final
+    JSON in the same hybrid wire format used by register and emit-benchmarks.
+    """
+    import json as _json
+
+    from robot_md.ifu import build_artifact, sign_artifact
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    artifact = build_artifact(
+        path,
+        description=description,
+        benchmark=benchmark,
+        lifetime=lifetime,
+    )
+
+    if sign:
+        rrn = artifact["provider_identity"]["rrn"].strip()
+        if not rrn:
+            typer.secho(
+                "error: --sign requires metadata.rrn in the manifest. "
+                "Run `robot-md register` first.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+        try:
+            artifact = sign_artifact(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+
+
+# ---------------------------------------------------------- §25 incidents
+
+
+incidents_app = typer.Typer(
+    help="rcan-spec §25 post-market monitoring: record + report serious incidents."
+)
+app.add_typer(incidents_app, name="incidents")
+
+
+def _rrn_from_manifest(path: Path) -> str:
+    from robot_md.parser import parse_file as _parse
+
+    parsed = _parse(path)
+    rrn = str((parsed.frontmatter.get("metadata") or {}).get("rrn") or "").strip()
+    return rrn
+
+
+@incidents_app.command("record")
+def incidents_record(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    severity: str = typer.Option(
+        ...,
+        "--severity",
+        help="'life_health' (15-day Art. 72 deadline) or 'other' (90-day).",
+    ),
+    category: str = typer.Option(..., "--category", help="Short tag, e.g. motor_stall."),
+    description: str = typer.Option(
+        ..., "--description", help="Human-readable incident description."
+    ),
+    system_state: str | None = typer.Option(
+        None,
+        "--system-state",
+        help="Optional JSON dict snapshotting relevant state (e.g. '{\"duty\":0.85}').",
+    ),
+) -> None:
+    """Append an incident to ~/.robot-md/incidents/<rrn>.jsonl (append-only)."""
+    import json as _json
+
+    from robot_md.incidents import record
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho(
+            "error: manifest has no metadata.rrn. Run `robot-md register` first.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+
+    state = None
+    if system_state is not None:
+        try:
+            state = _json.loads(system_state)
+        except _json.JSONDecodeError as e:
+            typer.secho(
+                f"error: --system-state must be valid JSON: {e}", err=True, fg=typer.colors.RED
+            )
+            raise typer.Exit(code=2) from e
+        if not isinstance(state, dict):
+            typer.secho(
+                "error: --system-state must be a JSON object.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+
+    try:
+        entry = record(
+            rrn,
+            severity=severity,
+            category=category,
+            description=description,
+            system_state=state,
+        )
+    except ValueError as e:
+        typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2) from e
+
+    typer.echo(_json.dumps(entry, indent=2))
+
+
+@incidents_app.command("report")
+def incidents_report(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Write the artifact here. Default: print to stdout."
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
+    ),
+) -> None:
+    """Emit an rcan-incidents-v1 Art. 72 report for this robot."""
+    import json as _json
+
+    from robot_md.incidents import build_report, sign_artifact
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho(
+            "error: manifest has no metadata.rrn. Run `robot-md register` first.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+
+    artifact = build_report(rrn)
+
+    if sign:
+        try:
+            artifact = sign_artifact(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+
+
 @app.command()
 def unregister(
     rrn: str = typer.Argument(..., help="The RRN to delete (e.g. RRN-000000000042)."),

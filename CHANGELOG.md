@@ -9,6 +9,59 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.4] — 2026-04-22
+
+Fifth release in the v0.9 RCAN 3.0 compliance theme. Adds emission of
+two EU AI Act external artifacts: §24 Instructions for Use
+(`rcan-ifu-v1`, Art. 13(3)) and §25 Post-Market Monitoring
+(`rcan-incidents-v1`, Art. 72). Both can sign via the v0.9.1 hybrid
+keypair — same wire format as register, emit-benchmarks, and future
+§26 submissions.
+
+### Added
+
+- **`robot-md emit-ifu MANIFEST [--description TEXT] [--benchmark PATH] [--lifetime TEXT] [--output OUT] [--sign]`**
+  — build the Art. 13(3) IFU artifact from a manifest. Fills all 8
+  mandatory sections (provider_identity, intended_purpose,
+  capabilities_and_limitations, accuracy_and_performance,
+  human_oversight_measures, known_risks_and_misuse, expected_lifetime,
+  maintenance_requirements). `--benchmark` embeds a v0.9.3 §23
+  artifact's overall_pass + per-path p95 without copying full results.
+- **`robot-md incidents record MANIFEST --severity {life_health|other} --category STR --description STR [--system-state JSON]`**
+  — append an entry to the per-robot JSONL at
+  `~/.robot-md/incidents/<rrn>.jsonl` (append-only, UUID v4 + ISO-8601
+  timestamp stamped on write).
+- **`robot-md incidents report MANIFEST [--output OUT] [--sign]`** —
+  emit an `rcan-incidents-v1` Art. 72 report summarizing all logged
+  incidents (total, by severity, reporting deadlines, art72_note, full
+  list).
+- **`robot_md.ifu` and `robot_md.incidents` modules** — reusable
+  `build_artifact` / `build_report` + `sign_artifact`. 14 + 10 TDD
+  tests respectively.
+
+### Reused (no new primitives)
+
+- `--sign` on IFU and incident-report artifacts routes through
+  v0.9.1 `signing.sign_body`. Any verifier that accepts a v0.9.1
+  register body accepts a v0.9.4 IFU or incident report. Single
+  signing scheme ecosystem-wide.
+
+### Out of scope this release
+
+- Classification gate (refusing to emit IFU when `annex_iii_basis`
+  unset) — v0.9.4.1 if operators want it.
+- Submitting reports to a national authority — operator action per
+  Art. 72, not CLI-automated.
+- Incident retention/pruning policies.
+- §26 EU Register submission pipeline (→ v0.9.5).
+
+### Compliance status (delta from 0.9.3)
+
+- §24 IFU emit CLI: ✅ shipped (was ❌)
+- §25 PMM incident log + report: ✅ shipped (was ❌)
+
+---
+
 ## [0.9.3] — 2026-04-22
 
 Fourth release in the v0.9 RCAN 3.0 compliance theme. Adds the
