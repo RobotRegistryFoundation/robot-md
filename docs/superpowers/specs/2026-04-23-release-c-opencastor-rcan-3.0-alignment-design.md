@@ -39,7 +39,7 @@ The `feedback_rcan_3_plus_policy.md` memo is unambiguous: **"All new robot-md/RR
 Two coordinated package releases + one config-sync commit. No new subsystems, no new APIs adopted in opencastor, no wire-format changes. The release makes RCAN 3.0 the hard minimum across all ecosystem consumers.
 
 - **opencastor `2026.4.23.0`** — bumps rcan dep to `>=3.1.1,<4.0`, hard-cuts `ACCEPTED_RCAN_VERSIONS` to `("3.0",)` with `major == 3` forward-compat, replaces `castor/loa.py`'s lexical string compare with unconditional `True`, rewrites the stale "RCAN v1.6 Features" README section.
-- **robot-md-mcp `0.2.2`** — `src/schema/robot.schema.json` tightens `rcan_version` to `pattern: "^3\\."`; description text updated.
+- **robot-md-mcp `0.2.2`** — `src/schema/robot.schema.json` syncs from the canonical upstream (`/home/craigm26/robot-md/schema/v1/robot.schema.json`), which already enforces `rcan_version` as `pattern: "^3\\.[0-9]+(\\.[0-9]+)?$"` with "RCAN 3.0+ only" description. This is a drift-correction, not a schema redesign.
 - **opencastor-ops sync commit** — `config/repos.json` bumps 4 `expected_version` values + `_updated` date.
 
 **Release sequencing:** opencastor and robot-md-mcp are independent and can publish in parallel. The `repos.json` sync commit lands **last**, after both registries confirm the new versions, to avoid a race where the monitor sees "expected version not yet on registry."
@@ -65,16 +65,13 @@ Files:
 
 ### robot-md-mcp (release `0.2.2`)
 
-Repo: `/home/craigm26/robot-md-mcp`, branch `main`.
+Repo: `/home/craigm26/robot-md-mcp`, branch `main`. Canonical schema source: `/home/craigm26/robot-md/schema/v1/robot.schema.json` (already enforces `"pattern": "^3\\.[0-9]+(\\.[0-9]+)?$"` on `rcan_version`, with description `"RCAN protocol version. Must be 3.0 or higher (ecosystem policy: RCAN 3.0+ only going forward; 2.x no longer accepted)."` — no change needed upstream).
 
 Files:
-- `src/schema/robot.schema.json` — the `rcan_version` field:
-  - `description`: `"RCAN protocol version. Must be 2.1+; 3.0+ recommended."` → `"RCAN protocol version. Must be 3.0+."`
-  - Add `"pattern": "^3\\."` (rejects `"2.1"`, `"2.2"`, `"1.6"`, and any future non-3.x)
+- `src/schema/robot.schema.json` — run `npm run sync-schema` (writes bundled copy from canonical). This imports the already-correct 3.0+ pattern + description in one step. Post-sync, `npm run sync-schema -- --check` exits 0.
 - `package.json` — version `0.2.1` → `0.2.2`
-- `CHANGELOG.md` — new `[0.2.2]` entry under "Changed" noting the schema tightening.
+- `CHANGELOG.md` — new `[0.2.2]` entry under "Changed" noting the bundled-schema resync that now enforces RCAN 3.0+.
 - `tests/` — new test cases (see Testing section).
-- Run `npm run sync-schema -- --check` post-edit; if the canonical copy is kept in this repo, commit any resulting sync.
 
 ### opencastor-ops (no tag; direct commit on master)
 
