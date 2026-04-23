@@ -225,6 +225,12 @@ class MintRequest:
     pq_kid: str = ""
     ruri: str = ""
     owner_uid: str = ""
+    # v0.9.7 — operator-declared §21 sibling registry IDs. RRF 1.10.0+ stores
+    # them on the RobotRecord when present; pre-1.10.0 RRFs ignore them. All
+    # optional; empty values strip from the POST body.
+    rcn_ids: tuple[str, ...] = ()
+    rmn: str = ""
+    rhn_ids: tuple[str, ...] = ()
 
     def as_body(self) -> dict[str, Any]:
         # Strip empty optional fields so the server gets a clean payload
@@ -243,6 +249,12 @@ class MintRequest:
             body["ruri"] = self.ruri
         if self.owner_uid:
             body["owner_uid"] = self.owner_uid
+        if self.rcn_ids:
+            body["rcn_ids"] = list(self.rcn_ids)
+        if self.rmn:
+            body["rmn"] = self.rmn
+        if self.rhn_ids:
+            body["rhn_ids"] = list(self.rhn_ids)
         return body
 
 
@@ -289,6 +301,10 @@ def _extract_mint_fields(
     if not robot_name:
         raise ValueError("manifest has no metadata.robot_name; add one before registering")
 
+    # v0.9.7 — pull sibling §21 IDs from manifest metadata if set.
+    rcn_ids = tuple(str(x).strip() for x in (meta.get("rcn_ids") or ()) if str(x).strip())
+    rhn_ids = tuple(str(x).strip() for x in (meta.get("rhn_ids") or ()) if str(x).strip())
+
     req = MintRequest(
         name=robot_name,
         manufacturer=pick(manufacturer, "manufacturer"),
@@ -296,6 +312,9 @@ def _extract_mint_fields(
         firmware_version=pick(firmware_version, "firmware_version", default="1.0"),
         rcan_version=pick(rcan_version, "rcan_version", default="3.0"),
         pq_signing_pub=pick(pq_signing_pub, "pq_signing_pub"),
+        rcn_ids=rcn_ids,
+        rmn=pick(None, "rmn"),
+        rhn_ids=rhn_ids,
     )
 
     missing: list[str] = []

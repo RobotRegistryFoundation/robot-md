@@ -9,6 +9,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.7] — 2026-04-23
+
+Closes the ecosystem loop on RCN/RMN/RHN sibling registry IDs: robot-md
+now emits them in the **signed** register POST body. Pairs with RRF
+1.9.0 (sibling endpoints signed) + 1.10.0 (robot record persists
+declared sibling IDs).
+
+### Added
+
+- `MintRequest` carries optional `rcn_ids: tuple[str, ...]`, `rmn: str`,
+  `rhn_ids: tuple[str, ...]`.
+- `as_body()` emits them (or strips them when empty).
+- `_extract_mint_fields()` pulls them from `metadata.rcn_ids`,
+  `metadata.rmn`, `metadata.rhn_ids`.
+- 4 new tests in `test_register.py` covering body shape, empty-strip,
+  manifest extraction, and end-to-end signed-POST carry.
+
+### Ecosystem alignment
+
+- robot-md @ 0.9.5 shipped the schema slots. 0.9.6 emitted them in IFU
+  and EU-register artifacts. 0.9.7 closes the last emission path: the
+  signed register POST. All three paths now carry the operator-declared
+  sibling IDs.
+- RRF 1.9.0 tightened `/v2/{components,models,harnesses}/register` to
+  require hybrid signing (matching `/v2/robots/register`).
+- RRF 1.10.0 accepts + persists `rcn_ids`/`rmn`/`rhn_ids` on the
+  `RobotRecord`.
+
+All seven v0.9 compliance criteria remain satisfied; v1.0.0
+(declaration tag) remains the next release.
+
+---
+
 ## [0.9.6] — 2026-04-23
 
 Seventh release in the v0.9 RCAN 3.0 compliance theme. Adds schema

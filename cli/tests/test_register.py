@@ -310,3 +310,99 @@ def test_auto_mint_skips_when_no_apikey(tmp_path, monkeypatch):
     with patch("robot_md.register.patch_rrf") as p:
         auto_mint_if_needed("RRN-000000000099", endpoint=DEFAULT_ENDPOINT)
         assert not p.called
+
+
+# ---- v0.9.7 sibling §21 IDs passthrough --------------------------------
+
+
+def test_mint_request_as_body_includes_sibling_ids():
+    req = MintRequest(
+        name="x",
+        manufacturer="y",
+        model="z",
+        firmware_version="1.0",
+        rcan_version="3.0",
+        rcn_ids=("RCN-000000000001", "RCN-000000000002"),
+        rmn="RMN-000000000007",
+        rhn_ids=("RHN-000000000099",),
+    )
+    body = req.as_body()
+    assert body["rcn_ids"] == ["RCN-000000000001", "RCN-000000000002"]
+    assert body["rmn"] == "RMN-000000000007"
+    assert body["rhn_ids"] == ["RHN-000000000099"]
+
+
+def test_mint_request_as_body_strips_empty_sibling_ids():
+    req = MintRequest(
+        name="x",
+        manufacturer="y",
+        model="z",
+        firmware_version="1.0",
+        rcan_version="3.0",
+    )
+    body = req.as_body()
+    assert "rcn_ids" not in body
+    assert "rmn" not in body
+    assert "rhn_ids" not in body
+
+
+def test_extract_mint_fields_pulls_sibling_ids_from_manifest(tmp_path):
+    manifest = BOB_MIN.replace(
+        "  firmware_version: 1.0.0\n",
+        "  firmware_version: 1.0.0\n"
+        "  rcn_ids:\n    - RCN-000000000001\n    - RCN-000000000002\n"
+        "  rmn: RMN-000000000007\n"
+        "  rhn_ids:\n    - RHN-000000000099\n",
+    )
+    path = _write(tmp_path, manifest)
+    req = _extract_mint_fields(
+        path,
+        name=None,
+        manufacturer=None,
+        model=None,
+        firmware_version=None,
+        rcan_version=None,
+        pq_signing_pub=None,
+    )
+    assert req.rcn_ids == ("RCN-000000000001", "RCN-000000000002")
+    assert req.rmn == "RMN-000000000007"
+    assert req.rhn_ids == ("RHN-000000000099",)
+
+
+def test_signed_register_body_carries_sibling_ids(tmp_path, monkeypatch):
+    """End-to-end: manifest with sibling IDs → signed POST body that RRF
+    1.10.0 can verify. sign_body covers the new fields (body+ids canonical
+    scheme from v0.9.1)."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    manifest = BOB_MIN.replace(
+        "  firmware_version: 1.0.0\n",
+        "  firmware_version: 1.0.0\n"
+        "  rcn_ids:\n    - RCN-000000000001\n"
+        "  rmn: RMN-000000000007\n"
+        "  rhn_ids:\n    - RHN-000000000099\n",
+    )
+    path = _write(tmp_path, manifest)
+
+    captured = {}
+
+    def fake_post(endpoint, body, timeout=15.0):
+        captured["body"] = body
+        from robot_md.register import MintResult
+
+        return MintResult(
+            rrn="RRN-000000000099",
+            registered_at="x",
+            record_url="u",
+            raw={"api_key": "k"},
+        )
+
+    with patch("robot_md.register.post_to_rrf", fake_post):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
+    assert rc == 0
+
+    body = captured["body"]
+    assert body["rcn_ids"] == ["RCN-000000000001"]
+    assert body["rmn"] == "RMN-000000000007"
+    assert body["rhn_ids"] == ["RHN-000000000099"]
+    # Signature covers the full body (body+ids canonical scheme)
+    assert verify_body(body) is True
