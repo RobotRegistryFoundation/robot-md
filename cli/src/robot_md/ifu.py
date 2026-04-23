@@ -27,19 +27,10 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from robot_md.parser import parse_file
+from rcan import ART13_COVERAGE, build_ifu  # noqa: F401  # ART13_COVERAGE re-exported for callers
+from rcan.compliance import IFU_SCHEMA as IFU_SCHEMA_NAME  # noqa: F401
 
-IFU_SCHEMA_NAME = "rcan-ifu-v1"
-ART13_COVERAGE = (
-    "provider_identity",
-    "intended_purpose",
-    "capabilities_and_limitations",
-    "accuracy_and_performance",
-    "human_oversight_measures",
-    "known_risks_and_misuse",
-    "expected_lifetime",
-    "maintenance_requirements",
-)
+from robot_md.parser import parse_file
 
 DEFAULT_LIFETIME = (
     "Software support: rolling release with semver-minor updates. "
@@ -174,19 +165,17 @@ def build_artifact(
     parsed = parse_file(manifest_path)
     fm = parsed.frontmatter
     rcan_version = str(fm.get("rcan_version") or "3.0")
-    return {
-        "schema": IFU_SCHEMA_NAME,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-        "art13_coverage": list(ART13_COVERAGE),
-        "provider_identity": _provider_identity(fm, rcan_version),
-        "intended_purpose": _intended_purpose(fm, description),
-        "capabilities_and_limitations": _capabilities(fm),
-        "accuracy_and_performance": _performance(benchmark),
-        "human_oversight_measures": _oversight(fm),
-        "known_risks_and_misuse": _risks(fm),
-        "expected_lifetime": _lifetime(fm, lifetime),
-        "maintenance_requirements": _maintenance(fm),
-    }
+    return build_ifu(
+        provider_identity=_provider_identity(fm, rcan_version),
+        intended_purpose=_intended_purpose(fm, description),
+        capabilities_and_limitations=_capabilities(fm),
+        accuracy_and_performance=_performance(benchmark),
+        human_oversight_measures=_oversight(fm),
+        known_risks_and_misuse=_risks(fm),
+        expected_lifetime=_lifetime(fm, lifetime),
+        maintenance_requirements=_maintenance(fm),
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    )
 
 
 def sign_artifact(artifact: dict, rrn: str) -> dict:

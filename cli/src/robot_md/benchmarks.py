@@ -32,13 +32,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from rcan import build_safety_benchmark
+from rcan.compliance import SAFETY_BENCHMARK_SCHEMA as BENCHMARK_SCHEMA_NAME  # noqa: F401
+
 from robot_md.mcp.context import EstopFlag
 from robot_md.parser import parse_file
 from robot_md.preconditions import _check_one, evaluate
 from robot_md.robot_spec import CapabilityContract, Precondition, RobotSpec
 from robot_md.validate import validate as validate_parsed
 
-BENCHMARK_SCHEMA_NAME = "rcan-safety-benchmark-v1"
 PATHS = ("estop", "bounds_check", "confidence_gate", "full_pipeline")
 DEFAULT_ITERATIONS = 20
 DEFAULT_THRESHOLDS_MS: dict[str, float] = {
@@ -206,15 +208,14 @@ def build_artifact(
     results = {path: _stats(samples[path], thresholds[path]).as_dict() for path in PATHS}
     overall_pass = all(r["pass"] for r in results.values())
 
-    return {
-        "schema": BENCHMARK_SCHEMA_NAME,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-        "mode": "synthetic",
-        "iterations": iterations,
-        "thresholds": {f"{p}_p95_ms": thresholds[p] for p in PATHS},
-        "results": results,
-        "overall_pass": overall_pass,
-    }
+    return build_safety_benchmark(
+        iterations=iterations,
+        thresholds={f"{p}_p95_ms": thresholds[p] for p in PATHS},
+        results=results,
+        mode="synthetic",
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+        overall_pass=overall_pass,
+    )
 
 
 def sign_artifact(artifact: dict, rrn: str) -> dict:

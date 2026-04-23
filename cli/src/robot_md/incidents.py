@@ -26,21 +26,14 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
 
-INCIDENTS_SCHEMA_NAME = "rcan-incidents-v1"
-VALID_SEVERITIES: tuple[Literal["life_health"], Literal["other"]] = (
-    "life_health",
-    "other",
+from rcan import (  # noqa: F401
+    ART72_NOTE,
+    REPORTING_DEADLINES,
+    VALID_SEVERITIES,
+    build_incident_report,
 )
-REPORTING_DEADLINES = {
-    "life_health": "15 days from incident timestamp",
-    "other": "90 days from incident timestamp",
-}
-ART72_NOTE = (
-    "Providers must report serious incidents to the relevant national "
-    "authority within the applicable deadline per EU AI Act Art. 72."
-)
+from rcan.compliance import INCIDENT_REPORT_SCHEMA as INCIDENTS_SCHEMA_NAME  # noqa: F401
 
 
 def _log_dir() -> Path:
@@ -96,21 +89,11 @@ def load(rrn: str) -> list[dict]:
 def build_report(rrn: str) -> dict:
     """Emit an rcan-incidents-v1 report summarizing all logged incidents."""
     entries = load(rrn)
-    by_severity = dict.fromkeys(VALID_SEVERITIES, 0)
-    for e in entries:
-        sev = e.get("severity")
-        if sev in by_severity:
-            by_severity[sev] += 1
-    return {
-        "schema": INCIDENTS_SCHEMA_NAME,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-        "rrn": rrn,
-        "total_incidents": len(entries),
-        "incidents_by_severity": by_severity,
-        "reporting_deadlines": dict(REPORTING_DEADLINES),
-        "art72_note": ART72_NOTE,
-        "incidents": entries,
-    }
+    return build_incident_report(
+        rrn=rrn,
+        incidents=entries,
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    )
 
 
 def sign_artifact(artifact: dict, rrn: str) -> dict:

@@ -23,15 +23,14 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from robot_md.parser import parse_file
-
-EU_REGISTER_SCHEMA_NAME = "rcan-eu-register-v1"
-CONFORMITY_STATUS_DECLARED = "declared"
-SUBMISSION_INSTRUCTIONS = (
-    "Submit this package to the EU AI Act database at "
-    "https://ec.europa.eu/digital-strategy/en/policies/european-ai-act. "
-    "Include the referenced rcan-fria-v1 JSON as an attachment."
+from rcan import (  # noqa: F401
+    CONFORMITY_STATUS_DECLARED,
+    SUBMISSION_INSTRUCTIONS,
+    build_eu_register_entry,
 )
+from rcan.compliance import EU_REGISTER_SCHEMA as EU_REGISTER_SCHEMA_NAME  # noqa: F401
+
+from robot_md.parser import parse_file
 
 
 class EuRegisterError(ValueError):
@@ -96,16 +95,13 @@ def build_artifact(
     provider = _provider(fm)
     system = _system(fm, opencastor_version)
 
-    return {
-        "schema": EU_REGISTER_SCHEMA_NAME,
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-        "fria_ref": fria_path.name,
-        "provider": provider,
-        "system": system,
-        "annex_iii_basis": basis,
-        "conformity_status": CONFORMITY_STATUS_DECLARED,
-        "submission_instructions": SUBMISSION_INSTRUCTIONS,
-    }
+    return build_eu_register_entry(
+        fria_ref=fria_path.name,
+        provider=provider,
+        system=system,
+        annex_iii_basis=basis,
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+    )
 
 
 def sign_artifact(artifact: dict, rrn: str) -> dict:
