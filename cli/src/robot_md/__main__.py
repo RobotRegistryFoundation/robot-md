@@ -308,6 +308,72 @@ def register(
         raise typer.Exit(code=rc)
 
 
+@app.command("emit-benchmarks")
+def emit_benchmarks(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    iterations: int = typer.Option(
+        20, "--iterations", "-n", help="Timed iterations per safety path (default: 20)."
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Write the artifact here. Default: print to stdout.",
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Sign with the v0.9.1 hybrid keypair from ~/.robot-md/keys/<rrn>.signing.json. "
+        "Manifest must have metadata.rrn set.",
+    ),
+) -> None:
+    """Emit rcan-safety-benchmark-v1 artifact (rcan-spec §23) for this robot.
+
+    Runs four synthetic in-process benchmarks against robot-md's own safety
+    paths (estop, bounds_check, confidence_gate, full_pipeline). No
+    hardware, no MCP subprocess — pure Python timing, safe in CI.
+
+    With --sign, the artifact is wrapped in a v0.9.1 hybrid signature so a
+    downstream verifier (e.g. RRF, rcan.dev) can confirm it came from the
+    registered robot.
+    """
+    import json as _json
+
+    from robot_md.benchmarks import build_artifact, sign_artifact
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    artifact = build_artifact(path, iterations=iterations)
+
+    if sign:
+        from robot_md.parser import parse_file as _parse
+
+        parsed = _parse(path)
+        rrn = str((parsed.frontmatter.get("metadata") or {}).get("rrn") or "").strip()
+        if not rrn:
+            typer.secho(
+                "error: --sign requires metadata.rrn in the manifest. "
+                "Run `robot-md register` first.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+        try:
+            artifact = sign_artifact(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+
+
 @app.command()
 def unregister(
     rrn: str = typer.Argument(..., help="The RRN to delete (e.g. RRN-000000000042)."),

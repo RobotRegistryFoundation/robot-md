@@ -9,6 +9,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [0.9.3] — 2026-04-22
+
+Fourth release in the v0.9 RCAN 3.0 compliance theme. Adds the
+`rcan-spec §23` Safety Benchmark Protocol emitter — robot-md's own
+synthetic benchmark of its safety-critical paths, no hardware, no
+castor dependency, optionally signed with the v0.9.1 hybrid keypair.
+
+### Added
+
+- **`robot-md emit-benchmarks MANIFEST [--iterations N] [--output OUT] [--sign]`**
+  — run 4 synthetic benchmarks against robot-md's own safety code,
+  emit a spec-conformant `rcan-safety-benchmark-v1` artifact.
+  Path mapping: `estop` ← `EstopFlag.set/is_set/clear`;
+  `bounds_check` ← `preconditions._check_one(workspace_declared)`;
+  `confidence_gate` ← `preconditions._check_one(learned_skill_ok)`;
+  `full_pipeline` ← `parse_file → validate → RobotSpec.from_parsed →
+  preconditions.evaluate` end-to-end.
+- **`robot_md.benchmarks` module** — reusable `build_artifact`,
+  `run_estop`, `run_bounds_check`, `run_confidence_gate`,
+  `run_full_pipeline`, `resolve_thresholds`, `sign_artifact`. 14 TDD
+  tests in `cli/tests/test_benchmarks.py`.
+- **Threshold resolution.** `estop` threshold is pulled from the
+  manifest's `safety.estop.response_ms`; other three paths default to
+  the §23 example values (5/2/50 ms).
+- **`--sign` uses v0.9.1 signing.** After building the artifact, the
+  canonical JSON is routed through `signing.sign_body` with the
+  keypair at `~/.robot-md/keys/<rrn>.signing.json`. Output is
+  wire-compatible with `signing.verify_body` — any verifier that
+  accepts a v0.9.1-signed register body accepts a v0.9.3-signed
+  benchmark artifact.
+
+### Out of scope this release
+
+- Live mode (connecting to a running robot / MCP subprocess).
+- Uploading the artifact to RRF. `§26` EU Register submission (v0.9.5)
+  will carry signed §23 artifacts as part of the conformity package.
+- New schema slots inside `compliance` for benchmark references — the
+  §23 artifact is an external object, not a ROBOT.md field, per the
+  v0.9 umbrella spec's spec-authority principle.
+
+### Compliance status (delta from 0.9.2)
+
+- §23 Safety Benchmarks emit CLI: ✅ shipped (was ❌)
+- Signed external artifact production: ✅ first (register/patch wire
+  format reused verbatim — one signing scheme ecosystem-wide).
+
+---
+
 ## [0.9.2] — 2026-04-22
 
 Third release in the v0.9 RCAN 3.0 compliance theme. **FRIA enforcement**
