@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robot-md"
-version = "0.9.7"
+version = "1.0.0"
 description = "ROBOT.md — a single self-describing file so Claude can safely operate your robot."
 readme = "../README.md"
 requires-python = ">=3.10"
@@ -12,7 +12,7 @@ license = { text = "Apache-2.0" }
 authors = [{ name = "craigm26", email = "craigm26@gmail.com" }]
 keywords = ["robotics", "claude", "anthropic", "rcan", "opencastor", "robot-md"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",

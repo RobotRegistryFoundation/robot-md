@@ -9,6 +9,51 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.0] — 2026-04-23
+
+**RCAN 3.0 compliance declaration.** No new code. This release tags the
+end of the v0.9 compliance theme: seven successive sub-releases (0.9.1
+through 0.9.7) each closed one slice of the v0.9 umbrella spec, and
+this tag marks the point at which all seven criteria ship together
+under a stable major version.
+
+### What was in the v0.9 arc
+
+| Release | Theme |
+|---|---|
+| 0.9.0 | `rcan>=3.0,<4.0` dep bump + RCAN 3.0 version declaration |
+| 0.9.1 | Hybrid signing on `register` (ML-DSA-65 + Ed25519); RURI construction; `test_register.py` rewrite |
+| 0.9.2 | Schema gate — `compliance.annex_iii_basis` present ⇒ `compliance.fria_ref` required and URI-shaped |
+| 0.9.3 | `emit-benchmarks` — §23 safety benchmark emitter over robot-md's own safety paths |
+| 0.9.4 | `emit-ifu` (§24 IFU, Art. 13(3)) + `incidents record`/`report` (§25 PMM, Art. 72) |
+| 0.9.5 | `emit-eu-register` (§26 EU Register submission, Art. 49) |
+| 0.9.6 | Schema slots for `metadata.rcn_ids[]` / `metadata.rmn` / `metadata.rhn_ids[]`; surfaced in IFU + EU register |
+| 0.9.7 | Signed register POST emits the operator-declared sibling IDs — closes ecosystem loop |
+
+### Ecosystem state at 1.0.0
+
+- **robot-md**: 1.0.0 — RCAN 3.0 compliant client.
+- **rcan-py**: 3.0.1 on PyPI — ML-DSA-65 + Ed25519 hybrid signing primitives.
+- **RRF**: 1.10.0 live at robotregistryfoundation.org — strict hybrid
+  signing on all `/v2/*/register` endpoints; `RobotRecord` persists
+  operator-declared `rcn_ids`/`rmn`/`rhn_ids`.
+
+### Not in 1.0.0 (carried forward)
+
+- Key rotation (§2.3), at-rest keystore encryption, FRIA content
+  enforcement (vs. just reference-gate), and the RCN/RMN/RHN client-side
+  register commands — all deferred to v1.1+.
+- Opencastor still accepts only RCAN 2.2 configs and reads `.rcan.yaml`
+  rather than ROBOT.md; the end-to-end round-trip through opencastor
+  remains broken pending a separate alignment release.
+
+### No migration
+
+Drop-in from 0.9.7. `pip install -U robot-md` — no schema change, no
+config change, no API change.
+
+---
+
 ## [0.9.7] — 2026-04-23
 
 Closes the ecosystem loop on RCN/RMN/RHN sibling registry IDs: robot-md
