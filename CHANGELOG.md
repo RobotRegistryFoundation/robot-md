@@ -9,6 +9,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.0.1] — 2026-04-23
+
+**rcan 3.1.1 consolidation.** Deletes duplicated primitives and spec-domain
+constants that now live upstream in rcan 3.1.1. No behavior change, no
+wire-format change, no test changes. All signing envelopes and compliance
+artifacts are byte-identical to 1.0.0's output.
+
+### Changed
+
+- `cli/pyproject.toml`: `rcan[pq,crypto]>=3.1,<4.0` → `rcan[pq,crypto]>=3.1.1,<4.0`.
+- `signing.py`: local `canonical_json` / `sign_body` / `verify_body` replaced
+  by thin adapters calling `rcan.canonical_json` / `rcan.sign_body` /
+  `rcan.verify_body` (Task 14, commit `bcb79e8`).
+- `benchmarks.py`, `ifu.py`, `incidents.py`, `eu_register.py`: the four
+  `build_artifact` emitters now call `rcan.build_safety_benchmark`,
+  `rcan.build_ifu`, `rcan.build_incident_report`,
+  `rcan.build_eu_register_entry` respectively. Domain logic (manifest
+  parsing, measurement, threshold resolution, FRIA validation) stays local.
+- Spec-domain constants `ART13_COVERAGE`, `VALID_SEVERITIES`,
+  `REPORTING_DEADLINES`, `ART72_NOTE`, `CONFORMITY_STATUS_DECLARED`,
+  `SUBMISSION_INSTRUCTIONS` now imported from `rcan` (previously duplicated).
+
+### Unchanged
+
+- Wire format for register POSTs and all compliance artifacts.
+- All 32 tests in `test_register.py` + `test_signing.py` pass UNCHANGED.
+- Full `cli/tests/` suite: 274 passed, 0 failed.
+
+---
+
 ## [1.0.0] — 2026-04-23
 
 **RCAN 3.0 compliance declaration.** No new code. This release tags the
