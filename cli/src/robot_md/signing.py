@@ -22,13 +22,12 @@ from pathlib import Path
 from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import ed25519
+from rcan import canonical_json as _rcan_canonical_json
+from rcan import sign_body as _rcan_sign_body
+from rcan import verify_body as _rcan_verify_body
 from rcan.crypto import (
-    HybridSignature,
     MlDsaKeyPair,
-    RCANSignatureError,
     generate_ml_dsa_keypair,
-    sign_hybrid,
-    verify_hybrid,
 )
 
 KEYSTORE_DIR = Path.home() / ".robot-md" / "keys"
@@ -111,58 +110,39 @@ def load_keypair(rrn: str) -> SigningKeypair | None:
     )
 
 
+# ----------------------------------------------------------------------
+# v1.0.1 — dict-level signing now lives in rcan.hybrid + rcan.encoding.
+# These thin adapters preserve robot-md's ergonomic SigningKeypair
+# wrapper (one arg, unpacked to rcan's keyword form) so existing callers
+# in register.py, benchmarks.py, etc. don't change.
+# ----------------------------------------------------------------------
+
+
 def canonical_json(body: dict[str, Any]) -> bytes:
-    """Deterministic JSON — must match TS `JSON.stringify(sortKeys(obj))`."""
-    return json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode(
-        "utf-8"
-    )
+    """Deterministic JSON — delegates to rcan.encoding.canonical_json."""
+    return _rcan_canonical_json(body)
 
 
 def sign_body(kp: SigningKeypair, body: dict[str, Any]) -> dict[str, Any]:
-    """Return a COPY of body with pq_signing_pub, pq_kid, sig appended.
+    """Unpack SigningKeypair and call rcan.hybrid.sign_body.
 
-    Signs over canonical_json({**body, pq_signing_pub, pq_kid}) — the IDs
-    are PART of the signed message, matching RRF's register.ts and PATCH
-    [rrn]/index.ts wire formats. verify_body strips only `sig` before
-    re-canonicalizing, which recovers the same signed message.
+    Wire format unchanged: body + pq_signing_pub + pq_kid + sig.
     """
-    pq_pub_b64 = base64.b64encode(kp.ml_dsa.public_key_bytes).decode()
-    body_with_ids = {**body, "pq_signing_pub": pq_pub_b64, "pq_kid": kp.pq_kid}
-    message = canonical_json(body_with_ids)
-    hs = sign_hybrid(kp.ml_dsa, kp.ed25519_sec, message)
-    return {
-        **body_with_ids,
-        "sig": {
-            "ml_dsa": base64.b64encode(hs.ml_dsa_sig).decode(),
-            "ed25519": base64.b64encode(hs.ed25519_sig).decode(),
-            "ed25519_pub": base64.b64encode(kp.ed25519_pub).decode(),
-        },
-    }
+    return _rcan_sign_body(
+        kp.ml_dsa,
+        body,
+        ed25519_secret=kp.ed25519_sec,
+        ed25519_public=kp.ed25519_pub,
+    )
 
 
 def verify_body(signed: dict[str, Any]) -> bool:
-    """Strip `sig`, canonicalize the rest (INCLUDING pq_signing_pub + pq_kid),
-    hybrid-verify. Matches RRF's wire format for register + PATCH.
-    """
-    try:
-        sig = signed.get("sig")
-        if not sig:
-            return False
-        pq_pub_b64 = signed.get("pq_signing_pub")
-        if not pq_pub_b64:
-            return False
-        rest = {k: v for k, v in signed.items() if k != "sig"}
-        message = canonical_json(rest)
-        verify_hybrid(
-            ml_dsa_public_key_bytes=base64.b64decode(pq_pub_b64),
-            ed25519_public_key_bytes=base64.b64decode(sig["ed25519_pub"]),
-            message=message,
-            hybrid_sig=HybridSignature(
-                ml_dsa_sig=base64.b64decode(sig["ml_dsa"]),
-                ed25519_sig=base64.b64decode(sig["ed25519"]),
-                kid=signed.get("pq_kid", ""),
-            ),
-        )
-        return True
-    except (RCANSignatureError, KeyError, ValueError, binascii.Error):
+    """Delegates to rcan.hybrid.verify_body with pq_signing_pub pulled from payload."""
+    pq_pub_b64 = signed.get("pq_signing_pub")
+    if not pq_pub_b64:
         return False
+    try:
+        pq_pub = base64.b64decode(pq_pub_b64)
+    except (ValueError, binascii.Error):
+        return False
+    return _rcan_verify_body(signed, pq_pub)
