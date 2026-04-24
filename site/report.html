@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Report an issue · robot-md</title>
+  <link rel="stylesheet" href="/style.css">
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; max-width: 780px; margin: 40px auto; padding: 0 20px; line-height: 1.6; color: #1d1c1a; }
+    h1 { font-size: 28px; border-bottom: 2px solid #e06c5a; padding-bottom: 8px; }
+    h2 { font-size: 18px; margin-top: 32px; letter-spacing: .05em; text-transform: uppercase; color: #e06c5a; }
+    .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 14px 16px; border-left: 3px solid #e06c5a; background: #f5f2ee; margin-bottom: 10px; border-radius: 4px; }
+    .row .sym { font-weight: 500; }
+    .row .link a { color: #b6452e; text-decoration: none; font-weight: 600; white-space: nowrap; }
+    .row .link a:hover { text-decoration: underline; }
+    .note { font-size: 14px; color: #555; margin-top: 24px; padding: 16px; background: #fffbe8; border-left: 3px solid #d4a017; border-radius: 4px; }
+    code { font-family: ui-monospace, Menlo, monospace; font-size: 0.9em; background: #fff; padding: 1px 5px; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <h1>Report an issue</h1>
+  <p>Every bug report goes on GitHub. Pick the repo that matches your symptom — your filing feeds the weekly triage digest at <a href="https://github.com/craigm26/opencastor-ops/tree/main/triage">opencastor-ops/triage/</a>.</p>
+
+  <h2>Decision tree</h2>
+
+  <div class="row">
+    <div class="sym"><code>robot-md</code> CLI crashes, <code>robot-md init</code> doesn't detect hardware, schema complaint</div>
+    <div class="link"><a href="https://github.com/RobotRegistryFoundation/robot-md/issues/new/choose">robot-md →</a></div>
+  </div>
+
+  <div class="row">
+    <div class="sym">MCP server <code>robot-md-mcp</code> won't start, tools broken, resources missing. Claude Code plugin issues.</div>
+    <div class="link"><a href="https://github.com/RobotRegistryFoundation/robot-md-mcp/issues/new/choose">robot-md-mcp →</a></div>
+  </div>
+
+  <div class="row">
+    <div class="sym"><code>robot-md-pendant</code> firmware / hardware bring-up</div>
+    <div class="link"><a href="https://github.com/RobotRegistryFoundation/robot-md-pendant/issues/new/choose">robot-md-pendant →</a></div>
+  </div>
+
+  <div class="row">
+    <div class="sym">RCAN protocol — spec ambiguity, §22-26 endpoint behavior</div>
+    <div class="link"><a href="https://github.com/continuonai/rcan-spec/issues/new/choose">rcan-spec →</a></div>
+  </div>
+
+  <div class="row">
+    <div class="sym">Python SDK <code>rcan-py</code> — <code>RCANMessage</code>, <code>HiTLGate</code>, <code>AuditChain</code></div>
+    <div class="link"><a href="https://github.com/continuonai/rcan-py/issues/new/choose">rcan-py →</a></div>
+  </div>
+
+  <div class="row">
+    <div class="sym">TypeScript SDK <code>rcan-ts</code> — Node or browser</div>
+    <div class="link"><a href="https://github.com/continuonai/rcan-ts/issues/new/choose">rcan-ts →</a></div>
+  </div>
+
+  <div class="row">
+    <div class="sym">OpenCastor runtime — hardware control, gateway, provider auth</div>
+    <div class="link"><a href="https://github.com/craigm26/opencastor/issues/new/choose">opencastor →</a></div>
+  </div>
+
+  <div class="row">
+    <div class="sym">Cross-repo ecosystem questions, triage meta</div>
+    <div class="link"><a href="https://github.com/craigm26/opencastor-ops/issues/new/choose">opencastor-ops →</a></div>
+  </div>
+
+  <p class="note"><b>Not sure?</b> File on the repo you think it might be, and the weekly triage sweep will re-route with a <code>triage:wrong-repo</code> label and a cross-reference comment. Better to over-file than stay silent.</p>
+
+  <p><a href="/">← back to robotmd.dev</a></p>
+</body>
+</html>
