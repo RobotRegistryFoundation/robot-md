@@ -18,6 +18,7 @@ This repo is the **declaration layer** — the file format + Python CLI. Everyth
 |---|---|---|
 | **Declaration** ← *this* | [ROBOT.md](https://github.com/RobotRegistryFoundation/robot-md) | The file a robot ships at its root. YAML frontmatter + markdown prose. Declares identity, capabilities, safety gates. **Spec + `robot-md` Python CLI** (`init`, `validate`, `render`, `calibrate`, `register`, `autodetect`). |
 | **Agent bridge** | [robot-md-mcp](https://github.com/RobotRegistryFoundation/robot-md-mcp) | MCP server that exposes a `ROBOT.md` to Claude Code, Claude Desktop, Cursor, Zed, Gemini CLI — any MCP-aware agent. One `claude mcp add` away. |
+| **Remote dispatch** | [robot-md-dispatcher](https://github.com/RobotRegistryFoundation/robot-md-dispatcher) | **BYOK Claude Agent SDK dispatcher** — accepts tasks over HTTP and runs them through a local Claude agent on the robot host. Use when an external system (cron, Slack bot, another agent) hands the robot a task; the MCP bridge above is for interactive human use. |
 | **Wire protocol** | [RCAN](https://rcan.dev/spec/) | How robots, gateways, and planners talk. Signed envelopes, LoA enforcement, PQC crypto. Think HTTP for robots. |
 | **Python SDK** | [rcan-py](https://github.com/continuonai/rcan-py) | `pip install rcan` — `RCANMessage`, `RobotURI`, `ConfidenceGate`, `HiTLGate`, `AuditChain`. |
 | **TypeScript SDK** | [rcan-ts](https://github.com/continuonai/rcan-ts) | `npm install rcan-ts` — same API surface for Node + browser. |
