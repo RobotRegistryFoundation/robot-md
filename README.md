@@ -3,6 +3,8 @@
 > **`ROBOT.md` is to a robot what `CLAUDE.md` is to a codebase.**
 > One file — YAML frontmatter + markdown prose — so Claude Code, Claude Desktop, Cursor, Zed, Gemini CLI, or any MCP-aware agent can safely operate your robot.
 
+> **Peer runtime:** `robot-md` and [`opencastor`](https://github.com/craigm26/OpenCastor) are first-class peer RCAN 3.x runtimes against a single `ROBOT.md` — see [PEER_RUNTIMES.md](https://github.com/craigm26/opencastor-ops/blob/master/PEER_RUNTIMES.md) for the side-by-side comparison.
+
 [![PyPI](https://img.shields.io/pypi/v/robot-md.svg)](https://pypi.org/project/robot-md/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Spec](https://img.shields.io/badge/spec-v1.1-green.svg)](spec/robot-md-v1.md)
