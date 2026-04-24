@@ -168,8 +168,7 @@ def cli_verify_tier(
             return 1
         if size > MAX_ATTESTATION_BYTES:
             print(
-                f"Attestation file too large: {size} bytes "
-                f"(max {MAX_ATTESTATION_BYTES} = 1 MiB)",
+                f"Attestation file too large: {size} bytes (max {MAX_ATTESTATION_BYTES} = 1 MiB)",
                 file=sys.stderr,
             )
             return 1

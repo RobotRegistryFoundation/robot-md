@@ -157,9 +157,7 @@ def build_rotate_request(old_kp, new_kp, rrn: str) -> dict[str, Any]:
     }
 
 
-def post_rotate(
-    url: str, body: dict[str, Any], *, timeout: float = 15.0
-) -> tuple[int, str]:
+def post_rotate(url: str, body: dict[str, Any], *, timeout: float = 15.0) -> tuple[int, str]:
     """POST body as JSON to url.
 
     Returns (status_code, response_text) on HTTP responses.
@@ -216,8 +214,7 @@ def cli_rotate_key(
     old_kp = load_keypair(rrn)
     if old_kp is None:
         print(
-            f"No signing key for {rrn}; cannot rotate. "
-            "Did you register with a v0.9.1+ client?",
+            f"No signing key for {rrn}; cannot rotate. Did you register with a v0.9.1+ client?",
             file=sys.stderr,
         )
         return 1
@@ -276,8 +273,7 @@ def cli_rotate_key(
         archive_dest = archive_old_keypair(rrn, old_kp)
     except OSError as e:
         print(
-            f"Server rotated but archive-write failed: {e}. "
-            "Local keystore still has old key.",
+            f"Server rotated but archive-write failed: {e}. Local keystore still has old key.",
             file=sys.stderr,
         )
         print(

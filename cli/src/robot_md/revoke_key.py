@@ -35,9 +35,7 @@ def build_revoke_body(rrn: str, reason: str | None) -> dict[str, Any]:
     return body
 
 
-def post_revoke(
-    url: str, signed_body: dict[str, Any], *, timeout: float = 15.0
-) -> tuple[int, str]:
+def post_revoke(url: str, signed_body: dict[str, Any], *, timeout: float = 15.0) -> tuple[int, str]:
     """POST signed_body as JSON to url.
 
     Returns (status_code, response_text) on HTTP responses.

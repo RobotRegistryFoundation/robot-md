@@ -747,9 +747,7 @@ def verify_tier(
         "--attestation-file",
         help="Path to a signed attestation JSON (required for manufacturer_verified).",
     ),
-    endpoint: str = typer.Option(
-        "https://robotregistryfoundation.org/v2/robots", "--endpoint"
-    ),
+    endpoint: str = typer.Option("https://robotregistryfoundation.org/v2/robots", "--endpoint"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the pre-flight confirmation prompt."),
 ) -> None:
     """Promote a robot's verification_status.
