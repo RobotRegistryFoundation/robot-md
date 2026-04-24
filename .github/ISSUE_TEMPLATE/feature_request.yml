@@ -1,34 +1,47 @@
 name: Feature request
-description: Propose a new feature or spec addition.
+description: Propose a new feature or improvement
+title: "[feat] "
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement! Before filing, check the
+        [ecosystem CONTRIBUTING doc](https://github.com/craigm26/opencastor-ops/blob/main/CONTRIBUTING.md)
+        to make sure this is the right repo.
   - type: textarea
     id: problem
     attributes:
-      label: What problem does this solve?
-      description: Describe the use case and why the current format/CLI falls short.
+      label: Problem
+      description: What are you trying to do that's hard today? Describe the user experience, not the solution.
     validations:
       required: true
   - type: textarea
-    id: proposal
+    id: proposed
     attributes:
-      label: Proposed change
-      description: If it's a spec change, show the before/after YAML. If it's a CLI change, show the new invocation.
+      label: Proposed approach
+      description: How would you solve this? Sketches, pseudocode, API shapes all welcome.
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
       label: Alternatives considered
+      description: Other approaches you ruled out and why.
     validations:
       required: false
-  - type: dropdown
-    id: breaking
+  - type: textarea
+    id: scope
     attributes:
-      label: Breaking change?
-      options:
-        - "No"
-        - "Yes (requires v2 schema)"
-        - "Unsure"
+      label: Scope
+      description: What's in scope for the first iteration? What's explicitly out of scope?
     validations:
-      required: true
+      required: false
+  - type: input
+    id: related
+    attributes:
+      label: Related issues / PRs
+      description: Cross-references in this or other ecosystem repos.
+      placeholder: "e.g. RobotRegistryFoundation/robot-md#3"
+    validations:
+      required: false
