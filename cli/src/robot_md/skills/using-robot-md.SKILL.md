@@ -123,15 +123,15 @@ If the operator hasn't invoked a prompt, you can still proceed via the matching 
 
 ## Installation
 
-This skill ships as part of the [robot-md](https://github.com/RobotRegistryFoundation/robot-md) repo at `integrations/claude-code-skill/SKILL.md`. To install into a Claude Code session that uses [superpowers](https://github.com/obra/superpowers) (or any skill-aware harness):
+This skill ships as part of the [`robot-md` Claude Code plugin](https://github.com/RobotRegistryFoundation/claude-code-plugins). Install with:
 
-```bash
-# Copy into your user skills directory
-mkdir -p ~/.claude/skills/using-robot-md
-cp integrations/claude-code-skill/SKILL.md ~/.claude/skills/using-robot-md/
+```
+/plugin marketplace add RobotRegistryFoundation/claude-code-plugins
+/plugin install robot-md
+/reload-plugins
 ```
 
-Or install via the superpowers skill-install flow if you use one.
+The plugin also auto-registers the `robot-md-mcp` MCP server. If you prefer a manual install, `pip install robot-md` and run `robot-md install-skill` to copy this file into `~/.claude/skills/using-robot-md/`.
 
 ## Integration
 

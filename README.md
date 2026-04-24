@@ -165,18 +165,7 @@ Claude will use its `Bash` tool to run the same one-liner from Option A, show yo
 
 ---
 
-### ▶ Option C — SessionStart hook (pre-MCP path)
-
-If you can't use MCP (older Claude Code, or you want the ROBOT.md context pinned into every session unconditionally):
-
-```bash
-mkdir -p ~/.claude/hooks
-curl -fsSL https://robotmd.dev/hook > ~/.claude/hooks/robot-md.sh
-chmod +x ~/.claude/hooks/robot-md.sh
-# Add one entry to ~/.claude/settings.json — see integrations/claude-code/settings.template.json.
-```
-
-All three paths end the same way: Claude Code is the planner and the executor. No gateway, no runtime to stand up.
+Both paths end the same way: Claude Code is the planner and the executor. No gateway, no runtime to stand up.
 
 `robot-md autodetect` scans PCI + USB + `/dev/tty*` and emits a draft that validates against the v1 schema but deliberately marks identity fields (`robot_name`, `physics.type`, `dof`) as TODO — the operator is the authority on what the robot *is*.
 
@@ -206,7 +195,7 @@ Beyond the initial setup, the rest of the package is designed so that **Claude C
 
 - **`CLAUDE.md` in the project root** — generate with `robot-md claude-md ROBOT.md`. Teaches Claude which operator intents should dispatch which verb (safety → check HITL gates, "broken" → `doctor`, motion → HITL first). Read at session start.
 - **MCP server descriptions** — `robot-md-mcp` v0.2+ advertises a server-level `instructions` field plus intent-matchable descriptions on every resource and tool. Any MCP client routes to the right resource by description alone.
-- **Skill definition** at [`integrations/claude-code-skill/SKILL.md`](integrations/claude-code-skill/SKILL.md) — for operators running the [superpowers](https://github.com/obra/superpowers) plugin (or any skill-aware harness), a drop-in skill with the intent → action table and a safety protocol Claude follows automatically.
+- **Claude Code plugin** at [`RobotRegistryFoundation/robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) — ships the `using-robot-md` skill (intent → action routing, safety protocol, registration flow) and auto-registers the MCP server. Install via `/plugin marketplace add RobotRegistryFoundation/claude-code-plugins` + `/plugin install robot-md`.
 
 ## Claude integration
 
@@ -221,7 +210,7 @@ Beyond the initial setup, the rest of the package is designed so that **Claude C
 
 **ROBOT.md is planner-agnostic by design.** MCP is an [open standard](https://modelcontextprotocol.io). The file you write is the file every provider reads. No per-vendor rewrites, no parallel manifests.
 
-See [`integrations/claude-code/`](integrations/claude-code/) for hook-path install instructions. The MCP path needs no files — just the `claude mcp add` one-liner (or your harness's equivalent) above.
+For Claude Code specifically, the [`robot-md` plugin](https://github.com/RobotRegistryFoundation/claude-code-plugins) is the easiest install — it bundles the skill and auto-registers the MCP server. Use the `claude mcp add` one-liner (or your harness's equivalent) above if you want to pin a specific path or run outside Claude Code.
 
 ## The broader ecosystem
 

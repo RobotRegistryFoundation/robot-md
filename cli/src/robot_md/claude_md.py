@@ -4,8 +4,8 @@ The CLAUDE.md template teaches Claude Code (and any CLAUDE.md-aware
 harness) how to recognize robot-related intent and which robot-md
 verbs to dispatch. Drop it in the same directory as `ROBOT.md`.
 
-Template source: `integrations/claude-code/CLAUDE.md.template` in the
-robot-md repo, bundled with the wheel via hatchling package_data.
+Template is inlined in this module as `_TEMPLATE_INLINE` — bundled
+with the wheel, no external files required.
 """
 # ruff: noqa: E501  # long lines are intentional in the embedded markdown template
 

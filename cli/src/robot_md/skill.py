@@ -7,10 +7,10 @@ installed, Claude Code auto-invokes the skill whenever it recognizes
 robot-related intent in a session — "what can this robot do", "is it
 safe to X", "pose the arm at zero", etc.
 
-Canonical source lives at `integrations/claude-code-skill/SKILL.md` in
-the robot-md repo; a copy is bundled in the wheel under
-`robot_md/skills/using-robot-md.SKILL.md` so the CLI can install it
-without network access.
+The canonical source ships in the `robot-md` Claude Code plugin at
+https://github.com/RobotRegistryFoundation/robot-md-mcp (skills/using-robot-md/).
+A copy is bundled in this wheel under `robot_md/skills/using-robot-md.SKILL.md`
+so `robot-md install-skill` can install it without network access.
 """
 
 from __future__ import annotations
@@ -19,28 +19,18 @@ from pathlib import Path
 
 SKILL_NAME = "using-robot-md"
 _BUNDLED = Path(__file__).parent / "skills" / "using-robot-md.SKILL.md"
-_REPO_FALLBACK = (
-    Path(__file__).resolve().parent.parent.parent.parent
-    / "integrations"
-    / "claude-code-skill"
-    / "SKILL.md"
-)
 
 
 def skill_content() -> str:
-    """Return the canonical SKILL.md content.
+    """Return the canonical SKILL.md content from the wheel-bundled copy.
 
-    Prefers the wheel-bundled copy; falls back to the repo tree (useful
-    when running editable installs where `src/robot_md/skills/` was not
-    synced). Raises FileNotFoundError if neither is present.
+    Raises FileNotFoundError if the bundled file is missing (should not
+    happen in a correctly-built wheel or editable install).
     """
     if _BUNDLED.exists():
         return _BUNDLED.read_text()
-    if _REPO_FALLBACK.exists():
-        return _REPO_FALLBACK.read_text()
     raise FileNotFoundError(
-        f"could not locate {SKILL_NAME}.SKILL.md in the wheel "
-        f"({_BUNDLED}) or the repo tree ({_REPO_FALLBACK})"
+        f"could not locate {SKILL_NAME}.SKILL.md in the wheel ({_BUNDLED})"
     )
 
 
