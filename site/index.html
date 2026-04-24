@@ -1506,11 +1506,11 @@
 
   <!-- ================= QUICKSTART ================= -->
   <div class="wrap" style="padding-top:40px; padding-bottom:40px; border-top:1px solid var(--rule)">
-    <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; font-size:11px; text-transform:uppercase; font-family:var(--mono); margin-bottom:8px">Quickstart · three surfaces, one file</div>
+    <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; font-size:11px; text-transform:uppercase; font-family:var(--mono); margin-bottom:8px">Quickstart · four surfaces, one file</div>
     <h2 class="sec-title" style="margin-bottom:8px">Start with <code style="font-family:var(--mono); color:var(--accent-ink)">robot-md init</code>. Pick a surface.</h2>
-    <p class="sec-lede" style="margin-bottom:24px">Every path begins the same: <code>pip install robot-md &amp;&amp; robot-md init</code> writes <code>ROBOT.md</code> + <code>CLAUDE.md</code> and (optionally) mints an <code>RRN</code> at the Robot Registry Foundation. Then choose where Claude runs.</p>
+    <p class="sec-lede" style="margin-bottom:24px">Every path begins the same: <code>pip install robot-md &amp;&amp; robot-md init</code> writes <code>ROBOT.md</code> + <code>CLAUDE.md</code> and (optionally) mints an <code>RRN</code> at the Robot Registry Foundation. Then choose where the planner runs.</p>
 
-    <div class="after-grid-1">
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px">
       <!-- Claude Code -->
       <div style="padding:18px; background:var(--paper-2); border-left:3px solid var(--accent)">
         <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">Claude Code · plugin</div>
@@ -1543,9 +1543,21 @@
         </div>
         <p style="margin-top:12px; font-size:13px; color:var(--ink-4); line-height:1.5">RRF hosts the manifest publicly — zero self-hosting. Mobile fetches ROBOT.md + CLAUDE.md and answers from the declared capabilities.</p>
       </div>
+
+      <!-- ChatGPT Custom GPT -->
+      <div style="padding:18px; background:var(--paper-2); border-left:3px solid var(--accent)">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">ChatGPT Custom GPT · web</div>
+        <div style="font-family:var(--mono); font-size:13px; line-height:1.75; color:var(--ink-2)">
+          <div><span style="color:var(--ink-4)">$</span> <span style="color:var(--accent-ink)">robot-md register ROBOT.md</span></div>
+          <div><span style="color:var(--ink-4)">#</span> enable Web Browsing, paste in Instructions:</div>
+          <div style="padding-left:12px; color:var(--accent-ink); word-break:break-all">Read robotregistryfoundation.org/r/&lt;rrn&gt; before any safety or capability question.</div>
+          <div><span style="color:var(--ink-4)">#</span> (optional) upload <code>ROBOT.md</code> as Knowledge</div>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--ink-4); line-height:1.5">No MCP, no Actions, no self-hosting. Custom GPT reads the RRF-hosted manifest + <code>CLAUDE.md</code>. Upgrade to OpenAPI Actions later if you want live <code>validate</code>/<code>render</code> calls.</p>
+      </div>
     </div>
 
-    <p style="margin-top:20px; font-size:13px; color:var(--ink-4)">Same <code>ROBOT.md</code>, one identity via <code>RRN</code>, every Claude surface reads it. No provider lock-in — any MCP-aware agent (Cursor, Zed, Continue, Gemini CLI, Codex CLI) uses the same server.</p>
+    <p style="margin-top:20px; font-size:13px; color:var(--ink-4)">Same <code>ROBOT.md</code>, one identity via <code>RRN</code>, every planner reads it. No provider lock-in — any MCP-aware agent (Cursor, Zed, Continue, Gemini CLI, Codex CLI) uses the same server; any web-browsing LLM reads the RRF URL.</p>
   </div>
 
   <!-- ================= §01 THE FILE ================= -->
@@ -1849,6 +1861,31 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
             <div style="color:var(--ink-4)">← reads hitl_gates, returns authorization rules</div>
           </div>
           <div class="cta">No native app · no Anthropic change · registry auto-hosts</div>
+        </article>
+
+        <article class="surface">
+          <div class="st ship">● Shipping</div>
+          <h3>ChatGPT Custom GPT · web</h3>
+          <div class="mech">No MCP needed. Web Browsing + Knowledge.</div>
+          <p>Custom GPTs don't speak MCP, but Web Browsing can fetch your robot's RRF-hosted manifest and Knowledge
+            files let you upload <code>ROBOT.md</code> for offline reads. In the Custom GPT builder, enable Web
+            Browsing, paste one line into Instructions — <em>"Read
+            <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code> before any safety or capability question"</em> —
+            and optionally upload <code>ROBOT.md</code> + <code>CLAUDE.md</code> as Knowledge files. Works for any
+            ChatGPT Plus/Team/Enterprise seat; no hosting, no Actions, no OpenAPI spec. For live
+            <code>validate</code>/<code>render</code> tool calls, a future <code>robot-md-http</code> bridge will
+            expose the same surface as OpenAPI Actions.
+          </p>
+          <div class="mock" aria-hidden="true">
+            <div class="bar"><i></i><i></i><i></i></div>
+            <div>Custom GPT: <span class="k">bob-robot-assistant</span></div>
+            <div style="color:var(--ink-4)">  Instructions · "Read RRF URL before any answer"</div>
+            <div style="color:var(--ink-4)">  Knowledge · ROBOT.md, CLAUDE.md</div>
+            <div style="color:var(--ink-4)">  Capabilities · Web Browsing ✓</div>
+            <div style="color:var(--accent-ink)">→ "what's bob's max payload?"</div>
+            <div style="color:var(--ink-4)">← fetches /r/RRN-…, answers 0.5 kg from the manifest</div>
+          </div>
+          <div class="cta">Zero infrastructure · paste one URL · works in the GPT Store</div>
         </article>
       </div>
     </div>
