@@ -322,3 +322,45 @@ def test_rotate_key_archive_write_failure(tmp_path, monkeypatch, capsys):
     # Archive directory was not created (the mock raised before any write)
     archive_dir = tmp_path / ".robot-md" / "keys" / "archive"
     assert not archive_dir.exists()
+
+
+# ---------------------------------------------------------------------------
+# Test 9: Archive succeeded but keystore save failed — exit code 2
+# ---------------------------------------------------------------------------
+
+
+def test_rotate_key_keystore_save_failure_after_archive(tmp_path, monkeypatch, capsys):
+    """Server rotated, archive succeeded, but writing the new keystore raised.
+
+    This is the partial-failure path the code signals with exit code 2. The old
+    key must still be present in the main keystore (so the operator can still
+    act on the robot), and the archive must exist as provenance of the old key.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path))
+    _make_keystore(tmp_path)
+    old_kp = _save_test_keypair(tmp_path)
+    old_kid = kid_from_pub(old_kp.ml_dsa.public_key_bytes)
+
+    from robot_md.rotate_key import cli_rotate_key
+
+    def raise_on_save(rrn, kp):
+        raise OSError("disk full writing keystore")
+
+    with patch("urllib.request.urlopen", return_value=_mock_200()):
+        with patch("robot_md.signing.save_keypair", side_effect=raise_on_save):
+            rc = cli_rotate_key(RRN)
+
+    # Exit code 2 signals "server rotated, local state inconsistent"
+    assert rc == 2
+
+    # Main keystore still has the OLD key (save raised before replacing it)
+    current_kp = load_keypair(RRN)
+    assert current_kp is not None
+    assert current_kp.ml_dsa.public_key_bytes == old_kp.ml_dsa.public_key_bytes
+
+    # Archive exists with the old kid — provenance is preserved
+    archive_path = tmp_path / ".robot-md" / "keys" / "archive" / f"{RRN}.{old_kid}.signing.json"
+    assert archive_path.exists()
+    archived = json.loads(archive_path.read_text())
+    # Archive contains a keypair blob (not empty)
+    assert archived

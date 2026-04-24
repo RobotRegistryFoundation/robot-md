@@ -228,7 +228,22 @@ def cli_rotate_key(
         return 2  # distinct non-zero code for this partial-failure mode
 
     # Archive succeeded — now atomically replace the keystore.
-    save_keypair(rrn, new_kp)
+    try:
+        save_keypair(rrn, new_kp)
+    except OSError as e:
+        print(
+            f"Server rotated and archive written, but keystore save failed: {e}. "
+            f"Archive at {archive_dest} holds the old key.",
+            file=sys.stderr,
+        )
+        print(
+            "Rotation is server-side complete; the server now expects the new key. "
+            "Recover by manually saving the new keypair to "
+            f"~/.robot-md/keys/{rrn}.signing.json, or contact support.",
+            file=sys.stderr,
+        )
+        return 2
+
     print(
         f"Rotated. Old key archived at {archive_dest} "
         "(treat as backup credential — can still revoke if new key is lost)."

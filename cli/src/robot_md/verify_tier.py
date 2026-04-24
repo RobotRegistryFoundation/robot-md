@@ -194,7 +194,8 @@ def cli_verify_tier(
     if status == 200:
         try:
             data = json.loads(text)
-            print(f"Promoted {rrn} to {target}.")
+            new_status = data.get("verification_status", target)
+            print(f"Promoted {rrn} to {new_status}.")
             binding = data.get("identity_binding", {})
             print(f"identity_binding: {json.dumps(binding, indent=2)}")
         except json.JSONDecodeError:

@@ -33,7 +33,7 @@ def _save_test_keypair(tmp_path: Path) -> None:
     save_keypair(RRN, kp)
 
 
-def _mock_200(body: bytes = b'{"identity_binding": {"type": "dns-txt", "domain": "robotis.com"}}') -> MagicMock:
+def _mock_200(body: bytes = b'{"verification_status": "manufacturer_claimed", "identity_binding": {"type": "dns-txt", "domain": "robotis.com"}}') -> MagicMock:
     """Build a context-manager mock for a successful 200 HTTP response."""
     resp = MagicMock()
     resp.status = 200
@@ -99,7 +99,8 @@ def test_verify_tier_manufacturer_verified_200_success(tmp_path, monkeypatch, ca
 
     from robot_md.verify_tier import cli_verify_tier
 
-    with patch("urllib.request.urlopen", return_value=_mock_200()):
+    mv_body = b'{"verification_status": "manufacturer_verified", "identity_binding": {"type": "attestation"}}'
+    with patch("urllib.request.urlopen", return_value=_mock_200(body=mv_body)):
         rc = cli_verify_tier(
             RRN,
             target="manufacturer_verified",
