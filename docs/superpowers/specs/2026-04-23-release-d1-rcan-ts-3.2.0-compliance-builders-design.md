@@ -120,7 +120,7 @@ Files:
       readonly maintenance_requirements: Record<string, unknown>;
     }
 
-    export type IncidentSeverity = "low" | "medium" | "high" | "critical";
+    export type IncidentSeverity = "life_health" | "other";
 
     export interface PostMarketIncidentReport {
       readonly schema: string;
@@ -152,7 +152,7 @@ Files:
     - `INCIDENT_REPORT_SCHEMA: string` — rcan-py's `INCIDENT_REPORT_SCHEMA`
     - `EU_REGISTER_SCHEMA: string` — rcan-py's `EU_REGISTER_SCHEMA`
     - `ART13_COVERAGE: readonly string[]` — rcan-py's `ART13_COVERAGE`
-    - `VALID_SEVERITIES: readonly IncidentSeverity[]` — `["low", "medium", "high", "critical"]`
+    - `VALID_SEVERITIES: readonly IncidentSeverity[]` — `["life_health", "other"]` (EU AI Act Art. 72 serious-incident categories)
     - `REPORTING_DEADLINES: Readonly<Record<string, string>>` — rcan-py's `REPORTING_DEADLINES`
     - `ART72_NOTE: string` — rcan-py's `ART72_NOTE`
     - `CONFORMITY_STATUS_DECLARED: string` — rcan-py's `CONFORMITY_STATUS_DECLARED` (= `"declared"`)
