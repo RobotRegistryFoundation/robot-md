@@ -1434,50 +1434,52 @@
       <div class="C-term-head">
         <div class="bulbs"><i></i><i></i><i></i></div>
         <span class="path">~/bob · robot-md v0.6.3</span>
-        <span class="tag">● one command · manifest + MCP + skill + auto-calibrate + arm.pick</span>
+        <span class="tag">● install the plugin · ask Claude · manifest + RRN + calibration through one conversation</span>
       </div>
       <div class="C-term-body" id="termCBody">
-        <div class="C-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md &amp;&amp; robot-md init</span></div>
-        <div class="C-line out"><br>  <span style="color:var(--accent); font-weight:600">🤖 robot-md v0.6.3</span><br></div>
+        <div class="C-line prompt"><span class="p">$</span><span class="cmd">claude plugin marketplace add RobotRegistryFoundation/claude-code-plugins</span></div>
+        <div class="C-line out">  <span class="ok">✓</span> marketplace added</div>
+        <div class="C-line prompt"><span class="p">$</span><span class="cmd">claude plugin install robot-md</span></div>
+        <div class="C-line out">  <span class="ok">✓</span> installed — <span class="v">using-robot-md</span> skill + <span class="v">robot-md-mcp</span> server auto-registered<br></div>
 
-        <div class="C-line ask"><span class="q">? Name your robot:</span> <span class="mute">[bob]</span> <span class="ans">bob</span></div>
-        <div class="C-line ask"><span class="q">? Scan for hardware?</span> <span class="mute">[Y/n]</span> <span class="ans">y</span></div>
-        <div class="C-line out">  <span class="mute">→</span> scanning <span class="v">/dev/tty*</span> ... found Feetech bus <span class="ok">(6 servos)</span></div>
-        <div class="C-line out">  <span class="mute">→</span> scanning USB ... found <span class="v">OAK-D</span> camera</div>
-        <div class="C-line out">  <span style="color:#e06c5a">★</span> Auto-matched preset: <span class="k">so-arm101</span><br></div>
+        <div class="C-line prompt"><span class="p">$</span><span class="cmd">mkdir my-bob &amp;&amp; cd my-bob &amp;&amp; claude</span></div>
+        <div class="C-line out"><br>  <span style="color:var(--accent); font-weight:600">🤖 Claude Code · using-robot-md skill loaded</span><br></div>
 
-        <div class="C-line ask"><span class="q">? Register with Robot Registry Foundation (RRF)?</span> <span class="mute">[Y/n]</span> <span class="ans">y</span></div>
-        <div class="C-line ask"><span class="q">? Manufacturer / Organization:</span> <span class="ans">Acme Corp</span></div>
-        <div class="C-line out">  <span class="mute">→</span> minting RRN ... <span class="ok">RRN-000000000173</span></div>
-        <div class="C-line out">  <span class="mute">→</span> validating manifest ... <span class="ok">55/55 valid</span><br></div>
+        <div class="C-line out"><span style="color:var(--accent-ink); font-weight:600">You:</span> <span class="ans">help me set up a new robot — an SO-ARM101 arm</span></div>
+        <div class="C-line out"><span style="color:var(--accent); font-weight:600">Claude:</span> I'll guide you through it. Installing the CLI...</div>
+        <div class="C-line out">  <span class="mute">→</span> <span class="k">pip install robot-md</span> <span class="ok">✓</span></div>
+        <div class="C-line out">  What would you like to name your robot?</div>
+        <div class="C-line out"><span style="color:var(--accent-ink); font-weight:600">You:</span> <span class="ans">bob</span></div>
+        <div class="C-line out"><span style="color:var(--accent); font-weight:600">Claude:</span> Scan your hardware to auto-detect the preset?</div>
+        <div class="C-line out"><span style="color:var(--accent-ink); font-weight:600">You:</span> <span class="ans">yes</span></div>
+        <div class="C-line out">  <span class="mute">→</span> <span class="k">robot-md autodetect</span> ... found Feetech bus <span class="ok">(6 servos)</span> + <span class="v">OAK-D</span> camera</div>
+        <div class="C-line out">  <span style="color:#e06c5a">★</span> Auto-matched preset: <span class="k">so-arm101</span></div>
+        <div class="C-line out"><span style="color:var(--accent); font-weight:600">Claude:</span> Register bob with Robot Registry Foundation for a permanent RRN?</div>
+        <div class="C-line out"><span style="color:var(--accent-ink); font-weight:600">You:</span> <span class="ans">yes — manufacturer Acme Corp, email me@acme.com</span></div>
+        <div class="C-line out">  <span class="mute">→</span> <span class="k">robot-md init bob --preset so-arm101 --register ...</span></div>
+        <div class="C-line out">  <span class="ok">✓</span> wrote <code>ROBOT.md</code> + <code>CLAUDE.md</code> · minted <span class="ok">RRN-000000000173</span> · 55/55 validations pass</div>
+        <div class="C-line out"><span style="color:var(--accent); font-weight:600">Claude:</span> Ready to calibrate the arm's zero pose?</div>
+        <div class="C-line out"><span style="color:var(--accent-ink); font-weight:600">You:</span> <span class="ans">ready</span></div>
+        <div class="C-line out">  <span class="mute">→</span> <span class="k">robot-md calibrate --zero ROBOT.md</span> <span class="ok">✓</span> <code style="color:#ffb88c">ready</code> pose auto-recorded via IK<br></div>
 
-        <div class="C-line ask"><span class="q">? Install robot-md Claude Code plugin?</span> <span class="mute">[Y/n]</span> <span class="ans">y</span></div>
-        <div class="C-line out">  <span class="mute">→</span> <span class="k">/plugin marketplace add RobotRegistryFoundation/claude-code-plugins</span></div>
-        <div class="C-line out">  <span class="mute">→</span> <span class="k">/plugin install robot-md</span> <span class="ok">ok</span></div>
-        <div class="C-line out">  <span class="mute">→</span> plugin bundles <span class="v">using-robot-md</span> skill + <span class="v">robot-md-mcp</span> server <span class="ok">auto-registered</span><br></div>
+        <div class="C-line banner">▸ Done. bob is online at robotregistryfoundation.org/r/RRN-000000000173</div>
+        <div class="C-line step"><span class="bullet">▸</span> same chat, keep going.</div>
 
-        <div class="C-line ask"><span class="q">? Calibrate arm zero pose now?</span> <span class="mute">[Y/n]</span> <span class="ans">y</span></div>
-        <div class="C-line out">  <span class="mute">→</span> move arm to zero and press Enter... <span class="ok">ok</span></div>
-        <div class="C-line out">  <span class="mute">→</span> auto-calibrated <code style="color:#ffb88c">ready</code> pose via IK<br></div>
-
-        <div class="C-line banner">▸ Done. bob is online at rcan.dev/r/RRN-000000000173</div>
-        <div class="C-line step"><span class="bullet">▸</span> hint: run <code style="color:#ffb88c">claude</code> to start planning.</div>
-
-        <div class="C-line prompt" style="margin-top:10px"><span class="p">$</span><span class="cmd">claude</span></div>
-        <div class="C-line out"><span class="mute">›</span> <span class="v">bob</span> is online. <code
-            style="color:#ffb88c">ready</code> pose auto-calibrated. What should I pick?</div>
-        <div class="C-line out">pick the red lego and place it in the bowl<span class="C-cursor"></span></div>
+        <div class="C-line out" style="margin-top:10px"><span style="color:var(--accent); font-weight:600">Claude:</span> What should I pick?</div>
+        <div class="C-line out"><span style="color:var(--accent-ink); font-weight:600">You:</span> <span class="ans">pick the red lego and place it in the bowl<span class="C-cursor"></span></span></div>
       </div>
     </div>
 
     <div class="C-sig">
       <div class="nm">ROBOT<span class="dot">.</span><span class="md">md</span></div>
       <div class="sub">
-        <b>v0.6.3 · The CLAUDE.md and AGENTS.md for physical machines.</b> One command wires up a single robot to Claude
-        Code via the <code
+        <b>The CLAUDE.md and AGENTS.md for physical machines.</b> Install the <code
           style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">robot-md</code>
-        MCP server. While purpose-built for Anthropic's surfaces, ROBOT.md is an open standard that any AI agent can use
-        to understand and safely operate a robot.
+        Claude Code plugin — then ask. Claude handles init, RRF registration, and calibration through the
+        <code style="font-family:var(--mono); color:var(--accent-ink); background:var(--paper-2); padding:1px 5px; text-transform:none">using-robot-md</code>
+        skill; the MCP server keeps the manifest live in every session. Prefer a terminal? <code>pip install robot-md &amp;&amp; robot-md init</code>
+        still works and is fully supported. While purpose-built for Anthropic's surfaces, ROBOT.md is an open standard
+        any MCP-aware agent (Cursor, Zed, Gemini CLI, Codex CLI) can read.
       </div>
       <a class="more" href="#spec">How it works →</a>
     </div>
@@ -1507,8 +1509,8 @@
   <!-- ================= QUICKSTART ================= -->
   <div class="wrap" style="padding-top:40px; padding-bottom:40px; border-top:1px solid var(--rule)">
     <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; font-size:11px; text-transform:uppercase; font-family:var(--mono); margin-bottom:8px">Quickstart · four surfaces, one file</div>
-    <h2 class="sec-title" style="margin-bottom:8px">Start with <code style="font-family:var(--mono); color:var(--accent-ink)">robot-md init</code>. Pick a surface.</h2>
-    <p class="sec-lede" style="margin-bottom:24px">Every path begins the same: <code>pip install robot-md &amp;&amp; robot-md init</code> writes <code>ROBOT.md</code> + <code>CLAUDE.md</code> and (optionally) mints an <code>RRN</code> at the Robot Registry Foundation. Then choose where the planner runs.</p>
+    <h2 class="sec-title" style="margin-bottom:8px">Install the plugin. Pick a surface. Ask Claude.</h2>
+    <p class="sec-lede" style="margin-bottom:24px">The Claude Code plugin is the recommended entry point — install once, and Claude handles <code>robot-md init</code>, registration, and calibration through the <code>using-robot-md</code> skill. Every surface reads the same <code>ROBOT.md</code> + <code>RRN</code>. Prefer a terminal? <code>pip install robot-md &amp;&amp; robot-md init</code> is the supported alternative.</p>
 
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px">
       <!-- Claude Code -->
