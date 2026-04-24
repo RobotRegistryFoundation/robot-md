@@ -34,6 +34,12 @@ DEFAULT_ENDPOINT = "https://robotregistryfoundation.org/v2/robots"
 
 VALID_TARGETS = {"manufacturer_claimed", "manufacturer_verified"}
 
+# Hard cap on attestation payload size. Attestations are signed JSON blobs
+# holding a public key + a few digests — a sane real one is well under 10 KiB.
+# The cap guards against operator mistakes (pointing at a log file) and
+# adversarial input.
+MAX_ATTESTATION_BYTES = 1 * 1024 * 1024  # 1 MiB
+
 
 def _is_interactive() -> bool:
     if os.environ.get("ROBOT_MD_NONINTERACTIVE") == "1":
@@ -156,8 +162,25 @@ def cli_verify_tier(
             print(f"Attestation file not found: {attestation_file}", file=sys.stderr)
             return 1
         try:
-            attestation = json.loads(attestation_file.read_text())
-        except (OSError, json.JSONDecodeError) as e:
+            size = attestation_file.stat().st_size
+        except OSError as e:
+            print(f"Could not stat attestation file: {e}", file=sys.stderr)
+            return 1
+        if size > MAX_ATTESTATION_BYTES:
+            print(
+                f"Attestation file too large: {size} bytes "
+                f"(max {MAX_ATTESTATION_BYTES} = 1 MiB)",
+                file=sys.stderr,
+            )
+            return 1
+        try:
+            raw = attestation_file.read_text()
+        except OSError as e:
+            print(f"Could not read attestation file: {e}", file=sys.stderr)
+            return 1
+        try:
+            attestation = json.loads(raw)
+        except json.JSONDecodeError as e:
             print(f"Attestation file is not valid JSON: {e}", file=sys.stderr)
             return 1
         if not isinstance(attestation, dict):
