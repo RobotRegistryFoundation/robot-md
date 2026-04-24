@@ -682,6 +682,28 @@ def unregister(
         raise typer.Exit(code=rc)
 
 
+@app.command(name="rotate-key")
+def rotate_key(
+    rrn: str = typer.Argument(..., help="RRN whose key you want to rotate."),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org/v2/robots",
+        "--endpoint",
+        help="RRF base URL. Override for staging / self-hosted.",
+    ),
+) -> None:
+    """Rotate a robot's signing key.
+
+    Generates a new keypair locally, co-signs the rotation with old+new keys,
+    and POSTs to RRF. On success, archives the old keypair for recovery.
+    The archive can be used to revoke the old key if the new key is lost.
+    """
+    from robot_md.rotate_key import cli_rotate_key
+
+    rc = cli_rotate_key(rrn, endpoint=endpoint)
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
 @app.command(name="revoke-key")
 def revoke_key(
     rrn: str = typer.Argument(..., help="RRN to revoke, e.g. RRN-000000000042."),
