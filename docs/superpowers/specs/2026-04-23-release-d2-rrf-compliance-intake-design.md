@@ -1,5 +1,15 @@
 # Release D2 — RRF Compliance Intake Endpoints
 
+**Status:** Spec — **SCOPE REDUCED 2026-04-23 (partial-ship):** §26 EU Register deferred to D3 pending rcan-ts 3.3.0 (needs `rmn` added to envelope upstream). D2 ships four endpoints: §22 FRIA, §23 SafetyBenchmark, §24 IFU, §25 IncidentReport. See `reference_rcan_spec_eu_register_rmn_gap.md` for the upstream bookmark.
+
+**Binding corrections** (from reading rcan-ts 3.2.0 source, not original spec assumptions):
+- §22 FRIA — check `doc.system.rrn === URL rrn` (no top-level rrn)
+- §23 SafetyBenchmark — **no doc-level binding check**; URL + sig only (builder output has no rrn field)
+- §24 IFU — **no doc-level binding check**; URL + sig only (builder output has no rrn field)
+- §25 IncidentReport — check `doc.rrn === URL rrn` (builder emits top-level rrn)
+
+The security model is unchanged: `verifyComplianceSubmission` looks up `pq_signing_pub` at the URL-derived `robot:{rrn}` and verifies the signature. A mismatched RRN would fail signature verification because it would look up a different robot's pubkey.
+
 **Status:** Spec (2026-04-23)
 **Target:** RobotRegistryFoundation (Astro + Cloudflare Pages Functions)
 **Depends on:** rcan-ts 3.2.0 (shipped in Release D1), existing RRF `/v2/robots/register` flow

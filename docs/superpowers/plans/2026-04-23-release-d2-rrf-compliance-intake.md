@@ -2,7 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Ship five RRF POST+GET endpoints that accept signed RCAN §22-26 compliance artifacts produced by rcan-ts 3.2.0 builders, store them in KV, and serve them back.
+> **SCOPE UPDATE 2026-04-23 (partial-ship):** Task 8 (eu-register) deferred to future D3 — rcan-ts 3.2.0's `EuRegisterEntry` envelope has no top-level `rmn` field, so the per-model `/v2/models/[rmn]/eu-register` design can't be implemented without upstream changes. See `reference_rcan_spec_eu_register_rmn_gap.md`. Tasks 4-7 also need builder-input corrections — this plan has NOT been edited in-place for those; the implementer subagent prompts carry the corrected task text verbatim.
+
+**Goal:** Ship four RRF POST+GET endpoints that accept signed RCAN §22-25 compliance artifacts produced by rcan-ts 3.2.0 builders, store them in KV, and serve them back. §26 deferred.
 
 **Architecture:** Five Cloudflare Pages Function handlers under `functions/v2/robots/[rrn]/` and `functions/v2/models/[rmn]/`, all sharing a `verifyComplianceSubmission` helper that reuses `verifyBody` from rcan-ts against the `pq_signing_pub` stored by the existing `/v2/robots/register` flow. Per-type GET policy (public for safety-benchmark/ifu/eu-register; Bearer-gated for fria/incident-report). 10-year KV TTL.
 
