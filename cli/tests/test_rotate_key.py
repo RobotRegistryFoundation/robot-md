@@ -88,6 +88,10 @@ def test_rotate_key_200_success(tmp_path, monkeypatch, capsys):
     file_mode = stat.S_IMODE(archive_path.stat().st_mode)
     assert file_mode == 0o600, f"archive mode is {oct(file_mode)}, expected 0o600"
 
+    # Staging file is cleaned up on the happy path
+    staging = tmp_path / ".robot-md" / "keys" / f"{RRN}.NEW.signing.json"
+    assert not staging.exists(), "staging file must be removed after successful rotation"
+
 
 # ---------------------------------------------------------------------------
 # Test 2: Request body shape
@@ -171,6 +175,10 @@ def test_rotate_key_401_rejected(tmp_path, monkeypatch, capsys):
     archive_dir = tmp_path / ".robot-md" / "keys" / "archive"
     assert not archive_dir.exists()
 
+    # Staging file cleaned up — nothing to recover when server rejected
+    staging = tmp_path / ".robot-md" / "keys" / f"{RRN}.NEW.signing.json"
+    assert not staging.exists()
+
 
 # ---------------------------------------------------------------------------
 # Test 4: 403 — record revoked
@@ -201,6 +209,9 @@ def test_rotate_key_403_revoked(tmp_path, monkeypatch, capsys):
     archive_dir = tmp_path / ".robot-md" / "keys" / "archive"
     assert not archive_dir.exists()
 
+    staging = tmp_path / ".robot-md" / "keys" / f"{RRN}.NEW.signing.json"
+    assert not staging.exists()
+
 
 # ---------------------------------------------------------------------------
 # Test 5: 404 — not found
@@ -230,6 +241,9 @@ def test_rotate_key_404_not_found(tmp_path, monkeypatch, capsys):
 
     archive_dir = tmp_path / ".robot-md" / "keys" / "archive"
     assert not archive_dir.exists()
+
+    staging = tmp_path / ".robot-md" / "keys" / f"{RRN}.NEW.signing.json"
+    assert not staging.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +299,9 @@ def test_rotate_key_network_error(tmp_path, monkeypatch, capsys):
     archive_dir = tmp_path / ".robot-md" / "keys" / "archive"
     assert not archive_dir.exists()
 
+    staging = tmp_path / ".robot-md" / "keys" / f"{RRN}.NEW.signing.json"
+    assert not staging.exists()
+
 
 # ---------------------------------------------------------------------------
 # Test 8: Archive-write failure — partial state (server rotated, archive failed)
@@ -312,7 +329,14 @@ def test_rotate_key_archive_write_failure(tmp_path, monkeypatch, capsys):
         with patch.object(rk_mod, "archive_old_keypair", side_effect=raise_ioerror):
             rc = cli_rotate_key(RRN)
 
-    assert rc != 0  # non-zero — something went wrong
+    # Exit 2 is the documented signal for "server rotated, local disk failed"
+    assert rc == 2
+
+    # Staging file exists so operator can recover
+    staging = tmp_path / ".robot-md" / "keys" / f"{RRN}.NEW.signing.json"
+    assert staging.exists(), "staged new keypair must persist for exit-2 recovery"
+    # Staging file has mode 0o600
+    assert stat.S_IMODE(staging.stat().st_mode) == 0o600
 
     # Keystore still has the OLD keypair — we did not replace it
     current_kp = load_keypair(RRN)
