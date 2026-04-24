@@ -144,7 +144,7 @@ def test_revoke_key_404_not_found(tmp_path, monkeypatch, capsys):
 
     with patch(
         "urllib.request.urlopen",
-        side_effect=_http_error(404, b'{"error": "not found"}'),
+        side_effect=_http_error(404, b'{"error": "Unknown RRN"}'),
     ):
         rc = cli_revoke_key(RRN)
 
@@ -152,6 +152,9 @@ def test_revoke_key_404_not_found(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     combined = captured.out + captured.err
     assert "not found" in combined.lower()
+    # Server body excerpt is surfaced so operators can distinguish a wrong
+    # --endpoint from an RRN typo.
+    assert "Unknown RRN" in combined
 
 
 # ---------------------------------------------------------------------------
@@ -191,10 +194,12 @@ def test_revoke_key_body_shape_with_reason(tmp_path, monkeypatch):
     _save_test_keypair(tmp_path)
 
     captured_body: dict = {}
+    captured_url: list = []
 
     def fake_urlopen(req, timeout=15.0):
         # Parse the sent body
         captured_body.update(json.loads(req.data.decode("utf-8")))
+        captured_url.append(req.full_url)
         return _mock_200_ish(204)
 
     from robot_md.revoke_key import cli_revoke_key
@@ -209,6 +214,9 @@ def test_revoke_key_body_shape_with_reason(tmp_path, monkeypatch):
     assert "pq_signing_pub" in captured_body
     assert "pq_kid" in captured_body
     assert "sig" in captured_body
+    # URL path is part of the contract — a typo in the segment would
+    # only surface as a silent 404 in production.
+    assert captured_url[0].endswith(f"/{RRN}/revoke-key")
 
 
 def test_revoke_key_body_shape_without_reason(tmp_path, monkeypatch):

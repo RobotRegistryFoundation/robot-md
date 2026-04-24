@@ -119,7 +119,11 @@ def cli_revoke_key(
         return 1
 
     if status == 404:
-        print(f"RRN not found at {endpoint}", file=sys.stderr)
+        # Include the server body excerpt so the operator can tell a wrong
+        # --endpoint apart from a missing registration.
+        body_excerpt = text.strip()[:200] if text else ""
+        suffix = f": {body_excerpt}" if body_excerpt else ""
+        print(f"RRN not found at {endpoint}{suffix}", file=sys.stderr)
         return 1
 
     # All other non-2xx
