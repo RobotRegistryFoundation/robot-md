@@ -770,7 +770,8 @@ def emit_draft(scan: Scan) -> str:
     lines.append("physics:")
     lines.append(
         f'  type: "{ptype}"'
-        "  # TODO: arm | arm_manipulator | wheeled | tracked | legged | arm+camera | humanoid | other"
+        "  # TODO: arm | arm_manipulator | wheeled | tracked | legged"
+        " | arm+camera | humanoid | other"
     )
     lines.append(f"  dof: {dof}  # TODO: actuator count (0 is valid for sensor-only nodes)")
     if drivers:

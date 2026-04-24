@@ -54,7 +54,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["arm", "wheeled", "tracked", "legged", "arm+camera", "humanoid", "sensor", "other"]
+          "enum": ["arm", "arm_manipulator", "wheeled", "tracked", "legged", "arm+camera", "humanoid", "sensor", "other"]
         },
         "dof": { "type": "integer", "minimum": 0, "maximum": 64 },
         "kinematics": {
