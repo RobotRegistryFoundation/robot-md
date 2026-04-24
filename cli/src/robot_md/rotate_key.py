@@ -35,6 +35,7 @@ rotation to recover from.
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import os
 import sys
@@ -73,29 +74,23 @@ def _write_secret_file(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     tmp = path.with_suffix(path.suffix + ".tmp")
     # Clear any stale tmp from a prior crashed invocation so O_EXCL succeeds.
-    try:
+    with contextlib.suppress(FileNotFoundError):
         tmp.unlink()
-    except FileNotFoundError:
-        pass
     fd = os.open(str(tmp), os.O_CREAT | os.O_WRONLY | os.O_EXCL, 0o600)
     try:
         with os.fdopen(fd, "w") as f:
             f.write(content)
         tmp.replace(path)
     except OSError:
-        try:
+        with contextlib.suppress(FileNotFoundError):
             tmp.unlink()
-        except FileNotFoundError:
-            pass
         raise
 
 
 def _silent_unlink(path: Path) -> None:
     """Remove a file if it exists; swallow errors (best-effort cleanup)."""
-    try:
+    with contextlib.suppress(FileNotFoundError, OSError):
         path.unlink()
-    except (FileNotFoundError, OSError):
-        pass
 
 
 def _serialize_keypair(rrn: str, kp) -> dict:

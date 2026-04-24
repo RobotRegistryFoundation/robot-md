@@ -12,8 +12,6 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from robot_md.signing import generate_keypair, save_keypair
 
 RRN = "RRN-000000000042"

@@ -12,8 +12,6 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from robot_md.signing import generate_keypair, save_keypair
 
 RRN = "RRN-000000000042"
@@ -33,7 +31,13 @@ def _save_test_keypair(tmp_path: Path) -> None:
     save_keypair(RRN, kp)
 
 
-def _mock_200(body: bytes = b'{"verification_status": "manufacturer_claimed", "identity_binding": {"type": "dns-txt", "domain": "robotis.com"}}') -> MagicMock:
+_DEFAULT_MOCK_200_BODY = (
+    b'{"verification_status": "manufacturer_claimed",'
+    b' "identity_binding": {"type": "dns-txt", "domain": "robotis.com"}}'
+)
+
+
+def _mock_200(body: bytes = _DEFAULT_MOCK_200_BODY) -> MagicMock:
     """Build a context-manager mock for a successful 200 HTTP response."""
     resp = MagicMock()
     resp.status = 200
@@ -99,7 +103,10 @@ def test_verify_tier_manufacturer_verified_200_success(tmp_path, monkeypatch, ca
 
     from robot_md.verify_tier import cli_verify_tier
 
-    mv_body = b'{"verification_status": "manufacturer_verified", "identity_binding": {"type": "attestation"}}'
+    mv_body = (
+        b'{"verification_status": "manufacturer_verified",'
+        b' "identity_binding": {"type": "attestation"}}'
+    )
     with patch("urllib.request.urlopen", return_value=_mock_200(body=mv_body)):
         rc = cli_verify_tier(
             RRN,
@@ -231,7 +238,7 @@ def test_verify_tier_reject_community(tmp_path, monkeypatch, capsys):
 # ---------------------------------------------------------------------------
 
 
-def test_verify_tier_manufacturer_verified_missing_attestation_file_arg(tmp_path, monkeypatch, capsys):
+def test_verify_tier_mv_missing_attestation_file_arg(tmp_path, monkeypatch, capsys):
     """manufacturer_verified without attestation_file → exit non-zero; no HTTP call."""
     monkeypatch.setenv("HOME", str(tmp_path))
     _make_keystore(tmp_path)
@@ -261,8 +268,8 @@ def test_verify_tier_manufacturer_verified_missing_attestation_file_arg(tmp_path
 # ---------------------------------------------------------------------------
 
 
-def test_verify_tier_manufacturer_verified_attestation_file_not_found(tmp_path, monkeypatch, capsys):
-    """manufacturer_verified with a non-existent file → exit non-zero; message about 'Attestation file not found'."""
+def test_verify_tier_mv_attestation_file_not_found(tmp_path, monkeypatch, capsys):
+    """manufacturer_verified + missing file: stderr says 'Attestation file not found'."""
     monkeypatch.setenv("HOME", str(tmp_path))
     _make_keystore(tmp_path)
     _save_test_keypair(tmp_path)
@@ -499,21 +506,23 @@ def test_verify_tier_non_interactive_suppresses_prompt(tmp_path, monkeypatch):
     _make_keystore(tmp_path)
     _save_test_keypair(tmp_path)
 
-    from robot_md.verify_tier import cli_verify_tier
     import robot_md.verify_tier as vt_mod
+    from robot_md.verify_tier import cli_verify_tier
 
     # Pretend we're running on a real terminal so _is_interactive() would
     # otherwise prompt.
-    with patch.object(vt_mod, "_is_interactive", return_value=True):
-        with patch("builtins.input") as mock_input:
-            with patch("urllib.request.urlopen", return_value=_mock_200()):
-                rc = cli_verify_tier(
-                    RRN,
-                    target="manufacturer_claimed",
-                    dns_domain=DNS_DOMAIN,
-                    non_interactive=True,
-                )
-            mock_input.assert_not_called()
+    with (
+        patch.object(vt_mod, "_is_interactive", return_value=True),
+        patch("builtins.input") as mock_input,
+        patch("urllib.request.urlopen", return_value=_mock_200()),
+    ):
+        rc = cli_verify_tier(
+            RRN,
+            target="manufacturer_claimed",
+            dns_domain=DNS_DOMAIN,
+            non_interactive=True,
+        )
+        mock_input.assert_not_called()
 
     assert rc == 0
 
@@ -529,19 +538,21 @@ def test_verify_tier_interactive_prompts_for_confirmation(tmp_path, monkeypatch)
     _make_keystore(tmp_path)
     _save_test_keypair(tmp_path)
 
-    from robot_md.verify_tier import cli_verify_tier
     import robot_md.verify_tier as vt_mod
+    from robot_md.verify_tier import cli_verify_tier
 
-    with patch.object(vt_mod, "_is_interactive", return_value=True):
-        with patch("builtins.input", return_value="") as mock_input:
-            with patch("urllib.request.urlopen", return_value=_mock_200()):
-                rc = cli_verify_tier(
-                    RRN,
-                    target="manufacturer_claimed",
-                    dns_domain=DNS_DOMAIN,
-                    non_interactive=False,
-                )
-            mock_input.assert_called_once()
+    with (
+        patch.object(vt_mod, "_is_interactive", return_value=True),
+        patch("builtins.input", return_value="") as mock_input,
+        patch("urllib.request.urlopen", return_value=_mock_200()),
+    ):
+        rc = cli_verify_tier(
+            RRN,
+            target="manufacturer_claimed",
+            dns_domain=DNS_DOMAIN,
+            non_interactive=False,
+        )
+        mock_input.assert_called_once()
 
     assert rc == 0
 
@@ -557,7 +568,7 @@ def test_verify_tier_attestation_file_too_large(tmp_path, monkeypatch, capsys):
     _make_keystore(tmp_path)
     _save_test_keypair(tmp_path)
 
-    from robot_md.verify_tier import cli_verify_tier, MAX_ATTESTATION_BYTES
+    from robot_md.verify_tier import MAX_ATTESTATION_BYTES, cli_verify_tier
 
     # Produce a syntactically-valid but oversized JSON file
     big = tmp_path / "big_attestation.json"

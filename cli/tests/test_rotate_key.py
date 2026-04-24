@@ -13,8 +13,6 @@ import urllib.error
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from robot_md.signing import generate_keypair, kid_from_pub, load_keypair, save_keypair
 
 RRN = "RRN-000000000042"
@@ -320,14 +318,16 @@ def test_rotate_key_archive_write_failure(tmp_path, monkeypatch, capsys):
     old_kp = _save_test_keypair(tmp_path)
 
     def raise_ioerror(rrn, kp):
-        raise IOError("disk full")
+        raise OSError("disk full")
 
-    from robot_md.rotate_key import cli_rotate_key
     import robot_md.rotate_key as rk_mod
+    from robot_md.rotate_key import cli_rotate_key
 
-    with patch("urllib.request.urlopen", return_value=_mock_200()):
-        with patch.object(rk_mod, "archive_old_keypair", side_effect=raise_ioerror):
-            rc = cli_rotate_key(RRN)
+    with (
+        patch("urllib.request.urlopen", return_value=_mock_200()),
+        patch.object(rk_mod, "archive_old_keypair", side_effect=raise_ioerror),
+    ):
+        rc = cli_rotate_key(RRN)
 
     # Exit 2 is the documented signal for "server rotated, local disk failed"
     assert rc == 2
@@ -370,9 +370,11 @@ def test_rotate_key_keystore_save_failure_after_archive(tmp_path, monkeypatch, c
     def raise_on_save(rrn, kp):
         raise OSError("disk full writing keystore")
 
-    with patch("urllib.request.urlopen", return_value=_mock_200()):
-        with patch("robot_md.signing.save_keypair", side_effect=raise_on_save):
-            rc = cli_rotate_key(RRN)
+    with (
+        patch("urllib.request.urlopen", return_value=_mock_200()),
+        patch("robot_md.signing.save_keypair", side_effect=raise_on_save),
+    ):
+        rc = cli_rotate_key(RRN)
 
     # Exit code 2 signals "server rotated, local state inconsistent"
     assert rc == 2
