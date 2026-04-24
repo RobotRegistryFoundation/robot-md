@@ -1,5 +1,5 @@
 ---
-rcan_version: "3.0"
+rcan_version: "3.2"
 metadata:
   robot_name: robot-md
   manufacturer: RobotRegistryFoundation
@@ -18,6 +18,13 @@ drivers:
 
 capabilities:
   - status.report
+
+agent:
+  runtimes:
+    - id: robot-md
+      harness: robot-md-cli
+      default: true
+      models: []
 
 safety:
   estop:

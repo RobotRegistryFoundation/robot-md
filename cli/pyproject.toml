@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robot-md"
-version = "1.0.1"
+version = "1.1.0"
 description = "ROBOT.md — a single self-describing file so Claude can safely operate your robot."
 readme = "../README.md"
 requires-python = ">=3.10"
@@ -34,7 +34,7 @@ dependencies = [
     "anthropic>=0.30",
     "fastapi>=0.110",
     "jinja2>=3.1",
-    "rcan[pq,crypto]>=3.1.1,<4.0",
+    "rcan[pq,crypto]>=3.3,<4",
     "websockets>=12",
 ]
 

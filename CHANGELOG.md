@@ -9,6 +9,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.0] — 2026-04-24
+
+**RCAN 3.2 peer-runtime alignment.** robot-md now declares itself in
+its own dogfood `ROBOT.md` using the new multi-runtime primitive from
+rcan-spec 3.2 (§8.6 `agent.runtimes[]`). R5 of the peer-runtimes
+cascade — ships alongside opencastor 3.0.0 (R4) as the two first peer
+RCAN 3.x runtimes against a single ROBOT.md.
+
+### Changed
+
+- `ROBOT.md` frontmatter
+  - `rcan_version: "3.0"` → `"3.2"`
+  - added `agent.runtimes[]` with a single `robot-md` entry
+    (`harness: robot-md-cli`, `default: true`, `models: []`). The
+    empty `models` reflects that this tooling node doesn't run an
+    LLM-backed agent loop — it's a schema/lint/validate surface.
+- `cli/pyproject.toml`
+  - `version = "1.0.1"` → `"1.1.0"`
+  - `rcan[pq,crypto]>=3.1.1,<4.0` → `>=3.3,<4`. Dogfoods rcan-py
+    3.3.0's `agent_runtimes` field so the self-ROBOT.md parses
+    through a shared validator.
+
+### Unchanged
+
+- No behavior change to `robot-md validate`, `robot-md init`, or any
+  of the CLI surfaces. No test surface change.
+
+---
+
 ## [1.0.1] — 2026-04-23
 
 **rcan 3.1.1 consolidation.** Deletes duplicated primitives and spec-domain
