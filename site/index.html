@@ -1451,9 +1451,10 @@
         <div class="C-line out">  <span class="mute">→</span> minting RRN ... <span class="ok">RRN-000000000173</span></div>
         <div class="C-line out">  <span class="mute">→</span> validating manifest ... <span class="ok">55/55 valid</span><br></div>
 
-        <div class="C-line ask"><span class="q">? Install MCP server for Claude Code?</span> <span class="mute">[Y/n]</span> <span class="ans">y</span></div>
-        <div class="C-line out">  <span class="mute">→</span> <span class="k">claude mcp add robot-md</span></div>
-        <div class="C-line out">  <span class="mute">→</span> installing <span class="v">using-robot-md</span> skill ... <span class="ok">ok</span><br></div>
+        <div class="C-line ask"><span class="q">? Install robot-md Claude Code plugin?</span> <span class="mute">[Y/n]</span> <span class="ans">y</span></div>
+        <div class="C-line out">  <span class="mute">→</span> <span class="k">/plugin marketplace add RobotRegistryFoundation/claude-code-plugins</span></div>
+        <div class="C-line out">  <span class="mute">→</span> <span class="k">/plugin install robot-md</span> <span class="ok">ok</span></div>
+        <div class="C-line out">  <span class="mute">→</span> plugin bundles <span class="v">using-robot-md</span> skill + <span class="v">robot-md-mcp</span> server <span class="ok">auto-registered</span><br></div>
 
         <div class="C-line ask"><span class="q">? Calibrate arm zero pose now?</span> <span class="mute">[Y/n]</span> <span class="ans">y</span></div>
         <div class="C-line out">  <span class="mute">→</span> move arm to zero and press Enter... <span class="ok">ok</span></div>
@@ -1501,6 +1502,50 @@
       <span>Registry‑resolvable via RRN</span><b>✦</b>
       <span>Zero runtime lock‑in</span><b>✦</b>
     </div>
+  </div>
+
+  <!-- ================= QUICKSTART ================= -->
+  <div class="wrap" style="padding-top:40px; padding-bottom:40px; border-top:1px solid var(--rule)">
+    <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; font-size:11px; text-transform:uppercase; font-family:var(--mono); margin-bottom:8px">Quickstart · three surfaces, one file</div>
+    <h2 class="sec-title" style="margin-bottom:8px">Start with <code style="font-family:var(--mono); color:var(--accent-ink)">robot-md init</code>. Pick a surface.</h2>
+    <p class="sec-lede" style="margin-bottom:24px">Every path begins the same: <code>pip install robot-md &amp;&amp; robot-md init</code> writes <code>ROBOT.md</code> + <code>CLAUDE.md</code> and (optionally) mints an <code>RRN</code> at the Robot Registry Foundation. Then choose where Claude runs.</p>
+
+    <div class="after-grid-1">
+      <!-- Claude Code -->
+      <div style="padding:18px; background:var(--paper-2); border-left:3px solid var(--accent)">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">Claude Code · plugin</div>
+        <div style="font-family:var(--mono); font-size:13px; line-height:1.75; color:var(--ink-2)">
+          <div><span style="color:var(--ink-4)">$</span> /plugin marketplace add</div>
+          <div style="padding-left:12px; color:var(--ink-3)">RobotRegistryFoundation/claude-code-plugins</div>
+          <div><span style="color:var(--ink-4)">$</span> <span style="color:var(--accent-ink)">/plugin install robot-md</span></div>
+          <div><span style="color:var(--ink-4)">$</span> cd my-robot &amp;&amp; claude</div>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--ink-4); line-height:1.5">MCP auto-connects, <code>using-robot-md</code> skill loads, 6 resources + 3 tools + 4 slash commands ready.</p>
+      </div>
+
+      <!-- Claude Desktop -->
+      <div style="padding:18px; background:var(--paper-2); border-left:3px solid var(--accent)">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">Claude Desktop · one command</div>
+        <div style="font-family:var(--mono); font-size:13px; line-height:1.75; color:var(--ink-2)">
+          <div><span style="color:var(--ink-4)">$</span> <span style="color:var(--accent-ink)">robot-md install-desktop ROBOT.md</span></div>
+          <div><span style="color:var(--ink-4)">$</span> <span style="color:var(--ink-4)"># restart Claude Desktop</span></div>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--ink-4); line-height:1.5">Merges a <code>robot-md</code> entry into <code>claude_desktop_config.json</code> on the right OS path, preserves existing MCP servers. Same 6 resources + 3 tools load.</p>
+      </div>
+
+      <!-- Claude Mobile -->
+      <div style="padding:18px; background:var(--paper-2); border-left:3px solid var(--accent)">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">Claude Mobile · share a URL</div>
+        <div style="font-family:var(--mono); font-size:13px; line-height:1.75; color:var(--ink-2)">
+          <div><span style="color:var(--ink-4)">$</span> <span style="color:var(--accent-ink)">robot-md register ROBOT.md</span></div>
+          <div><span style="color:var(--ink-4)">#</span> paste into Mobile chat:</div>
+          <div style="padding-left:12px; color:var(--accent-ink); word-break:break-all">robotregistryfoundation.org/r/&lt;rrn&gt;</div>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--ink-4); line-height:1.5">RRF hosts the manifest publicly — zero self-hosting. Mobile fetches ROBOT.md + CLAUDE.md and answers from the declared capabilities.</p>
+      </div>
+    </div>
+
+    <p style="margin-top:20px; font-size:13px; color:var(--ink-4)">Same <code>ROBOT.md</code>, one identity via <code>RRN</code>, every Claude surface reads it. No provider lock-in — any MCP-aware agent (Cursor, Zed, Continue, Gemini CLI, Codex CLI) uses the same server.</p>
   </div>
 
   <!-- ================= §01 THE FILE ================= -->
@@ -1743,20 +1788,24 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
           <h3>Claude Code · CLI</h3>
           <div class="mech"><b>Zero flags.</b> <code>robot-md init</code> — Claude Code drives the rest.</div>
           <p>Built for operators at a terminal. <code>pip install robot-md &amp;&amp; robot-md init</code> autodetects
-            your hardware, picks the right preset, writes <code>ROBOT.md</code> and <code>CLAUDE.md</code>, installs the
-            <code>robot-md</code> MCP server, and drops the <code>using-robot-md</code> skill. Open Claude Code next and
-            the planner reads your robot's frontmatter, capabilities, safety gates, and prose body as MCP resources.
-            Claude asks follow-ups — register? calibrate zero? hand-eye? — in English.
+            your hardware, picks the right preset, writes <code>ROBOT.md</code> and <code>CLAUDE.md</code>. Then install
+            the <a href="https://github.com/RobotRegistryFoundation/claude-code-plugins" style="color:var(--accent-ink)">robot-md plugin</a>
+            once with <code>/plugin install robot-md</code> — it bundles the
+            <code>using-robot-md</code> skill and auto-registers the <code>robot-md-mcp</code> server. Open Claude Code
+            from your project directory and the planner reads your robot's frontmatter, capabilities, safety gates, and
+            prose body as MCP resources. Claude asks follow-ups — register? calibrate zero? hand-eye? — in English.
           </p>
           <div class="mock" aria-hidden="true">
             <div class="bar"><i></i><i></i><i></i></div>
             <div><span class="k">⏵ robot-md init</span></div>
-            <div style="color:var(--ink-4)">✓ ROBOT.md · CLAUDE.md · MCP · skill installed</div>
+            <div style="color:var(--ink-4)">✓ ROBOT.md · CLAUDE.md written</div>
+            <div><span class="k">⏵ /plugin install robot-md</span></div>
+            <div style="color:var(--ink-4)">✓ skill + MCP server auto-registered</div>
             <div><span class="k">⏵ claude</span></div>
             <div style="color:var(--ink-4)">· 6 resources · 3 tools · 4 slash commands loaded</div>
             <div style="color:var(--accent-ink)">→ /brief-me · /check-safety · /explain-capability</div>
           </div>
-          <div class="cta">Two commands. Zero flags. Claude Code recognizes the robot.</div>
+          <div class="cta">Three commands. Zero flags. Claude Code recognizes the robot.</div>
         </article>
 
         <article class="surface">
@@ -1782,22 +1831,24 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <article class="surface">
           <div class="st ship">● Shipping</div>
           <h3>Claude Mobile · iOS / Android</h3>
-          <div class="mech">URL fetch. Paste the manifest URL into the chat.</div>
-          <p>iOS has no local MCP, but it fetches URLs and reasons over what it finds. Host <code>ROBOT.md</code> +
-            <code>.well-known/robot-md.json</code> at any public HTTPS URL (GitHub Pages works today), paste the link,
-            and Claude Mobile answers from the manifest. The auto-generated <code>CLAUDE.md</code> makes the safety
-            posture explicit so the gate-check logic survives the trip to mobile. Use
-            <code>robot-md publish-discovery ROBOT.md --url &lt;URL&gt;</code> to emit the discovery doc.
+          <div class="mech">Register once. Share the public RRF URL.</div>
+          <p>iOS has no local MCP, but it fetches URLs and reasons over what it finds. Once your robot has an
+            <code>RRN</code> (via <code>robot-md register ROBOT.md</code>), the Robot Registry Foundation hosts your
+            manifest publicly at <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code>. Paste that URL into Claude
+            Mobile — the app fetches <code>ROBOT.md</code> + the auto-generated <code>CLAUDE.md</code> and answers
+            from the declared capabilities and safety gates. <b>Zero setup on your side</b> — the registry is the host.
           </p>
+          <p style="color:var(--ink-4); font-size:13.5px; margin-top:6px">Prefer self-hosting? Emit a discovery doc
+            with <code>robot-md publish-discovery ROBOT.md --url &lt;URL&gt;</code> and serve it from any HTTPS URL
+            (GitHub Pages works). Paste that URL instead.</p>
           <div class="mock" aria-hidden="true">
             <div class="bar"><i></i><i></i><i></i></div>
-            <div>GET <span class="k">my-robot.example.com/ROBOT.md</span></div>
-            <div style="color:var(--ink-4)">← 200 OK · text/markdown · 4.8 KB</div>
-            <div>GET <span class="k">my-robot.example.com/.well-known/robot-md.json</span></div>
-            <div style="color:var(--ink-4)">← 200 OK · rrn · sha256 · public resolver</div>
+            <div>GET <span class="k">robotregistryfoundation.org/r/RRN-000000000042</span></div>
+            <div style="color:var(--ink-4)">← 200 OK · manifest + CLAUDE.md · sha256 · signed</div>
             <div style="color:var(--accent-ink)">→ "what are bob's safety gates?"</div>
+            <div style="color:var(--ink-4)">← reads hitl_gates, returns authorization rules</div>
           </div>
-          <div class="cta">Works today · no native app · no Anthropic change</div>
+          <div class="cta">No native app · no Anthropic change · registry auto-hosts</div>
         </article>
       </div>
     </div>
@@ -2066,8 +2117,8 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
 <span class="mute">          RRN: RRN-000000000042</span>
 <span class="mute">          Public record: https://rcan.dev/r/RRN-000000000042</span>
 
-<span class="mute">        [runs: claude mcp add robot-md -- npx -y robot-md-mcp...]</span>
-<span class="ok">        ✓ Added stdio MCP server robot-md</span>
+<span class="mute">        [runs: /plugin install robot-md@robotregistryfoundation]</span>
+<span class="ok">        ✓ plugin installed — using-robot-md skill + MCP server active</span>
 
 <span class="mute">        [reads: robot-md://my-bob/frontmatter]</span>
 <span class="ok">        ✓ MCP server responding — 4 resources live</span>
@@ -2141,7 +2192,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <div class="after-grid-1">
           <div style="padding:10px 12px; background:var(--paper); border-left:3px solid var(--accent)"><b
               style="color:var(--ink); font-family:var(--sans); font-size:11px; letter-spacing:.1em; text-transform:uppercase">Claude
-              Code</b><br><code style="color:var(--accent-ink)">claude mcp add robot-md …</code></div>
+              Code</b><br><code style="color:var(--accent-ink)">/plugin install robot-md</code></div>
           <div style="padding:10px 12px; background:var(--paper); border-left:3px solid var(--accent)"><b
               style="color:var(--ink); font-family:var(--sans); font-size:11px; letter-spacing:.1em; text-transform:uppercase">Claude
               Desktop</b><br><code style="color:var(--accent-ink)">robot-md install-desktop ROBOT.md</code></div>
@@ -2174,11 +2225,17 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
             </ul>
           </div>
         </div>
-        <p style="margin:14px 0 0; font-family:var(--serif); font-style:italic; font-size:14px">Optional: <code
-            style="font-family:var(--mono); font-style:normal; color:var(--accent-ink); background:var(--paper); padding:1px 5px">robot-md install-skill</code>
-          drops the <code style="font-family:var(--mono); font-style:normal">using-robot-md</code> skill into <code
-            style="font-family:var(--mono); font-style:normal">~/.claude/skills/</code> — superpowers-aware harnesses
-          auto-invoke the robot-md flow on the operator's first robot-related message.</p>
+        <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--rule)">
+          <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; margin-bottom:10px; font-size:11px; text-transform:uppercase; font-family:var(--mono)">
+            User flow · install once, work per-project</div>
+          <ol style="margin:0 0 0 18px; padding:0; font-size:13.5px; line-height:1.7">
+            <li><b>Install the plugin (once):</b> <code style="color:var(--accent-ink)">/plugin install robot-md</code> after <code>/plugin marketplace add RobotRegistryFoundation/claude-code-plugins</code>. Ships the <code>using-robot-md</code> skill and the <code>robot-md-mcp</code> server together.</li>
+            <li><b>Set up each robot project:</b> <code style="color:var(--accent-ink)">robot-md init &lt;name&gt; --preset &lt;…&gt;</code> in an empty directory. Writes <code>ROBOT.md</code> + <code>CLAUDE.md</code>.</li>
+            <li><b>Open Claude Code from the project root:</b> <code style="color:var(--accent-ink)">cd &lt;project&gt; &amp;&amp; claude</code>. The MCP server walks up from your cwd, finds <code>ROBOT.md</code>, and serves 6 resources + 3 tools + 4 slash commands. The skill loads automatically.</li>
+            <li><b>Ask in English.</b> "What can this robot do?" → skill reads <code>capabilities</code>. "Is it safe to X?" → skill reads <code>hitl_gates</code>. "Register it" → skill runs <code>robot-md register ROBOT.md</code> (signed with RCAN 3.0, posts to RRF, mints your <code>RRN</code>, writes it back into the manifest).</li>
+            <li><b>One file, one public identity, any Claude surface.</b> The same <code>ROBOT.md</code> + <code>RRN</code> works across Claude Code, Claude Desktop, and Claude Mobile (and any MCP-aware agent).</li>
+          </ol>
+        </div>
       </div>
 
       <!-- custom hardware / no preset callout, spans full width below the try-grid -->
