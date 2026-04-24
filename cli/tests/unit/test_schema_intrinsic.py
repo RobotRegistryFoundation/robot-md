@@ -94,6 +94,31 @@ def test_depth_stream_without_derived_from_or_intrinsic_allowed():
     jsonschema.Draft202012Validator(_schema()).validate(minimal)
 
 
+def test_physics_type_arm_manipulator_allowed():
+    """v1.1.1 — physics.type accepts 'arm_manipulator' (matches rcan-spec R6 draft)."""
+    minimal = {
+        "rcan_version": "3.0",
+        "metadata": {"robot_name": "bob"},
+        "physics": {"type": "arm_manipulator", "dof": 6},
+        "drivers": [{"id": "arm", "protocol": "feetech_scs"}],
+        "safety": {"estop": {"software": True, "response_ms": 50}},
+    }
+    jsonschema.Draft202012Validator(_schema()).validate(minimal)
+
+
+def test_physics_type_unknown_still_rejected():
+    """v1.1.1 — unknown physics.type values still fail validation."""
+    bad = {
+        "rcan_version": "3.0",
+        "metadata": {"robot_name": "bob"},
+        "physics": {"type": "not-a-real-type", "dof": 6},
+        "drivers": [{"id": "arm", "protocol": "feetech_scs"}],
+        "safety": {"estop": {"software": True, "response_ms": 50}},
+    }
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.Draft202012Validator(_schema()).validate(bad)
+
+
 def test_stream_key_unknown_rejected(fixtures_dir):
     parsed = parse_file(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
     parsed.frontmatter["drivers"][1]["streams"]["BOGUS"] = {"intrinsic": None}

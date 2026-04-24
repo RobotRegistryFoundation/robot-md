@@ -9,6 +9,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.1.1] — 2026-04-24
+
+**R6 demo-day fixes.** Patch release surfacing two interop gaps caught
+while recording the Bob peer-runtime hot-swap demo.
+
+### Fixed
+
+- `robot_md.register.DEFAULT_ENDPOINT` changed from
+  `https://rcan.dev/api/v2/robots/register` (returns 405) to
+  `https://robotregistryfoundation.org/v2/robots/register` (the
+  canonical RRF v2 ingress). Users previously had to pass
+  `--endpoint https://robotregistryfoundation.org/v2/robots/register`
+  explicitly; `robot-md register <ROBOT.md>` now works out of the box.
+
+### Changed
+
+- `schemas/v1/robot.schema.json` — `physics.type` enum extended to
+  accept `arm_manipulator` in addition to `arm`, `arm+camera`, and
+  friends. Aligns the robot-md body schema with the rcan-spec R6 draft
+  terminology (SO-ARM101 and similar 6-DoF arms declare themselves as
+  `arm_manipulator` in the spec). `arm+camera` still works unchanged.
+- `autodetect.py` TODO comment updated to include `arm_manipulator` in
+  the allowed-types hint.
+
+### Tests
+
+- `tests/unit/test_schema_intrinsic.py` — new tests assert
+  `arm_manipulator` validates and unknown types still reject.
+
+---
+
 ## [1.1.0] — 2026-04-24
 
 **RCAN 3.2 peer-runtime alignment.** robot-md now declares itself in

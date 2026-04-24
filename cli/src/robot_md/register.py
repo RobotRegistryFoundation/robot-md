@@ -41,7 +41,7 @@ from robot_md.parser import parse_file
 from robot_md.ruri import construct_ruri
 from robot_md.signing import generate_keypair, save_keypair, sign_body
 
-DEFAULT_ENDPOINT = "https://rcan.dev/api/v2/robots/register"
+DEFAULT_ENDPOINT = "https://robotregistryfoundation.org/v2/robots/register"
 
 
 def _keystore_dir() -> Path:
