@@ -29,9 +29,7 @@ def skill_content() -> str:
     """
     if _BUNDLED.exists():
         return _BUNDLED.read_text()
-    raise FileNotFoundError(
-        f"could not locate {SKILL_NAME}.SKILL.md in the wheel ({_BUNDLED})"
-    )
+    raise FileNotFoundError(f"could not locate {SKILL_NAME}.SKILL.md in the wheel ({_BUNDLED})")
 
 
 def default_skills_dir() -> Path:
