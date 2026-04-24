@@ -442,26 +442,246 @@ git commit -m "feat(rrf): add POST /v2/robots/:rrn/revoke-key"
 - Create: `RobotRegistryFoundation/functions/v2/robots/[rrn]/rotate-key.ts`
 - Create: `RobotRegistryFoundation/functions/v2/robots/[rrn]/rotate-key.test.ts`
 
-**Contract:**
-- Request: body is a *co-signed* envelope: `{old_sig, old_pq_kid, new_pq_signing_pub, new_pq_kid, new_sig}` where `old_sig` is the current key signing `{rrn, action: "rotate", new_pq_signing_pub, new_pq_kid}` and `new_sig` is the new key signing the same payload.
-- Auth: `old_sig` must verify against the record's current `pq_signing_pub`; `new_sig` must verify against `new_pq_signing_pub` (proves possession of the new private key).
-- On success: updates the record's `pq_signing_pub`/`pq_kid`, appends to `rotations[]`, returns 200 with the updated record.
-- Refuse if revoked (403).
+**Contract:** co-signed single payload. Both `old_sig` and `new_sig` cover the same canonical body `{rrn, action: "rotate", new_pq_signing_pub, new_pq_kid}`. `old_sig` verifies against `record.pq_signing_pub`; `new_sig` verifies against `new_pq_signing_pub`. On success: replace `pq_signing_pub`/`pq_kid`, append to `rotations[]`, return 200. Refuse if revoked (403), new==old key (400), missing fields (400), either sig invalid (401).
 
-Full tests + implementation follow the same structure as Task 3. Edge cases to cover:
-1. Happy path (old+new both verify, record updates).
-2. `old_sig` invalid → 401.
-3. `new_sig` invalid → 401.
-4. New key equals old key → 400 ("rotation requires a different key").
-5. Revoked record → 403.
-6. Missing fields → 400.
-7. `rotations[]` is appended (not overwritten) across multiple rotations.
+**Known limitation:** Cloudflare Workers KV has no CAS primitive in this project's setup, so two concurrent rotate requests can both read the current key, both verify, and both write — last-write-wins. Mitigated by: rotations are rare, user-initiated events; the `rotations[]` audit log will show the collision post-facto; optimistic versioning is deferred to a later revision.
 
-Implementation note: use the same `verifyBody` helper for both signatures. Structure the payload as `{rrn, action, new_pq_signing_pub, new_pq_kid}` for both signatures — co-signing the same bytes is cleaner than two separate payloads.
+- [ ] **Step 1: Write the failing tests**
 
-Commit message:
+```ts
+// functions/v2/robots/[rrn]/rotate-key.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { onRequestPost } from "./rotate-key.js";
+import { makeTestKeypair, makeRobotRecord, signBody, toPqPubB64 } from "../../_lib/test-helpers.js";
+
+const RRN = "RRN-000000000042";
+
+function makeEnv(init: Record<string, string> = {}) {
+  const store: Record<string, string> = { ...init };
+  return {
+    RRF_KV: {
+      get: vi.fn(async (k: string) => store[k] ?? null),
+      put: vi.fn(async (k: string, v: string) => { store[k] = v; }),
+      delete: vi.fn(async (k: string) => { delete store[k]; }),
+      list: vi.fn(),
+    } as unknown as KVNamespace,
+    __store: store,
+  };
+}
+
+function req(body: unknown): Request {
+  return new Request(`https://x/v2/robots/${RRN}/rotate-key`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+async function buildRotateBody(currentKp: any, newKp: any) {
+  const payload = {
+    rrn: RRN,
+    action: "rotate",
+    new_pq_signing_pub: toPqPubB64(newKp),
+    new_pq_kid: newKp.pq_kid,
+  };
+  const oldSigned = await signBody(payload, currentKp);
+  const newSigned = await signBody(payload, newKp);
+  return {
+    ...payload,
+    old_sig: oldSigned.sig,
+    old_pq_kid: currentKp.pq_kid,
+    new_sig: newSigned.sig,
+  };
+}
+
+describe("POST /v2/robots/[rrn]/rotate-key", () => {
+  it("400 on invalid RRN format", async () => {
+    const env = makeEnv();
+    const res = await onRequestPost({ request: req({}), env, params: { rrn: "bad" } } as any);
+    expect(res.status).toBe(400);
+  });
+
+  it("404 when record does not exist", async () => {
+    const oldKp = await makeTestKeypair();
+    const newKp = await makeTestKeypair();
+    const env = makeEnv();
+    const body = await buildRotateBody(oldKp, newKp);
+    const res = await onRequestPost({ request: req(body), env, params: { rrn: RRN } } as any);
+    expect(res.status).toBe(404);
+  });
+
+  it("rotates with valid old+new sigs (200), appends rotations[], updates record", async () => {
+    const oldKp = await makeTestKeypair();
+    const newKp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, oldKp) });
+    const body = await buildRotateBody(oldKp, newKp);
+    const res = await onRequestPost({ request: req(body), env, params: { rrn: RRN } } as any);
+    expect(res.status).toBe(200);
+    const updated = await res.json();
+    expect(updated.pq_signing_pub).toBe(toPqPubB64(newKp));
+    expect(updated.pq_kid).toBe(newKp.pq_kid);
+    expect(updated.rotations).toHaveLength(1);
+    expect(updated.rotations[0].old_pq_kid).toBe(oldKp.pq_kid);
+    expect(updated.rotations[0].new_pq_kid).toBe(newKp.pq_kid);
+  });
+
+  it("appends (not overwrites) rotations[] across multiple rotations", async () => {
+    const k0 = await makeTestKeypair();
+    const k1 = await makeTestKeypair();
+    const k2 = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, k0) });
+    await onRequestPost({ request: req(await buildRotateBody(k0, k1)), env, params: { rrn: RRN } } as any);
+    await onRequestPost({ request: req(await buildRotateBody(k1, k2)), env, params: { rrn: RRN } } as any);
+    const final = JSON.parse(env.__store[`robot:${RRN}`]);
+    expect(final.rotations).toHaveLength(2);
+    expect(final.pq_kid).toBe(k2.pq_kid);
+  });
+
+  it("401 when old_sig is invalid (signed by a non-current key)", async () => {
+    const currentKp = await makeTestKeypair();
+    const attackerKp = await makeTestKeypair();
+    const newKp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, currentKp) });
+    const body = await buildRotateBody(attackerKp, newKp);  // old_sig from attacker
+    const res = await onRequestPost({ request: req(body), env, params: { rrn: RRN } } as any);
+    expect(res.status).toBe(401);
+  });
+
+  it("401 when new_sig is invalid (new key does not own the new_pq_signing_pub)", async () => {
+    const oldKp = await makeTestKeypair();
+    const newKp = await makeTestKeypair();
+    const otherKp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, oldKp) });
+    const body = await buildRotateBody(oldKp, newKp);
+    // Swap new_sig for a sig from otherKp over the same payload — new_pq_signing_pub is still newKp.
+    const payload = { rrn: RRN, action: "rotate", new_pq_signing_pub: body.new_pq_signing_pub, new_pq_kid: body.new_pq_kid };
+    body.new_sig = (await signBody(payload, otherKp)).sig;
+    const res = await onRequestPost({ request: req(body), env, params: { rrn: RRN } } as any);
+    expect(res.status).toBe(401);
+  });
+
+  it("400 when new key equals old key", async () => {
+    const kp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, kp) });
+    const body = await buildRotateBody(kp, kp);
+    const res = await onRequestPost({ request: req(body), env, params: { rrn: RRN } } as any);
+    expect(res.status).toBe(400);
+  });
+
+  it("403 when record is revoked", async () => {
+    const oldKp = await makeTestKeypair();
+    const newKp = await makeTestKeypair();
+    const env = makeEnv({
+      [`robot:${RRN}`]: makeRobotRecord(RRN, oldKp),
+      [`revocation:${RRN}`]: JSON.stringify({ revoked_at: "2026-04-24T00:00:00Z", reason: "test" }),
+    });
+    const body = await buildRotateBody(oldKp, newKp);
+    const res = await onRequestPost({ request: req(body), env, params: { rrn: RRN } } as any);
+    expect(res.status).toBe(403);
+  });
+
+  it("400 when body is missing required fields", async () => {
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, await makeTestKeypair()) });
+    const res = await onRequestPost({ request: req({ rrn: RRN }), env, params: { rrn: RRN } } as any);
+    expect(res.status).toBe(400);
+  });
+});
 ```
-feat(rrf): add POST /v2/robots/:rrn/rotate-key (co-signed by old+new)
+
+- [ ] **Step 2: Verify RED**
+
+```bash
+npm test -- functions/v2/robots/\[rrn\]/rotate-key.test.ts
+```
+
+Expected: 9 failures, all `Cannot find module './rotate-key.js'`.
+
+- [ ] **Step 3: Implement `rotate-key.ts`**
+
+```ts
+// functions/v2/robots/[rrn]/rotate-key.ts
+import { isValidId } from "../../_lib/id.js";
+import { verifyBody } from "rcan-ts";
+import { isRevoked } from "../../_lib/revocation.js";
+
+export interface Env { RRF_KV: KVNamespace }
+
+function err(msg: string, status: number): Response {
+  return new Response(JSON.stringify({ error: msg }), {
+    status, headers: { "Content-Type": "application/json" },
+  });
+}
+
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, params }) => {
+  const rrn = params.rrn as string;
+  if (!isValidId(rrn, "RRN")) return err("Invalid RRN format", 400);
+
+  let body: any;
+  try { body = await request.json(); }
+  catch { return err("Invalid JSON body", 400); }
+
+  const { new_pq_signing_pub, new_pq_kid, old_sig, old_pq_kid, new_sig } = body ?? {};
+  if (typeof new_pq_signing_pub !== "string" || typeof new_pq_kid !== "string"
+      || typeof old_pq_kid !== "string"
+      || !old_sig?.ml_dsa || !old_sig?.ed25519 || !old_sig?.ed25519_pub
+      || !new_sig?.ml_dsa || !new_sig?.ed25519 || !new_sig?.ed25519_pub) {
+    return err("Missing required fields (new_pq_signing_pub, new_pq_kid, old_pq_kid, old_sig, new_sig)", 400);
+  }
+  if (body.rrn !== rrn || body.action !== "rotate") {
+    return err("Body must bind rrn and action:rotate", 400);
+  }
+
+  const stored = await env.RRF_KV.get(`robot:${rrn}`, "text");
+  if (!stored) return err("Not found", 404);
+  const record = JSON.parse(stored);
+
+  if (await isRevoked(env, rrn)) return err("Record is revoked", 403);
+
+  const currentPubB64 = record.pq_signing_pub;
+  if (typeof currentPubB64 !== "string") return err("Record has no registered key", 400);
+  if (currentPubB64 === new_pq_signing_pub) return err("Rotation requires a different key", 400);
+
+  const canonical = { rrn, action: "rotate", new_pq_signing_pub, new_pq_kid };
+
+  async function verify(pubB64: string, sig: any): Promise<boolean> {
+    try {
+      const pub = Uint8Array.from(atob(pubB64), c => c.charCodeAt(0));
+      return await verifyBody({ ...canonical, sig, pq_kid: "ignored" }, pub);
+    } catch { return false; }
+  }
+
+  if (!(await verify(currentPubB64, old_sig))) return err("old_sig verification failed", 401);
+  if (!(await verify(new_pq_signing_pub, new_sig))) return err("new_sig verification failed", 401);
+
+  const now = new Date().toISOString();
+  record.rotations = Array.isArray(record.rotations) ? record.rotations : [];
+  record.rotations.push({ rotated_at: now, old_pq_kid: record.pq_kid, new_pq_kid });
+  record.pq_signing_pub = new_pq_signing_pub;
+  record.pq_kid = new_pq_kid;
+  record.updated_at = now;
+  await env.RRF_KV.put(`robot:${rrn}`, JSON.stringify(record));
+  return new Response(JSON.stringify(record), {
+    status: 200, headers: { "Content-Type": "application/json" },
+  });
+};
+```
+
+Note: `verifyBody` in rcan-ts expects a body that looks like `{...canonical, sig, pq_kid}`. We pass a synthetic `pq_kid: "ignored"` because verifyBody signs over everything except `sig` — `pq_kid` is present in the canonical form but does not participate in sig comparison logic beyond being part of the signed bytes. If rcan-ts's exact canonical shape requires `pq_kid` to match one specific value, adapt this to pass `old_pq_kid` / `new_pq_kid` respectively.
+
+- [ ] **Step 4: Verify GREEN**
+
+```bash
+npm test -- functions/v2/robots/\[rrn\]/rotate-key.test.ts
+npm test    # full suite, watch for regressions
+```
+
+Expected: 9/9 pass plus full suite green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add functions/v2/robots/\[rrn\]/rotate-key.ts functions/v2/robots/\[rrn\]/rotate-key.test.ts
+git commit -m "feat(rrf): add POST /v2/robots/:rrn/rotate-key (co-signed by old+new)"
 ```
 
 ---
@@ -577,16 +797,241 @@ Looks up `_rcan-verify.<domain>` via Cloudflare DoH (`https://cloudflare-dns.com
 - Create: `RobotRegistryFoundation/functions/v2/_lib/attestation-verify.ts`
 - Create: `RobotRegistryFoundation/functions/v2/_lib/attestation-verify.test.ts`
 
-**Contract:** `verifyAttestation({attestation, ruri, pqPubBytes, expectedRrn}): Promise<{ok: true} | {ok: false, error: string}>`.
+**Contract:**
+```ts
+interface VerifyAttestationInput {
+  attestation: {
+    rrn: string;
+    manufacturer: string;
+    model: string;
+    timestamp_iso: string;
+    sig: { ml_dsa: string; ed25519: string; ed25519_pub: string };
+    pq_kid: string;
+  };
+  ruri: string;           // e.g. "https://robotis.com"
+  pqPubB64: string;       // robot's registered pq_signing_pub (from RobotRecord)
+  expectedRrn: string;    // RRN from the URL path being verified
+  expectedModel: string;  // record.model, to cross-check attestation
+  fetchFn?: typeof fetch;
+  nowMs?: number;         // injectable for time-based tests
+}
 
-Checks:
-1. Attestation JSON schema (per `rcan-spec/docs/verification/manufacturer-verification.md`) — `rrn`, `manufacturer`, `model`, `timestamp_iso`, `signature`.
-2. Signature over canonical attestation body verifies against `pqPubBytes` using `rcan-ts verifyBody`.
-3. `fetch(ruri + "/.well-known/rcan-manifest.json")` returns 200 and JSON with matching `rrn`.
+type VerifyAttestationResult =
+  | { ok: true; evidence: { attestation_digest: string; ruri_matched: string } }
+  | { ok: false; error: string };
 
-Tests should include: tampered attestation, expired timestamp (> 1 year), missing manifest, manifest mismatched rrn, network error. Inject `fetchFn` for testing.
+export async function verifyAttestation(input: VerifyAttestationInput): Promise<VerifyAttestationResult>;
+```
 
-Commit: `feat(rrf): add signed-attestation + RURI verifier`
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+// attestation-verify.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { verifyAttestation } from "./attestation-verify.js";
+import { makeTestKeypair, signBody, toPqPubB64 } from "./test-helpers.js";
+
+const RRN = "RRN-000000000042";
+const MODEL = "turtlebot3_burger";
+
+async function buildAttestation(kp: any, overrides: Record<string, unknown> = {}) {
+  const body = {
+    rrn: RRN,
+    manufacturer: "ROBOTIS",
+    model: MODEL,
+    timestamp_iso: "2026-04-24T12:00:00Z",
+    ...overrides,
+  };
+  return await signBody(body, kp);
+}
+
+function okManifestFetch(rrn: string) {
+  return vi.fn(async () => new Response(JSON.stringify({ rrn }), { status: 200 }));
+}
+
+describe("verifyAttestation", () => {
+  it("accepts a valid attestation + matching RURI manifest", async () => {
+    const kp = await makeTestKeypair();
+    const attestation = await buildAttestation(kp);
+    const res = await verifyAttestation({
+      attestation, ruri: "https://robotis.com", pqPubB64: toPqPubB64(kp),
+      expectedRrn: RRN, expectedModel: MODEL,
+      fetchFn: okManifestFetch(RRN),
+      nowMs: Date.parse("2026-04-25T00:00:00Z"),
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it("rejects a tampered attestation (wrong sig)", async () => {
+    const kp = await makeTestKeypair();
+    const attestation = await buildAttestation(kp);
+    attestation.manufacturer = "evil-inc";
+    const res = await verifyAttestation({
+      attestation, ruri: "https://robotis.com", pqPubB64: toPqPubB64(kp),
+      expectedRrn: RRN, expectedModel: MODEL,
+      fetchFn: okManifestFetch(RRN),
+      nowMs: Date.parse("2026-04-25T00:00:00Z"),
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toMatch(/sig/i);
+  });
+
+  it("rejects if attestation.rrn disagrees with expectedRrn", async () => {
+    const kp = await makeTestKeypair();
+    const attestation = await buildAttestation(kp, { rrn: "RRN-000000000999" });
+    const res = await verifyAttestation({
+      attestation, ruri: "https://robotis.com", pqPubB64: toPqPubB64(kp),
+      expectedRrn: RRN, expectedModel: MODEL,
+      fetchFn: okManifestFetch(RRN),
+      nowMs: Date.parse("2026-04-25T00:00:00Z"),
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects if attestation.model disagrees with expectedModel", async () => {
+    const kp = await makeTestKeypair();
+    const attestation = await buildAttestation(kp, { model: "some-other-model" });
+    const res = await verifyAttestation({
+      attestation, ruri: "https://robotis.com", pqPubB64: toPqPubB64(kp),
+      expectedRrn: RRN, expectedModel: MODEL,
+      fetchFn: okManifestFetch(RRN),
+      nowMs: Date.parse("2026-04-25T00:00:00Z"),
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects a timestamp > 1 year old", async () => {
+    const kp = await makeTestKeypair();
+    const attestation = await buildAttestation(kp, { timestamp_iso: "2024-01-01T00:00:00Z" });
+    const res = await verifyAttestation({
+      attestation, ruri: "https://robotis.com", pqPubB64: toPqPubB64(kp),
+      expectedRrn: RRN, expectedModel: MODEL,
+      fetchFn: okManifestFetch(RRN),
+      nowMs: Date.parse("2026-04-25T00:00:00Z"),
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error).toMatch(/expired|stale/i);
+  });
+
+  it("rejects if RURI manifest is unreachable", async () => {
+    const kp = await makeTestKeypair();
+    const attestation = await buildAttestation(kp);
+    const res = await verifyAttestation({
+      attestation, ruri: "https://robotis.com", pqPubB64: toPqPubB64(kp),
+      expectedRrn: RRN, expectedModel: MODEL,
+      fetchFn: vi.fn(async () => { throw new TypeError("fetch failed"); }),
+      nowMs: Date.parse("2026-04-25T00:00:00Z"),
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects if RURI manifest's rrn does not match", async () => {
+    const kp = await makeTestKeypair();
+    const attestation = await buildAttestation(kp);
+    const res = await verifyAttestation({
+      attestation, ruri: "https://robotis.com", pqPubB64: toPqPubB64(kp),
+      expectedRrn: RRN, expectedModel: MODEL,
+      fetchFn: okManifestFetch("RRN-000000000999"),
+      nowMs: Date.parse("2026-04-25T00:00:00Z"),
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("rejects if RURI manifest returns non-200", async () => {
+    const kp = await makeTestKeypair();
+    const attestation = await buildAttestation(kp);
+    const res = await verifyAttestation({
+      attestation, ruri: "https://robotis.com", pqPubB64: toPqPubB64(kp),
+      expectedRrn: RRN, expectedModel: MODEL,
+      fetchFn: vi.fn(async () => new Response("", { status: 404 })),
+      nowMs: Date.parse("2026-04-25T00:00:00Z"),
+    });
+    expect(res.ok).toBe(false);
+  });
+});
+```
+
+- [ ] **Step 2: Verify RED**
+
+```bash
+npm test -- functions/v2/_lib/attestation-verify.test.ts
+```
+
+Expected: 8 failures, all module-not-found.
+
+- [ ] **Step 3: Implement `attestation-verify.ts`**
+
+```ts
+// functions/v2/_lib/attestation-verify.ts
+import { verifyBody } from "rcan-ts";
+
+const ONE_YEAR_MS = 365 * 24 * 3600 * 1000;
+
+async function digestHex(bytes: Uint8Array): Promise<string> {
+  const hash = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function verifyAttestation(input: VerifyAttestationInput): Promise<VerifyAttestationResult> {
+  const { attestation, ruri, pqPubB64, expectedRrn, expectedModel } = input;
+  const fetchFn = input.fetchFn ?? fetch;
+  const now = input.nowMs ?? Date.now();
+
+  if (attestation.rrn !== expectedRrn) return { ok: false, error: "attestation rrn mismatch" };
+  if (attestation.model !== expectedModel) return { ok: false, error: "attestation model mismatch" };
+
+  const issued = Date.parse(attestation.timestamp_iso);
+  if (!Number.isFinite(issued)) return { ok: false, error: "invalid timestamp_iso" };
+  if (now - issued > ONE_YEAR_MS) return { ok: false, error: "attestation expired (> 1 year)" };
+  if (issued - now > 60_000) return { ok: false, error: "attestation timestamp in the future" };
+
+  let sigOk = false;
+  try {
+    const pub = Uint8Array.from(atob(pqPubB64), c => c.charCodeAt(0));
+    sigOk = await verifyBody(attestation as unknown as Record<string, unknown>, pub);
+  } catch { /* sigOk stays false */ }
+  if (!sigOk) return { ok: false, error: "attestation sig verification failed" };
+
+  const manifestUrl = ruri.replace(/\/+$/, "") + "/.well-known/rcan-manifest.json";
+  let manifestBody: string;
+  try {
+    const res = await fetchFn(manifestUrl, { headers: { "Accept": "application/json" } });
+    if (!res.ok) return { ok: false, error: `RURI manifest returned ${res.status}` };
+    manifestBody = await res.text();
+  } catch (e: any) {
+    return { ok: false, error: `RURI unreachable: ${e?.message ?? "unknown"}` };
+  }
+
+  let manifest: { rrn?: unknown };
+  try { manifest = JSON.parse(manifestBody); }
+  catch { return { ok: false, error: "RURI manifest is not valid JSON" }; }
+  if (manifest.rrn !== expectedRrn) return { ok: false, error: "RURI manifest rrn mismatch" };
+
+  const canonicalBytes = new TextEncoder().encode(JSON.stringify({
+    rrn: attestation.rrn, manufacturer: attestation.manufacturer,
+    model: attestation.model, timestamp_iso: attestation.timestamp_iso,
+  }));
+  return {
+    ok: true,
+    evidence: { attestation_digest: await digestHex(canonicalBytes), ruri_matched: manifestUrl },
+  };
+}
+```
+
+- [ ] **Step 4: Verify GREEN**
+
+```bash
+npm test -- functions/v2/_lib/attestation-verify.test.ts
+```
+
+Expected: 8/8 pass.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add functions/v2/_lib/attestation-verify.ts functions/v2/_lib/attestation-verify.test.ts
+git commit -m "feat(rrf): add signed-attestation + RURI verifier"
+```
 
 ---
 
@@ -596,18 +1041,320 @@ Commit: `feat(rrf): add signed-attestation + RURI verifier`
 - Create: `RobotRegistryFoundation/functions/v2/robots/[rrn]/verify-tier.ts`
 - Create: `RobotRegistryFoundation/functions/v2/robots/[rrn]/verify-tier.test.ts`
 
+**Scope decision:** Only `manufacturer_claimed` and `manufacturer_verified` are promotable via this endpoint. The `community` tier is maintainer-curated — it is set by a PR against `src/content/robots/<slug>.json`, not by an API call (see `rcan-spec/docs/verification/manufacturer-verification.md`). Attempts to POST `target_tier: "community"` return 400.
+
 **Contract:**
-- Request body: `{target_tier, binding, sig, pq_kid}` where `binding` is `{type, value}` and `sig` is over `{rrn, action: "verify-tier", target_tier, binding}`.
-- Server dispatches on `target_tier`:
-  - `"community"` — no external verification. Requires signature and at least one `attestations[]` entry in request (future work; for now accept `attestations: []` but flag as TODO in impl).
-  - `"manufacturer_claimed"` — `binding.type` MUST be `"dns-txt"`; calls `verifyDnsTxt(binding.value, rrn, record.model)`.
-  - `"manufacturer_verified"` — binding must also include `attestation` + `ruri`; calls `verifyAttestation(...)`.
-- On success: updates `record.verification_status` and `record.identity_binding`, returns 200.
-- On revoked: 403. On verifier failure: 400 with reason.
+- Request body: `{rrn, action: "verify-tier", target_tier, binding, ruri?, attestation?, sig, pq_kid}`.
+  - `target_tier`: `"manufacturer_claimed" | "manufacturer_verified"`.
+  - `binding`: `{type: "dns-txt", value: <domain>}` (only DNS TXT is accepted for `manufacturer_claimed`; `manufacturer_verified` requires DNS TXT AND a signed `attestation` + `ruri`).
+  - `sig`: envelope signed by the robot's current `pq_signing_pub` over the canonical body (minus `sig`/`pq_kid`).
+- Server checks (in order): RRN format, revocation, record exists, signature verifies, new tier > current tier (no downgrades), then dispatches on `target_tier`.
+- On success: updates `record.verification_status` + `record.identity_binding`, returns 200 with updated record.
 
-Seven tests minimum: happy path each tier, DNS failure, attestation failure, downgrade attempt (reject), revoked record, missing fields, bad signature.
+- [ ] **Step 1: Write the failing tests**
 
-Commit: `feat(rrf): add POST /v2/robots/:rrn/verify-tier`
+```ts
+// verify-tier.test.ts
+import { describe, it, expect, vi } from "vitest";
+import { onRequestPost } from "./verify-tier.js";
+import { makeTestKeypair, makeRobotRecord, signBody } from "../../_lib/test-helpers.js";
+
+const RRN = "RRN-000000000042";
+const DOMAIN = "robotis.com";
+
+function makeEnv(init: Record<string, string> = {}) {
+  const store: Record<string, string> = { ...init };
+  return {
+    RRF_KV: {
+      get: vi.fn(async (k: string) => store[k] ?? null),
+      put: vi.fn(async (k: string, v: string) => { store[k] = v; }),
+      delete: vi.fn(async (k: string) => { delete store[k]; }),
+      list: vi.fn(),
+    } as unknown as KVNamespace,
+    __store: store,
+  };
+}
+
+function req(body: unknown): Request {
+  return new Request(`https://x/v2/robots/${RRN}/verify-tier`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+describe("POST /v2/robots/[rrn]/verify-tier", () => {
+  it("rejects target_tier=community (not promotable via API)", async () => {
+    const kp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, kp) });
+    const signed = await signBody(
+      { rrn: RRN, action: "verify-tier", target_tier: "community", binding: { type: "dns-txt", value: DOMAIN } },
+      kp,
+    );
+    const res = await onRequestPost({
+      request: req(signed), env, params: { rrn: RRN },
+      // @ts-expect-error injected verifiers for test determinism
+      verifiers: { dns: vi.fn(), attestation: vi.fn() },
+    } as any);
+    expect(res.status).toBe(400);
+  });
+
+  it("promotes to manufacturer_claimed when DNS TXT verifies", async () => {
+    const kp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, kp, { model: "turtlebot3_burger" }) });
+    const signed = await signBody(
+      { rrn: RRN, action: "verify-tier", target_tier: "manufacturer_claimed", binding: { type: "dns-txt", value: DOMAIN } },
+      kp,
+    );
+    const verifiers = {
+      dns: vi.fn(async () => ({ ok: true, evidence: `rrn=${RRN};model=turtlebot3_burger` })),
+      attestation: vi.fn(),
+    };
+    const res = await onRequestPost({ request: req(signed), env, params: { rrn: RRN }, verifiers } as any);
+    expect(res.status).toBe(200);
+    const updated = JSON.parse(env.__store[`robot:${RRN}`]);
+    expect(updated.verification_status).toBe("manufacturer_claimed");
+    expect(updated.identity_binding.type).toBe("dns-txt");
+    expect(updated.identity_binding.value).toBe(DOMAIN);
+    expect(verifiers.dns).toHaveBeenCalledWith(DOMAIN, RRN, "turtlebot3_burger");
+  });
+
+  it("400 when DNS TXT verification fails", async () => {
+    const kp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, kp) });
+    const signed = await signBody(
+      { rrn: RRN, action: "verify-tier", target_tier: "manufacturer_claimed", binding: { type: "dns-txt", value: DOMAIN } },
+      kp,
+    );
+    const verifiers = {
+      dns: vi.fn(async () => ({ ok: false, error: "TXT record not found" })),
+      attestation: vi.fn(),
+    };
+    const res = await onRequestPost({ request: req(signed), env, params: { rrn: RRN }, verifiers } as any);
+    expect(res.status).toBe(400);
+  });
+
+  it("promotes to manufacturer_verified when DNS + attestation both verify", async () => {
+    const kp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, kp, { model: "turtlebot3_burger" }) });
+    const attestation = { rrn: RRN, manufacturer: "ROBOTIS", model: "turtlebot3_burger", timestamp_iso: "2026-04-24T00:00:00Z" };
+    const signed = await signBody(
+      {
+        rrn: RRN, action: "verify-tier", target_tier: "manufacturer_verified",
+        binding: { type: "dns-txt", value: DOMAIN },
+        ruri: "https://robotis.com", attestation,
+      },
+      kp,
+    );
+    const verifiers = {
+      dns: vi.fn(async () => ({ ok: true, evidence: `rrn=${RRN};model=turtlebot3_burger` })),
+      attestation: vi.fn(async () => ({ ok: true, evidence: { attestation_digest: "abc", ruri_matched: "https://robotis.com/.well-known/rcan-manifest.json" } })),
+    };
+    const res = await onRequestPost({ request: req(signed), env, params: { rrn: RRN }, verifiers } as any);
+    expect(res.status).toBe(200);
+    const updated = JSON.parse(env.__store[`robot:${RRN}`]);
+    expect(updated.verification_status).toBe("manufacturer_verified");
+  });
+
+  it("400 on downgrade attempt (current=manufacturer_verified, target=manufacturer_claimed)", async () => {
+    const kp = await makeTestKeypair();
+    const record = JSON.parse(makeRobotRecord(RRN, kp));
+    record.verification_status = "manufacturer_verified";
+    const env = makeEnv({ [`robot:${RRN}`]: JSON.stringify(record) });
+    const signed = await signBody(
+      { rrn: RRN, action: "verify-tier", target_tier: "manufacturer_claimed", binding: { type: "dns-txt", value: DOMAIN } },
+      kp,
+    );
+    const verifiers = { dns: vi.fn(), attestation: vi.fn() };
+    const res = await onRequestPost({ request: req(signed), env, params: { rrn: RRN }, verifiers } as any);
+    expect(res.status).toBe(400);
+  });
+
+  it("403 when record is revoked", async () => {
+    const kp = await makeTestKeypair();
+    const env = makeEnv({
+      [`robot:${RRN}`]: makeRobotRecord(RRN, kp),
+      [`revocation:${RRN}`]: JSON.stringify({ revoked_at: "2026-04-24T00:00:00Z", reason: "test" }),
+    });
+    const signed = await signBody(
+      { rrn: RRN, action: "verify-tier", target_tier: "manufacturer_claimed", binding: { type: "dns-txt", value: DOMAIN } },
+      kp,
+    );
+    const verifiers = { dns: vi.fn(), attestation: vi.fn() };
+    const res = await onRequestPost({ request: req(signed), env, params: { rrn: RRN }, verifiers } as any);
+    expect(res.status).toBe(403);
+  });
+
+  it("401 when signature does not verify against record's pq_signing_pub", async () => {
+    const kp = await makeTestKeypair();
+    const attackerKp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, kp) });
+    const signed = await signBody(
+      { rrn: RRN, action: "verify-tier", target_tier: "manufacturer_claimed", binding: { type: "dns-txt", value: DOMAIN } },
+      attackerKp,
+    );
+    const verifiers = { dns: vi.fn(), attestation: vi.fn() };
+    const res = await onRequestPost({ request: req(signed), env, params: { rrn: RRN }, verifiers } as any);
+    expect(res.status).toBe(401);
+  });
+
+  it("400 when target_tier is invalid", async () => {
+    const kp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, kp) });
+    const signed = await signBody(
+      { rrn: RRN, action: "verify-tier", target_tier: "wizard_tier", binding: { type: "dns-txt", value: DOMAIN } },
+      kp,
+    );
+    const verifiers = { dns: vi.fn(), attestation: vi.fn() };
+    const res = await onRequestPost({ request: req(signed), env, params: { rrn: RRN }, verifiers } as any);
+    expect(res.status).toBe(400);
+  });
+
+  it("400 when manufacturer_verified request is missing ruri or attestation", async () => {
+    const kp = await makeTestKeypair();
+    const env = makeEnv({ [`robot:${RRN}`]: makeRobotRecord(RRN, kp) });
+    const signed = await signBody(
+      { rrn: RRN, action: "verify-tier", target_tier: "manufacturer_verified", binding: { type: "dns-txt", value: DOMAIN } },
+      kp,
+    );
+    const verifiers = { dns: vi.fn(), attestation: vi.fn() };
+    const res = await onRequestPost({ request: req(signed), env, params: { rrn: RRN }, verifiers } as any);
+    expect(res.status).toBe(400);
+  });
+});
+```
+
+- [ ] **Step 2: Verify RED**
+
+```bash
+npm test -- functions/v2/robots/\[rrn\]/verify-tier.test.ts
+```
+
+Expected: 9 failures, module-not-found.
+
+- [ ] **Step 3: Implement `verify-tier.ts`**
+
+```ts
+// functions/v2/robots/[rrn]/verify-tier.ts
+import { isValidId } from "../../_lib/id.js";
+import { verifyBody } from "rcan-ts";
+import { isRevoked } from "../../_lib/revocation.js";
+import { verifyDnsTxt } from "../../_lib/dns-verify.js";
+import { verifyAttestation } from "../../_lib/attestation-verify.js";
+
+export interface Env { RRF_KV: KVNamespace }
+
+interface Verifiers {
+  dns: typeof verifyDnsTxt;
+  attestation: typeof verifyAttestation;
+}
+
+const TIER_ORDER = ["unverified", "community", "manufacturer_claimed", "manufacturer_verified"] as const;
+type Tier = typeof TIER_ORDER[number];
+
+function err(msg: string, status: number): Response {
+  return new Response(JSON.stringify({ error: msg }), {
+    status, headers: { "Content-Type": "application/json" },
+  });
+}
+
+export const onRequestPost: PagesFunction<Env> = async (ctx) => {
+  const { request, env, params } = ctx;
+  const verifiers: Verifiers = (ctx as any).verifiers ?? { dns: verifyDnsTxt, attestation: verifyAttestation };
+  const rrn = params.rrn as string;
+
+  if (!isValidId(rrn, "RRN")) return err("Invalid RRN format", 400);
+
+  let body: any;
+  try { body = await request.json(); }
+  catch { return err("Invalid JSON body", 400); }
+
+  const targetTier = body?.target_tier;
+  if (targetTier === "community") return err("community tier is maintainer-curated (PR, not API)", 400);
+  if (targetTier !== "manufacturer_claimed" && targetTier !== "manufacturer_verified") {
+    return err("target_tier must be manufacturer_claimed or manufacturer_verified", 400);
+  }
+  if (body?.action !== "verify-tier" || body?.rrn !== rrn) {
+    return err("Body must bind rrn and action:verify-tier", 400);
+  }
+  const binding = body?.binding;
+  if (!binding || binding.type !== "dns-txt" || typeof binding.value !== "string") {
+    return err("binding must be {type:'dns-txt', value:<domain>}", 400);
+  }
+  if (targetTier === "manufacturer_verified") {
+    if (typeof body?.ruri !== "string" || !body?.attestation) {
+      return err("manufacturer_verified requires ruri + attestation", 400);
+    }
+  }
+
+  if (await isRevoked(env, rrn)) return err("Record is revoked", 403);
+
+  const stored = await env.RRF_KV.get(`robot:${rrn}`, "text");
+  if (!stored) return err("Not found", 404);
+  const record = JSON.parse(stored);
+
+  const pqPubB64 = record.pq_signing_pub;
+  if (typeof pqPubB64 !== "string") return err("Record has no registered key", 400);
+
+  let sigOk = false;
+  try {
+    const pub = Uint8Array.from(atob(pqPubB64), c => c.charCodeAt(0));
+    sigOk = await verifyBody(body, pub);
+  } catch { /* sigOk stays false */ }
+  if (!sigOk) return err("Signature verification failed", 401);
+
+  const currentTier = (record.verification_status ?? "unverified") as Tier;
+  const currentIdx = TIER_ORDER.indexOf(currentTier);
+  const targetIdx = TIER_ORDER.indexOf(targetTier);
+  if (targetIdx <= currentIdx) return err("Cannot downgrade or stay at current tier", 400);
+
+  const dns = await verifiers.dns(binding.value, rrn, record.model);
+  if (!dns.ok) return err(`DNS verification failed: ${dns.error}`, 400);
+
+  let ruriEvidence: string | undefined;
+  if (targetTier === "manufacturer_verified") {
+    const att = await verifiers.attestation({
+      attestation: body.attestation,
+      ruri: body.ruri,
+      pqPubB64,
+      expectedRrn: rrn,
+      expectedModel: record.model,
+    });
+    if (!att.ok) return err(`Attestation verification failed: ${att.error}`, 400);
+    ruriEvidence = att.evidence.ruri_matched;
+  }
+
+  const now = new Date().toISOString();
+  record.verification_status = targetTier;
+  record.identity_binding = {
+    type: "dns-txt",
+    value: binding.value,
+    verified_at: now,
+    verifier_evidence: ruriEvidence ? `${dns.evidence}; ${ruriEvidence}` : dns.evidence,
+  };
+  record.updated_at = now;
+  await env.RRF_KV.put(`robot:${rrn}`, JSON.stringify(record));
+  return new Response(JSON.stringify(record), {
+    status: 200, headers: { "Content-Type": "application/json" },
+  });
+};
+```
+
+- [ ] **Step 4: Verify GREEN**
+
+```bash
+npm test -- functions/v2/robots/\[rrn\]/verify-tier.test.ts
+npm test    # full suite
+```
+
+Expected: 9/9 pass plus full suite green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add functions/v2/robots/\[rrn\]/verify-tier.ts functions/v2/robots/\[rrn\]/verify-tier.test.ts
+git commit -m "feat(rrf): add POST /v2/robots/:rrn/verify-tier (manufacturer_claimed + manufacturer_verified)"
+```
 
 ---
 
@@ -661,11 +1408,26 @@ Commit: `feat(cli): add robot-md revoke-key`
 robot-md rotate-key <rrn> [--endpoint URL]
 ```
 
-Generates a new ML-DSA + Ed25519 keypair, builds a `{rrn, action: "rotate", new_pq_signing_pub, new_pq_kid}` payload, signs it twice (with the old key and with the new key), POSTs. On 200, atomically replaces `~/.robot-md/keys/<rrn>.signing.json` (write-to-tmp-then-rename) and updates `~/.robot-md/keys/<rrn>.apikey` if server returns a new one. On failure, does NOT touch the on-disk key.
+Behavior:
+1. Load current signing keypair from `~/.robot-md/keys/<rrn>.signing.json`.
+2. Generate a new ML-DSA + Ed25519 keypair.
+3. Build canonical `{rrn, action: "rotate", new_pq_signing_pub, new_pq_kid}`; sign with old key (→ `old_sig`) and with new key (→ `new_sig`).
+4. POST to `<endpoint>/v2/robots/<rrn>/rotate-key`.
+5. **On 200 — order matters:**
+   a. Archive the old keypair to `~/.robot-md/keys/archive/<rrn>.<old_kid>.signing.json` (mode 0600). Create the archive directory if missing. Write-to-tmp-then-rename for crash-safety.
+   b. Atomically replace `~/.robot-md/keys/<rrn>.signing.json` with the new keypair (write-to-tmp-then-rename).
+   c. Print: `Rotated. Old key archived at ~/.robot-md/keys/archive/<rrn>.<old_kid>.signing.json (treat as backup credential — can still revoke if new key is lost).`
+6. **On any non-200 — do NOT touch the on-disk key.** The archive step only happens after the server confirms the rotation.
 
-Tests cover: happy path, network error (on-disk key untouched), server returns 401 (same).
+Tests:
+- Happy path: new keystore replaces old; archive contains the old keypair; exit 0.
+- Server returns 401: keystore untouched; archive dir not created; non-zero exit.
+- Server returns 404: same as 401.
+- Network error (urlopen raises URLError): same as 401.
+- Crash between archive-write and new-keystore-write: on next invocation, archive exists but keystore still has old key — idempotent retry should notice and complete. (Test by mocking the rename step to raise partway.)
+- Archive dir already has an entry with the same `<old_kid>`: overwrite without error (archive is provenance, not durable store).
 
-Commit: `feat(cli): add robot-md rotate-key`
+Commit: `feat(cli): add robot-md rotate-key (with old-key archive)`
 
 ---
 
@@ -721,9 +1483,13 @@ Commit: `docs: document rotate/revoke/verify-tier endpoints`
 - [ ] Function names consistent: `isRevoked`, `markRevoked`, `verifyDnsTxt`, `verifyAttestation`, `verifyComplianceBody`.
 - [ ] TDD strict — every task starts with a failing test.
 
-## Open questions for operator sign-off before execution
+## Design decisions (locked 2026-04-24)
 
-1. **Rotation envelope shape** — co-signed single payload (`{old_sig, new_sig}` over same bytes) vs nested envelope (new sig over `{old_sig, new_pub}`). Plan assumes co-signed. Confirm OK.
-2. **CLI key backup** — on `rotate-key`, should the OLD key be archived to `~/.robot-md/keys/archive/<rrn>.<kid>.signing.json` so an operator who lost trust in the new key can still revoke using the old? Plan assumes YES (belt-and-suspenders). Confirm.
-3. **DNS verifier TTL** — should successful DNS verification be re-checked after N days, or is it one-shot? Plan assumes one-shot (evidence stored at `verified_at`); re-verification is a future task. Confirm.
-4. **`community` tier logic** — left as TODO in Task 8. Is per-PR attestation collection still the intended path, or is this tier going away in favor of `unverified → manufacturer_claimed`? Clarify before Task 8.
+1. **Rotation envelope** — co-signed single payload. Both sigs cover canonical `{rrn, action: "rotate", new_pq_signing_pub, new_pq_kid}`. See Task 4.
+2. **Rotate archives old key** — `~/.robot-md/keys/archive/<rrn>.<old_kid>.signing.json` mode 0600. Treated as a backup credential. See Task 11.
+3. **DNS TTL** — one-shot at promotion time, `verified_at` recorded in `identity_binding`. Periodic re-verification is a follow-up.
+4. **`community` tier** — dropped from the `verify-tier` API; remains maintainer-curated via PR against `src/content/robots/<slug>.json` per `rcan-spec/docs/verification/manufacturer-verification.md`. Task 8 dispatches only on `manufacturer_claimed` and `manufacturer_verified`.
+
+## Known limitations
+
+- **Concurrent rotate race** — KV has no CAS primitive; two simultaneous rotate requests can both verify and both write (last-write-wins). The `rotations[]` audit log will reflect the collision post-facto. Optimistic versioning is deferred.

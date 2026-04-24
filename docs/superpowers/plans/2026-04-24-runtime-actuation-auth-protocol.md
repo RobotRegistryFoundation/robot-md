@@ -1,6 +1,6 @@
 # Runtime Actuation Auth Protocol — Design + Reference Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` to implement the opencastor reference (Tasks R1–R8) and CLI parity (Tasks C1–C4). The LeRobot / ROS2 / Reachy Mini integration sections are specification notes, not code tasks.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` to implement the rcan-py verifier (Tasks R1–R6), opencastor reference (Tasks O1–O5), and CLI parity (Tasks C1–C4). The LeRobot / ROS2 / Reachy Mini integration sections are specification notes, not code tasks.
 
 **Goal:** Define and implement a protocol by which "authorized users can actuate" a registered robot, where the robot's RRF identity (`pq_signing_pub`) is the root of trust and local runtimes (opencastor, LeRobot, ROS2, Reachy Mini) all enforce the same delegation check before accepting motor commands.
 
@@ -61,7 +61,23 @@ Signed with the robot's `pq_signing_pub` (ML-DSA + Ed25519 hybrid, same algorith
 }
 ```
 
-Scope vocabulary is defined in `rcan-spec §27` (this plan ships the initial set): `move`, `grip`, `tts`, `camera-stream`, `config-read`, `config-write`, `reset`, `shutdown`, `all` (only for admin/recovery operators; emits an audit event every time it's used).
+Scope vocabulary (rcan-spec §27 initial set):
+
+| Scope | Meaning |
+|---|---|
+| `move` | Any motor/joint command |
+| `grip` | Gripper open/close |
+| `tts` | Text-to-speech output |
+| `camera-stream` | Subscribe to camera feeds |
+| `config-read` | Read config / telemetry |
+| `config-write` | Modify non-policy config (speed limits, offsets) |
+| `policy-update` | Swap the active AI policy / model artifact |
+| `audit-read` | Read-only access to AuditChain (§16) |
+| `reset` | Soft reset / re-home |
+| `shutdown` | Power down / safe-stop |
+| `all` | Super-scope; **audit-emits on every command** (see §1.6a below) |
+
+Per-joint granularity is a HiTL gate concern (§8), not a scope. If a deployment needs "Alice can move all joints except the wrist," that is expressed as `scopes: [move]` with a wrist-flex HiTL gate — not as a finer scope.
 
 ### 1.3 Command envelope (canonical format)
 
@@ -80,7 +96,7 @@ Signed with the *operator's* Ed25519:
 }
 ```
 
-Every command carries its own signature. Sessions are *not* introduced in v1 — every command is independently verifiable and replay-protected via `nonce` + `issued_at` window (±60 s default). This is simpler than session tokens and has no token-theft surface. If bandwidth becomes an issue in a later revision, sessions can be added.
+Every command carries its own signature. Sessions are *not* introduced in v1 — every command is independently verifiable and replay-protected via `nonce` + `issued_at` window (±300 s default, configurable per-robot via `auth.max_skew_sec` in `robot.rcan.yaml`). 300 s absorbs mobile-network delivery jitter, embedded NTP drift, and DST transitions; nonce-based replay rejection bounds the attack window regardless of skew. Sessions can be added later if per-command bandwidth becomes an issue.
 
 ### 1.4 Revocation of operator delegations
 
@@ -99,7 +115,15 @@ This plan ships mechanism #1 only. Mechanism #2 is a followup; noted here so v1 
 
 This plan assumes the robot's `pq_signing_pub` is already registered on RRF (via the existing register flow). It does *not* require `verification_status` to be anything in particular — even an `unverified` robot can have operators. The tier affects *how much the RRF manifest can be trusted by outsiders*, not how the local runtime authorizes commands.
 
-If the robot's RRF key is *rotated* (via the write-auth plan's rotate-key endpoint), all existing operator delegations become invalid at the expiry/verification layer — they are signed by the old key. A rotate triggers re-enrollment. This is acceptable friction because rotation is a rare operator-initiated event. (Alternative: allow the rotate-key payload to optionally re-sign existing delegations. Rejected for v1: adds complexity and a partial-failure mode.)
+If the robot's RRF key is *rotated* (via the write-auth plan's rotate-key endpoint), all existing operator delegations become invalid at the verification layer — they are signed by the old key. Rotation triggers full re-enrollment. Transactional re-sign-on-rotate is rejected for v1: it couples rotate-key to an unbounded list of delegations and introduces a partial-failure mode. Rotations are rare and user-initiated; re-enrolling a handful of operators is acceptable friction.
+
+### 1.6a `all` scope handling
+
+The `all` super-scope is allowed so admin/recovery paths are expressible, but its cost must be visible:
+
+1. **Enrollment friction** — `robot-md operator enroll --scopes all` refuses to proceed without `--force`. The CLI prints a warning naming the device and requires an explicit confirmation.
+2. **Runtime audit-emit** — every command dispatched under a delegation whose scopes include `all` emits a `COMMAND_ADMIN_USE` AuditChain event (§16), regardless of what scope the command itself names. This makes `all`-scoped activity auditable after the fact even if the operator narrowed the command's declared scope.
+3. **No silent upgrade** — a delegation never gets `all` implicitly. It must be signed in at enrollment time with `scopes: ["all"]` (or equivalent).
 
 ---
 
@@ -186,120 +210,630 @@ def test_command_canonical_bytes_excludes_sig():
 
 ### Task R2: `verify_delegation(delegation, robot_pq_pub) -> bool`
 
-- [ ] **Step 1: Tests**
-  - Valid delegation signed by robot pq key → True.
-  - Tampered `scopes` → False.
-  - Tampered `operator_pub` → False.
-  - Wrong pq key → False.
-  - Expired `expires_at` → False (verifier checks time window).
-  - `issued_at` in the future → False.
+**Files:**
+- Modify: `rcan-py/src/rcan/auth/operator.py`
+- Create: `rcan-py/tests/auth/test_verify_delegation.py`
 
-- [ ] **Step 2: Verify RED.**
+- [ ] **Step 1: Write the failing tests**
 
-- [ ] **Step 3: Implement** using existing `rcan.crypto.verify_hybrid`. Expiry check uses `datetime.now(UTC)`.
+```python
+# tests/auth/test_verify_delegation.py
+from datetime import datetime, timedelta, timezone
+import pytest
+from rcan.auth.operator import OperatorDelegation, verify_delegation, sign_delegation
+from rcan.crypto import generate_hybrid_keypair  # existing helper
 
-- [ ] **Step 4: Verify GREEN.**
+ISO = lambda dt: dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-- [ ] **Step 5: Commit** `feat(rcan-py): verify_delegation`.
+def _body(pub_ed25519_b64: str, **overrides) -> dict:
+    now = datetime.now(timezone.utc)
+    b = {
+        "schema": "rcan-operator-delegation-v1",
+        "rrn": "RRN-000000000001",
+        "operator_pub": pub_ed25519_b64,
+        "operator_name": "alice-laptop",
+        "scopes": ["move", "grip"],
+        "issued_at": ISO(now - timedelta(minutes=1)),
+        "expires_at": ISO(now + timedelta(days=30)),
+        "max_ops_per_minute": 60,
+    }
+    b.update(overrides)
+    return b
+
+def test_verify_delegation_accepts_valid(robot_kp, operator_pub_b64):
+    dg = sign_delegation(_body(operator_pub_b64), robot_kp)
+    assert verify_delegation(dg, robot_kp.pq_pub_bytes) is True
+
+def test_verify_delegation_rejects_tampered_scopes(robot_kp, operator_pub_b64):
+    dg = sign_delegation(_body(operator_pub_b64), robot_kp)
+    dg.scopes = ["move", "grip", "shutdown"]  # escalated
+    assert verify_delegation(dg, robot_kp.pq_pub_bytes) is False
+
+def test_verify_delegation_rejects_tampered_operator_pub(robot_kp, operator_pub_b64):
+    dg = sign_delegation(_body(operator_pub_b64), robot_kp)
+    dg.operator_pub = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    assert verify_delegation(dg, robot_kp.pq_pub_bytes) is False
+
+def test_verify_delegation_rejects_wrong_pq_key(robot_kp, operator_pub_b64):
+    dg = sign_delegation(_body(operator_pub_b64), robot_kp)
+    other_kp = generate_hybrid_keypair()
+    assert verify_delegation(dg, other_kp.pq_pub_bytes) is False
+
+def test_verify_delegation_rejects_expired(robot_kp, operator_pub_b64):
+    past = datetime.now(timezone.utc) - timedelta(days=1)
+    dg = sign_delegation(_body(operator_pub_b64, expires_at=ISO(past)), robot_kp)
+    assert verify_delegation(dg, robot_kp.pq_pub_bytes) is False
+
+def test_verify_delegation_rejects_future_issued_at(robot_kp, operator_pub_b64):
+    future = datetime.now(timezone.utc) + timedelta(hours=2)
+    dg = sign_delegation(_body(operator_pub_b64, issued_at=ISO(future)), robot_kp)
+    assert verify_delegation(dg, robot_kp.pq_pub_bytes) is False
+```
+
+Shared fixtures in `tests/auth/conftest.py`:
+```python
+import base64, pytest
+from nacl.signing import SigningKey
+from rcan.crypto import generate_hybrid_keypair
+
+@pytest.fixture
+def robot_kp():
+    return generate_hybrid_keypair()
+
+@pytest.fixture
+def operator_ed25519():
+    return SigningKey.generate()
+
+@pytest.fixture
+def operator_pub_b64(operator_ed25519):
+    return base64.b64encode(bytes(operator_ed25519.verify_key)).decode()
+```
+
+- [ ] **Step 2: Verify RED** — `pytest tests/auth/test_verify_delegation.py -v` → ImportError on `verify_delegation` / `sign_delegation`.
+
+- [ ] **Step 3: Implement in `rcan/auth/operator.py`**
+
+```python
+from datetime import datetime, timezone
+from rcan.crypto import canonical_json, verify_hybrid, sign_hybrid
+from .operator import OperatorDelegation  # same module; arrange imports as suits
+
+_NOW = lambda: datetime.now(timezone.utc)
+
+def _canonical_body(dg: OperatorDelegation) -> bytes:
+    """Canonical JSON of everything except sig + pq_kid."""
+    d = dg.to_dict()
+    d.pop("sig", None); d.pop("pq_kid", None)
+    return canonical_json(d)
+
+def verify_delegation(dg: OperatorDelegation, robot_pq_pub: bytes) -> bool:
+    if not dg.sig:
+        return False
+    now = _NOW()
+    try:
+        issued = datetime.fromisoformat(dg.issued_at.replace("Z", "+00:00"))
+        expires = datetime.fromisoformat(dg.expires_at.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if issued - now > _SKEW_TOLERANCE:  # issued too far in future
+        return False
+    if expires <= now:
+        return False
+    message = _canonical_body(dg)
+    return verify_hybrid(robot_pq_pub, message, dg.sig)
+
+def sign_delegation(body: dict, robot_keypair) -> OperatorDelegation:
+    dg = OperatorDelegation.from_dict({**body, "pq_kid": robot_keypair.pq_kid, "sig": None})
+    message = _canonical_body(dg)
+    dg.sig = sign_hybrid(robot_keypair.ml_dsa, robot_keypair.ed25519_sec, message)
+    return dg
+
+_SKEW_TOLERANCE = timedelta(minutes=5)  # accept slight clock drift on issuance
+```
+
+- [ ] **Step 4: Verify GREEN**
+
+```bash
+pytest tests/auth/test_verify_delegation.py -v
+```
+
+Expected: 6/6 pass.
+
+- [ ] **Step 5: Commit** `feat(rcan-py): verify_delegation + sign_delegation`.
 
 ---
 
-### Task R3: `verify_command(command, known_operators, max_skew_sec=60) -> AuthResult`
+### Task R3: `verify_command(command, known_operators, max_skew_sec=300) -> AuthResult`
 
-Where `known_operators` is `list[OperatorDelegation]` already pre-verified (checked by the caller before caching).
+**Files:**
+- Modify: `rcan-py/src/rcan/auth/operator.py`
+- Create: `rcan-py/tests/auth/test_verify_command.py`
 
-**AuthResult:** dataclass `{ok: bool, reason: str | None, matched_delegation: OperatorDelegation | None}`.
+`known_operators` is `list[OperatorDelegation]` — the caller is responsible for pre-verifying each via `verify_delegation` before caching.
 
-- [ ] **Step 1: Tests**
-  - Command signed by known operator, scope ⊆ delegated scopes, within time window → `ok=True`.
-  - Command `operator_pub` not in any delegation → `ok=False, reason="unknown operator"`.
-  - Matching operator but scope not in delegation → `ok=False, reason="scope"`.
-  - Expired delegation (even if command is fresh) → `ok=False, reason="delegation expired"`.
-  - `issued_at` > 60 s in future → `ok=False, reason="skew"`.
-  - `issued_at` > 60 s in past → `ok=False, reason="skew"`.
-  - Tampered signature → `ok=False, reason="signature"`.
-  - Rate limit exceeded (pass in a counter) → `ok=False, reason="rate"`. **(Defer to follow-up; Task R3 ships the signature-correctness path and returns `rate=None`; rate enforcement is Task R7.)**
+- [ ] **Step 1: Write the failing tests**
 
-- [ ] **Step 2: Verify RED.**
+```python
+# tests/auth/test_verify_command.py
+import base64, time
+from datetime import datetime, timezone, timedelta
+from rcan.auth.operator import (
+    OperatorCommand, sign_command, verify_command, sign_delegation
+)
 
-- [ ] **Step 3: Implement.**
+ISO = lambda dt: dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-- [ ] **Step 4: Verify GREEN.**
+def _make_delegation(robot_kp, operator_ed25519, **overrides):
+    pub_b64 = base64.b64encode(bytes(operator_ed25519.verify_key)).decode()
+    now = datetime.now(timezone.utc)
+    body = {
+        "schema": "rcan-operator-delegation-v1",
+        "rrn": "RRN-000000000001",
+        "operator_pub": pub_b64,
+        "operator_name": "alice-laptop",
+        "scopes": ["move", "grip"],
+        "issued_at": ISO(now - timedelta(minutes=1)),
+        "expires_at": ISO(now + timedelta(days=30)),
+        "max_ops_per_minute": 60,
+    }
+    body.update(overrides)
+    return sign_delegation(body, robot_kp)
 
-- [ ] **Step 5: Commit** `feat(rcan-py): verify_command with scope + skew checks`.
+def _make_cmd(operator_ed25519, **overrides) -> OperatorCommand:
+    pub_b64 = base64.b64encode(bytes(operator_ed25519.verify_key)).decode()
+    body = {
+        "schema": "rcan-command-v1",
+        "rrn": "RRN-000000000001",
+        "operator_pub": pub_b64,
+        "nonce": base64.b64encode(b"x" * 16).decode(),
+        "issued_at": ISO(datetime.now(timezone.utc)),
+        "scope": "move",
+        "cmd": {"dx": 0.1},
+    }
+    body.update(overrides)
+    return sign_command(body, operator_ed25519)
+
+def test_accepts_valid_command(robot_kp, operator_ed25519):
+    dg = _make_delegation(robot_kp, operator_ed25519)
+    cmd = _make_cmd(operator_ed25519)
+    res = verify_command(cmd, [dg])
+    assert res.ok
+    assert res.matched_delegation is dg
+
+def test_rejects_unknown_operator(robot_kp, operator_ed25519):
+    from nacl.signing import SigningKey
+    dg = _make_delegation(robot_kp, operator_ed25519)
+    other = SigningKey.generate()
+    cmd = _make_cmd(other)
+    res = verify_command(cmd, [dg])
+    assert not res.ok and res.reason == "unknown operator"
+
+def test_rejects_out_of_scope(robot_kp, operator_ed25519):
+    dg = _make_delegation(robot_kp, operator_ed25519, scopes=["move"])
+    cmd = _make_cmd(operator_ed25519, scope="shutdown")
+    res = verify_command(cmd, [dg])
+    assert not res.ok and res.reason == "scope"
+
+def test_rejects_expired_delegation(robot_kp, operator_ed25519):
+    past = datetime.now(timezone.utc) - timedelta(seconds=1)
+    dg = _make_delegation(robot_kp, operator_ed25519,
+                          issued_at=ISO(datetime.now(timezone.utc) - timedelta(days=2)),
+                          expires_at=ISO(past))
+    cmd = _make_cmd(operator_ed25519)
+    res = verify_command(cmd, [dg])
+    assert not res.ok and res.reason == "delegation expired"
+
+def test_rejects_future_skew_beyond_300s(robot_kp, operator_ed25519):
+    dg = _make_delegation(robot_kp, operator_ed25519)
+    future = datetime.now(timezone.utc) + timedelta(seconds=400)
+    cmd = _make_cmd(operator_ed25519, issued_at=ISO(future))
+    res = verify_command(cmd, [dg])
+    assert not res.ok and res.reason == "skew"
+
+def test_rejects_past_skew_beyond_300s(robot_kp, operator_ed25519):
+    dg = _make_delegation(robot_kp, operator_ed25519)
+    past = datetime.now(timezone.utc) - timedelta(seconds=400)
+    cmd = _make_cmd(operator_ed25519, issued_at=ISO(past))
+    res = verify_command(cmd, [dg])
+    assert not res.ok and res.reason == "skew"
+
+def test_accepts_drift_within_skew_window(robot_kp, operator_ed25519):
+    dg = _make_delegation(robot_kp, operator_ed25519)
+    drifted = datetime.now(timezone.utc) - timedelta(seconds=200)
+    cmd = _make_cmd(operator_ed25519, issued_at=ISO(drifted))
+    assert verify_command(cmd, [dg]).ok
+
+def test_rejects_tampered_signature(robot_kp, operator_ed25519):
+    dg = _make_delegation(robot_kp, operator_ed25519)
+    cmd = _make_cmd(operator_ed25519)
+    cmd.cmd = {"dx": 999.0}  # tamper after signing
+    res = verify_command(cmd, [dg])
+    assert not res.ok and res.reason == "signature"
+```
+
+- [ ] **Step 2: Verify RED** — import/attribute errors for `verify_command` / `sign_command` / `AuthResult`.
+
+- [ ] **Step 3: Implement**
+
+```python
+# rcan/auth/operator.py (additions)
+import base64
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Optional
+from nacl.signing import VerifyKey
+from nacl.exceptions import BadSignatureError
+from rcan.crypto import canonical_json
+
+@dataclass
+class AuthResult:
+    ok: bool
+    reason: Optional[str] = None
+    matched_delegation: Optional["OperatorDelegation"] = None
+
+def _cmd_canonical_bytes(cmd: "OperatorCommand") -> bytes:
+    d = cmd.to_dict()
+    d.pop("sig", None)
+    return canonical_json(d)
+
+def sign_command(body: dict, operator_ed25519) -> "OperatorCommand":
+    cmd = OperatorCommand.from_dict({**body, "sig": None})
+    message = _cmd_canonical_bytes(cmd)
+    cmd.sig = base64.b64encode(operator_ed25519.sign(message).signature).decode()
+    return cmd
+
+def verify_command(cmd: "OperatorCommand", known: list["OperatorDelegation"],
+                   max_skew_sec: int = 300) -> AuthResult:
+    now = _NOW()
+    try:
+        issued = datetime.fromisoformat(cmd.issued_at.replace("Z", "+00:00"))
+    except ValueError:
+        return AuthResult(False, "skew")
+    if abs((now - issued).total_seconds()) > max_skew_sec:
+        return AuthResult(False, "skew")
+
+    matched = next((d for d in known if d.operator_pub == cmd.operator_pub), None)
+    if matched is None:
+        return AuthResult(False, "unknown operator")
+
+    try:
+        expires = datetime.fromisoformat(matched.expires_at.replace("Z", "+00:00"))
+    except ValueError:
+        return AuthResult(False, "delegation expired")
+    if expires <= now:
+        return AuthResult(False, "delegation expired")
+
+    allowed = set(matched.scopes)
+    if "all" not in allowed and cmd.scope not in allowed:
+        return AuthResult(False, "scope", matched)
+
+    try:
+        vk = VerifyKey(base64.b64decode(cmd.operator_pub))
+        vk.verify(_cmd_canonical_bytes(cmd), base64.b64decode(cmd.sig))
+    except (BadSignatureError, ValueError):
+        return AuthResult(False, "signature", matched)
+
+    return AuthResult(True, None, matched)
+```
+
+- [ ] **Step 4: Verify GREEN**
+
+```bash
+pytest tests/auth/test_verify_command.py -v
+```
+
+Expected: 8/8 pass.
+
+- [ ] **Step 5: Commit** `feat(rcan-py): verify_command + sign_command with scope/skew/sig checks`.
 
 ---
 
-### Task R4: `sign_delegation(delegation_body, robot_keypair) -> OperatorDelegation`
-
-Issuer-side helper — generates the `sig` field. Mirror of `verify_delegation`.
-
-TDD pattern same as R2: round-trip test (`sign_delegation` then `verify_delegation` → True).
-
-Commit: `feat(rcan-py): sign_delegation issuer helper`.
-
----
-
-### Task R5: `sign_command(cmd_body, operator_ed25519_sec) -> OperatorCommand`
-
-Operator-side helper. Round-trip test with `verify_command`.
-
-Commit: `feat(rcan-py): sign_command operator helper`.
-
----
-
-### Task R6: Nonce replay cache (`NonceCache`)
+### Task R4: `NonceCache` for replay prevention
 
 **Files:**
 - Create: `rcan-py/src/rcan/auth/nonce_cache.py`
 - Create: `rcan-py/tests/auth/test_nonce_cache.py`
 
-In-memory deque+set with TTL == `2 * max_skew_sec` (nonces expire after the skew window closes). Used by runtime adapters, not by `verify_command` itself (keeps the verifier pure).
+- [ ] **Step 1: Write failing tests**
 
-Tests: accepts first use, rejects second use within TTL, accepts same nonce after TTL, bounded memory (drops oldest when size cap hit).
+```python
+# tests/auth/test_nonce_cache.py
+import time, pytest
+from rcan.auth.nonce_cache import NonceCache
 
-Commit: `feat(rcan-py): NonceCache for command replay prevention`.
+def test_first_use_accepted():
+    c = NonceCache(ttl_seconds=10)
+    assert c.check_and_remember("n1") is True
+
+def test_second_use_within_ttl_rejected():
+    c = NonceCache(ttl_seconds=10)
+    c.check_and_remember("n1")
+    assert c.check_and_remember("n1") is False
+
+def test_same_nonce_accepted_after_ttl(monkeypatch):
+    t = [1000.0]
+    c = NonceCache(ttl_seconds=10, now_fn=lambda: t[0])
+    c.check_and_remember("n1")
+    t[0] += 11
+    assert c.check_and_remember("n1") is True
+
+def test_bounded_size_drops_oldest():
+    c = NonceCache(ttl_seconds=10, max_size=3)
+    for n in ["n1", "n2", "n3", "n4"]:
+        c.check_and_remember(n)
+    # n1 evicted; re-using it is accepted
+    assert c.check_and_remember("n1") is True
+    # n4 still cached; rejected
+    assert c.check_and_remember("n4") is False
+```
+
+- [ ] **Step 2: Verify RED.**
+
+- [ ] **Step 3: Implement**
+
+```python
+# rcan/auth/nonce_cache.py
+import time
+from collections import OrderedDict
+
+class NonceCache:
+    def __init__(self, ttl_seconds: int = 600, max_size: int = 100_000, now_fn=time.monotonic):
+        self._ttl = ttl_seconds
+        self._max = max_size
+        self._now = now_fn
+        self._cache: "OrderedDict[str, float]" = OrderedDict()
+
+    def _prune(self) -> None:
+        now = self._now()
+        while self._cache:
+            nonce, ts = next(iter(self._cache.items()))
+            if now - ts > self._ttl:
+                self._cache.popitem(last=False)
+            else:
+                break
+
+    def check_and_remember(self, nonce: str) -> bool:
+        self._prune()
+        if nonce in self._cache and self._now() - self._cache[nonce] <= self._ttl:
+            return False
+        self._cache[nonce] = self._now()
+        self._cache.move_to_end(nonce)
+        while len(self._cache) > self._max:
+            self._cache.popitem(last=False)
+        return True
+```
+
+- [ ] **Step 4: Verify GREEN.**
+
+- [ ] **Step 5: Commit** `feat(rcan-py): NonceCache for command replay prevention`.
 
 ---
 
-### Task R7: Rate-limit helper (`RateLimiter`)
+### Task R5: `RateLimiter` token bucket per operator
 
-Token-bucket per operator_pub. Per-delegation `max_ops_per_minute` is the bucket capacity. `RateLimiter.check(operator_pub, rate)` returns True if under budget.
+**Files:**
+- Create: `rcan-py/src/rcan/auth/rate_limiter.py`
+- Create: `rcan-py/tests/auth/test_rate_limiter.py`
 
-Commit: `feat(rcan-py): RateLimiter for per-operator actuation budget`.
+- [ ] **Step 1: Write failing tests**
+
+```python
+# tests/auth/test_rate_limiter.py
+from rcan.auth.rate_limiter import RateLimiter
+
+def test_under_budget_accepted():
+    t = [1000.0]
+    r = RateLimiter(now_fn=lambda: t[0])
+    for _ in range(30):
+        assert r.check("op1", max_per_minute=60)
+
+def test_bucket_drains_then_refills(monkeypatch):
+    t = [1000.0]
+    r = RateLimiter(now_fn=lambda: t[0])
+    for _ in range(60):
+        assert r.check("op1", max_per_minute=60)
+    assert r.check("op1", max_per_minute=60) is False
+    t[0] += 60  # one minute later — bucket refills
+    assert r.check("op1", max_per_minute=60) is True
+
+def test_buckets_are_per_operator():
+    t = [1000.0]
+    r = RateLimiter(now_fn=lambda: t[0])
+    for _ in range(60):
+        r.check("op1", max_per_minute=60)
+    assert r.check("op1", max_per_minute=60) is False
+    assert r.check("op2", max_per_minute=60) is True
+```
+
+- [ ] **Step 2: Verify RED.**
+
+- [ ] **Step 3: Implement**
+
+```python
+# rcan/auth/rate_limiter.py
+import time
+from dataclasses import dataclass
+
+@dataclass
+class _Bucket:
+    tokens: float
+    last: float
+
+class RateLimiter:
+    def __init__(self, now_fn=time.monotonic):
+        self._now = now_fn
+        self._buckets: dict[str, _Bucket] = {}
+
+    def check(self, operator_pub: str, max_per_minute: int) -> bool:
+        now = self._now()
+        refill_rate = max_per_minute / 60.0
+        b = self._buckets.get(operator_pub)
+        if b is None:
+            b = _Bucket(tokens=float(max_per_minute), last=now)
+            self._buckets[operator_pub] = b
+        else:
+            elapsed = now - b.last
+            b.tokens = min(float(max_per_minute), b.tokens + elapsed * refill_rate)
+            b.last = now
+        if b.tokens < 1.0:
+            return False
+        b.tokens -= 1.0
+        return True
+```
+
+- [ ] **Step 4: Verify GREEN.**
+
+- [ ] **Step 5: Commit** `feat(rcan-py): RateLimiter token-bucket per operator`.
 
 ---
 
-### Task R8: `AuthGuard` — glue class
+### Task R6: `AuthGuard` glue
 
 **Files:**
 - Create: `rcan-py/src/rcan/auth/guard.py`
+- Create: `rcan-py/tests/auth/test_guard.py`
+
+`AuthGuard` is the runtime-facing surface. It holds verified delegations, the nonce cache, the rate limiter, and the robot's pq pub, and exposes a single `check(command) -> AuthResult`.
+
+- [ ] **Step 1: Write failing tests**
 
 ```python
+# tests/auth/test_guard.py
+from datetime import datetime, timezone, timedelta
+import base64
+from rcan.auth.guard import AuthGuard
+from rcan.auth.operator import sign_command, sign_delegation
+
+ISO = lambda dt: dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+def _delegation_body(operator_pub_b64, **overrides):
+    now = datetime.now(timezone.utc)
+    b = {
+        "schema": "rcan-operator-delegation-v1",
+        "rrn": "RRN-000000000001",
+        "operator_pub": operator_pub_b64,
+        "operator_name": "alice-laptop",
+        "scopes": ["move", "grip"],
+        "issued_at": ISO(now - timedelta(minutes=1)),
+        "expires_at": ISO(now + timedelta(days=30)),
+        "max_ops_per_minute": 2,   # tiny for test
+    }
+    b.update(overrides)
+    return b
+
+def _cmd_body(operator_pub_b64, nonce_bytes=b"x" * 16, **overrides):
+    b = {
+        "schema": "rcan-command-v1",
+        "rrn": "RRN-000000000001",
+        "operator_pub": operator_pub_b64,
+        "nonce": base64.b64encode(nonce_bytes).decode(),
+        "issued_at": ISO(datetime.now(timezone.utc)),
+        "scope": "move",
+        "cmd": {"dx": 0.1},
+    }
+    b.update(overrides)
+    return b
+
+def test_accepts_fresh_command(robot_kp, operator_ed25519, operator_pub_b64):
+    dg = sign_delegation(_delegation_body(operator_pub_b64), robot_kp)
+    guard = AuthGuard(robot_pq_pub=robot_kp.pq_pub_bytes)
+    guard.load_delegations([dg.to_dict()])
+    cmd = sign_command(_cmd_body(operator_pub_b64), operator_ed25519)
+    assert guard.check(cmd).ok
+
+def test_rejects_replay(robot_kp, operator_ed25519, operator_pub_b64):
+    dg = sign_delegation(_delegation_body(operator_pub_b64), robot_kp)
+    guard = AuthGuard(robot_pq_pub=robot_kp.pq_pub_bytes)
+    guard.load_delegations([dg.to_dict()])
+    cmd = sign_command(_cmd_body(operator_pub_b64), operator_ed25519)
+    assert guard.check(cmd).ok
+    res = guard.check(cmd)
+    assert not res.ok and res.reason == "replay"
+
+def test_rejects_over_rate(robot_kp, operator_ed25519, operator_pub_b64):
+    dg = sign_delegation(_delegation_body(operator_pub_b64, max_ops_per_minute=2), robot_kp)
+    guard = AuthGuard(robot_pq_pub=robot_kp.pq_pub_bytes)
+    guard.load_delegations([dg.to_dict()])
+    for i in range(2):
+        cmd = sign_command(_cmd_body(operator_pub_b64, nonce_bytes=bytes([i]) * 16), operator_ed25519)
+        assert guard.check(cmd).ok
+    cmd3 = sign_command(_cmd_body(operator_pub_b64, nonce_bytes=b"3" * 16), operator_ed25519)
+    res = guard.check(cmd3)
+    assert not res.ok and res.reason == "rate"
+
+def test_load_delegations_drops_unverifiable(robot_kp, operator_pub_b64):
+    valid = sign_delegation(_delegation_body(operator_pub_b64), robot_kp).to_dict()
+    bogus = {**valid, "scopes": ["move", "shutdown"]}  # tampered, sig no longer matches
+    guard = AuthGuard(robot_pq_pub=robot_kp.pq_pub_bytes)
+    guard.load_delegations([bogus])
+    assert len(guard.delegations) == 0
+```
+
+- [ ] **Step 2: Verify RED.**
+
+- [ ] **Step 3: Implement**
+
+```python
+# rcan/auth/guard.py
+from .operator import (
+    OperatorDelegation, OperatorCommand, AuthResult,
+    verify_delegation, verify_command,
+)
+from .nonce_cache import NonceCache
+from .rate_limiter import RateLimiter
+
 class AuthGuard:
-    """One-stop auth for a runtime. Holds delegations, nonce cache, rate limiter.
-    Runtime calls .check(command) → AuthResult."""
-
-    def __init__(self, robot_pq_pub: bytes):
-        self._delegations: list[OperatorDelegation] = []
-        self._nonce_cache = NonceCache()
-        self._rate = RateLimiter()
+    def __init__(self, robot_pq_pub: bytes, max_skew_sec: int = 300,
+                 admin_audit_emit=None):
         self._robot_pq_pub = robot_pq_pub
+        self._max_skew_sec = max_skew_sec
+        self._delegations: list[OperatorDelegation] = []
+        self._nonces = NonceCache(ttl_seconds=2 * max_skew_sec)
+        self._rate = RateLimiter()
+        # admin_audit_emit(command, delegation) fires whenever a command dispatches
+        # under an `all`-scoped delegation. Wire to §16 AuditChain in the runtime.
+        self._admin_audit_emit = admin_audit_emit
 
-    def load_delegations(self, delegations: list[dict]) -> None:
+    @property
+    def delegations(self) -> list[OperatorDelegation]:
+        return list(self._delegations)
+
+    def load_delegations(self, raw: list[dict]) -> None:
         verified: list[OperatorDelegation] = []
-        for d in delegations:
+        for d in raw:
             dg = OperatorDelegation.from_dict(d)
             if verify_delegation(dg, self._robot_pq_pub):
                 verified.append(dg)
         self._delegations = verified
 
-    def check(self, command: OperatorCommand) -> AuthResult: ...
+    def check(self, cmd: OperatorCommand) -> AuthResult:
+        res = verify_command(cmd, self._delegations, max_skew_sec=self._max_skew_sec)
+        if not res.ok:
+            return res
+        # Replay check — only after signature is known valid (avoid poisoning cache with forgeries).
+        if not self._nonces.check_and_remember(cmd.nonce):
+            return AuthResult(False, "replay", res.matched_delegation)
+        # Rate limit per operator.
+        cap = res.matched_delegation.max_ops_per_minute
+        if not self._rate.check(cmd.operator_pub, cap):
+            return AuthResult(False, "rate", res.matched_delegation)
+        # Admin audit: any command under `all` scope delegation emits COMMAND_ADMIN_USE.
+        if "all" in res.matched_delegation.scopes and self._admin_audit_emit:
+            self._admin_audit_emit(cmd, res.matched_delegation)
+        return res
 ```
 
-Test `AuthGuard.check` end-to-end: load delegations, sign command, check → ok. Then: replay → not ok. Expired delegation → not ok. Over rate → not ok.
+- [ ] **Step 4: Verify GREEN**
 
-Commit: `feat(rcan-py): AuthGuard glue for runtimes`.
+```bash
+pytest tests/auth/ -v
+```
+
+Expected: all auth tests pass.
+
+- [ ] **Step 5: Commit** `feat(rcan-py): AuthGuard glue (nonce + rate + admin-audit)`.
+
+Note: Tasks R4–R8 from the original draft are consolidated into R2–R6 above (verifier, nonce cache, rate limiter, guard). The `sign_delegation` / `sign_command` helpers that were previously separate tasks ride along with R2/R3 since they are trivial round-trip mirrors.
 
 ---
 
@@ -374,7 +908,7 @@ Commit: `feat(opencastor): --require-auth flag for hard-fail on missing delegati
 ### Task C1: `robot-md operator enroll`
 
 ```
-robot-md operator enroll <rrn> --name DEVICE_NAME [--scopes SCOPE,SCOPE...] [--expires DURATION]
+robot-md operator enroll <rrn> --name DEVICE_NAME [--scopes SCOPE,SCOPE...] [--expires DURATION] [--force]
 ```
 
 Generates an Ed25519 keypair for the device, signs a delegation using the robot's on-disk signing key (`~/.robot-md/keys/<rrn>.signing.json`), writes:
@@ -383,9 +917,20 @@ Generates an Ed25519 keypair for the device, signs a delegation using the robot'
 
 Prints the delegation path with instructions to add to `robot.rcan.yaml`.
 
-Tests: keys are generated, delegation round-trips through `rcan.auth.operator.verify_delegation`, file modes are 0600, idempotent behavior (re-enrolling same name with `--force` overwrites, without `--force` errors).
+**`--force` requirements:**
+- Re-enrolling an existing `<name>` (prevents accidental overwrite).
+- `--scopes all` or any scope list containing `all` — the CLI prints the §1.6a warning explicitly naming the device, listing scopes, and showing that every subsequent command will emit a `COMMAND_ADMIN_USE` audit event. Refuses to proceed without `--force` even on first enrollment.
 
-Commit: `feat(cli): robot-md operator enroll`.
+Tests:
+- Keys are generated and delegation round-trips through `rcan.auth.operator.verify_delegation`.
+- File modes are 0600.
+- Re-enrolling same name without `--force` errors (non-zero exit, no files touched).
+- Re-enrolling same name with `--force` overwrites.
+- `--scopes all` without `--force` errors and prints the admin-use warning.
+- `--scopes all --force` succeeds and writes a delegation whose `scopes` is `["all"]`.
+- `--scopes move,all` (mixed) is rejected with "'all' must be used alone"; no files touched.
+
+Commit: `feat(cli): robot-md operator enroll (with --force guard on 'all' scope)`.
 
 ---
 
@@ -451,19 +996,18 @@ The operator side can run in a browser via `rcan-ts` (which already has verify/s
 
 ## Self-Review Checklist
 
-- [ ] Every design decision in Part 1 is locked (§1.1 per-device, §1.2 canonical delegation, §1.3 per-cmd signatures, §1.4 local revocation, §1.5 shared verifier, §1.6 rotate-invalidates).
+- [ ] Every design decision in Part 1 is locked (§1.1 per-device, §1.2 canonical delegation with full scope table, §1.3 per-cmd signatures at 300s skew, §1.4 local revocation, §1.5 shared verifier, §1.6 rotate-invalidates, §1.6a `all`-scope audit).
 - [ ] Spec section (Task S1) covers conformance for L2+.
-- [ ] rcan-py tasks R1–R8 leave a reusable, tested module.
+- [ ] rcan-py tasks R1–R6 leave a reusable, tested module with full code in every step.
 - [ ] opencastor tasks O1–O5 include zero-friction default (O4) AND the hard-fail opt-in (O5) to match `feedback_zero_friction_first.md`.
-- [ ] CLI tasks C1–C4 give operators the full enroll/list/revoke lifecycle.
+- [ ] CLI tasks C1–C4 give operators the full enroll/list/revoke lifecycle; C1 enforces `--force` for `all` scope.
 - [ ] LeRobot, ROS2, Reachy Mini are integration guides — no false "we'll ship LeRobot support in task X" promises.
-- [ ] No placeholders — every Task Rx step has full code; every Task Ox/Cx has an explicit file path and commit message (even if the body is sketched since executor reads opencastor first in O1).
 - [ ] Type names consistent: `OperatorDelegation`, `OperatorCommand`, `AuthGuard`, `AuthResult`, `NonceCache`, `RateLimiter`.
 
-## Open questions for operator sign-off before execution
+## Design decisions (locked 2026-04-24)
 
-1. **Scope vocabulary** — Part 1 §1.2 seeds with `move, grip, tts, camera-stream, config-read, config-write, reset, shutdown, all`. Are these the right initial scopes, or does a specific deployment (Bob's SO-ARM101) need finer granularity (e.g. per-joint locks)?
-2. **`all` scope** — should it be allowed at all in v1? Plan says yes but audit-emit on use. Alternative: forbid, require enumerated scopes. Confirm.
-3. **Clock skew window** — 60 s default. Plenty for LAN operators, possibly tight for flaky mobile networks. Confirm or bump to 300 s.
-4. **Rotation + delegations** — §1.6 says rotate invalidates all existing delegations. Alternative: allow the rotate payload to carry re-signed delegations as a transactional step. Simpler to ship v1 the plan's way and add the transactional re-sign only if operators complain. Confirm.
-5. **Reachy Mini** — is this a runtime-level ask, or is a Reachy Mini-specific demo robot manifest also expected? If the latter, plan needs a Part 7 for the specific integration bring-up.
+1. **Scope vocabulary** — §1.2 table: `move, grip, tts, camera-stream, config-read, config-write, policy-update, audit-read, reset, shutdown, all`. Coarse by design — per-joint granularity is a HiTL concern, not a scope.
+2. **`all` scope** — allowed; every command emits `COMMAND_ADMIN_USE` audit event; CLI requires `--force` at enrollment (§1.6a, Task C1).
+3. **Clock-skew window** — 300 s default, per-robot configurable via `auth.max_skew_sec` in `robot.rcan.yaml`. Nonce cache bounds replay window at `2 * max_skew_sec`.
+4. **Rotate invalidates all delegations** — re-enrollment required after RRF key rotation. Transactional re-sign is rejected for v1 (couples rotate-key to an unbounded list; partial-failure mode).
+5. **Reachy Mini** — runtime-level only; inherits `rcan-lerobot-bridge` path (§6.1). A Reachy-Mini-specific bring-up is a separate plan when hardware arrives.
