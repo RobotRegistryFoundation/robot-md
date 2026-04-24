@@ -96,6 +96,7 @@ def build_artifact(
     system = _system(fm, opencastor_version)
 
     return build_eu_register_entry(
+        rmn=system.get("rmn") or "",
         fria_ref=fria_path.name,
         provider=provider,
         system=system,
