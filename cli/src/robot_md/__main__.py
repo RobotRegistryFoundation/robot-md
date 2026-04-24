@@ -730,6 +730,49 @@ def revoke_key(
         raise typer.Exit(code=rc)
 
 
+@app.command(name="verify-tier")
+def verify_tier(
+    rrn: str = typer.Argument(..., help="RRN to promote."),
+    target: str = typer.Option(
+        ..., "--target", help="Target tier: manufacturer_claimed or manufacturer_verified."
+    ),
+    dns_domain: str = typer.Option(
+        ..., "--dns-domain", help="Domain whose _rcan-verify TXT record proves ownership."
+    ),
+    ruri: str | None = typer.Option(
+        None, "--ruri", help="Robot's RURI base URL (required for manufacturer_verified)."
+    ),
+    attestation_file: Path | None = typer.Option(
+        None,
+        "--attestation-file",
+        help="Path to a signed attestation JSON (required for manufacturer_verified).",
+    ),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org/v2/robots", "--endpoint"
+    ),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the pre-flight confirmation prompt."),
+) -> None:
+    """Promote a robot's verification_status.
+
+    manufacturer_claimed requires server-side DNS TXT verification;
+    manufacturer_verified also requires a signed attestation and a reachable
+    RURI /.well-known/rcan-manifest.json.
+    """
+    from robot_md.verify_tier import cli_verify_tier
+
+    rc = cli_verify_tier(
+        rrn,
+        target=target,
+        dns_domain=dns_domain,
+        ruri=ruri,
+        attestation_file=attestation_file,
+        endpoint=endpoint,
+        non_interactive=yes,
+    )
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
 def _hardware_present() -> bool:
     """Heuristic: return True if any /dev/ttyACM* device is visible.
 
