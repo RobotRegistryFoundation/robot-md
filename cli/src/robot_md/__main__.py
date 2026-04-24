@@ -682,6 +682,95 @@ def unregister(
         raise typer.Exit(code=rc)
 
 
+@app.command(name="rotate-key")
+def rotate_key(
+    rrn: str = typer.Argument(..., help="RRN whose key you want to rotate."),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org/v2/robots",
+        "--endpoint",
+        help="RRF base URL. Override for staging / self-hosted.",
+    ),
+) -> None:
+    """Rotate a robot's signing key.
+
+    Generates a new keypair locally, co-signs the rotation with old+new keys,
+    and POSTs to RRF. On success, archives the old keypair for recovery.
+    The archive can be used to revoke the old key if the new key is lost.
+    """
+    from robot_md.rotate_key import cli_rotate_key
+
+    rc = cli_rotate_key(rrn, endpoint=endpoint)
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+@app.command(name="revoke-key")
+def revoke_key(
+    rrn: str = typer.Argument(..., help="RRN to revoke, e.g. RRN-000000000042."),
+    reason: str | None = typer.Option(
+        None,
+        "--reason",
+        help="Optional human-readable reason recorded in the revocation entry.",
+    ),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org/v2/robots",
+        "--endpoint",
+        help="RRF base URL. Override for staging / self-hosted.",
+    ),
+) -> None:
+    """Revoke a robot's signing key.
+
+    After revocation, all §22-26 compliance intakes for this RRN will be
+    refused with 403. This is a ONE-WAY operation.
+    """
+    from robot_md.revoke_key import cli_revoke_key
+
+    rc = cli_revoke_key(rrn, endpoint=endpoint, reason=reason)
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+@app.command(name="verify-tier")
+def verify_tier(
+    rrn: str = typer.Argument(..., help="RRN to promote."),
+    target: str = typer.Option(
+        ..., "--target", help="Target tier: manufacturer_claimed or manufacturer_verified."
+    ),
+    dns_domain: str = typer.Option(
+        ..., "--dns-domain", help="Domain whose _rcan-verify TXT record proves ownership."
+    ),
+    ruri: str | None = typer.Option(
+        None, "--ruri", help="Robot's RURI base URL (required for manufacturer_verified)."
+    ),
+    attestation_file: Path | None = typer.Option(
+        None,
+        "--attestation-file",
+        help="Path to a signed attestation JSON (required for manufacturer_verified).",
+    ),
+    endpoint: str = typer.Option("https://robotregistryfoundation.org/v2/robots", "--endpoint"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the pre-flight confirmation prompt."),
+) -> None:
+    """Promote a robot's verification_status.
+
+    manufacturer_claimed requires server-side DNS TXT verification;
+    manufacturer_verified also requires a signed attestation and a reachable
+    RURI /.well-known/rcan-manifest.json.
+    """
+    from robot_md.verify_tier import cli_verify_tier
+
+    rc = cli_verify_tier(
+        rrn,
+        target=target,
+        dns_domain=dns_domain,
+        ruri=ruri,
+        attestation_file=attestation_file,
+        endpoint=endpoint,
+        non_interactive=yes,
+    )
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
 def _hardware_present() -> bool:
     """Heuristic: return True if any /dev/ttyACM* device is visible.
 
