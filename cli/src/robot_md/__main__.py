@@ -682,6 +682,32 @@ def unregister(
         raise typer.Exit(code=rc)
 
 
+@app.command(name="revoke-key")
+def revoke_key(
+    rrn: str = typer.Argument(..., help="RRN to revoke, e.g. RRN-000000000042."),
+    reason: str | None = typer.Option(
+        None,
+        "--reason",
+        help="Optional human-readable reason recorded in the revocation entry.",
+    ),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org/v2/robots",
+        "--endpoint",
+        help="RRF base URL. Override for staging / self-hosted.",
+    ),
+) -> None:
+    """Revoke a robot's signing key.
+
+    After revocation, all §22-26 compliance intakes for this RRN will be
+    refused with 403. This is a ONE-WAY operation.
+    """
+    from robot_md.revoke_key import cli_revoke_key
+
+    rc = cli_revoke_key(rrn, endpoint=endpoint, reason=reason)
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
 def _hardware_present() -> bool:
     """Heuristic: return True if any /dev/ttyACM* device is visible.
 
