@@ -214,6 +214,209 @@ def _check_registry(
     return out
 
 
+# Capability namespaces that imply *motion* (vs observation-only). Used by
+# the first-motion-readiness check to decide whether the manifest needs
+# hitl_gates and the other actuation pre-flights. Mirrors the matcher in
+# `mcp.tools.execute_capability._match_hitl_gate` (cap_scope = first dot
+# segment).
+MOTION_CAPABILITY_NAMESPACES: tuple[str, ...] = ("manipulate", "arm", "nav", "navigate", "move")
+
+# Backend capability namespaces in the bundled drivers — used to detect
+# "namespace mismatch" where the manifest declares e.g. `manipulate.pick`
+# but every available backend implements `arm.pick`. Updated when new
+# backends ship.
+BACKEND_NAMESPACES: dict[str, tuple[str, ...]] = {
+    "feetech_scs": ("arm", "status"),
+    "feetech_depthai": ("arm", "perceive", "status"),
+    "oak_d_lr": ("perceive",),
+    "dynamixel": ("arm", "status"),
+}
+
+
+def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, Any]:
+    """Pre-flight check covering the 5 things that block a first motion attempt
+    even when the EU AI Act submission stack is otherwise green.
+
+    Surfaces gaps that bob's manifest exposed in the first-pick attempt
+    (2026-04-25): empty hitl_gates with declared motion capabilities,
+    missing safety.max_joint_velocity_dps, missing vision.object_descriptors,
+    uncalibrated camera extrinsic, and capability-namespace mismatch with
+    declared drivers. Returns structured per-check results so an operator
+    can see exactly which step blocks first motion.
+    """
+    capabilities = fm.get("capabilities") or []
+    if not isinstance(capabilities, list):
+        capabilities = []
+    safety = fm.get("safety") or {}
+    drivers = fm.get("drivers") or []
+    vision = fm.get("vision") or {}
+    physics = fm.get("physics") or {}
+    solver = physics.get("solver") or {}
+    cameras = solver.get("cameras") or []
+
+    # Derive declared capability namespaces (e.g. "manipulate", "perceive").
+    declared_namespaces = sorted({c.split(".", 1)[0] for c in capabilities if isinstance(c, str)})
+    has_motion_caps = any(ns in MOTION_CAPABILITY_NAMESPACES for ns in declared_namespaces)
+    has_pick = any(c in ("manipulate.pick", "arm.pick", "nav.pick") for c in capabilities)
+    has_vision_driver = any(
+        d.get("protocol") in ("oak_d_lr", "depthai", "realsense", "luxonis")
+        for d in drivers
+        if isinstance(d, dict)
+    )
+
+    # 1. hitl_gates non-empty when motion capabilities declared
+    gates = safety.get("hitl_gates") or []
+    gates_ok = (not has_motion_caps) or bool(gates)
+
+    # 2. max_joint_velocity_dps required when any actuation driver present
+    has_actuation_driver = any(
+        d.get("protocol") in ("feetech_scs", "feetech", "dynamixel", "ros2_control")
+        for d in drivers
+        if isinstance(d, dict)
+    )
+    has_velocity_limit = "max_joint_velocity_dps" in safety
+    velocity_ok = (not has_actuation_driver) or has_velocity_limit
+
+    # 3. vision.object_descriptors non-empty when any *.pick capability
+    descriptors = vision.get("object_descriptors") or []
+    descriptors_ok = (not has_pick) or bool(descriptors)
+
+    # 4. cameras[].extrinsic non-null when vision driver declared
+    extrinsic_ok = (not has_vision_driver) or any(
+        c.get("extrinsic") not in (None, {}) for c in cameras if isinstance(c, dict)
+    )
+
+    # 5. Capability namespace alignment — every declared motion namespace
+    # appears in the union of namespaces supplied by some declared driver.
+    declared_driver_protocols = {
+        d.get("protocol") for d in drivers if isinstance(d, dict) and d.get("protocol")
+    }
+    backend_namespaces_supplied: set[str] = set()
+    for proto in declared_driver_protocols:
+        backend_namespaces_supplied.update(BACKEND_NAMESPACES.get(proto, ()))
+    motion_namespaces_in_caps = {
+        ns for ns in declared_namespaces if ns in MOTION_CAPABILITY_NAMESPACES
+    }
+    namespace_mismatch = (
+        bool(motion_namespaces_in_caps)
+        and bool(backend_namespaces_supplied)
+        and motion_namespaces_in_caps.isdisjoint(backend_namespaces_supplied)
+    )
+    namespace_ok = not namespace_mismatch
+
+    return {
+        "applies": has_motion_caps or has_actuation_driver or has_vision_driver,
+        "ready": gates_ok and velocity_ok and descriptors_ok and extrinsic_ok and namespace_ok,
+        "checks": {
+            "hitl_gates": {
+                "ok": gates_ok,
+                "detail": (
+                    f"{len(gates)} gate(s) declared"
+                    if gates_ok
+                    else (
+                        "motion capabilities declared but safety.hitl_gates[] is empty — "
+                        "any execute_capability call will run unauthorized"
+                    )
+                ),
+                "fix": (
+                    None
+                    if gates_ok
+                    else (
+                        "Add at least one gate per motion namespace, e.g. "
+                        "`safety.hitl_gates: [{scope: manipulate, require_auth: true}]`"
+                    )
+                ),
+            },
+            "max_joint_velocity_dps": {
+                "ok": velocity_ok,
+                "detail": (
+                    f"declared ({safety.get('max_joint_velocity_dps')} dps)"
+                    if velocity_ok and has_velocity_limit
+                    else (
+                        "no actuation driver — N/A"
+                        if not has_actuation_driver
+                        else (
+                            "actuation driver declared but safety.max_joint_velocity_dps "
+                            "is missing — load_context will refuse to open the backend"
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if velocity_ok
+                    else "Set safety.max_joint_velocity_dps (e.g. 30 for collaborative arms)"
+                ),
+            },
+            "object_descriptors": {
+                "ok": descriptors_ok,
+                "detail": (
+                    f"{len(descriptors)} descriptor(s) declared"
+                    if descriptors_ok and descriptors
+                    else (
+                        "no pick capability — N/A"
+                        if not has_pick
+                        else (
+                            "*.pick capability declared but vision.object_descriptors is "
+                            "empty — vision.find has no target shape to resolve"
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if descriptors_ok
+                    else (
+                        "Declare at least one object descriptor under vision.object_descriptors[] "
+                        "(e.g. red_lego with detector: hsv)"
+                    )
+                ),
+            },
+            "camera_extrinsic": {
+                "ok": extrinsic_ok,
+                "detail": (
+                    "extrinsic present"
+                    if extrinsic_ok and has_vision_driver
+                    else (
+                        "no vision driver — N/A"
+                        if not has_vision_driver
+                        else (
+                            "vision driver declared but no camera has a calibrated "
+                            "extrinsic — IK targets will be unreachable"
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if extrinsic_ok
+                    else (
+                        "Run `robot-md calibrate --hand-eye --marker-pos x,y,z ROBOT.md` "
+                        "to populate physics.solver.cameras[*].extrinsic"
+                    )
+                ),
+            },
+            "capability_namespace": {
+                "ok": namespace_ok,
+                "detail": (
+                    "namespace alignment OK"
+                    if namespace_ok
+                    else (
+                        f"capabilities declare {sorted(motion_namespaces_in_caps)} but the "
+                        f"declared driver(s) implement {sorted(backend_namespaces_supplied)} — "
+                        f"every dispatch will return not_implemented"
+                    )
+                ),
+                "fix": (
+                    None
+                    if namespace_ok
+                    else (
+                        "Either rename capabilities to match the backend namespace "
+                        "(e.g. `manipulate.pick` → `arm.pick`) or change the driver"
+                    )
+                ),
+            },
+        },
+    }
+
+
 def _check_submission_readiness(apikey_present: bool) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for kind in SUBMISSION_KINDS:
@@ -265,6 +468,12 @@ def _aggregate_blockers(status: dict[str, Any]) -> list[str]:
             f"apikey is recovered"
         )
 
+    fmr = status.get("first_motion_readiness") or {}
+    if fmr.get("applies") and not fmr.get("ready"):
+        for cid, c in (fmr.get("checks") or {}).items():
+            if not c.get("ok"):
+                blockers.append(f"first-motion: {cid} — {c.get('detail', '')}")
+
     return blockers
 
 
@@ -311,6 +520,7 @@ def gather_status(
     }
     apikey_present = status["keystore"]["apikey"]["present"]
     status["submission_readiness"] = _check_submission_readiness(apikey_present)
+    status["first_motion_readiness"] = _check_first_motion_readiness(fm, manifest_path)
     status["blockers"] = _aggregate_blockers(status)
     return status
 
@@ -408,6 +618,16 @@ def format_status_text(status: dict[str, Any]) -> str:
         else:
             lines.append(f"  ✗ emit-{kind:<18}  blocked — {r['reason']}")
     lines.append("")
+
+    # First-motion readiness — pre-flight for the actual hardware run
+    fmr = status.get("first_motion_readiness") or {}
+    if fmr.get("applies"):
+        lines.append("First-motion readiness")
+        for cid, c in (fmr.get("checks") or {}).items():
+            lines.append(f"  {_icon(c['ok'])} {cid:<24}  {c.get('detail', '')}")
+            if not c.get("ok") and c.get("fix"):
+                lines.append(f"      → {c['fix']}")
+        lines.append("")
 
     # Blockers summary
     if status["blockers"]:

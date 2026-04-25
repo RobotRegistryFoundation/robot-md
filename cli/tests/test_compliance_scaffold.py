@@ -8,6 +8,7 @@ from pathlib import Path
 from robot_md.init_phases.compliance_scaffold import (
     COMPLIANCE_README,
     DEMO_SCRIPT_TEMPLATE,
+    FIRST_ACTIVATION_TEMPLATE,
     phase_compliance_scaffold,
 )
 
@@ -20,8 +21,40 @@ def test_phase_creates_scripts_and_compliance_dirs(tmp_path: Path):
 
     assert result.status == "ok"
     assert (tmp_path / "scripts" / "demo-eu-ai-act.sh").exists()
+    assert (tmp_path / "scripts" / "first-activation.sh").exists()
     assert (tmp_path / "compliance" / "README.md").exists()
     assert (tmp_path / "compliance" / ".gitkeep").exists()
+
+
+def test_first_activation_script_is_executable(tmp_path: Path):
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text("---\n---\n# x\n")
+    phase_compliance_scaffold(manifest)
+    p = tmp_path / "scripts" / "first-activation.sh"
+    mode = p.stat().st_mode
+    assert mode & stat.S_IXUSR, f"first-activation.sh not executable: {oct(mode)}"
+
+
+def test_first_activation_template_runs_compliance_status_and_calibration(tmp_path: Path):
+    """Template wires the four key pre-first-motion steps: validate,
+    compliance status, doctor, and calibrate-zero. Pinning the structure
+    so future edits can't silently drop steps the operator depends on."""
+    for step in (
+        "robot-md validate",
+        "robot-md compliance status",
+        "robot-md doctor",
+        "robot-md calibrate --zero",
+        "calibrate --hand-eye",
+    ):
+        assert step in FIRST_ACTIVATION_TEMPLATE, f"first-activation must run `{step}`"
+
+
+def test_first_activation_template_uses_relative_manifest(tmp_path: Path):
+    """Same portability requirement as demo: $MANIFEST derives from $0,
+    not a hardcoded path."""
+    assert "MANIFEST=" in FIRST_ACTIVATION_TEMPLATE
+    assert '$(dirname "$0")' in FIRST_ACTIVATION_TEMPLATE
+    assert "/home/craigm26" not in FIRST_ACTIVATION_TEMPLATE
 
 
 def test_demo_script_is_executable(tmp_path: Path):

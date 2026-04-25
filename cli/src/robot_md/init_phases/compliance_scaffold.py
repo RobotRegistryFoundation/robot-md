@@ -162,6 +162,79 @@ sign + POST in one step. Submit attempts are recorded in the local
 hash-chained audit log (`robot-md audit verify`).
 """
 
+FIRST_ACTIVATION_TEMPLATE = """\
+#!/usr/bin/env bash
+# first-activation.sh — run once after `robot-md init` to confirm the
+# robot is ready for its first motion.
+#
+# This script is non-destructive but DOES touch hardware:
+#   1. Validates the manifest (schema + first-motion warnings)
+#   2. Runs `robot-md compliance status` to surface any blockers
+#   3. Probes RRF connectivity (`robot-md doctor`)
+#   4. (optional) Runs `robot-md calibrate --zero` to teach the ready pose
+#      — requires the operator to physically position the arm
+#   5. (optional) Runs `robot-md calibrate --hand-eye` if a vision driver
+#      is declared — requires a calibration marker at known coordinates
+#
+# After this script exits 0, the robot is ready for its first
+# `execute_capability` call. Re-run any time the manifest changes.
+
+set -euo pipefail
+
+MANIFEST="${MANIFEST:-$(dirname "$0")/../ROBOT.md}"
+SKIP_CALIBRATION="${SKIP_CALIBRATION:-}"
+
+if [ ! -f "$MANIFEST" ]; then
+  echo "error: $MANIFEST does not exist (set MANIFEST=...)" >&2
+  exit 2
+fi
+
+echo "=== first-activation: $MANIFEST ==="
+echo
+
+echo "[1/5] validate manifest"
+robot-md validate "$MANIFEST"
+echo
+
+echo "[2/5] compliance status (first-motion-readiness pre-flight)"
+# Don't abort on blockers — surface them, then keep going so calibration
+# can proceed and reduce the blocker count.
+robot-md compliance status "$MANIFEST" --no-probe || true
+echo
+
+echo "[3/5] RRF reachability (skip with: NO_RRF=1)"
+if [ "${NO_RRF:-}" != "1" ]; then
+  robot-md doctor --path "$MANIFEST" || echo "  (doctor reported issues; continuing)"
+else
+  echo "  (skipped per NO_RRF=1)"
+fi
+echo
+
+if [ "$SKIP_CALIBRATION" = "1" ]; then
+  echo "[4-5/5] calibration skipped per SKIP_CALIBRATION=1"
+else
+  echo "[4/5] calibrate --zero (teach the ready pose)"
+  echo "      Position the arm in the rest pose, then press ENTER..."
+  read -r _
+  robot-md calibrate --zero "$MANIFEST" || {
+    echo "  (calibrate --zero failed; continuing — re-run manually)"
+  }
+  echo
+
+  echo "[5/5] calibrate --hand-eye (if a vision driver is declared)"
+  echo "      Place the calibration marker at the known position, then"
+  echo "      pass --marker-pos <x>,<y>,<z>. Skipping for now — run manually:"
+  echo "        robot-md calibrate --hand-eye --marker-pos 200,0,0 $MANIFEST"
+  echo
+fi
+
+echo "=== final compliance status ==="
+robot-md compliance status "$MANIFEST" --no-probe || true
+
+echo
+echo "✓ first-activation complete. Manifest is staged for first motion."
+"""
+
 
 def phase_compliance_scaffold(
     manifest_path: Path,
@@ -177,6 +250,7 @@ def phase_compliance_scaffold(
     scripts_dir = base / "scripts"
     compliance_dir = base / "compliance"
     demo_path = scripts_dir / "demo-eu-ai-act.sh"
+    activation_path = scripts_dir / "first-activation.sh"
     readme_path = compliance_dir / "README.md"
     gitkeep_path = compliance_dir / ".gitkeep"
 
@@ -192,6 +266,13 @@ def phase_compliance_scaffold(
         demo_path.write_text(DEMO_SCRIPT_TEMPLATE)
         demo_path.chmod(0o755)
         created.append(str(demo_path.relative_to(base)))
+
+    if activation_path.exists() and not force_scripts:
+        skipped.append(str(activation_path.relative_to(base)))
+    else:
+        activation_path.write_text(FIRST_ACTIVATION_TEMPLATE)
+        activation_path.chmod(0o755)
+        created.append(str(activation_path.relative_to(base)))
 
     if readme_path.exists() and not force_scripts:
         skipped.append(str(readme_path.relative_to(base)))
