@@ -998,6 +998,66 @@ def incidents_report(
         typer.echo(f"wrote {output}", err=True)
 
 
+compliance_app = typer.Typer(
+    help="EU AI Act compliance status + bundling helpers."
+)
+app.add_typer(compliance_app, name="compliance")
+
+
+@compliance_app.command("status")
+def compliance_status_cmd(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    artifacts_dir: Path | None = typer.Option(
+        None,
+        "--artifacts-dir",
+        help="Directory of signed §22-26 artifacts. Default: <manifest>/compliance/",
+    ),
+    probe: bool = typer.Option(
+        True,
+        "--probe/--no-probe",
+        help="Probe RRF for reachability + RRN record + rcan_version drift. "
+        "Default on; use --no-probe for offline/CI.",
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit the structured status dict as JSON to stdout."
+    ),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org",
+        "--endpoint",
+        help="RRF base endpoint for the network probe.",
+    ),
+) -> None:
+    """One-shot pre-flight readiness check.
+
+    Surfaces in one place: keystore (signing key + apikey), audit chain
+    integrity, incidents log summary, on-disk signed artifact inventory,
+    RRF reachability + record drift, per-emit-* submission readiness, and
+    a ranked blocker list. Exit 4 if blockers are present, 0 if clean.
+    """
+    import json as _json
+
+    from robot_md.compliance_status import format_status_text, gather_status
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    status = gather_status(
+        path,
+        artifacts_dir=artifacts_dir,
+        network_probe=probe,
+        endpoint=endpoint,
+    )
+
+    if json_out:
+        typer.echo(_json.dumps(status, indent=2))
+    else:
+        typer.echo(format_status_text(status))
+
+    if status["blockers"]:
+        raise typer.Exit(code=4)
+
+
 audit_app = typer.Typer(
     help="Hash-chained audit log: verify integrity, list submissions and gate firings."
 )
