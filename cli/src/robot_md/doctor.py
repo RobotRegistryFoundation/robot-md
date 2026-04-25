@@ -8,7 +8,7 @@ Checks fall into five buckets:
 
   1. Install     — CLI installed, Python version, required deps importable.
   2. Manifest    — ROBOT.md in cwd (or --path) parses + validates against schema.
-  3. Network     — registry (rcan.dev) reachable; if --path has `rrn`, entry exists.
+  3. Network     — RRF registry reachable; if --path has `rrn`, entry exists.
   4. Drivers     — each declared driver probed (serial port readable, host reachable).
   5. Keystore    — ~/.robot-md/keys/ permissions + counts.
 
@@ -182,16 +182,18 @@ def check_manifest(path: Path | None) -> tuple[list[CheckResult], dict[str, Any]
 def check_network(fm: dict[str, Any] | None) -> list[CheckResult]:
     out: list[CheckResult] = []
 
-    endpoint = "https://rcan.dev/api/v1/robots"
+    endpoint = "https://robotregistryfoundation.org/v2/robots"
     if fm:
         configured = (fm.get("network") or {}).get("rrf_endpoint")
         if configured:
             endpoint = str(configured).rstrip("/")
-            if not endpoint.endswith("/api/v1/robots"):
-                endpoint = endpoint + "/api/v1/robots"
+            if not endpoint.endswith("/v2/robots"):
+                endpoint = endpoint + "/v2/robots"
+
+    ua = {"User-Agent": f"robot-md/{__version__}"}
 
     # HEAD-style GET with a small timeout; any HTTP response proves reachability.
-    req = request.Request(endpoint, method="GET", headers={"User-Agent": f"robot-md/{__version__}"})
+    req = request.Request(endpoint, method="GET", headers=ua)
     try:
         with request.urlopen(req, timeout=5) as resp:
             out.append(_pass("registry reachable", "network", f"{endpoint} → HTTP {resp.status}"))
@@ -206,11 +208,15 @@ def check_network(fm: dict[str, Any] | None) -> list[CheckResult]:
         rrn = (fm.get("metadata") or {}).get("rrn")
         if rrn:
             lookup = f"{endpoint}/{rrn}"
+            # Wrap in a Request so the User-Agent header lands; without it the
+            # default Python-urllib UA is blocked at Cloudflare with 403,
+            # masking the origin's real status.
+            lookup_req = request.Request(lookup, method="GET", headers=ua)
             try:
-                with request.urlopen(lookup, timeout=5) as resp:
+                with request.urlopen(lookup_req, timeout=5) as resp:
                     if resp.status == 200:
                         out.append(
-                            _pass("RRN lookup", "network", f"{rrn} resolvable at {endpoint}/{rrn}")
+                            _pass("RRN lookup", "network", f"{rrn} resolvable at {lookup}")
                         )
                     else:
                         out.append(_warn("RRN lookup", "network", f"{rrn} → HTTP {resp.status}"))

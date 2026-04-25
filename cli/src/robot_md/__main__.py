@@ -186,7 +186,7 @@ def init(
     do_register: bool = typer.Option(
         False,
         "--register",
-        help="Mint an RRN on rcan.dev as part of setup.",
+        help="Mint an RRN against the Robot Registry Foundation as part of setup.",
     ),
     contact_email: str | None = typer.Option(
         None, "--contact-email", help="Contact email for --register."
@@ -651,7 +651,7 @@ def incidents_report(
 def unregister(
     rrn: str = typer.Argument(..., help="The RRN to delete (e.g. RRN-000000000042)."),
     endpoint: str = typer.Option(
-        "https://rcan.dev/api/v1/robots",
+        "https://robotregistryfoundation.org/v2/robots/register",
         "--endpoint",
         help="RRF base endpoint. Override for staging / self-hosted.",
     ),
@@ -665,10 +665,10 @@ def unregister(
 
     Uses the issued API key (stored by `robot-md register` at
     `~/.robot-md/keys/<rrn>.apikey`) to authorize the DELETE against
-    `rcan.dev/api/v1/robots/<rrn>`. The local key file is removed after
-    a successful delete. Does NOT modify any local ROBOT.md files — if
-    you want to un-publish + clean the manifest, edit metadata.rrn to
-    empty string after this returns.
+    `robotregistryfoundation.org/v2/robots/<rrn>`. The local key file is
+    removed after a successful delete. Does NOT modify any local ROBOT.md
+    files — if you want to un-publish + clean the manifest, edit
+    metadata.rrn to empty string after this returns.
 
     Examples:
 

@@ -1,11 +1,11 @@
 """`robot-md register` — mint an RRN against the Robot Registry Foundation.
 
-Talks to the live RRF mint endpoint at ``https://rcan.dev/api/v1/robots``
-(the foundation's governance site is at `robotregistryfoundation.org`, but
-the registry service itself is served from `rcan.dev`). On success, writes the
-assigned RRN back into the manifest's ``metadata.rrn``, stores the issued
-API key at ``~/.robot-md/keys/<rrn>.apikey`` (mode 600), and prints the
-public resolver URL for the new record.
+Talks to the live RRF mint endpoint at
+``https://robotregistryfoundation.org/v2/robots/register`` (see
+``DEFAULT_ENDPOINT`` below). On success, writes the assigned RRN back into
+the manifest's ``metadata.rrn``, stores the issued API key at
+``~/.robot-md/keys/<rrn>.apikey`` (mode 600), and prints the public resolver
+URL for the new record.
 
 v0.2 will add signed registration with key-binding at mint time (see
 ``spec/v0.2-design.md`` §9.1). When that server-side endpoint lands, this

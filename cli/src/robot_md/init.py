@@ -224,12 +224,12 @@ def merge_preset_into_draft(
             "rrn": "",
             "license": "Apache-2.0",
         },
-        # RRF binding. The governance home is robotregistryfoundation.org;
-        # the live registry service (mint, resolve, FRIA, signed manifest)
-        # runs at rcan.dev. `/r/<rrn>` returns the signed manifest,
-        # `/api/v1/robots/<rrn>/fria` returns the EU AI Act FRIA reference.
+        # RRF binding. The mint/resolve/FRIA registry service is served from
+        # robotregistryfoundation.org under `/v2/robots`. The public resolver
+        # for human-facing URLs is at rcan.dev/r/<rrn>; it's derived from the
+        # RRN at discovery time and doesn't need to be in the manifest.
         "network": {
-            "rrf_endpoint": "https://rcan.dev",
+            "rrf_endpoint": "https://robotregistryfoundation.org",
             "signing_alg": "ml-dsa-65",  # RCAN 3.0 primary; ed25519 accepted at L1
             "transports": ["http"],
         },
