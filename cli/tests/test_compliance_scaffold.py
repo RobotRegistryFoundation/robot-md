@@ -93,3 +93,18 @@ def test_demo_template_has_no_bob_specific_paths(tmp_path: Path):
     should be portable."""
     assert "/home/craigm26/bob" not in DEMO_SCRIPT_TEMPLATE
     assert "bob/scripts" not in DEMO_SCRIPT_TEMPLATE
+
+
+def test_demo_template_includes_compliance_status_preamble(tmp_path: Path):
+    """The demo must run `robot-md compliance status` BEFORE the emit-* steps
+    so the operator sees blockers (apikey gap, audit chain, RRF drift) up
+    front. Without this preamble, --submit failures surface mid-flow with
+    no context. The preamble must NOT abort the demo (|| true) — running
+    to completion validates the flow shape even when blockers exist."""
+    cmd = 'robot-md compliance status "$MANIFEST"'
+    assert cmd in DEMO_SCRIPT_TEMPLATE, "demo must invoke `compliance status` on $MANIFEST"
+    cmd_idx = DEMO_SCRIPT_TEMPLATE.index(cmd)
+    emit_idx = DEMO_SCRIPT_TEMPLATE.index("emit-fria")
+    assert cmd_idx < emit_idx, "compliance status must run before emit-fria"
+    cmd_line = DEMO_SCRIPT_TEMPLATE[cmd_idx : DEMO_SCRIPT_TEMPLATE.index("\n", cmd_idx)]
+    assert "|| true" in cmd_line, "preamble must use `|| true` to not abort on blockers"

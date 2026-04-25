@@ -75,6 +75,14 @@ if [ "$RESET_AUDIT" = "--reset-audit" ]; then
   rm -f ~/.robot-md/audit/"$RRN".jsonl ~/.robot-md/incidents/"$RRN".jsonl
 fi
 
+echo "[0/6] pre-flight: robot-md compliance status"
+# Surface keystore/audit/artifact/RRF blockers BEFORE the demo so the operator
+# sees what's about to fail (e.g. apikey-gated --submit paths) up front.
+# --no-probe in CI; remove for live RRF check. Exit 4 = blockers present;
+# we DON'T abort — the demo runs to completion to validate the flow shape.
+robot-md compliance status "$MANIFEST" || true
+echo
+
 echo "[1/6] emit FRIA (Art. 27)"
 robot-md emit-fria "$MANIFEST" \\
   --deployment-context "demo-$(date -u +%Y-%m-%d)" \\
