@@ -452,6 +452,154 @@ def emit_ifu(
         typer.echo(f"wrote {output}", err=True)
 
 
+# ---------------------------------------------------------- Art. 11 summary
+
+
+@app.command("emit-art11")
+def emit_art11(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    sbom: Path | None = typer.Option(
+        None,
+        "--sbom",
+        help="Path to a CycloneDX (or other) SBOM file. Referenced by path in the artifact.",
+    ),
+    artifacts_dir: Path | None = typer.Option(
+        None,
+        "--artifacts-dir",
+        help="Directory containing signed §22-26 artifact JSON files. "
+        "Inventoried into notified_body_submission.",
+    ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Write the artifact here. Default: print to stdout."
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
+    ),
+) -> None:
+    """Emit a robot-md-art11-summary-v0 (EU AI Act Art. 11 technical-doc summary).
+
+    Aggregates the eight Art. 11 categories from the manifest, the on-disk
+    signed-artifacts inventory, and the per-robot post-market incident log.
+    Schema is intentionally an aggregator name (not rcan-art11-v1) since
+    rcan-spec hasn't defined an Art. 11 wire format upstream — this is
+    a notified-body-readable dossier that points at authoritative pieces.
+    """
+    import json as _json
+
+    from robot_md.art11 import build_artifact, sign_artifact
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    artifact = build_artifact(path, sbom_path=sbom, signed_artifacts_dir=artifacts_dir)
+
+    if sign:
+        rrn = artifact["rrn"]
+        if not rrn:
+            typer.secho(
+                "error: --sign requires metadata.rrn in the manifest. "
+                "Run `robot-md register` first.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+        try:
+            artifact = sign_artifact(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+
+
+# ---------------------------------------------------------- §22 FRIA
+
+
+@app.command("emit-fria")
+def emit_fria(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    deployment_context: str | None = typer.Option(
+        None,
+        "--deployment-context",
+        help="Deployment context (e.g. 'internal-warehouse-pilot'). "
+        "Overrides manifest compliance.deployment_context.",
+    ),
+    affected_groups: list[str] | None = typer.Option(
+        None,
+        "--affected-group",
+        help="Group affected by the system. Repeat for multiple. "
+        "Overrides manifest compliance.affected_groups.",
+    ),
+    known_risks: list[str] | None = typer.Option(
+        None,
+        "--known-risk",
+        help="Known risk statement. Repeat for multiple. "
+        "Overrides manifest compliance.known_risks.",
+    ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Write the artifact here. Default: print to stdout."
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
+    ),
+) -> None:
+    """Emit an rcan-fria-v1 (Art. 27 Fundamental Rights Impact Assessment) artifact.
+
+    Pulls system identity from manifest metadata + capabilities; pulls
+    deployment context, affected groups, known risks, and human-oversight
+    measures from the manifest's compliance and safety blocks. Mirrors the
+    rcan-py 3.3.0 FriaDocument shape so the artifact is wire-compatible
+    with RRF /v2/robots/<rrn>/fria submissions.
+    """
+    import json as _json
+
+    from robot_md.fria import build_artifact, sign_artifact
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    artifact = build_artifact(
+        path,
+        deployment_context=deployment_context,
+        affected_groups=affected_groups or None,
+        known_risks=known_risks or None,
+    )
+
+    if sign:
+        rrn = artifact["system"]["rrn"]
+        if not rrn:
+            typer.secho(
+                "error: --sign requires metadata.rrn in the manifest. "
+                "Run `robot-md register` first.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+        try:
+            artifact = sign_artifact(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+
+
 # ---------------------------------------------------------- §26 EU register
 
 
@@ -645,6 +793,40 @@ def incidents_report(
     else:
         output.write_text(out)
         typer.echo(f"wrote {output}", err=True)
+
+
+@incidents_app.command("list")
+def incidents_list(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+) -> None:
+    """List incidents from the per-robot log, newest first.
+
+    Convenience for operators inspecting ~/.robot-md/incidents/<rrn>.jsonl.
+    """
+    from robot_md.incidents import load
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho(
+            "error: manifest has no metadata.rrn. Run `robot-md register` first.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+
+    entries = load(rrn)
+    if not entries:
+        typer.echo(f"no incidents recorded for {rrn}")
+        return
+    typer.echo(f"{len(entries)} incident(s) for {rrn} (newest first):")
+    for e in entries:
+        typer.echo(
+            f"  {e['timestamp']}  {e['severity']:>11}  {e['category']:<24}  {e['description']}"
+        )
 
 
 @app.command()
