@@ -1,0 +1,255 @@
+# robot-md preset — Reachy 2 (Pollen Robotics open-source humanoid).
+# Apply with: robot-md init --preset reachy2
+#
+# Reachy 2 is a stationary-or-mobile humanoid: two 7-DoF arms with parallel
+# grippers, a 3-DoF Orbita neck, a 4-camera head/wrist vision stack, and a
+# Zuuu holonomic mobile base (3 omni-wheels). Control is over the Pollen
+# `reachy2-sdk` (gRPC :50051), which the published `pollenrobotics/reachy2`
+# Docker image exposes for both real-robot and MuJoCo-simulator targets.
+# This preset covers the simulator-or-robot interface; the underlying
+# driver is OpenCastor's reachy_driver.
+
+match:
+  drivers:
+    protocol: reachy2_sdk
+  name_hints: ["reachy", "pollen"]
+
+physics:
+  type: humanoid
+  dof: 22                              # 14 arms + 3 neck + 2 grippers + 3 base wheels
+  solver:
+    convention: DH
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 4096              # SDK exposes float radians; 4096 used for parity with Dynamixel-class chains
+    cameras:
+      - driver_id: head_left
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+      - driver_id: head_right
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+      - driver_id: wrist_left
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+      - driver_id: wrist_right
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+    gripper:
+      joint_id: r_gripper              # right by convention; mirror to l_gripper as needed
+      tip_offset_mm: [60, 0, 0]
+      open_steps: 100
+      close_steps: 0
+  kinematics:
+    # Left arm (7 DoF, Pollen Reachy 2 reference geometry)
+    - id: l_shoulder_pitch
+      axis: y
+      limits_deg: [-180, 90]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 190
+    - id: l_shoulder_roll
+      axis: x
+      limits_deg: [-180, 10]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: l_arm_yaw
+      axis: z
+      limits_deg: [-90, 90]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 280
+    - id: l_elbow_pitch
+      axis: y
+      limits_deg: [-125, 0]
+      length_mm: 280
+      a_mm: 280
+      d_mm: 0
+    - id: l_forearm_yaw
+      axis: z
+      limits_deg: [-100, 100]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 250
+    - id: l_wrist_pitch
+      axis: y
+      limits_deg: [-45, 45]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: l_wrist_roll
+      axis: x
+      limits_deg: [-45, 45]
+      length_mm: 70
+      a_mm: 70
+      d_mm: 0
+    # Right arm (mirrors left)
+    - id: r_shoulder_pitch
+      axis: y
+      limits_deg: [-180, 90]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 190
+    - id: r_shoulder_roll
+      axis: x
+      limits_deg: [-10, 180]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: r_arm_yaw
+      axis: z
+      limits_deg: [-90, 90]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 280
+    - id: r_elbow_pitch
+      axis: y
+      limits_deg: [-125, 0]
+      length_mm: 280
+      a_mm: 280
+      d_mm: 0
+    - id: r_forearm_yaw
+      axis: z
+      limits_deg: [-100, 100]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 250
+    - id: r_wrist_pitch
+      axis: y
+      limits_deg: [-45, 45]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: r_wrist_roll
+      axis: x
+      limits_deg: [-45, 45]
+      length_mm: 70
+      a_mm: 70
+      d_mm: 0
+    # Orbita 3-DoF neck (head pitch/roll/yaw, single Orbita actuator)
+    - id: neck_roll
+      axis: x
+      limits_deg: [-30, 30]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: neck_pitch
+      axis: y
+      limits_deg: [-40, 40]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: neck_yaw
+      axis: z
+      limits_deg: [-90, 90]
+      length_mm: 100
+      a_mm: 0
+      d_mm: 100
+    # Grippers (1 DoF each)
+    - id: l_gripper
+      axis: y
+      limits_deg: [0, 90]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: r_gripper
+      axis: y
+      limits_deg: [0, 90]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    # Zuuu holonomic mobile base (3 omni wheels — actuated DoF, not Cartesian)
+    - id: base_wheel_front
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: base_wheel_back_left
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: base_wheel_back_right
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+
+drivers:
+  - id: reachy
+    protocol: reachy2_sdk
+    port: localhost:50051             # Pollen reachy2-sdk default — Docker image exposes :50051
+    model: reachy2
+  - id: head_left
+    protocol: reachy2_sdk
+    model: head_left_camera
+  - id: head_right
+    protocol: reachy2_sdk
+    model: head_right_camera
+  - id: wrist_left
+    protocol: reachy2_sdk
+    model: wrist_left_camera
+  - id: wrist_right
+    protocol: reachy2_sdk
+    model: wrist_right_camera
+
+capabilities:
+  - arm.pick
+  - arm.place
+  - arm.reach
+  - arm.home
+  - bimanual.handover
+  - nav.go_to                          # Zuuu mobile base
+  - nav.stop
+  - nav.rotate
+  - head.look_at
+  - vision.describe
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_joint_velocity_dps: 90           # Reachy 2 is intentionally slow around humans
+  max_linear_velocity_ms: 0.7          # Zuuu base default cap
+  payload_kg: 3.0                      # per arm, per Pollen spec
+  workspace_bounds_m: [10, 10, 2]      # nominal indoor ops envelope; refine per deployment
+  estop:
+    hardware: true                     # Reachy 2 ships with physical E-stop on torso
+    software: true
+    response_ms: 50
+  failsafe_behavior: stop
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+    - scope: bimanual
+      require_auth: true               # coordinated arm motion can self-collide
+    - scope: mobile_base
+      require_auth: true               # base motion in human-shared space is risky
+    - scope: reach_high
+      require_auth: true               # extended-arm poses cross face/eye height of nearby humans
+
+body_hints:
+  identity: |
+    Reachy 2 — Pollen Robotics open-source humanoid: two 7-DoF arms, 3-DoF
+    Orbita neck, parallel-gripper hands, 4-camera vision stack (head L/R +
+    wrist L/R), and a Zuuu 3-wheel holonomic mobile base. Control via the
+    `reachy2-sdk` Python package over gRPC `:50051`. The same interface
+    drives the real robot and the MuJoCo-based simulator from the
+    `pollenrobotics/reachy2` Docker image.
+  capabilities: |
+    Single-arm pick/place/reach, coordinated bimanual handovers, head
+    look-at gestures, and holonomic navigation with the mobile base.
+    The wrist cameras are well-suited to imitation-learning capture.
+  safety: |
+    Hardware E-stop on the torso; software stop responds within 50 ms.
+    Each arm is rated for 3 kg payload and capped at 90 dps. Mobile-base
+    motion, bimanual coordination, and high-reach poses each route through
+    explicit HITL gates because mistakes in those modes can injure
+    bystanders or damage the robot. The Pollen docker image (amd64-only)
+    is the supported simulator surface — verify host architecture before
+    expecting interactive frame rates.

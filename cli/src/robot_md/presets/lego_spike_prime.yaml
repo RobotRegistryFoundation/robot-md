@@ -1,0 +1,99 @@
+# robot-md preset — LEGO SPIKE Prime (educational classroom robot).
+# Ported from OpenCastor's lego_spike_prime.rcan.yaml. Adjust port-letter
+# assignments per build — the SPIKE hub's 6 ports (A–F) are interchangeable.
+#
+# SPIKE Prime is the modern classroom successor to MINDSTORMS EV3:
+# a single hub with 6 multi-function ports, USB or BLE link, MicroPython
+# REPL. This preset assumes a 2-motor differential-drive build (A/B
+# drive, C arm) with force/color/distance sensors on D/E/F. The
+# OpenCastor `spike_driver` speaks `spike_hub_serial` over USB-CDC.
+
+match:
+  drivers:
+    protocol: spike_hub_serial
+  name_hints: ["spike", "lego"]
+  usb_hints: ["LEGO Hub"]
+
+physics:
+  type: wheeled
+  dof: 2
+  solver:
+    convention: custom                 # differential drive
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 360               # SPIKE motors report degrees
+  kinematics:
+    - id: left_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: right_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+
+drivers:
+  - id: left_motor
+    protocol: spike_hub_serial
+    port: A
+    model: spike_angular_motor
+  - id: right_motor
+    protocol: spike_hub_serial
+    port: B
+    model: spike_angular_motor
+  - id: arm_motor
+    protocol: spike_hub_serial
+    port: C
+    model: spike_medium_motor
+  - id: force_sensor
+    protocol: spike_hub_serial
+    port: D
+    model: spike_force_sensor
+  - id: color_sensor
+    protocol: spike_hub_serial
+    port: E
+    model: spike_color_sensor
+  - id: distance_sensor
+    protocol: spike_hub_serial
+    port: F
+    model: spike_distance_sensor
+  - id: imu
+    protocol: spike_hub_internal
+    model: spike_imu
+
+capabilities:
+  - nav.go_to
+  - nav.stop
+  - nav.rotate
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_linear_velocity_ms: 0.5
+  workspace_bounds_m: [3, 3, 1]
+  estop:
+    hardware: false                    # SPIKE hub has a center button — software-mediated
+    software: true
+    response_ms: 100
+  failsafe_behavior: stop
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+
+body_hints:
+  identity: |
+    LEGO SPIKE Prime — classroom-grade robot hub with 6 multi-function
+    ports (A–F), USB-C link, and MicroPython REPL. Reference build:
+    differential drive on A/B, arm motor on C, force/color/distance
+    sensors on D/E/F. Wheel base ~140 mm, wheel radius ~32 mm.
+  capabilities: |
+    Navigate within a small workspace (~3×3 m) using differential drive.
+    Sensors include force, color, and distance for reactive behaviors.
+    Suitable for STEM exercises and contained-environment teleop.
+  safety: |
+    No hardware E-stop (center button on hub is software-mediated).
+    Linear velocity capped at 0.5 m/s. Educational platform — supervise
+    when running near other students or fragile classroom equipment.

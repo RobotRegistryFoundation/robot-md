@@ -68,10 +68,19 @@ def test_preset_match_score_zero_on_empty_scan(presets):
 
 
 def test_pick_best_returns_highest(presets):
+    """A 6-servo Feetech bus should pick so_arm101 (not lekiwi/koch_arm/leader).
+
+    Both so_arm101 and lekiwi declare match.drivers.protocol=feetech (+10),
+    but they declare different servo counts (so_arm101=6, lekiwi=9). A real
+    autodetect scan embeds servo count in the label as "(N servos)"; the
+    test scan does the same so the count match (+5) breaks the tie in
+    favour of the preset whose count actually matches the rig.
+    """
+
     class Device:
         bus = "usb"
         protocol = "feetech"
-        label = ""
+        label = "Feetech servo bus (6 servos)"
         path = "/dev/ttyACM0"
 
     class Scan:
@@ -79,7 +88,28 @@ def test_pick_best_returns_highest(presets):
 
     r = pick_best(presets, Scan())
     assert r is not None
-    assert r.preset.name == "so_arm101"  # highest scorer on a Feetech bus
+    assert r.preset.name == "so_arm101"  # 6 servos → so_arm101 wins on count match
+
+
+def test_pick_best_lekiwi_on_nine_servo_feetech(presets):
+    """A 9-servo Feetech bus picks lekiwi (6 arm + 3 wheels = 9 servos).
+
+    Same protocol as so_arm101 but distinct count — pins that the
+    preset matcher discriminates between the two via match.drivers.count.
+    """
+
+    class Device:
+        bus = "usb"
+        protocol = "feetech"
+        label = "Feetech servo bus (9 servos)"
+        path = "/dev/ttyACM0"
+
+    class Scan:
+        devices = [Device()]
+
+    r = pick_best(presets, Scan())
+    assert r is not None
+    assert r.preset.name == "lekiwi"  # 9 servos = 6 arm + 3 omni-wheel base
 
 
 def test_pick_best_prefers_minimal_when_all_scores_zero(presets):

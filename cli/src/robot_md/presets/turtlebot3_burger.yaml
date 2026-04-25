@@ -1,0 +1,82 @@
+# robot-md preset — TurtleBot 3 Burger (ROBOTIS, ROS 2 educational robot).
+# Ported from OpenCastor's turtlebot3_burger.rcan.yaml. Complements the
+# existing TurtleBot 4 preset — TB3 is still ubiquitous in undergrad
+# robotics courses and labs that haven't upgraded.
+#
+# TB3 Burger = Raspberry Pi 4 + OpenCR MCU + 2 wheels + LDS-01 360° lidar
+# + IMU. Differential drive over ROS 2, default cmd_vel/odom/scan topics.
+
+match:
+  drivers:
+    protocol: ros2
+  name_hints: ["turtlebot3", "tb3", "burger"]
+  pci_hints: ["LDS-01"]
+
+physics:
+  type: wheeled
+  dof: 2
+  solver:
+    convention: custom                 # differential drive
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 4096              # OpenCR encoder
+  kinematics:
+    - id: left_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: right_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+
+drivers:
+  - id: base
+    protocol: ros2
+    topic: /cmd_vel
+  - id: lidar
+    protocol: ros2
+    model: LDS-01
+    topic: /scan
+  - id: imu
+    protocol: ros2
+    topic: /imu
+
+capabilities:
+  - nav.go_to
+  - nav.stop
+  - nav.rotate
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_linear_velocity_ms: 0.22         # ROBOTIS stock cap on Burger
+  max_joint_velocity_dps: 162          # 2.84 rad/s converted from upstream rcan
+  workspace_bounds_m: [5, 5, 1]
+  estop:
+    hardware: false                    # no physical E-stop on Burger
+    software: true
+    response_ms: 100
+  failsafe_behavior: stop
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+
+body_hints:
+  identity: |
+    TurtleBot 3 Burger — ROBOTIS entry-level ROS 2 mobile robot. Pi 4 +
+    OpenCR MCU + 2-wheel differential drive + LDS-01 360° lidar + IMU.
+    Wheel base 160 mm, wheel radius 33 mm. The canonical educational
+    ROS 2 platform.
+  capabilities: |
+    Indoor navigation with 2D SLAM via the lidar, plus stop and rotate
+    primitives. No vision in the stock build — operator can mount a
+    Pi camera if needed. Workspace ~5×5 m typical for classroom labs.
+  safety: |
+    No hardware E-stop. Linear velocity capped at 0.22 m/s (ROBOTIS
+    stock limit). Software stop responds within 100 ms. Indoor-only
+    platform — wheels and motor torque are not rated for ramps or
+    outdoor surfaces.
