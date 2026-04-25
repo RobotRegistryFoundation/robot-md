@@ -110,7 +110,10 @@ def test_discover_emits_per_step_progress(fixtures_dir, tmp_path):
                 },
             },
         )
-        reply, progress = _read_until_response(proc, 42, timeout_s=10.0)
+        # 30s budget is intentional — github-hosted CI runners can take 12-15s
+        # for the MCP stdio child + multi-step discover dispatch under load.
+        # 10s was too tight and flaked ~30% on the matrix (one Python at a time).
+        reply, progress = _read_until_response(proc, 42, timeout_s=30.0)
         assert "result" in reply, f"discover call failed: {reply}"
         # Every progress notification for this call must carry the token.
         for p in progress:
