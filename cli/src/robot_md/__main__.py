@@ -523,6 +523,36 @@ def emit_art11(
 # ---------------------------------------------------------- §22 FRIA
 
 
+def _maybe_submit(artifact: dict, *, rrn: str, kind: str, do_submit: bool, api_key: str | None) -> None:
+    """Optionally POST `artifact` to RRF /v2/robots/<rrn>/<kind>. P2 helper.
+
+    Audit-records every attempt (success or failure). Aborts the CLI with
+    exit 3 on any submission failure so the operator knows the artifact
+    was emitted but didn't reach the registry.
+    """
+    if not do_submit:
+        return
+    if not rrn:
+        typer.secho(
+            "error: --submit requires metadata.rrn in the manifest.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+    from robot_md.submit import SubmitError, submit_artifact
+
+    try:
+        result = submit_artifact(artifact, rrn=rrn, kind=kind, api_key=api_key)
+    except SubmitError as e:
+        typer.secho(f"submit failed: {e}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=3) from e
+    typer.secho(
+        f"submitted to RRF /v2/robots/{rrn}/{kind} (HTTP {result['status']})",
+        err=True,
+        fg=typer.colors.GREEN,
+    )
+
+
 @app.command("emit-fria")
 def emit_fria(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
@@ -552,6 +582,15 @@ def emit_fria(
         "--sign",
         help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the artifact to RRF /v2/robots/<rrn>/fria after emit. "
+        "Records the attempt in the local hash-chained audit log.",
+    ),
+    api_key: str | None = typer.Option(
+        None, "--api-key", help="Override apikey from ~/.robot-md/keys/<rrn>.apikey for --submit."
+    ),
 ) -> None:
     """Emit an rcan-fria-v1 (Art. 27 Fundamental Rights Impact Assessment) artifact.
 
@@ -576,8 +615,9 @@ def emit_fria(
         known_risks=known_risks or None,
     )
 
+    rrn = artifact["system"]["rrn"]
+
     if sign:
-        rrn = artifact["system"]["rrn"]
         if not rrn:
             typer.secho(
                 "error: --sign requires metadata.rrn in the manifest. "
@@ -591,6 +631,8 @@ def emit_fria(
         except RuntimeError as e:
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
+
+    _maybe_submit(artifact, rrn=rrn, kind="fria", do_submit=submit, api_key=api_key)
 
     out = _json.dumps(artifact, indent=2)
     if output is None:
@@ -759,6 +801,14 @@ def incidents_report(
         "--sign",
         help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the report to RRF /v2/robots/<rrn>/incident-report after emit.",
+    ),
+    api_key: str | None = typer.Option(
+        None, "--api-key", help="Override apikey for --submit."
+    ),
 ) -> None:
     """Emit an rcan-incidents-v1 Art. 72 report for this robot."""
     import json as _json
@@ -787,12 +837,90 @@ def incidents_report(
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
 
+    _maybe_submit(artifact, rrn=rrn, kind="incident-report", do_submit=submit, api_key=api_key)
+
     out = _json.dumps(artifact, indent=2)
     if output is None:
         typer.echo(out)
     else:
         output.write_text(out)
         typer.echo(f"wrote {output}", err=True)
+
+
+audit_app = typer.Typer(
+    help="Hash-chained audit log: verify integrity, list submissions and gate firings."
+)
+app.add_typer(audit_app, name="audit")
+
+
+@audit_app.command("verify")
+def audit_verify(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+) -> None:
+    """Walk the per-robot audit chain at ~/.robot-md/audit/<rrn>.jsonl.
+
+    Exits 0 with `valid` reported on success; exits 4 on chain integrity
+    failure (mid-stream tamper or chain split). Truncation of trailing
+    entries cannot be detected without an external witness — see audit.py.
+    """
+    from robot_md.audit import AuditChainError, verify_chain
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho(
+            "error: manifest has no metadata.rrn.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        result = verify_chain(rrn)
+    except AuditChainError as e:
+        typer.secho(f"audit chain INVALID: {e}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=4) from e
+    typer.secho(
+        f"audit chain valid for {rrn} ({result['entries']} entr"
+        + ("ies" if result["entries"] != 1 else "y")
+        + ")",
+        fg=typer.colors.GREEN,
+    )
+
+
+@audit_app.command("list")
+def audit_list(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    limit: int = typer.Option(20, "--limit", help="Max entries to show. Default 20."),
+) -> None:
+    """List audit log entries for this robot, oldest first."""
+    from robot_md.audit import load_entries
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho("error: manifest has no metadata.rrn.", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    entries = load_entries(rrn)
+    if not entries:
+        typer.echo(f"no audit entries for {rrn}")
+        return
+    typer.echo(f"{len(entries)} audit entr{'ies' if len(entries) != 1 else 'y'} for {rrn}:")
+    for e in entries[-limit:]:
+        details = e.get("details") or {}
+        kind = details.get("kind", "")
+        status = details.get("status", "")
+        outcome = details.get("outcome", "")
+        typer.echo(
+            f"  {e['timestamp']}  {e['event']:<20}  {kind:<18}  status={status} outcome={outcome}"
+        )
 
 
 @incidents_app.command("list")
