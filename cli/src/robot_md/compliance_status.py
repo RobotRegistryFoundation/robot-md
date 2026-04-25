@@ -236,8 +236,7 @@ def _aggregate_blockers(status: dict[str, Any]) -> list[str]:
 
     if not status["keystore"]["signing_keypair"]["present"]:
         blockers.append(
-            "no signing keypair in keystore — register the manifest first "
-            "with `robot-md register`"
+            "no signing keypair in keystore — register the manifest first with `robot-md register`"
         )
     if not status["keystore"]["apikey"]["present"]:
         blockers.append(
@@ -248,9 +247,7 @@ def _aggregate_blockers(status: dict[str, Any]) -> list[str]:
 
     audit = status["audit"]
     if not audit.get("valid", False):
-        blockers.append(
-            f"audit chain INVALID: {audit.get('error', 'unknown')}"
-        )
+        blockers.append(f"audit chain INVALID: {audit.get('error', 'unknown')}")
 
     missing = status["artifacts"]["missing"]
     if missing:
@@ -295,15 +292,15 @@ def gather_status(
             "rcan_version": str(fm.get("rcan_version") or ""),
             "robot_name": (fm.get("metadata") or {}).get("robot_name") or "",
         },
-        "keystore": _check_keystore(rrn) if rrn else {
+        "keystore": _check_keystore(rrn)
+        if rrn
+        else {
             "signing_keypair": {"present": False, "path": None},
             "apikey": {"present": False, "path": None},
         },
         "audit": _check_audit(rrn) if rrn else {"valid": True, "entries": 0},
         "incidents": (
-            _check_incidents(rrn)
-            if rrn
-            else {"path": None, "total": 0, "by_severity": {}}
+            _check_incidents(rrn) if rrn else {"path": None, "total": 0, "by_severity": {}}
         ),
         "artifacts": _check_artifacts(artifacts_dir),
         "registry": (
@@ -348,15 +345,10 @@ def format_status_text(status: dict[str, Any]) -> str:
         f"  signing keypair:    {_icon(ks['signing_keypair']['present'])} "
         f"{ks['signing_keypair']['path']}"
     )
-    lines.append(
-        f"  apikey:             {_icon(ks['apikey']['present'])} "
-        f"{ks['apikey']['path']}"
-    )
+    lines.append(f"  apikey:             {_icon(ks['apikey']['present'])} {ks['apikey']['path']}")
     audit = status["audit"]
     if audit.get("valid"):
-        lines.append(
-            f"  audit chain:        ✓ {audit['entries']} entries (valid)"
-        )
+        lines.append(f"  audit chain:        ✓ {audit['entries']} entries (valid)")
     else:
         lines.append(f"  audit chain:        ✗ INVALID — {audit.get('error', '?')}")
     inc = status["incidents"]
@@ -375,17 +367,13 @@ def format_status_text(status: dict[str, Any]) -> str:
         if schema in present_by_schema:
             a = present_by_schema[schema]
             sig = "signed" if a["signed"] else "unsigned"
-            lines.append(
-                f"  ✓ {schema:<28}  {a['size_bytes']:>5} bytes  ({sig})"
-            )
+            lines.append(f"  ✓ {schema:<28}  {a['size_bytes']:>5} bytes  ({sig})")
         else:
             lines.append(f"  ✗ {schema:<28}  missing")
     extras = [a for a in status["artifacts"]["present"] if a["schema"] not in expected_set]
     for a in extras:
         sig = "signed" if a["signed"] else "unsigned"
-        lines.append(
-            f"  • {a['schema']:<28}  {a['size_bytes']:>5} bytes  ({sig}) [extra]"
-        )
+        lines.append(f"  • {a['schema']:<28}  {a['size_bytes']:>5} bytes  ({sig}) [extra]")
     lines.append("")
 
     # Registry
@@ -402,8 +390,7 @@ def format_status_text(status: dict[str, Any]) -> str:
                 record_v = reg.get("record_rcan_version") or "?"
                 if reg.get("version_drift"):
                     lines.append(
-                        f"  rcan_version:       ✗ DRIFT — manifest={manifest_v} "
-                        f"record={record_v}"
+                        f"  rcan_version:       ✗ DRIFT — manifest={manifest_v} record={record_v}"
                     )
                 else:
                     lines.append(f"  rcan_version:       ✓ matches ({manifest_v})")

@@ -110,8 +110,10 @@ def test_fria_unsigned_sig_is_empty(tmp_path):
     art = build_artifact(_write(tmp_path))
     # Pre-sign: sig is an empty dict (the type contract is dict, not None)
     assert art["sig"] == {}
-    assert art["signing_key"] == {} or art["signing_key"] is None or (
-        isinstance(art["signing_key"], dict) and not art["signing_key"].get("public_key")
+    assert (
+        art["signing_key"] == {}
+        or art["signing_key"] is None
+        or (isinstance(art["signing_key"], dict) and not art["signing_key"].get("public_key"))
     )
 
 

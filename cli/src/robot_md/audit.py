@@ -126,8 +126,7 @@ def verify_chain(rrn: str) -> dict[str, Any]:
     for i, entry in enumerate(entries):
         if entry["prev_hash"] != expected_prev:
             raise AuditChainError(
-                f"entry {i} prev_hash mismatch: expected {expected_prev}, "
-                f"got {entry['prev_hash']}"
+                f"entry {i} prev_hash mismatch: expected {expected_prev}, got {entry['prev_hash']}"
             )
         recomputed = hashlib.sha256(
             _canonical_for_hash({k: v for k, v in entry.items() if k != "entry_hash"})

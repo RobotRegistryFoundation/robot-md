@@ -98,8 +98,7 @@ def test_model_provenance_from_agent_runtimes(manifest):
     art = build_artifact(manifest)
     models = art["model_provenance"]["models"]
     assert any(
-        m.get("provider") == "anthropic" and m.get("model") == "claude-sonnet-4-6"
-        for m in models
+        m.get("provider") == "anthropic" and m.get("model") == "claude-sonnet-4-6" for m in models
     )
 
 
@@ -114,6 +113,7 @@ def test_post_market_monitoring_includes_incident_log_path(manifest):
 def test_post_market_counts_incidents_when_log_present(manifest, tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     from robot_md.incidents import record
+
     record(
         "RRN-000000000042",
         severity="other",

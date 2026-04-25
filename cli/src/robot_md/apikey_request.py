@@ -70,9 +70,7 @@ def build_request(
       existing one (rotation / parallel use case).
     """
     if operation not in VALID_OPERATIONS:
-        raise ValueError(
-            f"operation must be one of {VALID_OPERATIONS}, got {operation!r}"
-        )
+        raise ValueError(f"operation must be one of {VALID_OPERATIONS}, got {operation!r}")
     payload: dict[str, Any] = {
         "schema": APIKEY_REQUEST_SCHEMA,
         "rrn": rrn,
@@ -163,9 +161,7 @@ def submit_request(
                 "error": body_bytes.decode("utf-8", errors="replace")[:500],
             },
         )
-        raise SubmitError(
-            f"RRF {url} returned {e.code}: {body_bytes[:200]!r}"
-        ) from e
+        raise SubmitError(f"RRF {url} returned {e.code}: {body_bytes[:200]!r}") from e
     except urllib.error.URLError as e:
         record_event(
             rrn,

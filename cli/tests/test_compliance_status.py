@@ -164,6 +164,7 @@ def test_status_inventories_compliance_artifacts(manifest, home, tmp_path):
 
 def test_status_detects_rcan_version_drift(manifest, home):
     """Manifest declares 3.2; record returns 3.0 → drift flagged in blockers."""
+
     def fake_urlopen(req, timeout=None):
         # Reachability check (list endpoint)
         if req.full_url.endswith("/v2/robots"):

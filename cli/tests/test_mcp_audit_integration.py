@@ -199,6 +199,7 @@ def test_estop_set_records_audit_entry(ctx, home):
 
         def set(self):
             import time
+
             self._on = True
             self._set_at = time.time()
             return self._set_at
@@ -266,6 +267,7 @@ def test_audit_failure_never_crashes_capability_call(ctx, home, monkeypatch):
 
     # Patch the import inside _audit_invocation
     import robot_md.audit as audit_mod
+
     monkeypatch.setattr(audit_mod, "record_event", boom)
 
     from robot_md.mcp.tools.execute_capability import execute_capability_tool

@@ -71,7 +71,7 @@ def test_demo_template_uses_relative_manifest_default(tmp_path: Path):
     """The default $MANIFEST in the demo must work when run from any cwd —
     it derives from the script's own location, not a hardcoded path."""
     assert "MANIFEST=" in DEMO_SCRIPT_TEMPLATE
-    assert "$(dirname \"$0\")" in DEMO_SCRIPT_TEMPLATE
+    assert '$(dirname "$0")' in DEMO_SCRIPT_TEMPLATE
 
 
 def test_compliance_readme_lists_each_artifact(tmp_path: Path):

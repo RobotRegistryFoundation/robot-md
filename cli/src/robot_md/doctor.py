@@ -215,9 +215,7 @@ def check_network(fm: dict[str, Any] | None) -> list[CheckResult]:
             try:
                 with request.urlopen(lookup_req, timeout=5) as resp:
                     if resp.status == 200:
-                        out.append(
-                            _pass("RRN lookup", "network", f"{rrn} resolvable at {lookup}")
-                        )
+                        out.append(_pass("RRN lookup", "network", f"{rrn} resolvable at {lookup}"))
                     else:
                         out.append(_warn("RRN lookup", "network", f"{rrn} → HTTP {resp.status}"))
             except Exception as e:

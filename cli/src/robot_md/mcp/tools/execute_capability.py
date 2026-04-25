@@ -161,9 +161,7 @@ def _publish_result(ctx: McpContext, request_id: str, capability: str, result: d
     )
 
 
-def _audit_invocation(
-    ctx: McpContext, capability: str, result: dict, request_id: str
-) -> None:
+def _audit_invocation(ctx: McpContext, capability: str, result: dict, request_id: str) -> None:
     """Append a tamper-evident entry to the per-robot audit log for every
     capability invocation outcome — including allows, denials, and estop
     blocks. No-op when the manifest has no rrn (unregistered robots have

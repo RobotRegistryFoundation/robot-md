@@ -117,9 +117,7 @@ def _patch_urlopen(monkeypatch, captured: list):
         # Doctor's reachability check passes a Request; lookup historically
         # passed a bare string. Capture both shapes.
         if isinstance(arg, urlrequest.Request):
-            captured.append(
-                {"url": arg.full_url, "headers": dict(arg.header_items())}
-            )
+            captured.append({"url": arg.full_url, "headers": dict(arg.header_items())})
         else:
             captured.append({"url": str(arg), "headers": {}})
         return _FakeResp(status=200)

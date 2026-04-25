@@ -331,9 +331,7 @@ def emit_benchmarks(
         "--submit",
         help="POST the artifact to RRF /v2/robots/<rrn>/safety-benchmark after emit.",
     ),
-    api_key: str | None = typer.Option(
-        None, "--api-key", help="Override apikey for --submit."
-    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:
     """Emit rcan-safety-benchmark-v1 artifact (rcan-spec §23) for this robot.
 
@@ -356,6 +354,7 @@ def emit_benchmarks(
     artifact = build_artifact(path, iterations=iterations)
 
     from robot_md.parser import parse_file as _parse
+
     parsed = _parse(path)
     rrn = str((parsed.frontmatter.get("metadata") or {}).get("rrn") or "").strip()
 
@@ -419,9 +418,7 @@ def emit_ifu(
         "--submit",
         help="POST the artifact to RRF /v2/robots/<rrn>/ifu after emit.",
     ),
-    api_key: str | None = typer.Option(
-        None, "--api-key", help="Override apikey for --submit."
-    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:
     """Emit an rcan-ifu-v1 (Art. 13(3) Instructions for Use) artifact.
 
@@ -813,9 +810,7 @@ def emit_eu_register(
         "--submit",
         help="POST the artifact to RRF /v2/robots/<rrn>/eu-register after emit.",
     ),
-    api_key: str | None = typer.Option(
-        None, "--api-key", help="Override apikey for --submit."
-    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:
     """Emit an rcan-eu-register-v1 Art. 49 submission package.
 
@@ -959,9 +954,7 @@ def incidents_report(
         "--submit",
         help="POST the report to RRF /v2/robots/<rrn>/incident-report after emit.",
     ),
-    api_key: str | None = typer.Option(
-        None, "--api-key", help="Override apikey for --submit."
-    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:
     """Emit an rcan-incidents-v1 Art. 72 report for this robot."""
     import json as _json
@@ -1000,9 +993,7 @@ def incidents_report(
         typer.echo(f"wrote {output}", err=True)
 
 
-compliance_app = typer.Typer(
-    help="EU AI Act compliance status + bundling helpers."
-)
+compliance_app = typer.Typer(help="EU AI Act compliance status + bundling helpers.")
 app.add_typer(compliance_app, name="compliance")
 
 

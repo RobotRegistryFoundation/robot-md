@@ -56,10 +56,15 @@ def test_incidents_record_writes_jsonl_under_home(manifest, home):
     result = runner.invoke(
         app,
         [
-            "incidents", "record", str(manifest),
-            "--severity", "other",
-            "--category", "test_event",
-            "--description", "smoke test entry",
+            "incidents",
+            "record",
+            str(manifest),
+            "--severity",
+            "other",
+            "--category",
+            "test_event",
+            "--description",
+            "smoke test entry",
         ],
     )
     assert result.exit_code == 0, result.stdout
@@ -74,10 +79,15 @@ def test_incidents_record_rejects_unknown_severity(manifest, home):
     result = runner.invoke(
         app,
         [
-            "incidents", "record", str(manifest),
-            "--severity", "BOGUS",
-            "--category", "x",
-            "--description", "y",
+            "incidents",
+            "record",
+            str(manifest),
+            "--severity",
+            "BOGUS",
+            "--category",
+            "x",
+            "--description",
+            "y",
         ],
     )
     assert result.exit_code != 0
@@ -87,10 +97,15 @@ def test_incidents_list_returns_recorded(manifest, home):
     runner.invoke(
         app,
         [
-            "incidents", "record", str(manifest),
-            "--severity", "life_health",
-            "--category", "motor_stall",
-            "--description", "wrist_flex stalled at +90°",
+            "incidents",
+            "record",
+            str(manifest),
+            "--severity",
+            "life_health",
+            "--category",
+            "motor_stall",
+            "--description",
+            "wrist_flex stalled at +90°",
         ],
     )
     result = runner.invoke(app, ["incidents", "list", str(manifest)])
@@ -109,10 +124,15 @@ def test_incidents_report_returns_v1_shape(manifest, home):
     runner.invoke(
         app,
         [
-            "incidents", "record", str(manifest),
-            "--severity", "other",
-            "--category", "x",
-            "--description", "y",
+            "incidents",
+            "record",
+            str(manifest),
+            "--severity",
+            "other",
+            "--category",
+            "x",
+            "--description",
+            "y",
         ],
     )
     result = runner.invoke(app, ["incidents", "report", str(manifest)])
@@ -141,10 +161,15 @@ capabilities: [navigate]
     result = runner.invoke(
         app,
         [
-            "incidents", "record", str(p),
-            "--severity", "other",
-            "--category", "x",
-            "--description", "y",
+            "incidents",
+            "record",
+            str(p),
+            "--severity",
+            "other",
+            "--category",
+            "x",
+            "--description",
+            "y",
         ],
     )
     assert result.exit_code != 0

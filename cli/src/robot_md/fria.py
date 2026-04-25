@@ -79,12 +79,12 @@ def _deployment(
     return {
         "annex_iii_basis": comp.get("annex_iii_basis") or "",
         "deployment_context": (
-            deployment_context if deployment_context is not None
+            deployment_context
+            if deployment_context is not None
             else comp.get("deployment_context") or ""
         ),
         "affected_groups": list(
-            affected_groups if affected_groups is not None
-            else comp.get("affected_groups") or ()
+            affected_groups if affected_groups is not None else comp.get("affected_groups") or ()
         ),
         "known_risks": list(risks),
         "human_oversight": _human_oversight(fm),

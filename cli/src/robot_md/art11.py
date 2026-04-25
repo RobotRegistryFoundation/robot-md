@@ -25,14 +25,14 @@ from robot_md.parser import parse_file
 ART11_SCHEMA_NAME = "robot-md-art11-summary-v0"
 
 ART11_CATEGORIES = (
-    "system_identity",          # Art. 11 §1a
-    "hardware_provenance",      # Art. 11 §1b
-    "model_provenance",         # Art. 11 §1c
-    "safety_controls",          # Art. 9
-    "post_market_monitoring",   # Art. 72
-    "sbom",                     # Art. 11 §1b
-    "notified_body_submission", # status + artifact inventory
-    "data_governance",          # Art. 10 (placeholder; manifest-derived where present)
+    "system_identity",  # Art. 11 §1a
+    "hardware_provenance",  # Art. 11 §1b
+    "model_provenance",  # Art. 11 §1c
+    "safety_controls",  # Art. 9
+    "post_market_monitoring",  # Art. 72
+    "sbom",  # Art. 11 §1b
+    "notified_body_submission",  # status + artifact inventory
+    "data_governance",  # Art. 10 (placeholder; manifest-derived where present)
 )
 
 
@@ -56,9 +56,7 @@ def _hardware_provenance(fm: dict) -> dict:
     return {
         "physics_type": physics.get("type") or "",
         "dof": physics.get("dof"),
-        "drivers": [
-            {"id": d.get("id"), "protocol": d.get("protocol")} for d in drivers
-        ],
+        "drivers": [{"id": d.get("id"), "protocol": d.get("protocol")} for d in drivers],
         "components_count": len(components),
         "components": components,
     }
