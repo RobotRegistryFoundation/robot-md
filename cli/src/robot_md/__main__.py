@@ -883,11 +883,18 @@ def audit_verify(
     except AuditChainError as e:
         typer.secho(f"audit chain INVALID: {e}", err=True, fg=typer.colors.RED)
         raise typer.Exit(code=4) from e
+    n = result["entries"]
+    plural = "ies" if n != 1 else "y"
     typer.secho(
-        f"audit chain valid for {rrn} ({result['entries']} entr"
-        + ("ies" if result["entries"] != 1 else "y")
-        + ")",
+        f"audit chain valid for {rrn} ({n} entr{plural})",
         fg=typer.colors.GREEN,
+    )
+    typer.secho(
+        "  note: chain integrity is verified for tamper + split. "
+        "Truncation of trailing entries is undetectable without an "
+        "external witness (e.g., a periodic checkpoint countersigned by RRF).",
+        err=True,
+        fg=typer.colors.YELLOW,
     )
 
 

@@ -188,6 +188,76 @@ def test_no_audit_when_manifest_has_no_rrn(home):
     assert not audit_dir.exists() or not any(audit_dir.iterdir())
 
 
+def test_estop_set_records_audit_entry(ctx, home):
+    """Setting the software e-stop is a reactive-safety action — must audit."""
+    from robot_md.mcp.tools.estop import estop_tool
+
+    # ctx.estop needs a real .set() returning a timestamp; build a stub
+    class _RealEstop:
+        def __init__(self):
+            self._on = False
+            self._set_at = None
+
+        def set(self):
+            import time
+            self._on = True
+            self._set_at = time.time()
+            return self._set_at
+
+        def clear(self):
+            self._on = False
+
+        def is_set(self):
+            return self._on
+
+    ctx.estop = _RealEstop()
+    r = estop_tool(ctx)
+    assert r["ok"] is True
+
+    entries = load_entries("RRN-000000000099")
+    assert len(entries) == 1
+    assert entries[0]["event"] == "estop_set"
+
+
+def test_estop_clear_records_audit_entry(ctx, home):
+    """Clearing the e-stop is also recorded — and denied clears too."""
+    import time
+
+    class _RealEstop:
+        def __init__(self):
+            self._on = True
+
+        def set(self):
+            self._on = True
+            return time.time()
+
+        def clear(self):
+            self._on = False
+
+        def is_set(self):
+            return self._on
+
+    ctx.estop = _RealEstop()
+
+    # Manifest declares system HITL gate → clear without token must be denied + audited
+    ctx.spec.safety.hitl_gates = [{"scope": "system", "require_auth": True}]
+    from robot_md.mcp.tools.estop import estop_clear_tool
+
+    r1 = estop_clear_tool(ctx, confirm_token=None)
+    assert r1["ok"] is False
+    assert r1["error"]["reason"] == "hitl_gate"
+
+    # With token: clear succeeds, also audited
+    r2 = estop_clear_tool(ctx, confirm_token="operator-ack")
+    assert r2["ok"] is True
+
+    entries = load_entries("RRN-000000000099")
+    assert len(entries) == 2
+    assert entries[0]["event"] == "estop_clear_denied"
+    assert entries[0]["details"]["reason"] == "hitl_gate"
+    assert entries[1]["event"] == "estop_cleared"
+
+
 def test_audit_failure_never_crashes_capability_call(ctx, home, monkeypatch):
     """If audit.record_event raises (disk full, etc.), the capability call
     must still complete. Audit integrity is checked separately by `audit verify`."""
