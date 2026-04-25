@@ -125,13 +125,15 @@ def test_submit_records_failed_audit_on_4xx(with_apikey, home):
             req.full_url, 403, "Forbidden", {}, io.BytesIO(b'{"error":"nope"}')
         )
 
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        with pytest.raises(SubmitError, match="403"):
-            submit_artifact(
-                {"schema": "rcan-fria-v1"},
-                rrn="RRN-000000000099",
-                kind="fria",
-            )
+    with (
+        patch("urllib.request.urlopen", side_effect=fake_urlopen),
+        pytest.raises(SubmitError, match="403"),
+    ):
+        submit_artifact(
+            {"schema": "rcan-fria-v1"},
+            rrn="RRN-000000000099",
+            kind="fria",
+        )
 
     log = home / ".robot-md" / "audit" / "RRN-000000000099.jsonl"
     entry = json.loads(log.read_text().strip().splitlines()[-1])

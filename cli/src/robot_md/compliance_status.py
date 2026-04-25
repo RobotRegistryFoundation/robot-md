@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import Any
 
 from robot_md import __version__
-from robot_md.audit import AuditChainError, load_entries as audit_load_entries
+from robot_md.audit import AuditChainError
 from robot_md.audit import verify_chain as audit_verify_chain
 from robot_md.parser import parse_file
 from robot_md.register import load_apikey
@@ -223,9 +223,9 @@ def _check_submission_readiness(apikey_present: bool) -> dict[str, dict[str, Any
             out[kind] = {
                 "ready": False,
                 "reason": (
-                    f"apikey missing — run "
-                    f"`robot-md request-apikey ROBOT.md -o request.json` "
-                    f"and submit it to RRF support"
+                    "apikey missing — run "
+                    "`robot-md request-apikey ROBOT.md -o request.json` "
+                    "and submit it to RRF support"
                 ),
             }
     return out
@@ -300,7 +300,11 @@ def gather_status(
             "apikey": {"present": False, "path": None},
         },
         "audit": _check_audit(rrn) if rrn else {"valid": True, "entries": 0},
-        "incidents": _check_incidents(rrn) if rrn else {"path": None, "total": 0, "by_severity": {}},
+        "incidents": (
+            _check_incidents(rrn)
+            if rrn
+            else {"path": None, "total": 0, "by_severity": {}}
+        ),
         "artifacts": _check_artifacts(artifacts_dir),
         "registry": (
             _check_registry(rrn, fm, endpoint=endpoint)

@@ -9,7 +9,6 @@ notified body would check.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
@@ -136,7 +135,7 @@ def test_hitl_gate_denial_records_audit_entry(ctx, home):
     assert e["details"]["scope"] == "arm"
 
 
-def test_estop_set_records_audit_entry(ctx, home):
+def test_execute_capability_blocked_by_estop_is_audited(ctx, home):
     ctx.estop.set()
     from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
@@ -261,7 +260,6 @@ def test_estop_clear_records_audit_entry(ctx, home):
 def test_audit_failure_never_crashes_capability_call(ctx, home, monkeypatch):
     """If audit.record_event raises (disk full, etc.), the capability call
     must still complete. Audit integrity is checked separately by `audit verify`."""
-    import robot_md.mcp.tools.execute_capability as mod_under_test
 
     def boom(*_a, **_kw):
         raise RuntimeError("simulated audit failure")

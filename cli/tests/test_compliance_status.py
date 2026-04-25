@@ -22,7 +22,6 @@ from robot_md.compliance_status import (
     gather_status,
 )
 
-
 BOB_MIN = """\
 ---
 rcan_version: "3.2"

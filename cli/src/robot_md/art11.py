@@ -15,6 +15,7 @@ Coverage of Art. 11 categories follows the structure produced by
 
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -110,10 +111,8 @@ def _post_market_monitoring(rrn: str) -> dict:
         for line in log_path.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line:
-                try:
+                with contextlib.suppress(json.JSONDecodeError):
                     incidents.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
     by_severity = {
         "life_health": sum(1 for i in incidents if i.get("severity") == "life_health"),
         "other": sum(1 for i in incidents if i.get("severity") == "other"),

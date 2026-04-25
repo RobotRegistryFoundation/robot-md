@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+
 from robot_md.mcp.context import McpContext
 
 
@@ -25,10 +27,9 @@ def _audit_estop(ctx: McpContext, event: str, details: dict) -> None:
         return
     from robot_md.audit import record_event
 
-    try:
+    # Audit failures must never crash an e-stop call.
+    with contextlib.suppress(Exception):
         record_event(rrn, event=event, details={"tool": "estop", **details})
-    except Exception:
-        pass
 
 
 def estop_tool(ctx: McpContext) -> dict:

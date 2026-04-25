@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Init phase: scaffold scripts/ + compliance/ directories alongside ROBOT.md.
 
 EU AI Act compliance evidence has to live somewhere reproducible. When

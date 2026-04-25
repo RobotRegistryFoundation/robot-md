@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import time
 from dataclasses import asdict
 from typing import Any
@@ -189,12 +190,10 @@ def _audit_invocation(
     scope = err.get("scope")
     if scope is not None:
         details["scope"] = scope
-    try:
+    # Audit failure must never crash a capability call. The deployer gets
+    # the audit chain integrity guarantee from `audit verify`.
+    with contextlib.suppress(Exception):
         record_event(rrn, event="capability_invocation", details=details)
-    except Exception:
-        # Audit failure must never crash a capability call. The deployer
-        # gets the audit chain integrity guarantee from `audit verify`.
-        pass
 
 
 def _gate_satisfied(gate: dict, token: str | None) -> bool:

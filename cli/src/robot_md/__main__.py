@@ -663,7 +663,9 @@ def request_apikey(
 # ---------------------------------------------------------- §22 FRIA
 
 
-def _maybe_submit(artifact: dict, *, rrn: str, kind: str, do_submit: bool, api_key: str | None) -> None:
+def _maybe_submit(
+    artifact: dict, *, rrn: str, kind: str, do_submit: bool, api_key: str | None
+) -> None:
     """Optionally POST `artifact` to RRF /v2/robots/<rrn>/<kind>. P2 helper.
 
     Audit-records every attempt (success or failure). Aborts the CLI with

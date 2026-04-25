@@ -173,9 +173,11 @@ def test_submit_records_audit_on_failure(home):
         )
 
     signed = {"schema": APIKEY_REQUEST_SCHEMA, "rrn": "RRN-000000000099"}
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        with pytest.raises(SubmitError, match="404"):
-            submit_request(signed, rrn="RRN-000000000099")
+    with (
+        patch("urllib.request.urlopen", side_effect=fake_urlopen),
+        pytest.raises(SubmitError, match="404"),
+    ):
+        submit_request(signed, rrn="RRN-000000000099")
 
     entries = load_entries("RRN-000000000099")
     assert entries[0]["details"]["status"] == 404
