@@ -145,6 +145,7 @@ def _match_hitl_gate(ctx: McpContext, capability: str) -> dict | None:
 
 
 def _publish_result(ctx: McpContext, request_id: str, capability: str, result: dict) -> None:
+    _audit_invocation(ctx, capability, result, request_id)
     if getattr(ctx, "publisher", None) is None:
         return
     ctx.publisher.publish(
@@ -157,6 +158,43 @@ def _publish_result(ctx: McpContext, request_id: str, capability: str, result: d
             "error": result.get("error"),
         },
     )
+
+
+def _audit_invocation(
+    ctx: McpContext, capability: str, result: dict, request_id: str
+) -> None:
+    """Append a tamper-evident entry to the per-robot audit log for every
+    capability invocation outcome — including allows, denials, and estop
+    blocks. No-op when the manifest has no rrn (unregistered robots have
+    no chain to bind audits to).
+    """
+    rrn = None
+    spec = getattr(ctx, "spec", None)
+    if spec is not None:
+        meta = getattr(spec, "metadata", None)
+        if meta is not None:
+            rrn = getattr(meta, "rrn", None)
+    if not rrn:
+        return
+    from robot_md.audit import record_event
+
+    err = result.get("error") or {}
+    details = {
+        "tool": "execute_capability",
+        "capability": capability,
+        "request_id": request_id,
+        "status": result.get("status"),
+        "reason": err.get("reason"),
+    }
+    scope = err.get("scope")
+    if scope is not None:
+        details["scope"] = scope
+    try:
+        record_event(rrn, event="capability_invocation", details=details)
+    except Exception:
+        # Audit failure must never crash a capability call. The deployer
+        # gets the audit chain integrity guarantee from `audit verify`.
+        pass
 
 
 def _gate_satisfied(gate: dict, token: str | None) -> bool:
