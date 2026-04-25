@@ -541,6 +541,125 @@ def emit_art11(
         typer.echo(f"wrote {output}", err=True)
 
 
+# ---------------------------------------------------------- apikey reissue
+
+
+@app.command("request-apikey")
+def request_apikey(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    operation: str = typer.Option(
+        "reissue",
+        "--operation",
+        help="'reissue' (default; replace lost apikey) or 'new' (issue an additional one).",
+    ),
+    reason: str | None = typer.Option(
+        None, "--reason", help="Optional human-readable reason recorded in the request."
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Write the signed request here. Default: print to stdout.",
+    ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the signed request to RRF /v2/robots/<rrn>/apikey-requests. "
+        "(Server-side endpoint may not be implemented yet — dry-run / out-of-band first.)",
+    ),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org",
+        "--endpoint",
+        help="RRF base endpoint. Override for staging / self-hosted.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Build the request without signing — no keystore touched.",
+    ),
+) -> None:
+    """Build a signed apikey-reissue request for an existing RRN.
+
+    Usable when the operator holds the signing keypair but lost (or never
+    received) the apikey for an RRN. The signature on the request body
+    authenticates against the RRF-registered pq_signing_pub — no bearer
+    token needed (that's the whole point — apikey is what we don't have).
+
+    Default behaviour: emit a signed JSON document to stdout that the
+    operator hands to RRF support out-of-band. With --submit, POSTs to
+    the apikey-requests endpoint when/if RRF implements it.
+    """
+    import json as _json
+
+    from robot_md.apikey_request import (
+        SubmitError,
+        build_request,
+        sign_request,
+        submit_request,
+    )
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho(
+            "error: manifest has no metadata.rrn. There's nothing to request "
+            "an apikey for. Run `robot-md register` to mint a fresh RRN.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        artifact = build_request(rrn, operation=operation, reason=reason)
+    except ValueError as e:
+        typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2) from e
+
+    if not dry_run:
+        try:
+            artifact = sign_request(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    if submit:
+        if dry_run:
+            typer.secho(
+                "error: --submit is incompatible with --dry-run "
+                "(unsigned requests cannot be submitted).",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+        try:
+            result = submit_request(artifact, rrn=rrn, endpoint=endpoint)
+        except SubmitError as e:
+            typer.secho(f"submit failed: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+        typer.secho(
+            f"submitted apikey reissue request for {rrn} (HTTP {result['status']})",
+            err=True,
+            fg=typer.colors.GREEN,
+        )
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+        if not submit:
+            typer.secho(
+                "  next: hand this signed JSON to RRF support out-of-band "
+                "(email/ticket) or rerun with --submit when the endpoint exists.",
+                err=True,
+                fg=typer.colors.YELLOW,
+            )
+
+
 # ---------------------------------------------------------- §22 FRIA
 
 
