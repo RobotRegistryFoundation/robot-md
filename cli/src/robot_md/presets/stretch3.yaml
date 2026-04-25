@@ -1,0 +1,168 @@
+# robot-md preset — Stretch 3 (Hello Robot mobile manipulator).
+# Apply with: robot-md init --preset stretch3
+#
+# Stretch 3 is a single-arm mobile manipulator: a vertically-actuated
+# lift carrying a telescoping arm with 3-DoF wrist + parallel gripper,
+# mounted on a differential-drive base with a 2-DoF (pan/tilt) head.
+# Vision: head RealSense D435if (RGB-D), wrist RealSense D405 (RGB-D),
+# base D435if (navigation/cliff). Control via the `stretch_body` Python
+# SDK (USB) or ROS 2 (`stretch_ros2`).
+
+match:
+  drivers:
+    protocol: stretch_body
+  name_hints: ["stretch", "hello-robot"]
+  usb_hints: ["FTDI", "Stretch"]
+
+physics:
+  type: arm_manipulator
+  dof: 10                              # 1 lift + 1 arm-extension + 3 wrist + 1 gripper + 2 head + 2 base
+  solver:
+    convention: custom                 # mixed prismatic/revolute + diff-drive — not a clean DH chain
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 16384             # Hello Robot uses 14-bit encoders on the lift/arm
+    cameras:
+      - driver_id: head_d435i
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+      - driver_id: wrist_d405
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+      - driver_id: base_d435i
+        primary_stream: rgb
+        mount: world
+        extrinsic: null
+    gripper:
+      joint_id: gripper
+      tip_offset_mm: [0, 0, 0]
+      open_steps: 100
+      close_steps: 0
+  kinematics:
+    - id: lift
+      axis: z
+      limits_mm: [0, 1100]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: arm
+      axis: x
+      limits_mm: [0, 520]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: wrist_yaw
+      axis: z
+      limits_deg: [-75, 200]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: wrist_pitch
+      axis: y
+      limits_deg: [-90, 30]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: wrist_roll
+      axis: x
+      limits_deg: [-180, 180]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: gripper
+      axis: y
+      limits_deg: [0, 90]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: head_pan
+      axis: z
+      limits_deg: [-180, 90]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: head_tilt
+      axis: y
+      limits_deg: [-90, 30]
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: base_left_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: base_right_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+
+drivers:
+  - id: stretch
+    protocol: stretch_body
+    port: /dev/hello-motor-arm        # Hello Robot udev-aliased ports
+    model: RE2V0
+  - id: head_d435i
+    protocol: realsense
+    model: D435if
+  - id: wrist_d405
+    protocol: realsense
+    model: D405
+  - id: base_d435i
+    protocol: realsense
+    model: D435if
+
+capabilities:
+  - arm.pick
+  - arm.place
+  - arm.reach
+  - arm.home
+  - nav.go_to
+  - nav.stop
+  - nav.rotate
+  - head.look_at
+  - vision.describe
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_joint_velocity_dps: 90
+  max_linear_velocity_ms: 0.5          # Stretch's safe-cap for human-shared spaces
+  payload_kg: 1.5                      # Stretch 3 spec
+  workspace_bounds_m: [10, 10, 2]
+  estop:
+    hardware: true                     # runstop button on chassis
+    software: true
+    response_ms: 50
+  failsafe_behavior: stop
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+    - scope: mobile_base
+      require_auth: true
+    - scope: high_lift
+      require_auth: true               # full-extension lift can knock items off shelves
+
+body_hints:
+  identity: |
+    Stretch 3 — Hello Robot single-arm mobile manipulator with a
+    1100 mm-stroke vertical lift, a 520 mm-extension telescoping arm,
+    3-DoF wrist + gripper, 2-DoF pan/tilt head, and a differential-drive
+    base. Cameras: head + base RealSense D435if (RGB-D + nav), wrist
+    RealSense D405 (close-range RGB-D). Control via `stretch_body`
+    Python SDK or `stretch_ros2`.
+  capabilities: |
+    Pick/place from floor-to-shelf height (lift + arm-extension + wrist),
+    drive to a goal pose, look-at gestures with the pan/tilt head.
+    Telescoping arm + lift gives a tall reach envelope unusual for
+    consumer-priced mobile manipulators.
+  safety: |
+    Hardware runstop on chassis; software stop within 50 ms. Linear
+    base velocity capped at 0.5 m/s. The lift can extend through
+    eye-level — `high_lift` HITL gate exists because full-extension
+    motion near humans is non-obvious. Mobile-base motion always
+    routes through the `mobile_base` gate.

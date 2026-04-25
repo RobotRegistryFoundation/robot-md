@@ -7,6 +7,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Six new `robot-md init --preset` targets in
+  `cli/src/robot_md/presets/`. Brings the bundled count from 11 to 17:
+  - `reachy2` — Pollen Robotics open-source humanoid (bimanual 7-DoF
+    arms + 3-DoF Orbita neck + Zuuu holonomic mobile base + 4-camera
+    head/wrist stack). `physics.type: humanoid`. First preset to drive
+    the `reachy2_sdk` gRPC interface (port `50051`); same surface for
+    real robot and the `pollenrobotics/reachy2` Docker simulator.
+  - `stretch3` — Hello Robot Stretch 3 mobile manipulator (vertical
+    lift + telescoping arm + 3-DoF wrist + pan/tilt head + diff-drive
+    base + tri-RealSense vision). `physics.type: arm_manipulator`.
+  - `lekiwi` — HuggingFace LeRobot LeKiwi mobile manipulator (6-DoF
+    Feetech arm on a 3-omni-wheel holonomic base, single shared
+    Feetech bus). `physics.type: arm_manipulator`.
+  - `lego-spike-prime` — ported from `opencastor`'s
+    `config/presets/lego_spike_prime.rcan.yaml`. Differential-drive
+    classroom build over the SPIKE hub serial protocol.
+  - `lego-ev3` — ported from `opencastor`'s
+    `config/presets/lego_mindstorms_ev3.rcan.yaml`. Differential-drive
+    via `ev3dev` over SSH/RNDIS; common in second-hand classroom kits.
+  - `turtlebot3-burger` — ported from `opencastor`'s
+    `config/presets/turtlebot3_burger.rcan.yaml`. ROS 2 + LDS-01 lidar;
+    complements the existing `turtlebot4` preset.
+
+  All six pass the standard round-trip
+  (`robot-md init … --non-interactive | robot-md validate`).
+
 ---
 
 ## [1.1.1] — 2026-04-24

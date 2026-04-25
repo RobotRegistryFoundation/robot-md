@@ -1,0 +1,102 @@
+# robot-md preset — LEGO MINDSTORMS EV3 (legacy educational robot).
+# Ported from OpenCastor's lego_mindstorms_ev3.rcan.yaml.
+#
+# MINDSTORMS EV3 ships with the ev3dev Linux distribution and is the
+# pre-SPIKE generation of LEGO classroom robotics. Reference build:
+# 2 large motors on outA/outD for differential drive, medium motor on
+# outB for arm, touch/color/ultrasonic/gyro sensors on in1–in4. The
+# OpenCastor `ev3dev_driver` speaks `ev3dev_tacho_motor`/`ev3dev_sensor`
+# over an SSH/RNDIS link to the EV3 brick running ev3dev.
+
+match:
+  drivers:
+    protocol: ev3dev_tacho_motor
+  name_hints: ["ev3", "mindstorms", "lego"]
+
+physics:
+  type: wheeled
+  dof: 2
+  solver:
+    convention: custom                 # differential drive
+    base_frame: { up: z, forward: x }
+    encoder:
+      steps_per_rev: 360               # ev3dev tacho counts in degrees
+  kinematics:
+    - id: left_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+    - id: right_wheel
+      axis: y
+      length_mm: 0
+      a_mm: 0
+      d_mm: 0
+
+drivers:
+  - id: left_motor
+    protocol: ev3dev_tacho_motor
+    port: outA
+    model: lego-ev3-l-motor
+  - id: right_motor
+    protocol: ev3dev_tacho_motor
+    port: outD
+    model: lego-ev3-l-motor
+  - id: arm_motor
+    protocol: ev3dev_tacho_motor
+    port: outB
+    model: lego-ev3-m-motor
+  - id: touch_sensor
+    protocol: ev3dev_sensor
+    port: in1
+    model: lego-ev3-touch
+  - id: color_sensor
+    protocol: ev3dev_sensor
+    port: in2
+    model: lego-ev3-color
+  - id: ultrasonic_sensor
+    protocol: ev3dev_sensor
+    port: in3
+    model: lego-ev3-us
+  - id: gyro_sensor
+    protocol: ev3dev_sensor
+    port: in4
+    model: lego-ev3-gyro
+
+capabilities:
+  - nav.go_to
+  - nav.stop
+  - nav.rotate
+  - status.report
+
+safety:
+  p66_enabled: true
+  loa_enforcement: true
+  max_linear_velocity_ms: 0.4
+  workspace_bounds_m: [3, 3, 1]
+  estop:
+    hardware: false                    # EV3 has a brick button — software-mediated
+    software: true
+    response_ms: 200                   # ev3dev/SSH path is slower than USB-CDC
+  failsafe_behavior: stop
+  hitl_gates:
+    - scope: destructive
+      require_auth: true
+
+body_hints:
+  identity: |
+    LEGO MINDSTORMS EV3 — legacy educational robot brick running ev3dev
+    Linux. Reference build: differential drive (large motors outA/outD)
+    + arm (medium motor outB) + touch/color/ultrasonic/gyro sensors on
+    in1–in4. Wheel base ~130 mm, wheel radius ~28 mm. Common in school
+    surplus and second-hand markets.
+  capabilities: |
+    Navigate within a small workspace using differential drive. Touch
+    sensor for bump detection, color for line-following, ultrasonic for
+    obstacle distance, gyro for heading. Network link is SSH/RNDIS over
+    USB or WiFi dongle.
+  safety: |
+    No hardware E-stop. Software stop responds within ~200 ms (slower
+    than USB-direct platforms because commands traverse SSH/ev3dev).
+    Educational platform — supervise around fragile classroom equipment
+    and other students.
