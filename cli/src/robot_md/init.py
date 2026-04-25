@@ -284,7 +284,87 @@ def merge_preset_into_draft(
                 }
             )
 
+    _ensure_first_motion_defaults(fm)
     return fm
+
+
+# --- first-motion defaults --------------------------------------------------
+#
+# Scaffold the manifest fields that make a robot "first-motion ready" so an
+# operator running `robot-md init <preset>` doesn't discover blockers at first
+# motion. Mirrors the pre-flight checks in compliance_status.
+# _check_first_motion_readiness — what's checked there is what's defaulted here.
+#
+# Intentionally additive: if the preset declares a value, the default is NOT
+# applied. Operator-supplied values always win.
+
+_FIRST_MOTION_NAMESPACES_OBSERVATION = ("perceive", "perception", "status", "report", "observe")
+_FIRST_MOTION_ACTUATION_PROTOCOLS = ("feetech_scs", "feetech", "dynamixel", "ros2_control")
+_FIRST_MOTION_VISION_PROTOCOLS = ("oak_d_lr", "depthai", "realsense", "luxonis")
+_FIRST_MOTION_PICK_CAPABILITIES = ("manipulate.pick", "arm.pick", "nav.pick")
+_FIRST_MOTION_DEFAULT_VELOCITY_DPS = 30  # Conservative collaborative-arm budget
+
+
+def _ensure_first_motion_defaults(fm: dict[str, Any]) -> None:
+    """Fill in safety.hitl_gates, safety.max_joint_velocity_dps, and
+    vision.object_descriptors when the manifest's capabilities + drivers
+    imply they're needed and the operator/preset hasn't supplied them.
+    Mutates `fm` in place. Pure additive — never overrides existing values.
+    """
+    capabilities = fm.get("capabilities") or []
+    if not isinstance(capabilities, list):
+        return
+    drivers = fm.get("drivers") or []
+    if not isinstance(drivers, list):
+        drivers = []
+
+    safety = fm.setdefault("safety", {})
+
+    # 1. Default hitl_gates from declared motion namespaces.
+    motion_namespaces: list[str] = []
+    seen: set[str] = set()
+    for cap in capabilities:
+        if not isinstance(cap, str) or "." not in cap:
+            continue
+        ns = cap.split(".", 1)[0]
+        if ns in _FIRST_MOTION_NAMESPACES_OBSERVATION or ns in seen:
+            continue
+        motion_namespaces.append(ns)
+        seen.add(ns)
+    if motion_namespaces and not safety.get("hitl_gates"):
+        safety["hitl_gates"] = [{"scope": ns, "require_auth": True} for ns in motion_namespaces]
+
+    # 2. Default max_joint_velocity_dps when any actuation driver is declared.
+    has_actuation = any(
+        isinstance(d, dict) and d.get("protocol") in _FIRST_MOTION_ACTUATION_PROTOCOLS
+        for d in drivers
+    )
+    if has_actuation and "max_joint_velocity_dps" not in safety:
+        safety["max_joint_velocity_dps"] = _FIRST_MOTION_DEFAULT_VELOCITY_DPS
+
+    # 3. Default vision.object_descriptors placeholders when any *.pick
+    #    capability is declared. Two canonical placeholders (red_lego,
+    #    white_bowl) — enough that vision.find has SOME shape to resolve;
+    #    operator replaces with real targets.
+    has_pick = any(c in _FIRST_MOTION_PICK_CAPABILITIES for c in capabilities)
+    if has_pick:
+        vision = fm.setdefault("vision", {})
+        descriptors = vision.setdefault("object_descriptors", [])
+        if not descriptors:
+            descriptors.extend(
+                [
+                    {
+                        "id": "red_lego",
+                        "detector": "hsv",
+                        "params": {"h": [0, 10], "s": [120, 255], "v": [80, 255]},
+                    },
+                    {
+                        "id": "white_bowl",
+                        "detector": "hsv",
+                        "params": {"h": [0, 180], "s": [0, 60], "v": [180, 255]},
+                    },
+                ]
+            )
 
 
 def render_draft(

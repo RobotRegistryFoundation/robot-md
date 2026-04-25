@@ -75,3 +75,90 @@ def test_valid_minimal_has_summary(fixtures_dir):
     result = validate(parsed)
     assert result.summary
     assert "test-bot" in result.summary
+
+
+# ---- capability namespace alignment warning (PR D, 2026-04-25) ----------
+
+
+def test_namespace_mismatch_warning_on_manipulate_with_feetech(tmp_path):
+    """Bob's actual hand-rolled gap: capabilities declare manipulate.* but
+    feetech_scs driver implements arm.*. Validation should warn — not fail
+    the schema (it's a runtime-time issue, not a schema violation)."""
+    p = tmp_path / "ROBOT.md"
+    p.write_text("""\
+---
+rcan_version: "3.2"
+metadata:
+  robot_name: bob
+  manufacturer: Acme
+  model: SO-ARM101
+  firmware_version: 1.0.0
+physics: { type: arm, dof: 6 }
+drivers:
+  - { id: arm, protocol: feetech_scs, port: /dev/null }
+capabilities: [manipulate.pick]
+safety:
+  estop: { software: true, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates: [{ scope: manipulate, require_auth: true }]
+---
+# bob
+
+## Identity
+
+bob.
+
+## What bob Can Do
+
+stuff.
+
+## Safety Gates
+
+manipulate.
+""")
+    result = validate(parse_file(p))
+    assert result.code == VALID, (
+        f"expected VALID + warning; got code={result.code} errors={result.errors}"
+    )
+    assert any("namespace mismatch" in w.lower() for w in result.warnings), (
+        f"expected namespace-mismatch warning; got {result.warnings}"
+    )
+
+
+def test_no_namespace_mismatch_warning_when_aligned(tmp_path):
+    """capabilities = arm.* with feetech_scs driver → no warning."""
+    p = tmp_path / "ROBOT.md"
+    p.write_text("""\
+---
+rcan_version: "3.2"
+metadata:
+  robot_name: bob
+  manufacturer: Acme
+  model: SO-ARM101
+  firmware_version: 1.0.0
+physics: { type: arm, dof: 6 }
+drivers:
+  - { id: arm, protocol: feetech_scs, port: /dev/null }
+capabilities: [arm.pick, arm.home]
+safety:
+  estop: { software: true, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates: [{ scope: arm, require_auth: true }]
+---
+# bob
+
+## Identity
+
+bob.
+
+## What bob Can Do
+
+pick + home.
+
+## Safety Gates
+
+arm.
+""")
+    result = validate(parse_file(p))
+    assert result.code == VALID
+    assert not any("namespace mismatch" in w.lower() for w in result.warnings)

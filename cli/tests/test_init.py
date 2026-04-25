@@ -256,3 +256,128 @@ def test_so_arm101_preset_ships_object_descriptors(presets):
     bowl = next(d for d in descs if d["id"] == "white_bowl")
     assert bowl["detector"] == "hsv_roi"
     assert "roi" in bowl["params"]
+
+
+# ---- first-motion defaults (PR D, 2026-04-25) ----------------------------
+
+
+class _Scan:
+    devices: list = []
+    cameras: list = []
+
+
+def _bare_preset(**data) -> Preset:
+    """Tiny synthetic preset for unit-testing first-motion defaults without
+    touching the bundled presets."""
+    return Preset(name="bare", match={}, data=data)
+
+
+def test_first_motion_defaults_scaffold_hitl_gates_from_motion_capabilities():
+    """capabilities=[manipulate.pick] with no preset gates → init scaffolds
+    one gate per motion namespace with require_auth=true."""
+    preset = _bare_preset(
+        physics={"type": "arm", "dof": 6},
+        drivers=[{"id": "arm", "protocol": "feetech_scs"}],
+        capabilities=["manipulate.pick", "manipulate.place", "perceive.rgb"],
+        safety={"estop": {"software": True, "response_ms": 50}},
+    )
+    fm = merge_preset_into_draft(preset, "bot", _Scan())
+    gates = fm["safety"]["hitl_gates"]
+    scopes = [g["scope"] for g in gates]
+    assert "manipulate" in scopes
+    # observation namespace excluded
+    assert "perceive" not in scopes
+    assert all(g["require_auth"] is True for g in gates)
+
+
+def test_first_motion_defaults_does_not_override_preset_hitl_gates():
+    """Operator/preset gates win — defaults are additive only."""
+    preset = _bare_preset(
+        physics={"type": "arm", "dof": 6},
+        drivers=[{"id": "arm", "protocol": "feetech_scs"}],
+        capabilities=["manipulate.pick"],
+        safety={
+            "estop": {"software": True, "response_ms": 50},
+            "hitl_gates": [{"scope": "destructive", "require_auth": True}],
+        },
+    )
+    fm = merge_preset_into_draft(preset, "bot", _Scan())
+    gates = fm["safety"]["hitl_gates"]
+    # Original preset gate is preserved verbatim
+    assert gates == [{"scope": "destructive", "require_auth": True}]
+
+
+def test_first_motion_defaults_velocity_limit_from_actuation_driver():
+    """Any feetech_scs / dynamixel / ros2_control driver triggers a default
+    safety.max_joint_velocity_dps when none is declared."""
+    preset = _bare_preset(
+        physics={"type": "arm", "dof": 6},
+        drivers=[{"id": "arm", "protocol": "feetech_scs"}],
+        capabilities=["arm.home"],
+        safety={"estop": {"software": True, "response_ms": 50}},
+    )
+    fm = merge_preset_into_draft(preset, "bot", _Scan())
+    assert fm["safety"]["max_joint_velocity_dps"] == 30
+
+
+def test_first_motion_defaults_does_not_override_preset_velocity_limit():
+    preset = _bare_preset(
+        physics={"type": "arm", "dof": 6},
+        drivers=[{"id": "arm", "protocol": "feetech_scs"}],
+        capabilities=["arm.home"],
+        safety={
+            "estop": {"software": True, "response_ms": 50},
+            "max_joint_velocity_dps": 180,
+        },
+    )
+    fm = merge_preset_into_draft(preset, "bot", _Scan())
+    assert fm["safety"]["max_joint_velocity_dps"] == 180
+
+
+def test_first_motion_defaults_descriptors_from_pick_capability():
+    """capabilities include arm.pick or manipulate.pick → object_descriptors
+    placeholder seeded if none declared."""
+    preset = _bare_preset(
+        physics={"type": "arm", "dof": 6},
+        drivers=[{"id": "arm", "protocol": "feetech_scs"}],
+        capabilities=["manipulate.pick", "manipulate.place"],
+        safety={"estop": {"software": True, "response_ms": 50}},
+    )
+    fm = merge_preset_into_draft(preset, "bot", _Scan())
+    ids = {d["id"] for d in fm["vision"]["object_descriptors"]}
+    assert "red_lego" in ids
+    assert "white_bowl" in ids
+
+
+def test_first_motion_defaults_does_not_override_preset_descriptors():
+    """If preset already declares descriptors, init keeps them verbatim."""
+    preset = _bare_preset(
+        physics={"type": "arm", "dof": 6},
+        drivers=[{"id": "arm", "protocol": "feetech_scs"}],
+        capabilities=["arm.pick"],
+        vision={
+            "object_descriptors": [
+                {"id": "blue_block", "detector": "hsv", "params": {"h": [200, 240]}}
+            ]
+        },
+        safety={"estop": {"software": True, "response_ms": 50}},
+    )
+    fm = merge_preset_into_draft(preset, "bot", _Scan())
+    ids = {d["id"] for d in fm["vision"]["object_descriptors"]}
+    assert ids == {"blue_block"}
+
+
+def test_first_motion_defaults_inert_for_sensor_only_preset():
+    """Pure observation preset (no motion namespaces, no actuation driver,
+    no .pick capability) → defaults add nothing."""
+    preset = _bare_preset(
+        physics={"type": "sensor", "dof": 0},
+        drivers=[{"id": "temp", "protocol": "i2c"}],
+        capabilities=["perceive.temperature"],
+        safety={"estop": {"software": True, "response_ms": 50}},
+    )
+    fm = merge_preset_into_draft(preset, "thermo", _Scan())
+    safety = fm["safety"]
+    assert "hitl_gates" not in safety, "no motion namespaces — should not add gates"
+    assert "max_joint_velocity_dps" not in safety, "no actuator — should not add velocity limit"
+    assert "vision" not in fm, "no .pick — should not add descriptors"

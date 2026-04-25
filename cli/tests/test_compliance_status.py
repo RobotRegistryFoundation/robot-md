@@ -38,6 +38,9 @@ drivers:
   - { id: arm, protocol: feetech, port: /dev/null }
 safety:
   estop: { software: true, hardware: false, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates:
+    - { scope: navigate, require_auth: true }
 capabilities: [navigate]
 ---
 # bob
@@ -90,6 +93,7 @@ def test_status_has_all_top_level_sections(manifest, home):
         "artifacts",
         "registry",
         "submission_readiness",
+        "first_motion_readiness",
         "blockers",
     ):
         assert k in s, f"missing section: {k}"
@@ -261,3 +265,183 @@ def test_format_text_no_blockers_when_clean(manifest, home, tmp_path):
 
     s = gather_status(manifest, artifacts_dir=artifacts_dir, network_probe=False)
     assert s["blockers"] == []
+
+
+# ---- first-motion readiness ---------------------------------------------
+
+
+BOB_NOT_READY = """\
+---
+rcan_version: "3.2"
+metadata:
+  robot_name: bob
+  manufacturer: Acme
+  model: SO-ARM101
+  firmware_version: 1.0.0
+  rrn: RRN-000000000077
+network:
+  rrf_endpoint: https://robotregistryfoundation.org
+physics:
+  type: arm
+  dof: 6
+drivers:
+  - { id: arm, protocol: feetech_scs, port: /dev/null }
+  - { id: vision, protocol: oak_d_lr, connection: usb }
+capabilities:
+  - manipulate.pick
+  - manipulate.place
+safety:
+  estop: { software: true, response_ms: 50 }
+---
+# bob (not first-motion-ready)
+"""
+
+
+@pytest.fixture
+def bob_not_ready(tmp_path: Path) -> Path:
+    p = tmp_path / "ROBOT_NOT_READY.md"
+    p.write_text(BOB_NOT_READY)
+    return p
+
+
+def test_first_motion_readiness_section_present(manifest, home):
+    s = gather_status(manifest, network_probe=False)
+    fmr = s["first_motion_readiness"]
+    assert "applies" in fmr
+    assert "ready" in fmr
+    assert "checks" in fmr
+    for cid in (
+        "hitl_gates",
+        "max_joint_velocity_dps",
+        "object_descriptors",
+        "camera_extrinsic",
+        "capability_namespace",
+    ):
+        assert cid in fmr["checks"], f"missing first-motion check: {cid}"
+
+
+def test_first_motion_readiness_clean_for_well_formed_manifest(manifest, home):
+    """BOB_MIN has gates + velocity-limit + only `navigate` cap (no .pick) +
+    no vision driver → all 5 checks pass."""
+    s = gather_status(manifest, network_probe=False)
+    fmr = s["first_motion_readiness"]
+    assert fmr["ready"] is True
+    for cid, c in fmr["checks"].items():
+        assert c["ok"] is True, f"{cid} unexpectedly not ok: {c}"
+
+
+def test_first_motion_readiness_flags_bobs_actual_gaps(bob_not_ready, home):
+    """The exact 5 gaps bob's hand-rolled manifest exposed on 2026-04-25."""
+    s = gather_status(bob_not_ready, network_probe=False)
+    fmr = s["first_motion_readiness"]
+    assert fmr["applies"] is True
+    assert fmr["ready"] is False
+
+    checks = fmr["checks"]
+    # 1. No hitl_gates declared with motion capabilities
+    assert checks["hitl_gates"]["ok"] is False
+    assert "hitl_gates" in checks["hitl_gates"]["detail"].lower()
+    # 2. Actuation driver but no max_joint_velocity_dps
+    assert checks["max_joint_velocity_dps"]["ok"] is False
+    assert "max_joint_velocity_dps" in checks["max_joint_velocity_dps"]["detail"]
+    # 3. *.pick declared but no descriptors
+    assert checks["object_descriptors"]["ok"] is False
+    assert "descriptor" in checks["object_descriptors"]["detail"].lower()
+    # 4. Vision driver but no extrinsic
+    assert checks["camera_extrinsic"]["ok"] is False
+    assert "extrinsic" in checks["camera_extrinsic"]["detail"].lower()
+    # 5. manipulate.* capabilities but feetech_scs implements arm.*
+    assert checks["capability_namespace"]["ok"] is False
+    assert "manipulate" in checks["capability_namespace"]["detail"]
+
+
+def test_first_motion_readiness_bubbles_to_blockers(bob_not_ready, home):
+    s = gather_status(bob_not_ready, network_probe=False)
+    blocker_text = "\n".join(s["blockers"])
+    for cid in (
+        "hitl_gates",
+        "max_joint_velocity_dps",
+        "object_descriptors",
+        "camera_extrinsic",
+        "capability_namespace",
+    ):
+        assert cid in blocker_text, f"first-motion check {cid} not aggregated into blockers"
+
+
+def test_first_motion_readiness_does_not_apply_for_pure_sensor_manifest(tmp_path, home):
+    """A manifest with no actuation driver, no motion capabilities, no
+    vision driver should not surface first-motion blockers — fmr.applies=False."""
+    sensor_only = tmp_path / "ROBOT_sensor.md"
+    sensor_only.write_text("""\
+---
+rcan_version: "3.2"
+metadata:
+  robot_name: lonely-thermometer
+  manufacturer: Acme
+  model: probe
+  firmware_version: 1.0.0
+physics: { type: sensor, dof: 0 }
+drivers:
+  - { id: temp, protocol: i2c, port: /dev/null }
+safety:
+  estop: { software: true, response_ms: 50 }
+capabilities: [perceive.temperature]
+---
+""")
+    s = gather_status(sensor_only, network_probe=False)
+    fmr = s["first_motion_readiness"]
+    assert fmr["applies"] is False, "pure-sensor manifest should not trigger first-motion checks"
+
+
+def test_first_motion_readiness_passes_when_all_5_gaps_filled(tmp_path, home):
+    ready = tmp_path / "ROBOT_ready.md"
+    ready.write_text("""\
+---
+rcan_version: "3.2"
+metadata:
+  robot_name: ready-bob
+  manufacturer: Acme
+  model: SO-ARM101
+  firmware_version: 1.0.0
+  rrn: RRN-000000000088
+network:
+  rrf_endpoint: https://robotregistryfoundation.org
+physics:
+  type: arm
+  dof: 6
+  solver:
+    cameras:
+      - driver_id: cam
+        primary_stream: rgb
+        mount: world
+        extrinsic: { R: [[1,0,0],[0,1,0],[0,0,1]], t: [0.0, 0.0, 0.5] }
+drivers:
+  - { id: arm, protocol: feetech_scs, port: /dev/null }
+  - { id: vision, protocol: oak_d_lr, connection: usb }
+vision:
+  object_descriptors:
+    - { id: red_lego, detector: hsv, params: { h: [0, 10] } }
+capabilities:
+  - arm.pick
+  - arm.place
+  - perceive.rgb
+safety:
+  estop: { software: true, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates:
+    - { scope: arm, require_auth: true }
+---
+""")
+    s = gather_status(ready, network_probe=False)
+    fmr = s["first_motion_readiness"]
+    assert fmr["applies"] is True
+    assert fmr["ready"] is True, f"expected ready=True; checks: {fmr['checks']}"
+
+
+def test_format_text_includes_first_motion_section(bob_not_ready, home):
+    s = gather_status(bob_not_ready, network_probe=False)
+    out = format_status_text(s)
+    assert "First-motion readiness" in out
+    # Each failed check shows its fix line
+    assert "hitl_gates" in out
+    assert "extrinsic" in out

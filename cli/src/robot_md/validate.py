@@ -99,6 +99,41 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
                 f"run `robot-md calibrate-intrinsic --driver {did} --stream {primary}`"
             )
 
+    # 1d. Capability namespace alignment with declared drivers. Warn when
+    # capabilities[] contains motion namespaces that none of the declared
+    # drivers implement — every dispatch through that namespace would
+    # return not_implemented at runtime. See compliance_status.
+    # MOTION_CAPABILITY_NAMESPACES + BACKEND_NAMESPACES for the canonical
+    # set; mirrored here to avoid a circular import.
+    motion_namespaces = {"manipulate", "arm", "nav", "navigate", "move"}
+    driver_namespace_map = {
+        "feetech_scs": ("arm", "status"),
+        "feetech": ("arm", "status"),
+        "feetech_depthai": ("arm", "perceive", "status"),
+        "oak_d_lr": ("perceive",),
+        "depthai": ("perceive",),
+        "dynamixel": ("arm", "status"),
+        "ros2_control": ("arm", "nav", "navigate", "status"),
+    }
+    capabilities = fm.get("capabilities") or []
+    if isinstance(capabilities, list):
+        declared_motion_ns = {
+            c.split(".", 1)[0]
+            for c in capabilities
+            if isinstance(c, str) and "." in c and c.split(".", 1)[0] in motion_namespaces
+        }
+        supplied_ns: set[str] = set()
+        for d in fm.get("drivers") or []:
+            if isinstance(d, dict):
+                for ns in driver_namespace_map.get(d.get("protocol"), ()):
+                    supplied_ns.add(ns)
+        if declared_motion_ns and supplied_ns and declared_motion_ns.isdisjoint(supplied_ns):
+            warnings.append(
+                f"capability namespace mismatch: capabilities declare "
+                f"{sorted(declared_motion_ns)} but declared driver(s) implement "
+                f"{sorted(supplied_ns)} — execute_capability will return not_implemented"
+            )
+
     # 2. Body-section checks
     robot_name = fm.get("metadata", {}).get("robot_name", "")
     if not _has_matching_h1(body, robot_name):
