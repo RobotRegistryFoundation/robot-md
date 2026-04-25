@@ -515,6 +515,13 @@ def default_flow(
         _print_tally(results, out_path)
         return 2  # only fatal exit path
 
+    # Phase 1.5: scaffold scripts/ + compliance/ alongside the manifest.
+    # EU AI Act evidence has to live somewhere reproducible — emit-* artifacts
+    # land in compliance/, the parameterized demo lives in scripts/. Idempotent.
+    from robot_md.init_phases import phase_compliance_scaffold
+
+    results.append(phase_compliance_scaffold(out_path))
+
     # Phase 2: register (opt-in). Runs BEFORE the first CLAUDE.md refresh so
     # a successful mint's RRN lands in the generated CLAUDE.md on first write.
     if do_register:
