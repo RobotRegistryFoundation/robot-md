@@ -1423,17 +1423,17 @@
     <div class="C-eyebrow">
       <span>§ Getting started · one line</span>
       <span class="line"></span>
-      <span>APRIL 21, 2026</span>
+      <span>APRIL 24, 2026 · v1.1.1 · peer runtimes live · full §22–26 compliance live</span>
     </div>
     <h1 class="C-head">
       Configure your robot for <em>Claude Code</em>.<br>
-      <b>One file. One robot.</b>
+      <b>One file. One robot. Many peer runtimes.</b>
     </h1>
 
     <div class="C-term" id="termC">
       <div class="C-term-head">
         <div class="bulbs"><i></i><i></i><i></i></div>
-        <span class="path">~/bob · robot-md v0.6.3</span>
+        <span class="path">~/bob · robot-md v1.1.1</span>
         <span class="tag">● install the plugin · ask Claude · manifest + RRN + calibration through one conversation</span>
       </div>
       <div class="C-term-body" id="termCBody">
@@ -1509,9 +1509,9 @@
 
   <!-- ================= QUICKSTART ================= -->
   <div class="wrap" style="padding-top:40px; padding-bottom:40px; border-top:1px solid var(--rule)">
-    <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; font-size:11px; text-transform:uppercase; font-family:var(--mono); margin-bottom:8px">Quickstart · four surfaces, one file</div>
-    <h2 class="sec-title" style="margin-bottom:8px">Install the plugin. Pick a surface. Ask Claude.</h2>
-    <p class="sec-lede" style="margin-bottom:24px">The Claude Code plugin is the recommended entry point — install once, and Claude handles <code>robot-md init</code>, registration, and calibration through the <code>using-robot-md</code> skill. Every surface reads the same <code>ROBOT.md</code> + <code>RRN</code>. Prefer a terminal? <code>pip install robot-md &amp;&amp; robot-md init</code> is the supported alternative.</p>
+    <div style="color:var(--accent); font-weight:600; letter-spacing:.18em; font-size:11px; text-transform:uppercase; font-family:var(--mono); margin-bottom:8px">Quickstart · six surfaces, one file</div>
+    <h2 class="sec-title" style="margin-bottom:8px">Install. Pick a surface. Ask.</h2>
+    <p class="sec-lede" style="margin-bottom:24px">The Claude Code plugin is the recommended entry point — install once, and Claude handles <code>robot-md init</code>, registration, and calibration through the <code>using-robot-md</code> skill. Every surface reads the same <code>ROBOT.md</code> + <code>RRN</code>. As of 2026-04-24, Gemini CLI and OpenAI Codex CLI are verified as native MCP hosts too. Prefer a terminal? <code>pip install robot-md &amp;&amp; robot-md init</code> is the supported alternative.</p>
 
     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:16px">
       <!-- Claude Code -->
@@ -1558,9 +1558,31 @@
         </div>
         <p style="margin-top:12px; font-size:13px; color:var(--ink-4); line-height:1.5">No MCP, no Actions, no self-hosting. Custom GPT reads the RRF-hosted manifest + <code>CLAUDE.md</code>. Upgrade to OpenAPI Actions later if you want live <code>validate</code>/<code>render</code> calls.</p>
       </div>
+
+      <!-- Gemini CLI -->
+      <div style="padding:18px; background:var(--paper-2); border-left:3px solid var(--accent)">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">Gemini CLI · native MCP</div>
+        <div style="font-family:var(--mono); font-size:13px; line-height:1.75; color:var(--ink-2)">
+          <div><span style="color:var(--ink-4)">$</span> <span style="color:var(--accent-ink)">gemini mcp add robot-md npx \</span></div>
+          <div style="padding-left:12px; color:var(--accent-ink)">-- --yes robot-md-mcp ./ROBOT.md</div>
+          <div><span style="color:var(--ink-4)">$</span> gemini mcp list <span style="color:var(--ink-4)"># verify Connected</span></div>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--ink-4); line-height:1.5">Verified on Gemini CLI 0.34.0. Same 6 resources + 3 tools. Project-scoped by default; pass <code>--scope user</code> for global. JSON config at <code>~/.gemini/settings.json</code>.</p>
+      </div>
+
+      <!-- OpenAI Codex CLI -->
+      <div style="padding:18px; background:var(--paper-2); border-left:3px solid var(--accent)">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">OpenAI Codex CLI · native MCP</div>
+        <div style="font-family:var(--mono); font-size:13px; line-height:1.75; color:var(--ink-2)">
+          <div><span style="color:var(--ink-4)">$</span> <span style="color:var(--accent-ink)">codex mcp add robot-md \</span></div>
+          <div style="padding-left:12px; color:var(--accent-ink)">-- npx --yes robot-md-mcp ./ROBOT.md</div>
+          <div><span style="color:var(--ink-4)">$</span> codex mcp list <span style="color:var(--ink-4)"># verify enabled</span></div>
+        </div>
+        <p style="margin-top:12px; font-size:13px; color:var(--ink-4); line-height:1.5">Verified on <code>@openai/codex</code> 0.125.0. Always global; TOML config at <code>~/.codex/config.toml</code>. Tool calls need <code>--dangerously-bypass-approvals-and-sandbox</code> until Codex relaxes its default sandbox.</p>
+      </div>
     </div>
 
-    <p style="margin-top:20px; font-size:13px; color:var(--ink-4)">Same <code>ROBOT.md</code>, one identity via <code>RRN</code>, every planner reads it. No provider lock-in — any MCP-aware agent (Cursor, Zed, Continue, Gemini CLI, Codex CLI) uses the same server; any web-browsing LLM reads the RRF URL.</p>
+    <p style="margin-top:20px; font-size:13px; color:var(--ink-4)">Same <code>ROBOT.md</code>, one identity via <code>RRN</code>, every planner reads it. No provider lock-in — Gemini CLI and Codex CLI verified above; any other MCP-aware agent (Cursor, Zed, Continue) uses the same <code>npx robot-md-mcp</code> entry; any web-browsing LLM reads the RRF URL. Compatibility status tracked in <a href="https://github.com/RobotRegistryFoundation/robot-md-surfaces" style="color:var(--accent-ink)">robot-md-surfaces</a>.</p>
   </div>
 
   <!-- ================= §01 THE FILE ================= -->
@@ -1685,11 +1707,13 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <div class="stack-row" role="row">
           <div class="layer"><span>Layer 4 · Declaration</span><b>ROBOT.md</b></div>
           <div class="cell"><span class="tag on">This spec</span>YAML + markdown. One file at the robot's root. Read at
-            session start by the planner; consumed by every layer below.</div>
+            session start by the planner; consumed by every layer below. <b>New:</b> <code
+              style="font-family:var(--mono)">agent.runtimes[]</code> declares multiple peer runtimes
+            (robot-md + opencastor) in one manifest — the planner can hot-swap between them.</div>
           <div class="cell"><span class="tag">Format</span>Frontmatter validated by JSON Schema draft 2020‑12. Body read
             by Claude Code, Desktop, Mobile.</div>
-          <div class="cell"><span class="tag">Status</span>Draft v1 shipped 2026‑04‑21. v1.0 frozen spec targeted Q3
-            2026.</div>
+          <div class="cell"><span class="tag">Status</span>Draft v1 shipped 2026‑04‑21. CLI at <b>1.1.1</b> on PyPI
+            (2026‑04‑24). v1.0 frozen spec targeted Q3 2026.</div>
         </div>
 
         <div class="stack-row primary" role="row">
@@ -1710,26 +1734,32 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
           <div class="cell"><span class="tag">Identity</span>Assigns an RRN — a permanent, globally‑unique robot
             identifier. Mint with one command: <code
               style="font-family:var(--mono);color:var(--accent-ink)">robot-md register ROBOT.md</code>. Resolvable via
-            <code style="font-family:var(--mono)">rrn://</code> URIs.
+            <code style="font-family:var(--mono)">rrn://</code> URIs. <b>Bob</b>, a Raspberry Pi 5 + SO‑ARM101,
+            is live as <b>RRN‑000000000002</b> with a reproducible hot‑swap demo between peer runtimes.
           </div>
-          <div class="cell"><span class="tag">Neutral</span>A foundation, not a vendor. Cloudflare Pages + Workers + D1.
-            No seat fees, no per‑robot tax.</div>
+          <div class="cell"><span class="tag">Compliance</span>All five RCAN §22–26 endpoints live (2026‑04‑24):
+            FRIA, safety benchmark, IFU Art. 13(3), incident report Art. 72, and per‑model EU Register Art. 49.
+            Neutral foundation; Cloudflare Pages + Workers + D1. No seat fees.</div>
           <div class="cell"><span class="tag">Public</span>Public endpoint at <code
               style="font-family:var(--mono)">rcan.dev/r/&lt;rrn&gt;</code>. Self‑hosted mode supported.</div>
         </div>
 
         <div class="stack-row" role="row">
-          <div class="layer"><span>Layer 1 · Runtime</span><b>Claude Code is enough. OpenCastor for harness authoring
-              &amp; swarms.</b></div>
-          <div class="cell"><span class="tag on">Tier 0</span><b>Claude Code is already a runtime.</b> Drop
+          <div class="layer"><span>Layer 1 · Runtime</span><b>Peer runtimes. Interactive or dispatched.</b></div>
+          <div class="cell"><span class="tag on">Tier 0–1</span><b>Claude Code is already a runtime.</b> Drop
             <code>ROBOT.md</code> in a repo with shell access to your robot — USB, serial, HTTP, MQTT — and the Bash
-            tool dispatches. No SDK to install.
+            tool dispatches. No SDK to install. Add your own driver scripts for sub‑second loops; still no
+            "runtime" in the traditional sense, just Claude plus the scripts you'd write anyway.
           </div>
-          <div class="cell"><span class="tag">Tier 1</span>Add your own driver scripts for sub‑second loops. Still no
-            "runtime" in the traditional sense — just Claude plus the scripts you'd write anyway.</div>
-          <div class="cell"><span class="tag">Tier 2</span><b>OpenCastor</b> — a visual agent-harness editor plus
-            multi-robot swarm orchestration. ROBOT.md is its native robot format, but Claude Code reads the same file
-            standalone. Opt-in when you need to compose harnesses visually or run a fleet.</div>
+          <div class="cell"><span class="tag">Peer runtimes</span><b>robot-md</b> and <b>OpenCastor 3.0</b> are
+            now first‑class peers under <code style="font-family:var(--mono)">agent.runtimes[]</code>. Same
+            manifest, same RRN — the planner picks which one drives. OpenCastor adds a visual agent‑harness editor
+            plus multi‑robot swarm orchestration; Claude Code reads the same file standalone.</div>
+          <div class="cell"><span class="tag">Remote dispatch</span><b>robot-md-dispatcher</b> (new, 2026‑04‑24)
+            lets a Slack bot, cron job, phone, or other agent hand the robot a task from outside the LAN. The
+            Claude Agent SDK runs on the robot host — only goals and results cross the network. BYOK billing,
+            tier‑gated auth, default‑deny policy. Provision from inside Claude Code with <code
+              style="font-family:var(--mono);color:var(--accent-ink)">/enable-dispatch</code>.</div>
         </div>
       </div>
 
@@ -1765,6 +1795,9 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
               <code>metadata.manufacturer/model/version/device_id</code>, POSTs to RRF, and writes the assigned RRN back
               into the file.
             </li>
+            <li><b>All five RCAN §22–26 compliance endpoints live as of 2026‑04‑24</b> — FRIA (§22),
+              safety benchmark (§23), IFU Art. 13(3) (§24), incident report Art. 72 (§25), and per‑model
+              EU Register Art. 49 (§26). Bob (RRN‑000000000002) is queued as the first producer.</li>
             <li>Edge‑served via Cloudflare Pages + Workers + D1. Zero downtime at the identifier layer.</li>
             <li>Foundation‑governed, not vendor‑owned. Self‑hosted mode for private fleets.</li>
             <li>RRF is the authority ROBOT.md points at when <code>metadata.rrn_uri</code> is populated.</li>
@@ -2314,11 +2347,12 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
       <div class="sec-head">
         <div class="sec-num">§ 06 — The rest of the ecosystem</div>
         <div>
-          <h2 class="sec-title">Four standards. Separate roles.</h2>
+          <h2 class="sec-title">Five pieces. Separate roles.</h2>
           <p class="sec-lede">ROBOT.md is designed to configure Claude Code to control a single robot. To ensure safety
             and verifiable identity, it depends on two independent foundations: <b>RCAN</b> (the signed wire protocol)
-            and the <b>Robot Registry Foundation</b> (permanent identity). <b>OpenCastor</b> (visual agent-harness
-            editor + swarm orchestration) is completely optional.</p>
+            and the <b>Robot Registry Foundation</b> (permanent identity). <b>OpenCastor 3.0</b> is now a first‑class
+            peer runtime, not an alternative. <b>robot-md-dispatcher</b> (new) handles non‑interactive dispatch
+            — the answer for cron jobs, Slack bots, phones, and other agents handing the robot a task from outside.</p>
         </div>
       </div>
 
@@ -2348,12 +2382,25 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
           <a href="https://robotregistryfoundation.org">robotregistryfoundation.org →</a>
         </div>
         <div class="eco">
-          <h5>Agent harness · opencastor.com</h5>
-          <b>OpenCastor</b>
-          <p>Optional. Visual editor for Claude agent harnesses plus multi-robot swarm orchestration. Compose MCP
-            stacks, wire tools, scale from one robot to a fleet. ROBOT.md is its native robot format — but Claude Code
-            reads the same file standalone. Pick it up when you outgrow a single terminal.</p>
+          <h5>Peer runtime · opencastor.com</h5>
+          <b>OpenCastor 3.0</b>
+          <p>A peer runtime, not an alternative. Declared alongside <code>robot-md</code> in
+            <code style="font-family:var(--mono)">agent.runtimes[]</code> in the same ROBOT.md; the planner can
+            hot-swap between them. Adds a visual editor for Claude agent harnesses plus multi-robot swarm
+            orchestration. Ships on PyPI as <code>opencastor 3.0.1</code> (2026‑04‑24).</p>
           <a href="https://github.com/craigm26/OpenCastor">github.com/craigm26/OpenCastor →</a>
+        </div>
+        <div class="eco">
+          <h5>Remote dispatch · new</h5>
+          <b>robot-md-dispatcher</b>
+          <p>BYOK Claude Agent SDK dispatcher that runs on the robot host. Accepts natural-language goals over HTTP,
+            consumes <code>robot-md-mcp</code> unchanged, and keeps reasoning + sensor data on-LAN — only goals and
+            results cross the network. Default-deny tier gate, audit log, hardened systemd unit. Provision
+            from inside Claude Code with <code
+              style="font-family:var(--mono);color:var(--accent-ink)">/enable-dispatch</code>.</p>
+          <a
+            href="https://github.com/RobotRegistryFoundation/robot-md-dispatcher">github.com/RobotRegistryFoundation/robot-md-dispatcher
+            →</a>
         </div>
       </div>
     </div>
