@@ -326,6 +326,14 @@ def emit_benchmarks(
         help="Sign with the v0.9.1 hybrid keypair from ~/.robot-md/keys/<rrn>.signing.json. "
         "Manifest must have metadata.rrn set.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the artifact to RRF /v2/robots/<rrn>/safety-benchmark after emit.",
+    ),
+    api_key: str | None = typer.Option(
+        None, "--api-key", help="Override apikey for --submit."
+    ),
 ) -> None:
     """Emit rcan-safety-benchmark-v1 artifact (rcan-spec §23) for this robot.
 
@@ -347,11 +355,11 @@ def emit_benchmarks(
 
     artifact = build_artifact(path, iterations=iterations)
 
-    if sign:
-        from robot_md.parser import parse_file as _parse
+    from robot_md.parser import parse_file as _parse
+    parsed = _parse(path)
+    rrn = str((parsed.frontmatter.get("metadata") or {}).get("rrn") or "").strip()
 
-        parsed = _parse(path)
-        rrn = str((parsed.frontmatter.get("metadata") or {}).get("rrn") or "").strip()
+    if sign:
         if not rrn:
             typer.secho(
                 "error: --sign requires metadata.rrn in the manifest. "
@@ -365,6 +373,8 @@ def emit_benchmarks(
         except RuntimeError as e:
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
+
+    _maybe_submit(artifact, rrn=rrn, kind="safety-benchmark", do_submit=submit, api_key=api_key)
 
     out = _json.dumps(artifact, indent=2)
     if output is None:
@@ -404,6 +414,14 @@ def emit_ifu(
         "--sign",
         help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the artifact to RRF /v2/robots/<rrn>/ifu after emit.",
+    ),
+    api_key: str | None = typer.Option(
+        None, "--api-key", help="Override apikey for --submit."
+    ),
 ) -> None:
     """Emit an rcan-ifu-v1 (Art. 13(3) Instructions for Use) artifact.
 
@@ -428,8 +446,9 @@ def emit_ifu(
         lifetime=lifetime,
     )
 
+    rrn = artifact["provider_identity"]["rrn"].strip()
+
     if sign:
-        rrn = artifact["provider_identity"]["rrn"].strip()
         if not rrn:
             typer.secho(
                 "error: --sign requires metadata.rrn in the manifest. "
@@ -443,6 +462,8 @@ def emit_ifu(
         except RuntimeError as e:
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
+
+    _maybe_submit(artifact, rrn=rrn, kind="ifu", do_submit=submit, api_key=api_key)
 
     out = _json.dumps(artifact, indent=2)
     if output is None:
@@ -666,6 +687,14 @@ def emit_eu_register(
         "--sign",
         help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the artifact to RRF /v2/robots/<rrn>/eu-register after emit.",
+    ),
+    api_key: str | None = typer.Option(
+        None, "--api-key", help="Override apikey for --submit."
+    ),
 ) -> None:
     """Emit an rcan-eu-register-v1 Art. 49 submission package.
 
@@ -689,13 +718,16 @@ def emit_eu_register(
         typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
         raise typer.Exit(code=2) from e
 
+    rrn = artifact["system"]["rrn"]
+
     if sign:
-        rrn = artifact["system"]["rrn"]
         try:
             artifact = sign_artifact(artifact, rrn=rrn)
         except RuntimeError as e:
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
+
+    _maybe_submit(artifact, rrn=rrn, kind="eu-register", do_submit=submit, api_key=api_key)
 
     out = _json.dumps(artifact, indent=2)
     if output is None:
