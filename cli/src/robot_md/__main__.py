@@ -186,7 +186,7 @@ def init(
     do_register: bool = typer.Option(
         False,
         "--register",
-        help="Mint an RRN on rcan.dev as part of setup.",
+        help="Mint an RRN against the Robot Registry Foundation as part of setup.",
     ),
     contact_email: str | None = typer.Option(
         None, "--contact-email", help="Contact email for --register."
@@ -326,6 +326,12 @@ def emit_benchmarks(
         help="Sign with the v0.9.1 hybrid keypair from ~/.robot-md/keys/<rrn>.signing.json. "
         "Manifest must have metadata.rrn set.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the artifact to RRF /v2/robots/<rrn>/safety-benchmark after emit.",
+    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:
     """Emit rcan-safety-benchmark-v1 artifact (rcan-spec §23) for this robot.
 
@@ -347,11 +353,12 @@ def emit_benchmarks(
 
     artifact = build_artifact(path, iterations=iterations)
 
-    if sign:
-        from robot_md.parser import parse_file as _parse
+    from robot_md.parser import parse_file as _parse
 
-        parsed = _parse(path)
-        rrn = str((parsed.frontmatter.get("metadata") or {}).get("rrn") or "").strip()
+    parsed = _parse(path)
+    rrn = str((parsed.frontmatter.get("metadata") or {}).get("rrn") or "").strip()
+
+    if sign:
         if not rrn:
             typer.secho(
                 "error: --sign requires metadata.rrn in the manifest. "
@@ -365,6 +372,8 @@ def emit_benchmarks(
         except RuntimeError as e:
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
+
+    _maybe_submit(artifact, rrn=rrn, kind="safety-benchmark", do_submit=submit, api_key=api_key)
 
     out = _json.dumps(artifact, indent=2)
     if output is None:
@@ -404,6 +413,12 @@ def emit_ifu(
         "--sign",
         help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the artifact to RRF /v2/robots/<rrn>/ifu after emit.",
+    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:
     """Emit an rcan-ifu-v1 (Art. 13(3) Instructions for Use) artifact.
 
@@ -428,8 +443,9 @@ def emit_ifu(
         lifetime=lifetime,
     )
 
+    rrn = artifact["provider_identity"]["rrn"].strip()
+
     if sign:
-        rrn = artifact["provider_identity"]["rrn"].strip()
         if not rrn:
             typer.secho(
                 "error: --sign requires metadata.rrn in the manifest. "
@@ -443,6 +459,319 @@ def emit_ifu(
         except RuntimeError as e:
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
+
+    _maybe_submit(artifact, rrn=rrn, kind="ifu", do_submit=submit, api_key=api_key)
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+
+
+# ---------------------------------------------------------- Art. 11 summary
+
+
+@app.command("emit-art11")
+def emit_art11(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    sbom: Path | None = typer.Option(
+        None,
+        "--sbom",
+        help="Path to a CycloneDX (or other) SBOM file. Referenced by path in the artifact.",
+    ),
+    artifacts_dir: Path | None = typer.Option(
+        None,
+        "--artifacts-dir",
+        help="Directory containing signed §22-26 artifact JSON files. "
+        "Inventoried into notified_body_submission.",
+    ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Write the artifact here. Default: print to stdout."
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
+    ),
+) -> None:
+    """Emit a robot-md-art11-summary-v0 (EU AI Act Art. 11 technical-doc summary).
+
+    Aggregates the eight Art. 11 categories from the manifest, the on-disk
+    signed-artifacts inventory, and the per-robot post-market incident log.
+    Schema is intentionally an aggregator name (not rcan-art11-v1) since
+    rcan-spec hasn't defined an Art. 11 wire format upstream — this is
+    a notified-body-readable dossier that points at authoritative pieces.
+    """
+    import json as _json
+
+    from robot_md.art11 import build_artifact, sign_artifact
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    artifact = build_artifact(path, sbom_path=sbom, signed_artifacts_dir=artifacts_dir)
+
+    if sign:
+        rrn = artifact["rrn"]
+        if not rrn:
+            typer.secho(
+                "error: --sign requires metadata.rrn in the manifest. "
+                "Run `robot-md register` first.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+        try:
+            artifact = sign_artifact(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+
+
+# ---------------------------------------------------------- apikey reissue
+
+
+@app.command("request-apikey")
+def request_apikey(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    operation: str = typer.Option(
+        "reissue",
+        "--operation",
+        help="'reissue' (default; replace lost apikey) or 'new' (issue an additional one).",
+    ),
+    reason: str | None = typer.Option(
+        None, "--reason", help="Optional human-readable reason recorded in the request."
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output",
+        "-o",
+        help="Write the signed request here. Default: print to stdout.",
+    ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the signed request to RRF /v2/robots/<rrn>/apikey-requests. "
+        "(Server-side endpoint may not be implemented yet — dry-run / out-of-band first.)",
+    ),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org",
+        "--endpoint",
+        help="RRF base endpoint. Override for staging / self-hosted.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Build the request without signing — no keystore touched.",
+    ),
+) -> None:
+    """Build a signed apikey-reissue request for an existing RRN.
+
+    Usable when the operator holds the signing keypair but lost (or never
+    received) the apikey for an RRN. The signature on the request body
+    authenticates against the RRF-registered pq_signing_pub — no bearer
+    token needed (that's the whole point — apikey is what we don't have).
+
+    Default behaviour: emit a signed JSON document to stdout that the
+    operator hands to RRF support out-of-band. With --submit, POSTs to
+    the apikey-requests endpoint when/if RRF implements it.
+    """
+    import json as _json
+
+    from robot_md.apikey_request import (
+        SubmitError,
+        build_request,
+        sign_request,
+        submit_request,
+    )
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho(
+            "error: manifest has no metadata.rrn. There's nothing to request "
+            "an apikey for. Run `robot-md register` to mint a fresh RRN.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        artifact = build_request(rrn, operation=operation, reason=reason)
+    except ValueError as e:
+        typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2) from e
+
+    if not dry_run:
+        try:
+            artifact = sign_request(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    if submit:
+        if dry_run:
+            typer.secho(
+                "error: --submit is incompatible with --dry-run "
+                "(unsigned requests cannot be submitted).",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+        try:
+            result = submit_request(artifact, rrn=rrn, endpoint=endpoint)
+        except SubmitError as e:
+            typer.secho(f"submit failed: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+        typer.secho(
+            f"submitted apikey reissue request for {rrn} (HTTP {result['status']})",
+            err=True,
+            fg=typer.colors.GREEN,
+        )
+
+    out = _json.dumps(artifact, indent=2)
+    if output is None:
+        typer.echo(out)
+    else:
+        output.write_text(out)
+        typer.echo(f"wrote {output}", err=True)
+        if not submit:
+            typer.secho(
+                "  next: hand this signed JSON to RRF support out-of-band "
+                "(email/ticket) or rerun with --submit when the endpoint exists.",
+                err=True,
+                fg=typer.colors.YELLOW,
+            )
+
+
+# ---------------------------------------------------------- §22 FRIA
+
+
+def _maybe_submit(
+    artifact: dict, *, rrn: str, kind: str, do_submit: bool, api_key: str | None
+) -> None:
+    """Optionally POST `artifact` to RRF /v2/robots/<rrn>/<kind>. P2 helper.
+
+    Audit-records every attempt (success or failure). Aborts the CLI with
+    exit 3 on any submission failure so the operator knows the artifact
+    was emitted but didn't reach the registry.
+    """
+    if not do_submit:
+        return
+    if not rrn:
+        typer.secho(
+            "error: --submit requires metadata.rrn in the manifest.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+    from robot_md.submit import SubmitError, submit_artifact
+
+    try:
+        result = submit_artifact(artifact, rrn=rrn, kind=kind, api_key=api_key)
+    except SubmitError as e:
+        typer.secho(f"submit failed: {e}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=3) from e
+    typer.secho(
+        f"submitted to RRF /v2/robots/{rrn}/{kind} (HTTP {result['status']})",
+        err=True,
+        fg=typer.colors.GREEN,
+    )
+
+
+@app.command("emit-fria")
+def emit_fria(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    deployment_context: str | None = typer.Option(
+        None,
+        "--deployment-context",
+        help="Deployment context (e.g. 'internal-warehouse-pilot'). "
+        "Overrides manifest compliance.deployment_context.",
+    ),
+    affected_groups: list[str] | None = typer.Option(
+        None,
+        "--affected-group",
+        help="Group affected by the system. Repeat for multiple. "
+        "Overrides manifest compliance.affected_groups.",
+    ),
+    known_risks: list[str] | None = typer.Option(
+        None,
+        "--known-risk",
+        help="Known risk statement. Repeat for multiple. "
+        "Overrides manifest compliance.known_risks.",
+    ),
+    output: Path | None = typer.Option(
+        None, "--output", "-o", help="Write the artifact here. Default: print to stdout."
+    ),
+    sign: bool = typer.Option(
+        False,
+        "--sign",
+        help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
+    ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the artifact to RRF /v2/robots/<rrn>/fria after emit. "
+        "Records the attempt in the local hash-chained audit log.",
+    ),
+    api_key: str | None = typer.Option(
+        None, "--api-key", help="Override apikey from ~/.robot-md/keys/<rrn>.apikey for --submit."
+    ),
+) -> None:
+    """Emit an rcan-fria-v1 (Art. 27 Fundamental Rights Impact Assessment) artifact.
+
+    Pulls system identity from manifest metadata + capabilities; pulls
+    deployment context, affected groups, known risks, and human-oversight
+    measures from the manifest's compliance and safety blocks. Mirrors the
+    rcan-py 3.3.0 FriaDocument shape so the artifact is wire-compatible
+    with RRF /v2/robots/<rrn>/fria submissions.
+    """
+    import json as _json
+
+    from robot_md.fria import build_artifact, sign_artifact
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    artifact = build_artifact(
+        path,
+        deployment_context=deployment_context,
+        affected_groups=affected_groups or None,
+        known_risks=known_risks or None,
+    )
+
+    rrn = artifact["system"]["rrn"]
+
+    if sign:
+        if not rrn:
+            typer.secho(
+                "error: --sign requires metadata.rrn in the manifest. "
+                "Run `robot-md register` first.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
+        try:
+            artifact = sign_artifact(artifact, rrn=rrn)
+        except RuntimeError as e:
+            typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
+            raise typer.Exit(code=3) from e
+
+    _maybe_submit(artifact, rrn=rrn, kind="fria", do_submit=submit, api_key=api_key)
 
     out = _json.dumps(artifact, indent=2)
     if output is None:
@@ -476,6 +805,12 @@ def emit_eu_register(
         "--sign",
         help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the artifact to RRF /v2/robots/<rrn>/eu-register after emit.",
+    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:
     """Emit an rcan-eu-register-v1 Art. 49 submission package.
 
@@ -499,13 +834,16 @@ def emit_eu_register(
         typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
         raise typer.Exit(code=2) from e
 
+    rrn = artifact["system"]["rrn"]
+
     if sign:
-        rrn = artifact["system"]["rrn"]
         try:
             artifact = sign_artifact(artifact, rrn=rrn)
         except RuntimeError as e:
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
+
+    _maybe_submit(artifact, rrn=rrn, kind="eu-register", do_submit=submit, api_key=api_key)
 
     out = _json.dumps(artifact, indent=2)
     if output is None:
@@ -611,6 +949,12 @@ def incidents_report(
         "--sign",
         help="Sign via v0.9.1 hybrid keypair. Manifest must have metadata.rrn.",
     ),
+    submit: bool = typer.Option(
+        False,
+        "--submit",
+        help="POST the report to RRF /v2/robots/<rrn>/incident-report after emit.",
+    ),
+    api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:
     """Emit an rcan-incidents-v1 Art. 72 report for this robot."""
     import json as _json
@@ -639,6 +983,8 @@ def incidents_report(
             typer.secho(f"error: {e}", err=True, fg=typer.colors.RED)
             raise typer.Exit(code=3) from e
 
+    _maybe_submit(artifact, rrn=rrn, kind="incident-report", do_submit=submit, api_key=api_key)
+
     out = _json.dumps(artifact, indent=2)
     if output is None:
         typer.echo(out)
@@ -647,11 +993,186 @@ def incidents_report(
         typer.echo(f"wrote {output}", err=True)
 
 
+compliance_app = typer.Typer(help="EU AI Act compliance status + bundling helpers.")
+app.add_typer(compliance_app, name="compliance")
+
+
+@compliance_app.command("status")
+def compliance_status_cmd(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    artifacts_dir: Path | None = typer.Option(
+        None,
+        "--artifacts-dir",
+        help="Directory of signed §22-26 artifacts. Default: <manifest>/compliance/",
+    ),
+    probe: bool = typer.Option(
+        True,
+        "--probe/--no-probe",
+        help="Probe RRF for reachability + RRN record + rcan_version drift. "
+        "Default on; use --no-probe for offline/CI.",
+    ),
+    json_out: bool = typer.Option(
+        False, "--json", help="Emit the structured status dict as JSON to stdout."
+    ),
+    endpoint: str = typer.Option(
+        "https://robotregistryfoundation.org",
+        "--endpoint",
+        help="RRF base endpoint for the network probe.",
+    ),
+) -> None:
+    """One-shot pre-flight readiness check.
+
+    Surfaces in one place: keystore (signing key + apikey), audit chain
+    integrity, incidents log summary, on-disk signed artifact inventory,
+    RRF reachability + record drift, per-emit-* submission readiness, and
+    a ranked blocker list. Exit 4 if blockers are present, 0 if clean.
+    """
+    import json as _json
+
+    from robot_md.compliance_status import format_status_text, gather_status
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    status = gather_status(
+        path,
+        artifacts_dir=artifacts_dir,
+        network_probe=probe,
+        endpoint=endpoint,
+    )
+
+    if json_out:
+        typer.echo(_json.dumps(status, indent=2))
+    else:
+        typer.echo(format_status_text(status))
+
+    if status["blockers"]:
+        raise typer.Exit(code=4)
+
+
+audit_app = typer.Typer(
+    help="Hash-chained audit log: verify integrity, list submissions and gate firings."
+)
+app.add_typer(audit_app, name="audit")
+
+
+@audit_app.command("verify")
+def audit_verify(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+) -> None:
+    """Walk the per-robot audit chain at ~/.robot-md/audit/<rrn>.jsonl.
+
+    Exits 0 with `valid` reported on success; exits 4 on chain integrity
+    failure (mid-stream tamper or chain split). Truncation of trailing
+    entries cannot be detected without an external witness — see audit.py.
+    """
+    from robot_md.audit import AuditChainError, verify_chain
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho(
+            "error: manifest has no metadata.rrn.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        result = verify_chain(rrn)
+    except AuditChainError as e:
+        typer.secho(f"audit chain INVALID: {e}", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=4) from e
+    n = result["entries"]
+    plural = "ies" if n != 1 else "y"
+    typer.secho(
+        f"audit chain valid for {rrn} ({n} entr{plural})",
+        fg=typer.colors.GREEN,
+    )
+    typer.secho(
+        "  note: chain integrity is verified for tamper + split. "
+        "Truncation of trailing entries is undetectable without an "
+        "external witness (e.g., a periodic checkpoint countersigned by RRF).",
+        err=True,
+        fg=typer.colors.YELLOW,
+    )
+
+
+@audit_app.command("list")
+def audit_list(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    limit: int = typer.Option(20, "--limit", help="Max entries to show. Default 20."),
+) -> None:
+    """List audit log entries for this robot, oldest first."""
+    from robot_md.audit import load_entries
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho("error: manifest has no metadata.rrn.", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    entries = load_entries(rrn)
+    if not entries:
+        typer.echo(f"no audit entries for {rrn}")
+        return
+    typer.echo(f"{len(entries)} audit entr{'ies' if len(entries) != 1 else 'y'} for {rrn}:")
+    for e in entries[-limit:]:
+        details = e.get("details") or {}
+        kind = details.get("kind", "")
+        status = details.get("status", "")
+        outcome = details.get("outcome", "")
+        typer.echo(
+            f"  {e['timestamp']}  {e['event']:<20}  {kind:<18}  status={status} outcome={outcome}"
+        )
+
+
+@incidents_app.command("list")
+def incidents_list(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+) -> None:
+    """List incidents from the per-robot log, newest first.
+
+    Convenience for operators inspecting ~/.robot-md/incidents/<rrn>.jsonl.
+    """
+    from robot_md.incidents import load
+
+    if not path.exists():
+        typer.secho(f"error: {path} does not exist", err=True, fg=typer.colors.RED)
+        raise typer.Exit(code=2)
+
+    rrn = _rrn_from_manifest(path)
+    if not rrn:
+        typer.secho(
+            "error: manifest has no metadata.rrn. Run `robot-md register` first.",
+            err=True,
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=2)
+
+    entries = load(rrn)
+    if not entries:
+        typer.echo(f"no incidents recorded for {rrn}")
+        return
+    typer.echo(f"{len(entries)} incident(s) for {rrn} (newest first):")
+    for e in entries:
+        typer.echo(
+            f"  {e['timestamp']}  {e['severity']:>11}  {e['category']:<24}  {e['description']}"
+        )
+
+
 @app.command()
 def unregister(
     rrn: str = typer.Argument(..., help="The RRN to delete (e.g. RRN-000000000042)."),
     endpoint: str = typer.Option(
-        "https://rcan.dev/api/v1/robots",
+        "https://robotregistryfoundation.org/v2/robots/register",
         "--endpoint",
         help="RRF base endpoint. Override for staging / self-hosted.",
     ),
@@ -665,10 +1186,10 @@ def unregister(
 
     Uses the issued API key (stored by `robot-md register` at
     `~/.robot-md/keys/<rrn>.apikey`) to authorize the DELETE against
-    `rcan.dev/api/v1/robots/<rrn>`. The local key file is removed after
-    a successful delete. Does NOT modify any local ROBOT.md files — if
-    you want to un-publish + clean the manifest, edit metadata.rrn to
-    empty string after this returns.
+    `robotregistryfoundation.org/v2/robots/<rrn>`. The local key file is
+    removed after a successful delete. Does NOT modify any local ROBOT.md
+    files — if you want to un-publish + clean the manifest, edit
+    metadata.rrn to empty string after this returns.
 
     Examples:
 

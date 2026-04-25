@@ -8,7 +8,9 @@ network bucket entirely so CI stays deterministic.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from pathlib import Path
+from urllib import request as urlrequest
 
 import pytest
 
@@ -93,3 +95,81 @@ def test_exit_code_clean_is_zero():
     clean = [doctor.CheckResult("a", "x", "pass", "")]
     assert doctor.exit_code(clean, strict=False) == 0
     assert doctor.exit_code(clean, strict=True) == 0
+
+
+# --- network-bucket: verify URL construction + UA, with urlopen mocked --------
+
+
+class _FakeResp:
+    def __init__(self, status: int = 200) -> None:
+        self.status = status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_a):
+        return False
+
+
+@contextmanager
+def _patch_urlopen(monkeypatch, captured: list):
+    def fake_urlopen(arg, timeout=None):
+        # Doctor's reachability check passes a Request; lookup historically
+        # passed a bare string. Capture both shapes.
+        if isinstance(arg, urlrequest.Request):
+            captured.append({"url": arg.full_url, "headers": dict(arg.header_items())})
+        else:
+            captured.append({"url": str(arg), "headers": {}})
+        return _FakeResp(status=200)
+
+    monkeypatch.setattr(urlrequest, "urlopen", fake_urlopen)
+    yield
+
+
+def test_check_network_uses_v2_robots_path_for_lookup(monkeypatch):
+    """RRN lookup must hit /v2/robots/<rrn>, not the legacy /api/v1/robots/<rrn>.
+
+    Regression: pre-v1.1.1 the doctor hardcoded /api/v1/robots which doesn't
+    exist on robotregistryfoundation.org/v2 and only returns 404 on rcan.dev.
+    """
+    captured: list = []
+    with _patch_urlopen(monkeypatch, captured):
+        results = doctor.check_network(
+            {
+                "network": {"rrf_endpoint": "https://robotregistryfoundation.org"},
+                "metadata": {"rrn": "RRN-000000000002"},
+            }
+        )
+
+    assert len(captured) == 2, "expected reachability + RRN lookup"
+    lookup = captured[1]
+    assert lookup["url"].endswith("/v2/robots/RRN-000000000002"), (
+        f"lookup hit {lookup['url']}, expected /v2/robots/<rrn>"
+    )
+    assert all(r.status in {"pass", "skip"} for r in results)
+
+
+def test_check_network_lookup_sends_user_agent(monkeypatch):
+    """Lookup must send a User-Agent header.
+
+    Regression: a bare urlopen(url, timeout=5) call defaults to
+    Python-urllib/X.Y, which Cloudflare blocks at the edge with 403 — masking
+    the origin's real status. The reachability check already sets a UA; the
+    lookup must too.
+    """
+    captured: list = []
+    with _patch_urlopen(monkeypatch, captured):
+        doctor.check_network(
+            {
+                "network": {"rrf_endpoint": "https://robotregistryfoundation.org"},
+                "metadata": {"rrn": "RRN-000000000002"},
+            }
+        )
+
+    lookup = captured[1]
+    ua = next(
+        (v for k, v in lookup["headers"].items() if k.lower() == "user-agent"),
+        None,
+    )
+    assert ua is not None, f"lookup sent no User-Agent: {lookup['headers']}"
+    assert "robot-md" in ua.lower()
