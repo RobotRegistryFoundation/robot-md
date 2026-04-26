@@ -52,6 +52,75 @@ def _confirm(prompt: str) -> bool:
     return line in ("", "y", "yes")
 
 
+def _speaker_test(output_device_name: str) -> bool:
+    """Play a 1s 880Hz tone via the chosen output. Returns True if user confirmed."""
+    try:
+        import math
+        import struct
+        import asyncio
+        from pendantd.audio.devices import list_devices, match_substring  # type: ignore
+        from pendantd.audio.streams import OutputStream  # type: ignore
+
+        devs = list_devices()
+        device = match_substring(devs.outputs, output_device_name)
+        if device is None:
+            sys.stdout.write(
+                f"  (couldn't find output device matching {output_device_name!r}; skipping tone)\n"
+            )
+            return _confirm("Hear it?")
+
+        # Generate 1s of 880Hz tone, mono int16 at the device's preferred rate
+        sr = device.sample_rate
+        n = int(1.0 * sr)
+        amp = 8000  # ~25% of int16 max — comfortable
+        tone = struct.pack(f"<{n}h", *[int(amp * math.sin(2 * math.pi * 880 * t / sr)) for t in range(n)])
+
+        async def _play() -> None:
+            stream = OutputStream(device_index=device.index, samplerate=sr)
+            await stream.start()
+            try:
+                await stream.write(tone)
+                await asyncio.sleep(1.1)  # let the tone finish
+            finally:
+                await stream.stop()
+
+        sys.stdout.write(f"Speaker test… playing 880 Hz via {device.name}\n")
+        asyncio.run(_play())
+    except Exception as e:
+        sys.stdout.write(f"  (speaker test failed: {e}; falling back to manual confirmation)\n")
+    return _confirm("Hear it?")
+
+
+def _mic_loopback_test(input_name: str, output_name: str) -> bool:
+    """Record 2s, play it back. Returns True if user confirmed."""
+    try:
+        import asyncio
+        from pendantd.audio.devices import list_devices, match_substring  # type: ignore
+        from pendantd.audio.streams import InputStream, OutputStream  # type: ignore
+        from pendantd.audio.loopback import record_and_play  # type: ignore
+
+        devs = list_devices()
+        in_dev = match_substring(devs.inputs, input_name)
+        out_dev = match_substring(devs.outputs, output_name)
+        if in_dev is None or out_dev is None:
+            sys.stdout.write("  (couldn't find devices for loopback; skipping)\n")
+            return _confirm("Sound right?")
+
+        async def _loopback():
+            inp = InputStream(device_index=in_dev.index, samplerate=in_dev.sample_rate)
+            out = OutputStream(device_index=out_dev.index, samplerate=in_dev.sample_rate)
+            return await record_and_play(inp, out, seconds=2.0)
+
+        sys.stdout.write(
+            f"Mic loopback test… recording 2s via {in_dev.name}, playing back via {out_dev.name}\n"
+        )
+        result = asyncio.run(_loopback())
+        sys.stdout.write(f"  recorded {result.recorded_bytes} bytes (peak {result.peak_dbfs:.1f} dBFS)\n")
+    except Exception as e:
+        sys.stdout.write(f"  (loopback failed: {e}; falling back to manual confirmation)\n")
+    return _confirm("Sound right?")
+
+
 def run_voice_setup(
     robot_name: str,
     cfg_path: Path,
@@ -103,14 +172,11 @@ def run_voice_setup(
 
         # Speaker test
         if cfg["output_device"]:
-            sys.stdout.write(f"Speaker test… (you should hear a 1s tone via {cfg['output_device']})\n")
-            sys.stdout.write("(skipped in this build — confirm interactively after pendantd starts)\n")
-            if not _confirm("Hear it?"):
+            if not _speaker_test(cfg["output_device"]):
                 sys.stdout.write("Output may need attention. Continuing.\n")
-        # Mic loopback test placeholder
-        if cfg["input_device"]:
-            sys.stdout.write("Mic loopback test… (deferred to runtime; pendantd reports peak dBFS)\n")
-            if not _confirm("Sound right?"):
+        # Mic loopback test
+        if cfg["input_device"] and cfg["output_device"]:
+            if not _mic_loopback_test(cfg["input_device"], cfg["output_device"]):
                 sys.stdout.write("Input may need attention. Continuing.\n")
         # Wake-word check
         if not _skip_wake_check and cfg["robot_name"]:
