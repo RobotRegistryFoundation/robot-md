@@ -23,6 +23,8 @@ deterministic and offline.
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -227,10 +229,89 @@ MOTION_CAPABILITY_NAMESPACES: tuple[str, ...] = ("manipulate", "arm", "nav", "na
 # backends ship.
 BACKEND_NAMESPACES: dict[str, tuple[str, ...]] = {
     "feetech_scs": ("arm", "status"),
+    "feetech": ("arm", "status"),
     "feetech_depthai": ("arm", "perceive", "status"),
+    "depthai": ("perceive",),
     "oak_d_lr": ("perceive",),
     "dynamixel": ("arm", "status"),
 }
+
+# Driver protocols that name an actuator + the path field that holds the
+# device endpoint. Used by the device-availability probe to find what's
+# currently holding a serial port (or other actuator endpoint).
+ACTUATOR_PROTOCOLS_WITH_PORTS: tuple[str, ...] = (
+    "feetech",
+    "feetech_scs",
+    "dynamixel",
+    "ros2_control",
+)
+
+
+def _get_registered_protocols() -> set[str]:
+    """Union of `.protocols` across every registered backend in the entry-point
+    registry. Empty set if backends fail to load — caller treats empty as
+    "can't check, skip the gate". Lazy import to avoid pulling backend deps
+    on machines that only render manifests.
+    """
+    try:
+        from robot_md.backends.registry import BackendRegistry
+    except Exception:
+        return set()
+    try:
+        registry = BackendRegistry.from_entry_points()
+    except Exception:
+        return set()
+    out: set[str] = set()
+    for b in registry.backends:
+        out.update(getattr(b, "protocols", ()) or ())
+    return out
+
+
+_SERIAL_PORT_PATH_PREFIXES: tuple[str, ...] = ("/dev/tty", "/dev/serial/", "/dev/cu.")
+
+
+def _probe_serial_port_holder(port: str) -> dict[str, Any]:
+    """Best-effort: report whether `port` is currently held by another process.
+
+    Returns one of:
+      {"state": "free"}                              — port exists and is unheld
+      {"state": "held", "holders": [{pid, command}]} — held by N process(es)
+      {"state": "missing"}                           — port path does not exist
+      {"state": "skipped", "reason": "..."}          — not a serial-port-shaped
+                                                       path (e.g. /dev/null fixture)
+      {"state": "unknown", "reason": "..."}          — probe couldn't run
+    """
+    if not port:
+        return {"state": "unknown", "reason": "no port declared"}
+    if not any(port.startswith(prefix) for prefix in _SERIAL_PORT_PATH_PREFIXES):
+        return {"state": "skipped", "reason": "not a serial-port path"}
+    if not Path(port).exists():
+        return {"state": "missing"}
+    if shutil.which("lsof") is None:
+        return {"state": "unknown", "reason": "lsof not available"}
+    try:
+        result = subprocess.run(
+            ["lsof", "-Fpc", "--", port],
+            capture_output=True,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return {"state": "unknown", "reason": f"lsof failed: {exc!s}"}
+    if result.returncode == 1 and not result.stdout.strip():
+        return {"state": "free"}
+    holders: list[dict[str, str]] = []
+    pid: str | None = None
+    for line in result.stdout.splitlines():
+        if line.startswith("p"):
+            pid = line[1:]
+        elif line.startswith("c") and pid is not None:
+            holders.append({"pid": pid, "command": line[1:]})
+            pid = None
+    if not holders:
+        return {"state": "unknown", "reason": "no holders parsed"}
+    return {"state": "held", "holders": holders}
 
 
 def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, Any]:
@@ -304,9 +385,61 @@ def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, An
     )
     namespace_ok = not namespace_mismatch
 
+    # 6. Backend resolution — every declared driver protocol must be supplied
+    # by some registered backend. Catches the case where a manifest invents
+    # a friendly protocol name (e.g. "feetech_scs", "oak_d_lr") that no
+    # backend in the entry-point registry actually claims, so dispatch
+    # short-circuits at no_backend before any capability runs.
+    registered_protocols = _get_registered_protocols()
+    if registered_protocols and declared_driver_protocols:
+        unmatched_protocols = sorted(declared_driver_protocols - registered_protocols)
+        backend_resolution_ok = not unmatched_protocols
+    else:
+        # No registered backends loadable in this env, OR no drivers declared.
+        # Skip the gate rather than raise a false alarm.
+        unmatched_protocols = []
+        backend_resolution_ok = True
+
+    # 7. Device availability — at probe time, are the actuator serial ports
+    # already held by another process? Best-effort runtime probe; non-blocking
+    # if lsof is missing or the port doesn't exist yet (operator may calibrate
+    # before plugging in). Reported as a warning-flavored check: held device
+    # = blocker, but missing/unknown = informational.
+    device_probes: list[dict[str, Any]] = []
+    any_held = False
+    for d in drivers:
+        if not isinstance(d, dict):
+            continue
+        if d.get("protocol") not in ACTUATOR_PROTOCOLS_WITH_PORTS:
+            continue
+        port = d.get("port")
+        probe = (
+            _probe_serial_port_holder(port)
+            if isinstance(port, str)
+            else {
+                "state": "unknown",
+                "reason": "non-string port",
+            }
+        )
+        device_probes.append(
+            {"driver_id": d.get("id"), "protocol": d.get("protocol"), "port": port, **probe}
+        )
+        if probe.get("state") == "held":
+            any_held = True
+    device_availability_ok = not any_held
+    device_applies = any(p.get("state") in ("free", "held", "missing") for p in device_probes)
+
     return {
         "applies": has_motion_caps or has_actuation_driver or has_vision_driver,
-        "ready": gates_ok and velocity_ok and descriptors_ok and extrinsic_ok and namespace_ok,
+        "ready": (
+            gates_ok
+            and velocity_ok
+            and descriptors_ok
+            and extrinsic_ok
+            and namespace_ok
+            and backend_resolution_ok
+            and device_availability_ok
+        ),
         "checks": {
             "hitl_gates": {
                 "ok": gates_ok,
@@ -412,6 +545,71 @@ def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, An
                         "(e.g. `manipulate.pick` → `arm.pick`) or change the driver"
                     )
                 ),
+            },
+            "backend_resolution": {
+                "ok": backend_resolution_ok,
+                "detail": (
+                    f"all declared protocols match registered backends "
+                    f"({len(declared_driver_protocols)} driver(s))"
+                    if backend_resolution_ok and declared_driver_protocols
+                    else (
+                        "no drivers declared — N/A"
+                        if not declared_driver_protocols
+                        else (
+                            "no registered backends discoverable in this env — skipped"
+                            if not registered_protocols
+                            else (
+                                f"declared driver protocol(s) {unmatched_protocols} "
+                                f"have no registered backend — every execute_capability "
+                                f"call will return no_backend. Registered protocols: "
+                                f"{sorted(registered_protocols)}"
+                            )
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if backend_resolution_ok
+                    else (
+                        f"Rename driver protocol(s) to one of the registered set "
+                        f"{sorted(registered_protocols)} (e.g. `feetech_scs` → `feetech`, "
+                        f"`oak_d_lr` → `depthai`), or install a plugin backend that "
+                        f"registers the missing protocol(s) under the "
+                        f"`robot_md.backends` entry-point group"
+                    )
+                ),
+            },
+            "device_availability": {
+                "ok": device_availability_ok,
+                "detail": (
+                    "no probable serial actuator drivers — N/A"
+                    if not device_applies
+                    else (
+                        "all actuator ports free"
+                        if device_availability_ok
+                        else (
+                            "actuator port(s) currently held: "
+                            + "; ".join(
+                                f"{p['driver_id']}@{p['port']} held by "
+                                + ", ".join(
+                                    f"{h['command']}({h['pid']})" for h in p.get("holders", [])
+                                )
+                                for p in device_probes
+                                if p.get("state") == "held"
+                            )
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if device_availability_ok or not device_applies
+                    else (
+                        "Stop the holding process (e.g. "
+                        "`sudo systemctl stop castor-gateway` for OpenCastor) "
+                        "before invoking robot-md motion"
+                    )
+                ),
+                "probes": device_probes,
             },
         },
     }

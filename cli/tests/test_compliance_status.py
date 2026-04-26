@@ -40,8 +40,8 @@ safety:
   estop: { software: true, hardware: false, response_ms: 50 }
   max_joint_velocity_dps: 30
   hitl_gates:
-    - { scope: navigate, require_auth: true }
-capabilities: [navigate]
+    - { scope: arm, require_auth: true }
+capabilities: [arm.home]
 ---
 # bob
 """
@@ -316,6 +316,8 @@ def test_first_motion_readiness_section_present(manifest, home):
         "object_descriptors",
         "camera_extrinsic",
         "capability_namespace",
+        "backend_resolution",
+        "device_availability",
     ):
         assert cid in fmr["checks"], f"missing first-motion check: {cid}"
 
@@ -353,6 +355,13 @@ def test_first_motion_readiness_flags_bobs_actual_gaps(bob_not_ready, home):
     # 5. manipulate.* capabilities but feetech_scs implements arm.*
     assert checks["capability_namespace"]["ok"] is False
     assert "manipulate" in checks["capability_namespace"]["detail"]
+    # 6. feetech_scs / oak_d_lr have no registered backend at all (the only
+    # built-in backend exposes feetech + depthai protocols)
+    assert checks["backend_resolution"]["ok"] is False
+    assert (
+        "feetech_scs" in checks["backend_resolution"]["detail"]
+        or "oak_d_lr" in checks["backend_resolution"]["detail"]
+    )
 
 
 def test_first_motion_readiness_bubbles_to_blockers(bob_not_ready, home):
@@ -364,6 +373,7 @@ def test_first_motion_readiness_bubbles_to_blockers(bob_not_ready, home):
         "object_descriptors",
         "camera_extrinsic",
         "capability_namespace",
+        "backend_resolution",
     ):
         assert cid in blocker_text, f"first-motion check {cid} not aggregated into blockers"
 
@@ -416,8 +426,8 @@ physics:
         mount: world
         extrinsic: { R: [[1,0,0],[0,1,0],[0,0,1]], t: [0.0, 0.0, 0.5] }
 drivers:
-  - { id: arm, protocol: feetech_scs, port: /dev/null }
-  - { id: vision, protocol: oak_d_lr, connection: usb }
+  - { id: arm, protocol: feetech, port: /dev/null }
+  - { id: vision, protocol: depthai, connection: usb }
 vision:
   object_descriptors:
     - { id: red_lego, detector: hsv, params: { h: [0, 10] } }
@@ -445,3 +455,141 @@ def test_format_text_includes_first_motion_section(bob_not_ready, home):
     # Each failed check shows its fix line
     assert "hitl_gates" in out
     assert "extrinsic" in out
+
+
+# ---- backend_resolution check (PR follow-up, 2026-04-25) -----------------
+
+
+def test_backend_resolution_passes_for_canonical_protocols(tmp_path, home):
+    """A manifest declaring `feetech` + `depthai` (the canonical protocols
+    the bundled backend registers under) should pass backend_resolution."""
+    p = tmp_path / "ROBOT.md"
+    p.write_text("""\
+---
+rcan_version: "3.2"
+metadata: { robot_name: bob, manufacturer: Acme, model: rx, firmware_version: 1.0.0 }
+physics: { type: arm, dof: 6 }
+drivers:
+  - { id: arm, protocol: feetech, port: /dev/null }
+  - { id: vision, protocol: depthai, connection: usb }
+capabilities: [arm.home]
+safety:
+  estop: { software: true, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates: [{ scope: arm, require_auth: true }]
+---
+""")
+    s = gather_status(p, network_probe=False)
+    assert s["first_motion_readiness"]["checks"]["backend_resolution"]["ok"] is True
+
+
+def test_backend_resolution_flags_unregistered_protocols(tmp_path, home):
+    """`feetech_scs` and `oak_d_lr` look reasonable but aren't claimed by any
+    registered backend — the bundled `FeetechDepthaiBackend.protocols` is
+    `{feetech, depthai}`. Dispatch will fail at no_backend, so this is a
+    first-motion blocker."""
+    p = tmp_path / "ROBOT.md"
+    p.write_text("""\
+---
+rcan_version: "3.2"
+metadata: { robot_name: bob, manufacturer: Acme, model: rx, firmware_version: 1.0.0 }
+physics: { type: arm, dof: 6 }
+drivers:
+  - { id: arm, protocol: feetech_scs, port: /dev/null }
+  - { id: vision, protocol: oak_d_lr, connection: usb }
+capabilities: [arm.home]
+safety:
+  estop: { software: true, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates: [{ scope: arm, require_auth: true }]
+---
+""")
+    s = gather_status(p, network_probe=False)
+    check = s["first_motion_readiness"]["checks"]["backend_resolution"]
+    assert check["ok"] is False
+    assert "feetech_scs" in check["detail"] and "oak_d_lr" in check["detail"]
+    # Fix-line names canonical replacements
+    assert "feetech" in check["fix"] and "depthai" in check["fix"]
+
+
+# ---- device_availability check (PR follow-up, 2026-04-25) ----------------
+
+
+def test_device_availability_skipped_for_dev_null(manifest, home):
+    """BOB_MIN uses `port: /dev/null` as a fixture sentinel — the probe
+    should skip non-serial-port-shaped paths so existing tests don't trip."""
+    s = gather_status(manifest, network_probe=False)
+    check = s["first_motion_readiness"]["checks"]["device_availability"]
+    assert check["ok"] is True
+    # Probe ran but skipped the non-tty path
+    probes = check.get("probes", [])
+    assert any(p.get("state") == "skipped" for p in probes), (
+        f"expected at least one skipped probe; got {probes}"
+    )
+
+
+def test_device_availability_reports_missing_for_nonexistent_tty(tmp_path, home):
+    """If the manifest names a /dev/tty* path that doesn't exist, the probe
+    reports 'missing' (operator may not have plugged in yet) — not a blocker."""
+    p = tmp_path / "ROBOT.md"
+    p.write_text("""\
+---
+rcan_version: "3.2"
+metadata: { robot_name: bob, manufacturer: Acme, model: rx, firmware_version: 1.0.0 }
+physics: { type: arm, dof: 6 }
+drivers:
+  - { id: arm, protocol: feetech, port: /dev/ttyDOES_NOT_EXIST_99 }
+capabilities: [arm.home]
+safety:
+  estop: { software: true, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates: [{ scope: arm, require_auth: true }]
+---
+""")
+    s = gather_status(p, network_probe=False)
+    check = s["first_motion_readiness"]["checks"]["device_availability"]
+    # Missing port is informational, not a blocker
+    assert check["ok"] is True
+    probes = check.get("probes", [])
+    assert any(pr.get("state") == "missing" for pr in probes), probes
+
+
+def test_device_availability_detects_held_serial_port(tmp_path, home, monkeypatch):
+    """When a serial port is held, the probe surfaces the holder + fix line."""
+    p = tmp_path / "ROBOT.md"
+    p.write_text("""\
+---
+rcan_version: "3.2"
+metadata: { robot_name: bob, manufacturer: Acme, model: rx, firmware_version: 1.0.0 }
+physics: { type: arm, dof: 6 }
+drivers:
+  - { id: arm, protocol: feetech, port: /dev/ttyTEST_FAKE }
+capabilities: [arm.home]
+safety:
+  estop: { software: true, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates: [{ scope: arm, require_auth: true }]
+---
+""")
+
+    # Stub the probe to simulate a held port — avoids needing a real holder
+    # and keeps the test deterministic across OS/lsof variants.
+    from robot_md import compliance_status as cs
+
+    def _fake_probe(port: str) -> dict:
+        if port == "/dev/ttyTEST_FAKE":
+            return {
+                "state": "held",
+                "holders": [{"pid": "12345", "command": "castor"}],
+            }
+        return {"state": "skipped", "reason": "not under test"}
+
+    monkeypatch.setattr(cs, "_probe_serial_port_holder", _fake_probe)
+
+    s = gather_status(p, network_probe=False)
+    check = s["first_motion_readiness"]["checks"]["device_availability"]
+    assert check["ok"] is False
+    assert "castor" in check["detail"] and "12345" in check["detail"]
+    assert "stop" in check["fix"].lower()
+    # Bubbles into ranked blockers
+    assert any("device_availability" in b for b in s["blockers"])
