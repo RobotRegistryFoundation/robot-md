@@ -3,6 +3,7 @@
 Imports pendantd.audio.devices as a soft dependency. If pendantd isn't
 importable, the phase prints a notice and exits rc=0.
 """
+
 from __future__ import annotations
 
 import datetime as _dt
@@ -11,14 +12,13 @@ from pathlib import Path
 
 import yaml
 
-_HEADER = (
-    "═══ Voice setup ═══════════════════════════════════════════"
-)
+_HEADER = "═══ Voice setup ═══════════════════════════════════════════"
 
 
 def _try_import_pendantd():
     try:
         from pendantd.audio import devices as devs_mod  # type: ignore
+
         return devs_mod
     except Exception:
         return None
@@ -119,8 +119,7 @@ def _mic_loopback_test(input_name: str, output_name: str) -> bool:
         )
         result = asyncio.run(_loopback())
         sys.stdout.write(
-            f"  recorded {result.recorded_bytes} bytes "
-            f"(peak {result.peak_dbfs:.1f} dBFS)\n"
+            f"  recorded {result.recorded_bytes} bytes (peak {result.peak_dbfs:.1f} dBFS)\n"
         )
     except Exception as e:
         sys.stdout.write(f"  (loopback failed: {e}; falling back to manual confirmation)\n")
@@ -156,8 +155,7 @@ def run_voice_setup(
     if not devs.inputs and not devs.outputs:
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         cfg_path.write_text(
-            "# TODO(voice): no audio devices detected at init time\n"
-            + yaml.safe_dump(cfg)
+            "# TODO(voice): no audio devices detected at init time\n" + yaml.safe_dump(cfg)
         )
         sys.stdout.write(
             "No audio devices detected. Wrote a TODO marker; re-run when devices attach.\n"
