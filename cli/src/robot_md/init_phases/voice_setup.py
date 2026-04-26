@@ -125,3 +125,51 @@ def run_voice_setup(
     cfg_path.write_text(yaml.safe_dump(cfg) + provenance)
     sys.stdout.write(f"Wrote {cfg_path}.\n")
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Phase adapter — converts run_voice_setup's int rc to PhaseResult so this
+# phase can be wired into default_flow alongside the other init phases.
+# ---------------------------------------------------------------------------
+
+from pathlib import Path as _Path  # noqa: E402 (below module-level code)
+
+from robot_md.init_phases import PhaseResult as _PhaseResult  # noqa: E402
+
+
+def phase_voice_setup(
+    manifest_path: _Path,
+    *,
+    non_interactive: bool = False,
+) -> _PhaseResult:
+    """Adapter: run voice/audio onboarding and return a PhaseResult.
+
+    Derives the robot_name from the manifest's frontmatter.
+    The voice config is written to ``<manifest_dir>/.robot-md/voice.yaml``.
+    Always returns status="ok" when pendantd is missing (soft dependency).
+    """
+    robot_name = ""
+    try:
+        from robot_md.parser import parse_file
+
+        parsed = parse_file(manifest_path)
+        robot_name = (parsed.frontmatter.get("metadata") or {}).get("robot_name", "") or ""
+    except Exception:
+        pass  # robot_name stays ""; run_voice_setup handles empty gracefully
+
+    cfg_path = manifest_path.parent / ".robot-md" / "voice.yaml"
+    rc = run_voice_setup(robot_name, cfg_path=cfg_path, non_interactive=non_interactive)
+
+    if rc == 0:
+        return _PhaseResult(
+            phase="voice_setup",
+            status="ok",
+            message=f"voice config written to {cfg_path}",
+            detail={"cfg_path": str(cfg_path), "robot_name": robot_name},
+        )
+    return _PhaseResult(
+        phase="voice_setup",
+        status="failed",
+        message=f"run_voice_setup exited with rc={rc}",
+        detail={"rc": rc, "cfg_path": str(cfg_path)},
+    )
