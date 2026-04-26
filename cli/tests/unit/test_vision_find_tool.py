@@ -219,3 +219,56 @@ def test_vision_find_filters_oak_d_no_data_sentinel():
         f"depth filter broken — saturation values pulled median to {r['depth_mm']}mm"
     )
     assert 350 < r["depth_mm"] < 500
+
+
+def test_vision_find_passes_depth_frame_to_detector():
+    """vision_find_tool must pass `depth_frame` to the detector so descriptor
+    `min_depth_mm`/`max_depth_mm`/`strict_depth` actually take effect.
+    Bug: PR #10 added depth bounds to the init scaffold but vision_find
+    only passed the RGB frame, so depth filtering was silently skipped."""
+    rgb = np.zeros((200, 300, 3), dtype=np.uint8)
+    rgb[:] = (240, 240, 240)
+    cv2.rectangle(rgb, (50, 50), (100, 100), (40, 40, 220), -1)  # red blob in upper-left
+    cv2.rectangle(rgb, (200, 130), (260, 170), (40, 40, 220), -1)  # red blob in lower-right
+    # Depth: upper-left blob at 6m (background, out of range);
+    # lower-right blob at 400mm (in range).
+    depth = np.full((200, 300), 65535, dtype=np.uint16)
+    depth[40:110, 40:110] = 6000
+    depth[120:180, 195:265] = 400
+    K = np.array([[500.0, 0, 150.0], [0, 500.0, 100.0], [0, 0, 1.0]])
+
+    per = MagicMock()
+    per.grab_frame.return_value = (rgb, depth, K)
+    backend = MagicMock()
+    backend._perception = per
+    spec = MagicMock()
+    # Strict depth filter — must reject the 6m background blob and pick
+    # the 400mm in-range blob.
+    spec.vision = VisionBlock(
+        object_descriptors=(
+            ObjectDescriptor(
+                id="red_lego",
+                detector="hsv",
+                params={
+                    "h_ranges": [[0, 10], [170, 180]],
+                    "s_min": 80,
+                    "v_min": 80,
+                    "min_depth_mm": 100,
+                    "max_depth_mm": 800,
+                    "strict_depth": True,
+                },
+            ),
+        )
+    )
+    ctx = MagicMock()
+    ctx.backend = backend
+    ctx.spec = spec
+
+    r = vision_find_tool(ctx, descriptor_id="red_lego")
+    assert r["status"] == "ok"
+    # Centroid should land on the 400mm blob (lower-right, around (230, 150))
+    u, v = r["pixel"]
+    assert 195 < u < 265 and 120 < v < 180, (
+        f"detector matched wrong blob: pixel ({u},{v}) — depth filter not applied"
+    )
+    assert r["depth_mm"] < 800

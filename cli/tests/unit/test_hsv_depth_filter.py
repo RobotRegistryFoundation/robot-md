@@ -109,3 +109,41 @@ def test_detect_hsv_roi_accepts_depth_without_bounds_is_noop():
     a = detect_hsv_roi(frame, params=params)
     b = detect_hsv_roi(frame, params=params, depth_frame=depth)
     assert a == b
+
+
+def test_detect_hsv_strict_depth_rejects_stereo_holes():
+    """Default `unknown | in_range` mask lets background through stereo
+    holes (depth==0). `strict_depth: true` requires VALID in-range depth."""
+    frame = _solid_red_frame()
+    # Most of the frame is stereo-hole (depth=0); only a small patch in the
+    # right half has a valid 400mm reading.
+    depth = np.zeros((400, 600), dtype=np.uint16)
+    depth[180:220, 380:420] = 400
+
+    # Default (permissive) — passes unknown pixels, so the centroid lands
+    # near image center because the entire red frame is in the mask.
+    centroid_perm = detect_hsv(
+        frame,
+        params={**RED_PARAMS, "min_depth_mm": 100, "max_depth_mm": 500},
+        depth_frame=depth,
+    )
+    assert centroid_perm is not None
+    u_perm, _, _ = centroid_perm
+    assert 250 < u_perm < 350  # near image center
+
+    # Strict — rejects unknown, must land on the small valid patch.
+    centroid_strict = detect_hsv(
+        frame,
+        params={
+            **RED_PARAMS,
+            "min_depth_mm": 100,
+            "max_depth_mm": 500,
+            "strict_depth": True,
+        },
+        depth_frame=depth,
+    )
+    assert centroid_strict is not None
+    u_strict, v_strict, _ = centroid_strict
+    # Should land on the valid-depth patch around (400, 200).
+    assert 380 <= u_strict <= 420
+    assert 180 <= v_strict <= 220

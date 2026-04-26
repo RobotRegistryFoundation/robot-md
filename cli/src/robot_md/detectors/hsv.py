@@ -60,6 +60,15 @@ def _depth_mask(depth_frame: np.ndarray, params: dict[str, Any]) -> np.ndarray |
     hi = int(max_d) if max_d is not None else 65535
     unknown = depth_frame == 0
     in_range = (depth_frame >= lo) & (depth_frame <= hi)
+    # `strict_depth=True` rejects stereo-hole (depth==0) pixels. The
+    # default `unknown | in_range` lets textureless objects (matte LEGO,
+    # painted bowl) survive through depth holes — but the cost is that
+    # background regions with stereo holes also pass, so a saturated red
+    # wall or white floor matches when the camera sees past the workspace.
+    # Set strict_depth: true when the target has enough edges/texture
+    # for stereo to produce SOME valid depth pixels.
+    if params.get("strict_depth"):
+        return in_range.astype(np.uint8) * 255
     return (unknown | in_range).astype(np.uint8) * 255
 
 
