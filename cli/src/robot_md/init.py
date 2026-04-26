@@ -712,6 +712,12 @@ def default_flow(
     if do_teach_poses:
         results.append(phase_teach_poses(manifest_path=out_path, interactive=sys.stdin.isatty()))
 
+    # Phase 8: voice/audio onboarding — host-dependent (USB audio devices),
+    # so placed last alongside other hardware-detection phases.
+    from robot_md.init_phases import phase_voice_setup
+
+    results.append(phase_voice_setup(out_path, non_interactive=not sys.stdin.isatty()))
+
     _print_tally(results, out_path)
     return 0
 
