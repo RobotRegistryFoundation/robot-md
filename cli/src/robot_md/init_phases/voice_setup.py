@@ -8,10 +8,8 @@ from __future__ import annotations
 import datetime as _dt
 import sys
 from pathlib import Path
-from typing import Any
 
 import yaml
-
 
 _HEADER = (
     "═══ Voice setup ═══════════════════════════════════════════"
@@ -31,7 +29,7 @@ def _prompt_choice(prompt: str, options: list, default_idx: int = 0) -> int:
     for i, o in enumerate(options, 1):
         marker = "  ←  auto-pick" if i - 1 == default_idx else ""
         sys.stdout.write(f"  [{i}] {o.name}{marker}\n")
-    sys.stdout.write(f"  [ ] Press Enter to accept auto-pick, or type a number: ")
+    sys.stdout.write("  [ ] Press Enter to accept auto-pick, or type a number: ")
     sys.stdout.flush()
     line = sys.stdin.readline().strip()
     if not line:
@@ -55,9 +53,10 @@ def _confirm(prompt: str) -> bool:
 def _speaker_test(output_device_name: str) -> bool:
     """Play a 1s 880Hz tone via the chosen output. Returns True if user confirmed."""
     try:
+        import asyncio
         import math
         import struct
-        import asyncio
+
         from pendantd.audio.devices import list_devices, match_substring  # type: ignore
         from pendantd.audio.streams import OutputStream  # type: ignore
 
@@ -73,7 +72,10 @@ def _speaker_test(output_device_name: str) -> bool:
         sr = device.sample_rate
         n = int(1.0 * sr)
         amp = 8000  # ~25% of int16 max — comfortable
-        tone = struct.pack(f"<{n}h", *[int(amp * math.sin(2 * math.pi * 880 * t / sr)) for t in range(n)])
+        tone = struct.pack(
+            f"<{n}h",
+            *[int(amp * math.sin(2 * math.pi * 880 * t / sr)) for t in range(n)],
+        )
 
         async def _play() -> None:
             stream = OutputStream(device_index=device.index, samplerate=sr)
@@ -95,9 +97,10 @@ def _mic_loopback_test(input_name: str, output_name: str) -> bool:
     """Record 2s, play it back. Returns True if user confirmed."""
     try:
         import asyncio
+
         from pendantd.audio.devices import list_devices, match_substring  # type: ignore
-        from pendantd.audio.streams import InputStream, OutputStream  # type: ignore
         from pendantd.audio.loopback import record_and_play  # type: ignore
+        from pendantd.audio.streams import InputStream, OutputStream  # type: ignore
 
         devs = list_devices()
         in_dev = match_substring(devs.inputs, input_name)
@@ -115,7 +118,10 @@ def _mic_loopback_test(input_name: str, output_name: str) -> bool:
             f"Mic loopback test… recording 2s via {in_dev.name}, playing back via {out_dev.name}\n"
         )
         result = asyncio.run(_loopback())
-        sys.stdout.write(f"  recorded {result.recorded_bytes} bytes (peak {result.peak_dbfs:.1f} dBFS)\n")
+        sys.stdout.write(
+            f"  recorded {result.recorded_bytes} bytes "
+            f"(peak {result.peak_dbfs:.1f} dBFS)\n"
+        )
     except Exception as e:
         sys.stdout.write(f"  (loopback failed: {e}; falling back to manual confirmation)\n")
     return _confirm("Sound right?")
@@ -153,31 +159,41 @@ def run_voice_setup(
             "# TODO(voice): no audio devices detected at init time\n"
             + yaml.safe_dump(cfg)
         )
-        sys.stdout.write("No audio devices detected. Wrote a TODO marker; re-run when devices attach.\n")
+        sys.stdout.write(
+            "No audio devices detected. Wrote a TODO marker; re-run when devices attach.\n"
+        )
         return 0
 
     in_default = devs_mod.pick_default(devs.inputs, kind="input") if devs.inputs else None
-    out_default = devs_mod.pick_default(devs.outputs, kind="output", all_devices=devs) if devs.outputs else None
+    out_default = (
+        devs_mod.pick_default(devs.outputs, kind="output", all_devices=devs)
+        if devs.outputs
+        else None
+    )
 
     if non_interactive:
         cfg["input_device"] = in_default.name if in_default else ""
         cfg["output_device"] = out_default.name if out_default else ""
     else:
         if devs.inputs:
-            idx = _prompt_choice("Inputs:", devs.inputs, default_idx=devs.inputs.index(in_default) if in_default else 0)
+            default_idx = devs.inputs.index(in_default) if in_default else 0
+            idx = _prompt_choice("Inputs:", devs.inputs, default_idx=default_idx)
             cfg["input_device"] = devs.inputs[idx].name
         if devs.outputs:
-            idx = _prompt_choice("Outputs:", devs.outputs, default_idx=devs.outputs.index(out_default) if out_default else 0)
+            default_idx = devs.outputs.index(out_default) if out_default else 0
+            idx = _prompt_choice("Outputs:", devs.outputs, default_idx=default_idx)
             cfg["output_device"] = devs.outputs[idx].name
 
         # Speaker test
-        if cfg["output_device"]:
-            if not _speaker_test(cfg["output_device"]):
-                sys.stdout.write("Output may need attention. Continuing.\n")
+        if cfg["output_device"] and not _speaker_test(cfg["output_device"]):
+            sys.stdout.write("Output may need attention. Continuing.\n")
         # Mic loopback test
-        if cfg["input_device"] and cfg["output_device"]:
-            if not _mic_loopback_test(cfg["input_device"], cfg["output_device"]):
-                sys.stdout.write("Input may need attention. Continuing.\n")
+        if (
+            cfg["input_device"]
+            and cfg["output_device"]
+            and not _mic_loopback_test(cfg["input_device"], cfg["output_device"])
+        ):
+            sys.stdout.write("Input may need attention. Continuing.\n")
         # Wake-word check
         if not _skip_wake_check and cfg["robot_name"]:
             sys.stdout.write(f'Wake-word check… say "{cfg["robot_name"]}" or "claude" within 10s\n')
