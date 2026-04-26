@@ -429,6 +429,50 @@ def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, An
     device_availability_ok = not any_held
     device_applies = any(p.get("state") in ("free", "held", "missing") for p in device_probes)
 
+    # 8. Workspace bounds_mm required for IK envelope sampling. `calibrate
+    # --extrinsic`'s plan_sweep keys directly into
+    # `physics.workspace.bounds_mm` and KeyErrors when only `reach_mm` is
+    # declared. The IK target reachability check needs it too. Required
+    # whenever motion capabilities are declared.
+    workspace = physics.get("workspace") or {}
+    bounds_mm = workspace.get("bounds_mm") or {}
+    has_xyz_bounds = all(k in bounds_mm for k in ("x", "y", "z"))
+    workspace_bounds_ok = (not has_motion_caps) or has_xyz_bounds
+
+    # 9. Kinematics chain length must match dof. IK + FK + plan_sweep all
+    # iterate `physics.kinematics[]`; len < dof produces silent IK failures
+    # downstream. Manifests that copied a preset usually pass; hand-rolled
+    # ones often miss the kinematics block entirely.
+    declared_dof = int(physics.get("dof") or 0)
+    kinematics_entries = physics.get("kinematics") or []
+    kinematics_len = len(kinematics_entries) if isinstance(kinematics_entries, list) else 0
+    kinematics_ok = (not has_motion_caps) or (declared_dof == 0 or kinematics_len >= declared_dof)
+
+    # 10. Solver block required for IK when motion capabilities exist.
+    # Needs at minimum `ik_provider` and (for vision-aided motion) `cameras`.
+    solver_has_ik = bool(solver.get("ik_provider"))
+    solver_has_cameras = isinstance(solver.get("cameras"), list) and bool(solver.get("cameras"))
+    solver_ok = not has_motion_caps or (
+        solver_has_ik and (not has_vision_driver or solver_has_cameras)
+    )
+
+    # 11. Joint zero / sign calibration. SO-ARM101's preset ships
+    # `zero_pose_steps: 2048` (servo midpoint) and `encoder_sign: 1` for
+    # every joint as TODO defaults. With those, `calibrate --extrinsic`'s
+    # FK reference is systematically biased and the optimization can't
+    # converge below ~150-220mm residual regardless of detector quality.
+    # Warn before extrinsic calibration is even attempted.
+    needs_zero_sign = False
+    if has_motion_caps and isinstance(kinematics_entries, list):
+        for k in kinematics_entries:
+            if not isinstance(k, dict):
+                continue
+            # 2048 = exactly servo midpoint, the canonical preset stub.
+            if k.get("zero_pose_steps") == 2048:
+                needs_zero_sign = True
+                break
+    zero_sign_ok = not needs_zero_sign
+
     return {
         "applies": has_motion_caps or has_actuation_driver or has_vision_driver,
         "ready": (
@@ -439,6 +483,10 @@ def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, An
             and namespace_ok
             and backend_resolution_ok
             and device_availability_ok
+            and workspace_bounds_ok
+            and kinematics_ok
+            and solver_ok
+            and zero_sign_ok
         ),
         "checks": {
             "hitl_gates": {
@@ -610,6 +658,110 @@ def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, An
                     )
                 ),
                 "probes": device_probes,
+            },
+            "workspace_bounds_mm": {
+                "ok": workspace_bounds_ok,
+                "detail": (
+                    "no motion capabilities — N/A"
+                    if not has_motion_caps
+                    else (
+                        "bounds_mm declared on x/y/z"
+                        if workspace_bounds_ok
+                        else (
+                            "physics.workspace.bounds_mm missing or incomplete — "
+                            "calibrate --extrinsic and IK envelope sampling both "
+                            "need x/y/z ranges"
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if workspace_bounds_ok
+                    else (
+                        "Add physics.workspace.bounds_mm with x, y, z ranges "
+                        "(e.g. `bounds_mm: {x: [-200, 340], y: [-340, 340], z: [0, 250]}`)"
+                    )
+                ),
+            },
+            "kinematics_complete": {
+                "ok": kinematics_ok,
+                "detail": (
+                    "no motion capabilities — N/A"
+                    if not has_motion_caps
+                    else (
+                        f"{kinematics_len} joints declared (dof={declared_dof})"
+                        if kinematics_ok
+                        else (
+                            f"physics.kinematics has {kinematics_len} joints but "
+                            f"physics.dof = {declared_dof} — IK + FK iterate "
+                            f"kinematics[] and silently produce wrong answers when short"
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if kinematics_ok
+                    else (
+                        f"Declare {declared_dof} joints under physics.kinematics[] "
+                        f"with id/axis/limits_deg/a_mm/d_mm/servo_id/encoder_sign/"
+                        f"zero_pose_steps. Copy from a matching preset (e.g. so_arm101) "
+                        f"if available."
+                    )
+                ),
+            },
+            "solver_block": {
+                "ok": solver_ok,
+                "detail": (
+                    "no motion capabilities — N/A"
+                    if not has_motion_caps
+                    else (
+                        "solver block populated"
+                        if solver_ok
+                        else (
+                            "physics.solver missing ik_provider"
+                            if not solver_has_ik
+                            else (
+                                "vision driver declared but solver.cameras[] is empty — "
+                                "camera-to-base transform can't be applied"
+                            )
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if solver_ok
+                    else (
+                        "Add physics.solver with `ik_provider` and (when a vision "
+                        "driver is present) `cameras: [{driver_id, primary_stream, "
+                        "mount, extrinsic_source}]`. Copy from a matching preset."
+                    )
+                ),
+            },
+            "joint_zero_sign": {
+                "ok": zero_sign_ok,
+                "detail": (
+                    "no motion capabilities — N/A"
+                    if not has_motion_caps
+                    else (
+                        "zero_pose_steps and encoder_sign appear operator-calibrated"
+                        if zero_sign_ok
+                        else (
+                            "one or more joints still at preset-default "
+                            "zero_pose_steps=2048 — calibrate --extrinsic's FK "
+                            "reference will be biased and the optimization can't "
+                            "converge below ~150-220mm residual"
+                        )
+                    )
+                ),
+                "fix": (
+                    None
+                    if zero_sign_ok
+                    else (
+                        "Run `robot-md calibrate --zero ROBOT.md` (pose arm at zero "
+                        "config, press Enter) and `robot-md calibrate --sign ROBOT.md` "
+                        "(per-joint y/n) BEFORE `robot-md calibrate --extrinsic`"
+                    )
+                ),
             },
         },
     }

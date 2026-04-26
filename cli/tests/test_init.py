@@ -349,6 +349,34 @@ def test_first_motion_defaults_descriptors_from_pick_capability():
     assert "white_bowl" in ids
 
 
+def test_first_motion_defaults_descriptors_use_correct_param_keys():
+    """The HSV detector reads `h_ranges` (list of [lo, hi] pairs), `s_min`,
+    `s_max`, `v_min`, `v_max` — NOT `h`/`s`/`v` with list values. Wrong keys
+    silently fall back to "match every saturated pixel" so the centroid
+    lands at image center and dispatch resolves to whatever happens to be
+    behind it (production bug observed during bob's first-pick attempt
+    2026-04-25)."""
+    preset = _bare_preset(
+        physics={"type": "arm", "dof": 6},
+        drivers=[{"id": "arm", "protocol": "feetech_scs"}],
+        capabilities=["arm.pick"],
+        safety={"estop": {"software": True, "response_ms": 50}},
+    )
+    fm = merge_preset_into_draft(preset, "bot", _Scan())
+    by_id = {d["id"]: d for d in fm["vision"]["object_descriptors"]}
+    for desc_id in ("red_lego", "white_bowl"):
+        params = by_id[desc_id]["params"]
+        # The shape the detector actually reads
+        assert "h_ranges" in params, f"{desc_id} missing h_ranges"
+        assert isinstance(params["h_ranges"], list)
+        assert all(isinstance(pair, list) and len(pair) == 2 for pair in params["h_ranges"])
+        assert "s_min" in params and "s_max" in params
+        assert "v_min" in params and "v_max" in params
+        # NOT the broken shape from the original PR #8 scaffold
+        assert "h" not in params, f"{desc_id} still has bare 'h' key"
+        assert "s" not in params, f"{desc_id} still has bare 's' key"
+
+
 def test_first_motion_defaults_does_not_override_preset_descriptors():
     """If preset already declares descriptors, init keeps them verbatim."""
     preset = _bare_preset(
