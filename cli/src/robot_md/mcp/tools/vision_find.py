@@ -49,10 +49,18 @@ def vision_find_tool(ctx: Any, *, descriptor_id: str) -> dict:
     patch = depth[max(0, v - r) : min(h, v + r + 1), max(0, u - r) : min(w, u + r + 1)].astype(
         np.float32
     )
-    # Filter out OAK-D's 65535 "no data" sentinel — without this, sparse
-    # valid pixels in a textureless patch are dwarfed by the saturated
-    # background and the median lands at ~15m even for objects at 40cm.
-    valid = patch[(patch > 0) & (patch < 10000)]
+    # Filter the patch by the descriptor's declared depth range when it
+    # has one. Without this bound, when the centroid lands on a stereo-
+    # hole pixel (matte target) the patch median samples surrounding
+    # background pixels and reports a depth far outside the workspace,
+    # even when the detector's color+depth mask correctly identified
+    # the centroid. Falls back to the saturation-only filter when no
+    # bounds declared.
+    desc_min = desc.params.get("min_depth_mm")
+    desc_max = desc.params.get("max_depth_mm")
+    lo = int(desc_min) if desc_min is not None else 1
+    hi = int(desc_max) if desc_max is not None else 10000
+    valid = patch[(patch >= lo) & (patch <= hi)]
     depth_mm = float(np.median(valid)) if valid.size else float("nan")
     xyz = _pixel_to_3d(u, v, depth_mm, K)
     return {
