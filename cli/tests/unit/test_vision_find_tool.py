@@ -272,3 +272,56 @@ def test_vision_find_passes_depth_frame_to_detector():
         f"detector matched wrong blob: pixel ({u},{v}) — depth filter not applied"
     )
     assert r["depth_mm"] < 800
+
+
+def test_vision_find_patch_median_honors_descriptor_depth_bounds():
+    """When the descriptor declares min/max depth, the patch median around
+    the centroid should be filtered by THOSE bounds, not just the saturation
+    filter. Otherwise a centroid that lands on a stereo-hole pixel can have
+    its depth read from surrounding background pixels (e.g. a back wall at
+    600mm when bob's workspace is 100-500mm)."""
+    rgb = np.zeros((200, 300, 3), dtype=np.uint8)
+    rgb[:] = (240, 240, 240)
+    cv2.rectangle(rgb, (135, 85), (165, 115), (40, 40, 220), -1)  # red blob (~900px)
+    # The lego region is full of stereo holes (depth==0) — typical of
+    # matte plastic. The detector's permissive mask (unknown | in_range)
+    # still passes the holes so it lands on the lego centroid. The patch
+    # around the centroid then samples surrounding background (600mm
+    # wall, OUT of band) — the bug we're testing for.
+    depth = np.full((200, 300), 600, dtype=np.uint16)
+    depth[85:115, 135:165] = 0  # stereo holes covering the lego region
+    K = np.array([[500.0, 0, 150.0], [0, 500.0, 100.0], [0, 0, 1.0]])
+
+    per = MagicMock()
+    per.grab_frame.return_value = (rgb, depth, K)
+    backend = MagicMock()
+    backend._perception = per
+    spec = MagicMock()
+    spec.vision = VisionBlock(
+        object_descriptors=(
+            ObjectDescriptor(
+                id="red_lego",
+                detector="hsv",
+                params={
+                    "h_ranges": [[0, 10], [170, 180]],
+                    "s_min": 80,
+                    "v_min": 80,
+                    "min_depth_mm": 100,
+                    "max_depth_mm": 500,
+                },
+            ),
+        )
+    )
+    ctx = MagicMock()
+    ctx.backend = backend
+    ctx.spec = spec
+
+    r = vision_find_tool(ctx, descriptor_id="red_lego")
+    # No valid in-band pixels in the patch → depth_mm should be nan, NOT
+    # the 600mm out-of-band median. xyz collapses to nan accordingly.
+    assert r["status"] == "ok"
+    import math
+
+    assert math.isnan(r["depth_mm"]), (
+        f"expected nan when no in-band depth pixels; got {r['depth_mm']}"
+    )
