@@ -1741,7 +1741,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
             FRIA, safety benchmark, IFU Art. 13(3), incident report Art. 72, and per‑model EU Register Art. 49.
             Neutral foundation; Cloudflare Pages + Workers + D1. No seat fees.</div>
           <div class="cell"><span class="tag">Public</span>Public endpoint at <code
-              style="font-family:var(--mono)">rcan.dev/r/&lt;rrn&gt;</code>. Self‑hosted mode supported.</div>
+              style="font-family:var(--mono)">robotregistryfoundation.org/r/&lt;rrn&gt;</code>. Self‑hosted mode supported.</div>
         </div>
 
         <div class="stack-row" role="row">
@@ -1789,7 +1789,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
             <li>RRN format: <code>RRN‑000000000001</code> (12‑digit numeric) and
               <code>rrn://org/category/model/id</code> URI form.
             </li>
-            <li>Public resolver at <code>rcan.dev/r/&lt;rrn&gt;</code> — returns the robot's ROBOT.md, its compliance
+            <li>Public resolver at <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code> — returns the robot's ROBOT.md, its compliance
               block, its registry metadata.</li>
             <li>Mint in one command: <code>robot-md register ROBOT.md</code> reads your manifest's
               <code>metadata.manufacturer/model/version/device_id</code>, POSTs to RRF, and writes the assigned RRN back
@@ -1969,7 +1969,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
               <td>string</td>
               <td><span class="req yes">✓</span></td>
               <td>RRF-assigned identifier (e.g. <code>RRN-000000000001</code>). Empty until
-                <code>robot-md register</code> mints one. Resolves via <code>rcan.dev/r/&lt;rrn&gt;</code>.
+                <code>robot-md register</code> mints one. Resolves via <code>robotregistryfoundation.org/r/&lt;rrn&gt;</code>.
               </td>
             </tr>
             <tr>
@@ -2102,9 +2102,11 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
         <div>
           <h2 class="sec-title">Zero flags. One command. Claude does the rest.</h2>
           <p class="sec-lede">Bare <code>robot-md init</code> scans PCI/USB/<code>/dev/tty*</code>, actively probes for
-            Feetech servo buses, matches against the 10-preset library — <b>so-arm101</b>, <b>so-arm101-leader</b>,
-            <b>turtlebot4</b>, <b>picar-x</b>, <b>franka-panda</b>, <b>ur5e</b>, <b>koch-arm</b>, <b>aloha2</b>
-            (bimanual), <b>unitree-go2</b> (quadruped), <b>minimal</b> — and emits a validated draft with full DH
+            Feetech servo buses, matches against the 16-preset library — <b>so-arm101</b>, <b>so-arm101-leader</b>,
+            <b>turtlebot4</b>, <b>turtlebot3-burger</b>, <b>picar-x</b>, <b>franka-panda</b>, <b>ur5e</b>,
+            <b>koch-arm</b>, <b>aloha2</b> (bimanual), <b>unitree-go2</b> (quadruped), <b>reachy2</b> (humanoid),
+            <b>stretch3</b>, <b>lekiwi</b>, <b>lego-spike-prime</b>, <b>lego-ev3</b>, <b>minimal</b> — and emits a
+            validated draft with full DH
             kinematics + safety defaults already populated. For known robots, ~85&nbsp;% of the manifest is pre-filled
             automatically. Follow-ups (register, calibrate, hand-eye) happen inside Claude Code in English — or as flags
             if you'd rather script them.
@@ -2143,7 +2145,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
 <span class="p">$</span> pip install robot-md
 <span class="p">$</span> robot-md init
 
-<span class="c">🤖 robot-md v0.6.3 — Let's get your robot online.</span>
+<span class="c">🤖 robot-md v1.1.1 — Let's get your robot online.</span>
 
 <span class="c">? Name your robot:</span> bob
 <span class="c">? Scan for hardware? [Y/n]</span> y
@@ -2160,7 +2162,7 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
 <span class="c">? Calibrate arm zero pose now? [Y/n]</span> y
 <span class="mute">  → move arm to zero and press Enter... ok</span>
 
-<span class="ok">▸ Done. bob is online at rcan.dev/r/RRN-000000000173</span>
+<span class="ok">▸ Done. bob is online at robotregistryfoundation.org/r/RRN-000000000173</span>
 
 <span class="p">$</span> claude
 <span class="c">· 6 resources loaded: robot-md://bob/{identity, context, frontmatter...}</span>
@@ -2174,21 +2176,21 @@ RCAN §8 AUTHORIZE. Bounds enforced per‑joint before servo bus.</pre>
           <div class="top"><i></i><i></i><i></i><span>Path B · Claude Code · ~/projects/my-bob</span></div>
           <pre class="body"><span class="c"># Inside Claude Code. NLP translates to Bash & MCP automatically.</span>
 <span class="p">You:</span> Set up a ROBOT.md for this robot. Use the so-arm101 preset.
-     Register it publicly at rcan.dev under manufacturer "acme".
+     Register it publicly at robotregistryfoundation.org under manufacturer "acme".
      Then add the robot-md MCP server to this session.
 
 <span class="c">Claude:</span> I'll do this in four steps — install the CLI, init the
         manifest with registration, wire up MCP, then verify.
 
 <span class="mute">        [runs: pip install robot-md]</span>
-<span class="ok">        ✓ robot-md 0.6.3 installed</span>
+<span class="ok">        ✓ robot-md 1.1.1 installed</span>
 
 <span class="mute">        [runs: robot-md init my-bob --preset so-arm101 --register...]</span>
 <span class="ok">        ✓ wrote ROBOT.md  preset: so-arm101</span>
 <span class="ok">        ✓ my-bob (arm, 6 DoF, 5 capabilities)</span>
-<span class="ok">        ✓ registered on rcan.dev</span>
+<span class="ok">        ✓ registered on robotregistryfoundation.org</span>
 <span class="mute">          RRN: RRN-000000000042</span>
-<span class="mute">          Public record: https://rcan.dev/r/RRN-000000000042</span>
+<span class="mute">          Public record: https://robotregistryfoundation.org/r/RRN-000000000042</span>
 
 <span class="mute">        [runs: /plugin install robot-md@robotregistryfoundation]</span>
 <span class="ok">        ✓ plugin installed — using-robot-md skill + MCP server active</span>
