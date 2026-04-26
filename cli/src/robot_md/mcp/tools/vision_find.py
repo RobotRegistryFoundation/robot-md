@@ -49,7 +49,10 @@ def vision_find_tool(ctx: Any, *, descriptor_id: str) -> dict:
     patch = depth[max(0, v - r) : min(h, v + r + 1), max(0, u - r) : min(w, u + r + 1)].astype(
         np.float32
     )
-    valid = patch[patch > 0]
+    # Filter out OAK-D's 65535 "no data" sentinel — without this, sparse
+    # valid pixels in a textureless patch are dwarfed by the saturated
+    # background and the median lands at ~15m even for objects at 40cm.
+    valid = patch[(patch > 0) & (patch < 10000)]
     depth_mm = float(np.median(valid)) if valid.size else float("nan")
     xyz = _pixel_to_3d(u, v, depth_mm, K)
     return {

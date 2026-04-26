@@ -23,9 +23,14 @@ def phase_calibrate_extrinsic(
     camera: Any | None,
     interactive: bool = True,
     n_poses: int = 6,
+    auto_yes: bool = False,
 ) -> PhaseResult:
     """Opt-in init phase; writes `extrinsic_source: gripper_silhouette_calibrated`
     plus the computed 6-vec back into the manifest on success.
+
+    `auto_yes=True` (passed by the CLI when `--yes` is set) skips both
+    interactive prompts: the initial "arm will move through N poses"
+    confirmation AND the high-residual acceptance prompt at the end.
     """
     if not interactive:
         return PhaseResult(
@@ -73,17 +78,20 @@ def phase_calibrate_extrinsic(
             detail={"reason": "already_calibrated", "source": source},
         )
 
-    answer = (
-        (
-            input(
-                "Calibrate camera-to-arm alignment now? The arm will move through "
-                f"{n_poses} poses. [Y/n] "
+    if auto_yes:
+        answer = "y"
+    else:
+        answer = (
+            (
+                input(
+                    "Calibrate camera-to-arm alignment now? The arm will move through "
+                    f"{n_poses} poses. [Y/n] "
+                )
+                or "y"
             )
-            or "y"
+            .strip()
+            .lower()
         )
-        .strip()
-        .lower()
-    )
     if answer.startswith("n"):
         return PhaseResult(
             phase="calibrate_extrinsic",
@@ -172,11 +180,14 @@ def phase_calibrate_extrinsic(
 
         six_vec, residual = solve(samples)
         if residual > 15.0:
-            ans = (
-                (input(f"Calibration residual {residual:.1f}mm is high. Accept? [y/N] ") or "n")
-                .strip()
-                .lower()
-            )
+            if auto_yes:
+                ans = "y"
+            else:
+                ans = (
+                    (input(f"Calibration residual {residual:.1f}mm is high. Accept? [y/N] ") or "n")
+                    .strip()
+                    .lower()
+                )
             if not ans.startswith("y"):
                 return PhaseResult(
                     phase="calibrate_extrinsic",

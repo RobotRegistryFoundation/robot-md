@@ -351,17 +351,37 @@ def _ensure_first_motion_defaults(fm: dict[str, Any]) -> None:
         vision = fm.setdefault("vision", {})
         descriptors = vision.setdefault("object_descriptors", [])
         if not descriptors:
+            # Match the keys read by detectors/hsv.py: `h_ranges` (list of
+            # [lo, hi] pairs), `s_min`/`s_max`/`v_min`/`v_max`. Wrong keys
+            # silently fall back to "match every saturated pixel" — the
+            # centroid lands at image center and dispatch resolves to
+            # whatever pixel happens to sit behind that.
             descriptors.extend(
                 [
                     {
                         "id": "red_lego",
                         "detector": "hsv",
-                        "params": {"h": [0, 10], "s": [120, 255], "v": [80, 255]},
+                        # Red wraps both ends of the HSV hue circle.
+                        "params": {
+                            "h_ranges": [[0, 10], [170, 180]],
+                            "s_min": 120,
+                            "s_max": 255,
+                            "v_min": 80,
+                            "v_max": 255,
+                            "min_area": 200,
+                        },
                     },
                     {
                         "id": "white_bowl",
                         "detector": "hsv",
-                        "params": {"h": [0, 180], "s": [0, 60], "v": [180, 255]},
+                        "params": {
+                            "h_ranges": [[0, 180]],
+                            "s_min": 0,
+                            "s_max": 60,
+                            "v_min": 180,
+                            "v_max": 255,
+                            "min_area": 1000,
+                        },
                     },
                 ]
             )

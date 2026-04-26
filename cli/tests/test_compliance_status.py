@@ -1,3 +1,6 @@
+# ruff: noqa: E501  -- YAML test fixtures (kinematics entries) are flow-style
+# one-liners; splitting them across multiple lines hurts readability for the
+# small diff this saves.
 """Tests for `robot-md compliance status` — the one-shot pre-flight check.
 
 Pulls together: manifest, keystore, audit chain, incidents log, on-disk
@@ -33,7 +36,16 @@ metadata:
   rrn: RRN-000000000099
 network:
   rrf_endpoint: https://robotregistryfoundation.org
-physics: { type: arm, dof: 6 }
+physics:
+  type: arm
+  dof: 2
+  workspace:
+    bounds_mm: { x: [0, 300], y: [-200, 200], z: [0, 250] }
+  solver:
+    ik_provider: stub
+  kinematics:
+    - { id: j1, axis: z, limits_deg: [-180, 180], a_mm: 0, d_mm: 60, servo_id: 1, encoder_sign: 1, zero_pose_steps: 1500 }
+    - { id: j2, axis: y, limits_deg: [-90, 90], a_mm: 100, d_mm: 0, servo_id: 2, encoder_sign: 1, zero_pose_steps: 2200 }
 drivers:
   - { id: arm, protocol: feetech, port: /dev/null }
 safety:
@@ -318,6 +330,10 @@ def test_first_motion_readiness_section_present(manifest, home):
         "capability_namespace",
         "backend_resolution",
         "device_availability",
+        "workspace_bounds_mm",
+        "kinematics_complete",
+        "solver_block",
+        "joint_zero_sign",
     ):
         assert cid in fmr["checks"], f"missing first-motion check: {cid}"
 
@@ -374,6 +390,9 @@ def test_first_motion_readiness_bubbles_to_blockers(bob_not_ready, home):
         "camera_extrinsic",
         "capability_namespace",
         "backend_resolution",
+        "workspace_bounds_mm",
+        "kinematics_complete",
+        "solver_block",
     ):
         assert cid in blocker_text, f"first-motion check {cid} not aggregated into blockers"
 
@@ -418,19 +437,25 @@ network:
   rrf_endpoint: https://robotregistryfoundation.org
 physics:
   type: arm
-  dof: 6
+  dof: 2
+  workspace:
+    bounds_mm: { x: [0, 300], y: [-200, 200], z: [0, 250] }
   solver:
+    ik_provider: stub
     cameras:
       - driver_id: cam
         primary_stream: rgb
         mount: world
         extrinsic: { R: [[1,0,0],[0,1,0],[0,0,1]], t: [0.0, 0.0, 0.5] }
+  kinematics:
+    - { id: j1, axis: z, limits_deg: [-180, 180], a_mm: 0, d_mm: 60, servo_id: 1, encoder_sign: 1, zero_pose_steps: 1500 }
+    - { id: j2, axis: y, limits_deg: [-90, 90], a_mm: 100, d_mm: 0, servo_id: 2, encoder_sign: 1, zero_pose_steps: 2200 }
 drivers:
   - { id: arm, protocol: feetech, port: /dev/null }
   - { id: vision, protocol: depthai, connection: usb }
 vision:
   object_descriptors:
-    - { id: red_lego, detector: hsv, params: { h: [0, 10] } }
+    - { id: red_lego, detector: hsv, params: { h_ranges: [[0, 10]], s_min: 120 } }
 capabilities:
   - arm.pick
   - arm.place
@@ -593,3 +618,118 @@ safety:
     assert "stop" in check["fix"].lower()
     # Bubbles into ranked blockers
     assert any("device_availability" in b for b in s["blockers"])
+
+
+# ---- workspace_bounds_mm / kinematics / solver / joint_zero_sign (PR follow-up-2, 2026-04-25) ---
+
+
+_MOTION_HEAD = """\
+---
+rcan_version: "3.2"
+metadata: { robot_name: t, manufacturer: A, model: m, firmware_version: 1.0.0 }
+"""
+_MOTION_TAIL = """\
+drivers:
+  - { id: arm, protocol: feetech, port: /dev/null }
+capabilities: [arm.home]
+safety:
+  estop: { software: true, response_ms: 50 }
+  max_joint_velocity_dps: 30
+  hitl_gates: [{ scope: arm, require_auth: true }]
+---
+"""
+
+
+def _write(path, physics_yaml: str) -> None:
+    path.write_text(_MOTION_HEAD + physics_yaml + _MOTION_TAIL)
+
+
+def test_workspace_bounds_mm_flags_missing_bounds(tmp_path, home):
+    """`calibrate --extrinsic` keys into physics.workspace.bounds_mm; missing
+    it KeyErrors at calibration time. The pre-flight should refuse first."""
+    p = tmp_path / "ROBOT.md"
+    _write(p, "physics: { type: arm, dof: 2, workspace: { reach_mm: 400 } }\n")
+    s = gather_status(p, network_probe=False)
+    check = s["first_motion_readiness"]["checks"]["workspace_bounds_mm"]
+    assert check["ok"] is False
+    assert "bounds_mm" in check["detail"] and "bounds_mm" in check["fix"]
+
+
+def test_kinematics_complete_flags_short_chain(tmp_path, home):
+    """dof=6 but only 2 kinematics entries → IK + FK silently produce wrong
+    answers. Pre-flight should refuse."""
+    p = tmp_path / "ROBOT.md"
+    _write(
+        p,
+        """physics:
+  type: arm
+  dof: 6
+  workspace: { bounds_mm: { x: [0, 300], y: [-200, 200], z: [0, 250] } }
+  solver: { ik_provider: stub }
+  kinematics:
+    - { id: j1, axis: z, limits_deg: [-180, 180], a_mm: 0, d_mm: 60, servo_id: 1, encoder_sign: 1, zero_pose_steps: 1500 }
+    - { id: j2, axis: y, limits_deg: [-90, 90], a_mm: 100, d_mm: 0, servo_id: 2, encoder_sign: 1, zero_pose_steps: 2200 }
+""",
+    )
+    s = gather_status(p, network_probe=False)
+    check = s["first_motion_readiness"]["checks"]["kinematics_complete"]
+    assert check["ok"] is False
+    assert "2" in check["detail"] and "6" in check["detail"]
+
+
+def test_solver_block_flags_missing_ik_provider(tmp_path, home):
+    p = tmp_path / "ROBOT.md"
+    _write(
+        p,
+        """physics:
+  type: arm
+  dof: 1
+  workspace: { bounds_mm: { x: [0, 300], y: [-200, 200], z: [0, 250] } }
+  kinematics:
+    - { id: j1, axis: z, limits_deg: [-180, 180], a_mm: 0, d_mm: 60, servo_id: 1, encoder_sign: 1, zero_pose_steps: 1500 }
+""",
+    )
+    s = gather_status(p, network_probe=False)
+    check = s["first_motion_readiness"]["checks"]["solver_block"]
+    assert check["ok"] is False
+    assert "ik_provider" in check["detail"]
+
+
+def test_joint_zero_sign_flags_default_zeros(tmp_path, home):
+    """zero_pose_steps still at servo midpoint 2048 → calibration won't
+    converge. Pre-flight should refuse to run --extrinsic."""
+    p = tmp_path / "ROBOT.md"
+    _write(
+        p,
+        """physics:
+  type: arm
+  dof: 1
+  workspace: { bounds_mm: { x: [0, 300], y: [-200, 200], z: [0, 250] } }
+  solver: { ik_provider: stub }
+  kinematics:
+    - { id: j1, axis: z, limits_deg: [-180, 180], a_mm: 0, d_mm: 60, servo_id: 1, encoder_sign: 1, zero_pose_steps: 2048 }
+""",
+    )
+    s = gather_status(p, network_probe=False)
+    check = s["first_motion_readiness"]["checks"]["joint_zero_sign"]
+    assert check["ok"] is False
+    assert "2048" in check["detail"] or "preset-default" in check["detail"]
+    assert "calibrate --zero" in check["fix"]
+
+
+def test_joint_zero_sign_clean_when_calibrated(tmp_path, home):
+    """Non-2048 zero_pose_steps → operator has run --zero. Check passes."""
+    p = tmp_path / "ROBOT.md"
+    _write(
+        p,
+        """physics:
+  type: arm
+  dof: 1
+  workspace: { bounds_mm: { x: [0, 300], y: [-200, 200], z: [0, 250] } }
+  solver: { ik_provider: stub }
+  kinematics:
+    - { id: j1, axis: z, limits_deg: [-180, 180], a_mm: 0, d_mm: 60, servo_id: 1, encoder_sign: 1, zero_pose_steps: 1837 }
+""",
+    )
+    s = gather_status(p, network_probe=False)
+    assert s["first_motion_readiness"]["checks"]["joint_zero_sign"]["ok"] is True

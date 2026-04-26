@@ -174,3 +174,48 @@ def test_vision_find_depth_patch_is_clamped():
     assert abs(r["depth_mm"] - 500) < 50, (
         f"depth_mm={r['depth_mm']} — radius clamp missing? patch may be sampling background."
     )
+
+
+def test_vision_find_filters_oak_d_no_data_sentinel():
+    """OAK-D's stereo depth fills textureless surfaces (lego, bowl) with the
+    65535mm 'no data' sentinel. Without filtering, the patch median around
+    the centroid is dominated by saturated values and depth lands at ~15m
+    even when valid neighboring pixels are at 40cm."""
+    rgb = np.zeros((200, 300, 3), dtype=np.uint8)
+    rgb[:] = (240, 240, 240)
+    cv2.rectangle(rgb, (120, 60), (180, 120), (40, 40, 220), -1)
+    # Depth: most of the patch around the red blob is saturated (65535).
+    # A few scattered valid pixels (within the patch) at 400mm — the
+    # legitimate depth of the textureless lego surface gleaned from edges.
+    depth = np.full((200, 300), 65535, dtype=np.uint16)
+    depth[80:85, 145:155] = 400  # small valid patch inside the blob
+    K = np.array([[500.0, 0, 150.0], [0, 500.0, 100.0], [0, 0, 1.0]])
+
+    per = MagicMock()
+    per.grab_frame.return_value = (rgb, depth, K)
+    backend = MagicMock()
+    backend._perception = per
+
+    spec = MagicMock()
+    spec.vision = VisionBlock(
+        object_descriptors=(
+            ObjectDescriptor(
+                id="red_lego",
+                detector="hsv",
+                params={"h_ranges": [[0, 10], [170, 180]], "s_min": 80, "v_min": 80},
+            ),
+        )
+    )
+    ctx = MagicMock()
+    ctx.backend = backend
+    ctx.spec = spec
+
+    r = vision_find_tool(ctx, descriptor_id="red_lego")
+    assert r["status"] == "ok"
+    # If the saturation filter is broken, depth_mm would be ~65535 (or its
+    # median with a few 400s mixed in: still >>10000). With the filter,
+    # depth_mm should be near 400.
+    assert r["depth_mm"] < 1000, (
+        f"depth filter broken — saturation values pulled median to {r['depth_mm']}mm"
+    )
+    assert 350 < r["depth_mm"] < 500

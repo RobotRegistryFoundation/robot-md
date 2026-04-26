@@ -1709,6 +1709,16 @@ def calibrate(
         "--extrinsic",
         help="Calibrate camera-to-arm extrinsic via gripper silhouette.",
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help=(
+            "Skip interactive prompts (assume yes). For --extrinsic this auto-"
+            "confirms both the initial 'arm will move' prompt and the high-"
+            "residual acceptance prompt. Required when invoking from a script."
+        ),
+    ),
     hand_eye: bool = typer.Option(
         False,
         "--hand-eye",
@@ -1784,7 +1794,9 @@ def calibrate(
                 cam = None
         except Exception as e:
             typer.echo(f"could not load manifest: {e}", err=True)
-        result = phase_calibrate_extrinsic(path, bus=bus, camera=cam, interactive=True)
+        result = phase_calibrate_extrinsic(
+            path, bus=bus, camera=cam, interactive=True, auto_yes=yes
+        )
         typer.echo(result.message)
         if bus is not None:
             with contextlib.suppress(Exception):
