@@ -198,10 +198,8 @@ def run_voice_setup(
             sys.stdout.write("(deferred to runtime — re-run with `pendantd voice test-wake`)\n")
 
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
-    provenance = (
-        f"# Provenance: autodetected {_dt.datetime.utcnow().isoformat(timespec='seconds')}Z; "
-        f"first input that matched USB class.\n"
-    )
+    _now = _dt.datetime.now(tz=_dt.timezone.utc).isoformat(timespec="seconds")
+    provenance = f"# Provenance: autodetected {_now}; first input that matched USB class.\n"
     cfg_path.write_text(yaml.safe_dump(cfg) + provenance)
     sys.stdout.write(f"Wrote {cfg_path}.\n")
     return 0
