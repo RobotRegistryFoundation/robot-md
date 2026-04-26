@@ -36,7 +36,7 @@ def vision_find_tool(ctx: Any, *, descriptor_id: str) -> dict:
     if frame is None:
         return _err("no_frame", "grab_frame returned None")
     rgb, depth, K = frame
-    hit = detector(rgb, params=desc.params)
+    hit = detector(rgb, params=desc.params, depth_frame=depth)
     if hit is None:
         return {"status": "not_found", "descriptor": descriptor_id}
     u, v, area = hit
