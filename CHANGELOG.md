@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.3] — 2026-04-27
+
+**`request-apikey --submit` now usable end-to-end.** Closes the apikey gap
+for any operator who lost (or never received) the original apikey for a
+registered RRN. The RRF `/v2/robots/<rrn>/apikey-requests` endpoint
+shipped 2026-04-27 (RRF commit `cdf5198`); this release wires the CLI
+side so the issued apikey lands on stdout AND is auto-saved to
+`~/.robot-md/keys/<rrn>.apikey` (mode 600) — no manual curl.
+
+### Added
+
+- `robot_md.apikey_request.persist_response()` helper: parses the submit
+  result, atomically writes a string `api_key` to the keystore via the
+  same `_write_apikey` used at initial registration, returns the JSON
+  body for the caller to surface.
+- `request-apikey --submit` now:
+  - prints the response body to stdout (or `--output` file)
+  - prints `saved apikey to <path> (mode 600)` to stderr on success
+  - 5 new unit tests + 1 CliRunner integration test covering the helper.
+
+### Changed
+
+- `request-apikey --submit` help text now reflects that the endpoint is
+  live, not "may not be implemented yet."
+- `submit_request` docstring updated to point at the live endpoint.
+
+### Docs
+
+- `cli/tests/spatial_eval/manual_smoke_bob.md` no longer claims SP1 gates
+  T30 — that gate cleared when PR #14 merged at `f238c72`.
+
+---
+
 ## [1.2.2] — 2026-04-27
 
 **Servo SDK rewrite to `scservo_sdk.sms_sts`.** Unblocks Phase 8 hardware
