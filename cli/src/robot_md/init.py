@@ -747,17 +747,6 @@ def _print_tally(results: list[Any], out_path: Path) -> None:
             file=sys.stderr,
         )
 
-    # When MCP install didn't run (skip flag, skipped phase, or failed),
-    # print the copy-pasteable `claude mcp add` one-liner so the operator
-    # can register the server by hand. Matches what the old init printed.
-    mcp_ran_ok = any(r.phase == "install_mcp" and r.status == "ok" for r in results)
-    if not mcp_ran_ok and robot_name:
-        print(
-            f"\nTo register the MCP server manually:\n"
-            f'  claude mcp add robot-md-{robot_name} -- robot-md-mcp "{out_path}"',
-            file=sys.stderr,
-        )
-
     if robot_name:
         print(
             f"{robot_name} is set up. Open Claude Code in this dir:\n"
