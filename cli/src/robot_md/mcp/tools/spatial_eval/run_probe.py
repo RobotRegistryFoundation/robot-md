@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 import uuid
+from datetime import datetime, timezone
 
 from robot_md.mcp.tools.spatial_eval._ctx import _frontmatter
 from robot_md.spatial_eval.probe.datasets.loader import load_public_split
@@ -61,7 +61,7 @@ def run_probe_tool(
         spec_version=se.get("spec_version", "1.0.0"),
         rrn=fm.get("id", "RRN-unknown"),
         run_id=str(uuid.uuid4()),
-        timestamp=_dt.datetime.utcnow().isoformat() + "Z",
+        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         tracks_probe=pt,
         tracks_execute={},
         aggregate=Aggregate.compute(probe=pt, execute={}),

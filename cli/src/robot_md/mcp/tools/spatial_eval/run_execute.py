@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 from robot_md.mcp.tools.spatial_eval._ctx import _frontmatter
@@ -76,7 +76,7 @@ def run_execute_tool(
         spec_version=se.get("spec_version", "1.0.0"),
         rrn=fm.get("id", "RRN-unknown"),
         run_id=rd.name,
-        timestamp=_dt.datetime.utcnow().isoformat() + "Z",
+        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         tracks_probe=pt,
         tracks_execute=per_unit,
         aggregate=Aggregate.compute(probe=pt, execute=per_unit),

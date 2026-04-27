@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from robot_md.spatial_eval.execute.evidence import packet_root_sha256
@@ -28,11 +28,27 @@ def replay_tool(ctx, *, run_dir: Path) -> dict:
         for u, rs in counts.items()
     }
     pt = ProbeTrack(baseline_claude={}, robot_declared={}, delta_per_unit={})
+
+    # Preserve provenance from the original Score.json when present.
+    spec_version = "1.0.0"
+    rrn = "RRN-replayed"
+    score_path = rd / "Score.json"
+    if score_path.exists():
+        try:
+            prior = json.loads(score_path.read_text())
+            if isinstance(prior, dict):
+                if isinstance(prior.get("spec_version"), str):
+                    spec_version = prior["spec_version"]
+                if isinstance(prior.get("rrn"), str):
+                    rrn = prior["rrn"]
+        except json.JSONDecodeError:
+            pass
+
     score = ScoreJSON(
-        spec_version="1.0.0",
-        rrn="RRN-replayed",
+        spec_version=spec_version,
+        rrn=rrn,
         run_id=rd.name,
-        timestamp=_dt.datetime.utcnow().isoformat() + "Z",
+        timestamp=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         tracks_probe=pt,
         tracks_execute=per_unit,
         aggregate=Aggregate.compute(probe=pt, execute=per_unit),
