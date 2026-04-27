@@ -171,14 +171,18 @@ def load_context(manifest_path: Path) -> McpContext:
             )
         try:
             backend.open(spec)
-        except ImportError as e:
-            # Optional hardware dep not installed (e.g. feetech_servo_sdk,
-            # depthai). Degrade to a backend-less context so render/validate
+        except (ImportError, OSError, RuntimeError) as e:
+            # Optional hardware dep not installed (ImportError on scservo_sdk
+            # / depthai), declared port not openable (OSError /
+            # SerialException — pyserial raises SerialException, a subclass
+            # of IOError/OSError), or backend's own open-time validation
+            # failed (RuntimeError, e.g. baud-rate setup). Degrade to a
+            # backend-less context so render / validate / read-only tools
             # still work. execute_capability will return no_backend.
             import logging as _logging
 
             _logging.getLogger("robot_md.mcp").warning(
-                "backend.open failed due to missing dep (%s); running without backend", e
+                "backend.open failed (%s); running without backend", e
             )
             backend = None
 
