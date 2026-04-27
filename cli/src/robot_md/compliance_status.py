@@ -982,14 +982,14 @@ def format_status_text(status: dict[str, Any]) -> str:
     for schema in EXPECTED_ARTIFACT_SCHEMAS:
         if schema in present_by_schema:
             a = present_by_schema[schema]
-            _marker, suffix = _render_sig_state(a.get("sig_state", "unsigned"))
-            lines.append(f"  ✓ {schema:<28}  {a['size_bytes']:>5} bytes  {suffix}")
+            marker, suffix = _render_sig_state(a.get("sig_state", "unsigned"))
+            lines.append(f"  {marker} {schema:<28}  {a['size_bytes']:>5} bytes  {suffix}")
         else:
             lines.append(f"  ✗ {schema:<28}  missing")
     extras = [a for a in status["artifacts"]["present"] if a["schema"] not in expected_set]
     for a in extras:
-        _marker, suffix = _render_sig_state(a.get("sig_state", "unsigned"))
-        lines.append(f"  • {a['schema']:<28}  {a['size_bytes']:>5} bytes  {suffix} [extra]")
+        marker, suffix = _render_sig_state(a.get("sig_state", "unsigned"))
+        lines.append(f"  {marker} {a['schema']:<28}  {a['size_bytes']:>5} bytes  {suffix} [extra]")
     lines.append("")
 
     # Registry
