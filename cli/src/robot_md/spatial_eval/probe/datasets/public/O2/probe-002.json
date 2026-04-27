@@ -1,0 +1,11 @@
+{
+  "id": "o2-public-002",
+  "unit": "O2",
+  "scenario_header": "Red cube placed inside a blue translucent bottle resting on its side.",
+  "frames": [],
+  "question": {"type": "container_relationship"},
+  "ground_truth": {
+    "container": "blue_bottle",
+    "contained": "red_cube"
+  }
+}

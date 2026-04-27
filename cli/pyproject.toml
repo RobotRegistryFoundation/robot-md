@@ -67,6 +67,13 @@ feetech-depthai = [
 # (SO-ARM101 + OAK-D today; SP3 will extend with lerobot + realsense).
 # Operators run `pip install 'robot-md[hardware]'` for the recommended
 # all-in-one install.
+#
+# NOTE (SP6 spatial-eval): the execute track of `spatial_eval_*` MCP tools
+# needs `opencv-python` for color segmentation + frame differencing in
+# `robot_md.spatial_eval.execute.judge`. The dependency is already in this
+# extra, so `[hardware]` covers the full SP6 surface (probe + execute) without
+# a separate `[spatial-eval]` extra. Probe-only operation needs only core
+# dependencies (anthropic + numpy are already declared at top level).
 hardware = [
     "pyserial>=3.5",
     "depthai>=2.24",

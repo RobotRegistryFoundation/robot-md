@@ -150,6 +150,103 @@ def build_server(ctx: McpContext):
         """
         return doctor_summary_tool(ctx)
 
+    # ── SP6 spatial-intelligence eval tools ──────────────────────────────────
+    # 9 tools wrapping cli/src/robot_md/spatial_eval/* core logic. Each public
+    # shim only exposes JSON-serializable args; the underlying *_tool functions
+    # have private `_*` injection kwargs for tests, kept off the FastMCP surface.
+
+    @server.tool()
+    def spatial_eval_dry_run() -> dict:
+        """Preflight: spatial-eval section, ANTHROPIC_API_KEY, judge camera."""
+        from robot_md.mcp.tools.spatial_eval.dry_run import dry_run_tool
+
+        return dry_run_tool(ctx)
+
+    @server.tool()
+    def spatial_eval_init(units: list[str]) -> dict:
+        """Scaffold the spatial-eval: section into the served ROBOT.md."""
+        from robot_md.mcp.tools.spatial_eval.init import init_tool
+
+        return init_tool(ctx, units=units)
+
+    @server.tool()
+    def spatial_eval_kit() -> dict:
+        """Return the v1 fixture-kit BOM and grid-mat path."""
+        from robot_md.mcp.tools.spatial_eval.kit import kit_tool
+
+        return kit_tool(ctx)
+
+    @server.tool()
+    def spatial_eval_run_probe(units: list[str] | None = None, baseline_only: bool = False) -> dict:
+        """Run the probe track. Returns Score JSON probe section."""
+        from robot_md.mcp.tools.spatial_eval.run_probe import run_probe_tool
+
+        return run_probe_tool(ctx, units=units, baseline_only=baseline_only)
+
+    @server.tool()
+    def spatial_eval_run_execute(
+        units: list[str] | None = None,
+        trials_per_unit: int = 10,
+        run_dir: str | None = None,
+    ) -> dict:
+        """Run the execute track on hardware. Returns Score JSON + run_dir."""
+        from pathlib import Path as _Path
+
+        from robot_md.mcp.tools.spatial_eval.run_execute import run_execute_tool
+
+        return run_execute_tool(
+            ctx,
+            units=units,
+            trials_per_unit=trials_per_unit,
+            run_dir=_Path(run_dir) if run_dir else None,
+        )
+
+    @server.tool()
+    def spatial_eval_run_full(
+        units: list[str] | None = None,
+        trials_per_unit: int = 10,
+        run_dir: str | None = None,
+    ) -> dict:
+        """Run both tracks (probe + execute) and merge results."""
+        from pathlib import Path as _Path
+
+        from robot_md.mcp.tools.spatial_eval.run_full import run_full_tool
+
+        return run_full_tool(
+            ctx,
+            units=units,
+            trials_per_unit=trials_per_unit,
+            run_dir=_Path(run_dir) if run_dir else None,
+        )
+
+    @server.tool()
+    def spatial_eval_replay(run_dir: str) -> dict:
+        """Recompute Score JSON from an existing evidence packet without re-running."""
+        from pathlib import Path as _Path
+
+        from robot_md.mcp.tools.spatial_eval.replay import replay_tool
+
+        return replay_tool(ctx, run_dir=_Path(run_dir))
+
+    @server.tool()
+    def spatial_eval_verify(score_json: str) -> dict:
+        """Verify a Score JSON's RCAN signature.
+
+        Phase 0: returns `production verifier not wired` when no injected
+        verifier is available. Phase 1 wires this to the apikey-based verifier
+        once that integration ships in a separate plan.
+        """
+        from robot_md.mcp.tools.spatial_eval.verify import verify_tool
+
+        return verify_tool(ctx, score_json=score_json)
+
+    @server.tool()
+    def spatial_eval_submit_to_rrf(run_dir: str) -> dict:
+        """Submit signed evidence to RRF §27 (Phase 1 stub for now)."""
+        from robot_md.mcp.tools.spatial_eval.submit_to_rrf import submit_to_rrf_tool
+
+        return submit_to_rrf_tool(ctx, run_dir=run_dir)
+
     from robot_md.mcp.resources import _sanitize_robot_name
 
     robot_name = _sanitize_robot_name(ctx.spec.metadata.robot_name if ctx.spec else None)

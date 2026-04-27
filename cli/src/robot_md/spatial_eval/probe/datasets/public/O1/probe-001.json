@@ -1,0 +1,11 @@
+{
+  "id": "o1-public-001",
+  "unit": "O1",
+  "scenario_header": "Red cube at (0.00, 0.05, 0.00) on grid mat; cardboard occluder slides over from +x at t=1.5s.",
+  "frames": [],
+  "question": {"type": "presence_and_position"},
+  "ground_truth": {
+    "still_present": true,
+    "position": [0.0, 0.05, 0.0]
+  }
+}

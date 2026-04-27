@@ -1,0 +1,15 @@
+{
+  "id": "a1-public-001",
+  "unit": "A1",
+  "scenario_header": "Novel toothpaste-tube-shaped object on grid mat at (0.10, 0.00, 0.05); long axis along y.",
+  "frames": [],
+  "question": {"type": "rank_grasps"},
+  "ground_truth": {
+    "gold_grasps_top_k": [
+      {"position": [0.10, 0.00, 0.05], "orientation": [0.0, 0.0, 0.0, 1.0], "score": 1.0},
+      {"position": [0.10, 0.02, 0.05], "orientation": [0.0, 0.0, 0.0, 1.0], "score": 0.8}
+    ],
+    "k": 3,
+    "tolerance_m": 0.02
+  }
+}
