@@ -93,7 +93,7 @@ This signs the body with the local key under `~/.robot-md/keys/` (RCAN 3.0 envel
 
 ## Motion intent without motion tools
 
-If the operator requests physical motion (any of `arm.*`, `nav.*`, `gripper.*` capabilities, or English phrasing like "find / move / grasp / place / pick up / put"), AND the `execute_task` tool is NOT in your available tools, **stop before issuing any action**. Output the upgrade instructions verbatim:
+If the operator requests physical motion or perception (any of `arm.*`, `nav.*`, `gripper.*`, `perceive.*` capabilities, or English phrasing like "find / move / grasp / place / pick up / put / look / see / detect / scan"), AND the `execute_task` tool is NOT in your available tools, **stop before issuing any action**. Output the upgrade instructions verbatim:
 
 > "This robot's manifest declares motion capabilities, but the runtime isn't installed in this environment. To enable motion:
 >
