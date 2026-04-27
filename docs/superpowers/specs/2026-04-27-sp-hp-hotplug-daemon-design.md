@@ -11,7 +11,7 @@
 Once SP3 ships, an operator with `robot-md` installed can plug in any vendor's arm and *if they re-run* `robot-md init`, autodetect picks up the change. The "headless auto-onboard" demo moment — *robot reboots, no screen, just audio I/O, and Claude's like "I see a new arm, want me to bind it?"* — does NOT work today. Two specific gaps:
 
 1. **No runtime device watcher.** `robot-md init` only runs when the operator invokes it.
-2. **No durable event surface.** Even if `init` ran on every boot, there's no place to queue "I detected an arm, but I need confirmation" so an operator (via Claude or pendant) can answer it later.
+2. **No durable event surface.** Even if `init` ran on every boot, there's no place to queue "I detected an arm, but I need confirmation" so an operator (via Claude, terminal CLI, or — in the future — pendant) can answer it later.
 
 For the Anthropic acquisition demo, the auto-onboard moment is a strong reveal — *it just works the way you'd want a robot to work*. Without SP-HP, that moment requires manual operator intervention (re-run init), which weakens the demo.
 
@@ -32,7 +32,7 @@ For the Anthropic acquisition demo, the auto-onboard moment is a strong reveal �
 - **Multi-host robot rigs.** Single host assumed; cross-host event sync is out of scope.
 - **Automatic driver download from a registry.** The matching backend's pip extra must already be installed; if no backend matches the device's protocol, the event lands as LOW with a `missing_backend_extra` hint.
 - **Backend hot-uninstall mid-session.** Manifest stays bound to the named backend even if `pip uninstall` removed the entry-point. Runtime fails with a clean error on next call.
-- **Pendant subscription without an active Claude session.** The pendant subscribes via MCP notifications; no Claude session = pendant doesn't see live events. Events still queue and surface on next Claude connect. Future work: pendant hosts its own socket subscriber. (Tracked in SP-AN.)
+- **Pendant integration.** Originally co-scoped, **deferred to SP-AN v2** because the pendant repo is in early bring-up. SP-HP's queue contract is shape-correct for any future surface; pendant slots in without queue-shape changes. (Tracked in SP-AN.)
 
 ## Design
 
@@ -200,7 +200,7 @@ Tier thresholds are deliberately stricter than SP2's init-time tiers — SP2 has
 {"id":"evt_01H...","ts":"2026-04-27T19:31:05Z","kind":"pending","event":{...},"decision":{...},"prev_hash":"sha256:beef...","this_hash":"sha256:cafe..."}
 ```
 
-**State model:** every `pending` record is in one of three terminal states: `bind | reject | expired`. The terminal state is a separate `kind: "resolved"` record referencing the original by `id` — first writer wins. The MCP server (when subscribed) and the pendant (when reachable) each call `hotplug_confirm` independently; both go through the daemon's socket-or-file API; the daemon serializes resolution writes (see Concurrency below).
+**State model:** every `pending` record is in one of three terminal states: `bind | reject | expired`. The terminal state is a separate `kind: "resolved"` record referencing the original by `id` — first writer wins. In v1 the resolution channels are the MCP server (when subscribed) and the terminal CLI (`robot-md hotplug confirm`); each calls `hotplug_confirm` independently; both go through the daemon's socket-or-file API; the daemon serializes resolution writes (see Concurrency below). v2 surfaces (pendant, web UI) plug into the same path.
 
 **TTL:** pending events expire after **7 days** (configurable via `~/.robot-md/hotplug.toml` key `pending_ttl_days`). The daemon scans the queue on start and once an hour, appending `resolution: "expired"` for any pending older than the TTL.
 
@@ -314,7 +314,8 @@ Operator                                State
                                       audit.append(hotplug_event, ...)
                                       socket nudge
 
-(Operator's pendant or Claude     →   hotplug_review() →
+(Operator's Claude chat session   →   hotplug_review() →
+ or terminal CLI)
  chat session)                          [{event_id, tier=MEDIUM,
                                           bind_proposal: {preset=so_arm101,
                                                           backend=lerobot},
@@ -355,8 +356,7 @@ Operator                                State
 
 ```
 (Robot reboots, daemon restarts.    →   Queue file persists; daemon doesn't
- No Claude session is running. No       lose state across restarts.
- pendant attached.)
+ No Claude session is running.)         lose state across restarts.
                                         HIGH-tier still auto-binds (no
                                         operator dependency).
                                         MEDIUM/LOW pending records persist.
@@ -509,11 +509,11 @@ Operator                                State
 - Long-haul daemon stability: 7-day TTL handling tested via clock skew, not real elapsed time.
 - Multi-arm rigs: single-arm scenarios are the v1 baseline; multi-arm tested by hand only on bob.
 
-## Open Questions
+## Decisions deferred / future work
 
-1. **`pending_ttl_days` default.** 7 days picked to give operators a vacation-length window. Roll back to 3 days if event-queue accumulation becomes a UX problem.
-2. **Pendant subscription path.** v1 limitation: pendant subscribes only via an active Claude session's MCP notifications. Future: pendant hosts its own socket subscriber. Decided: out of scope for SP-HP v1; called out in SP-AN.
-3. **macOS launchd permission prompt.** First daemon launch may trigger macOS's "allow background app" prompt. Action: smoke-test on a fresh macOS account; document the click-through.
+1. **`pending_ttl_days` default.** Picked 7 days as a vacation-length window. Roll back to 3 days if event-queue accumulation becomes a UX problem after first hands-on use.
+2. **macOS launchd permission prompt.** First daemon launch may trigger macOS's "allow background app" prompt. Action item (not a question): smoke-test on a fresh macOS account during plan execution and document the click-through in the operator install hint.
+3. **Pendant + web UI surfaces (SP-AN v2).** Tracked in SP-AN. SP-HP's queue contract is shape-correct for any future subscriber; no SP-HP changes needed when those land.
 
 ## Success Criteria
 
@@ -530,7 +530,7 @@ SP-HP is done when:
 ## Sub-project Relationships
 
 - **SP3 → SP-HP.** SP-HP consumes SP3's `enumerate_capabilities()` to preview a backend's tools at hot-plug time. Without the SP3 addendum, SP-HP would have to re-build the lookup.
-- **SP-HP → SP-AN.** SP-AN's surfaces (audio + Claude chat + pendant) are subscribers of the queue SP-HP produces. SP-AN doesn't write to the queue.
+- **SP-HP → SP-AN.** SP-AN v1's surfaces (audio + Claude chat) are subscribers of the queue SP-HP produces; SP-AN v2 adds the pendant surface. SP-AN doesn't write to the queue.
 - **SP-HP ↔ SP1.** SP1's MCP server gains the inotify watch + socket subscriber + two new tools as part of SP-HP. No SP1 changes outside that delta.
 - **SP-HP ↔ SP4.** When LOW-tier events surface "no backend can drive this hardware," SP4's `author-backend` flow is the operator's path forward. SP-HP doesn't trigger SP4 automatically; surfaces the option.
 - **SP-HP unblocks the auto-onboard demo moment.** Combined with SP-AN, the headline beat is: *robot reboots, no display, audio onboarding, Claude takes over.* SP-HP is the eyes; SP-AN is the mouth.
