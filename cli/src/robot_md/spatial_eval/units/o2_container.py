@@ -3,7 +3,10 @@ from __future__ import annotations
 from robot_md.spatial_eval.units.base import register
 
 code = "O2"
-description = "Container reasoning — target hidden under/inside a known container; recover relationship and act."
+description = (
+    "Container reasoning — target hidden under/inside a known container; "
+    "recover relationship and act."
+)
 
 LIFT_MIN_CM = 5.0
 

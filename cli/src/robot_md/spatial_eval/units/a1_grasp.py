@@ -3,7 +3,10 @@ from __future__ import annotations
 from robot_md.spatial_eval.units.base import register
 
 code = "A1"
-description = "Graspable region on novel objects — identify graspable region(s) and pick orientation."
+description = (
+    "Graspable region on novel objects — identify graspable region(s) "
+    "and pick orientation."
+)
 
 LIFT_MIN_CM = 5.0
 HOLD_MIN_S = 2.0

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from robot_md.spatial_eval.score import ScoreJSON
 
@@ -11,7 +11,7 @@ def verify_tool(
     ctx,
     *,
     score_json: str,
-    _verify_signature: Optional[Callable[[bytes, str], bool]] = None,
+    _verify_signature: Callable[[bytes, str], bool] | None = None,
 ) -> dict:
     score = ScoreJSON.from_json(score_json)
     if score.rcan_signature is None:

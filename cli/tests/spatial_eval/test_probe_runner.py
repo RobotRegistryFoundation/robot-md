@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from robot_md.spatial_eval.probe.runner import run_probes
 from robot_md.spatial_eval.probe.stacks import FakeStack
 
@@ -26,4 +27,6 @@ def test_runner_side_by_side_with_delta():
     result = run_probes(probes, baseline=baseline, declared=declared)
     assert result.baseline_per_unit["O1"].passed == 2
     assert result.declared_per_unit["O1"].passed == 1
-    assert result.delta_per_unit["O1"] == result.declared_per_unit["O1"].score - result.baseline_per_unit["O1"].score
+    assert result.delta_per_unit["O1"] == (
+        result.declared_per_unit["O1"].score - result.baseline_per_unit["O1"].score
+    )

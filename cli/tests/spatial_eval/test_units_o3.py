@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 import pytest
-from robot_md.spatial_eval.units.o3_partial_view import O3, parse_answer, execute_pass
+
+from robot_md.spatial_eval.units.o3_partial_view import execute_pass, parse_answer
+
 
 def test_o3_parse_answer_8_corners():
     raw = {"bbox_corners": [[0,0,0],[1,0,0],[0,1,0],[1,1,0],[0,0,1],[1,0,1],[0,1,1],[1,1,1]]}

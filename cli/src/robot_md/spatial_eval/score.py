@@ -1,7 +1,7 @@
 from __future__ import annotations
+
 import json
 from dataclasses import asdict, dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class Aggregate:
     execute: float
 
     @classmethod
-    def compute(cls, *, probe: ProbeTrack, execute: ExecuteTrack) -> "Aggregate":
+    def compute(cls, *, probe: ProbeTrack, execute: ExecuteTrack) -> Aggregate:
         def _mean(d: dict[str, PerUnitProbeScore]) -> float:
             return sum(v.score for v in d.values()) / max(1, len(d))
         ex_mean = (
@@ -58,8 +58,8 @@ class ScoreJSON:
     tracks_probe: ProbeTrack
     tracks_execute: ExecuteTrack
     aggregate: Aggregate
-    rcan_signature: Optional[str] = None
-    evidence_root: Optional[str] = None
+    rcan_signature: str | None = None
+    evidence_root: str | None = None
 
     def to_dict(self) -> dict:
         def _dump_unit_map(m: dict) -> dict:
@@ -86,7 +86,7 @@ class ScoreJSON:
         return json.dumps(self.to_dict(), sort_keys=True, separators=(",", ":"))
 
     @classmethod
-    def from_json(cls, blob: str) -> "ScoreJSON":
+    def from_json(cls, blob: str) -> ScoreJSON:
         d = json.loads(blob)
         def _load_probe(m: dict) -> dict[str, PerUnitProbeScore]:
             return {k: PerUnitProbeScore(**v) for k, v in m.items()}

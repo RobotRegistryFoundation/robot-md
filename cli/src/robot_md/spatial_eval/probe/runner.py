@@ -1,7 +1,8 @@
 from __future__ import annotations
+
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, Optional
 
 from robot_md.spatial_eval.probe.scorer import score_answer
 from robot_md.spatial_eval.probe.stacks import Stack
@@ -26,7 +27,7 @@ def run_probes(
     probes: Iterable[dict],
     *,
     baseline: Stack,
-    declared: Optional[Stack] = None,
+    declared: Stack | None = None,
     progress_cb=None,
 ) -> ProbeRunResult:
     by_unit_baseline: dict[str, list[tuple[bool, float]]] = defaultdict(list)

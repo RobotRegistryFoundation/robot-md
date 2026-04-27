@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime as _dt
 import uuid
 from pathlib import Path
-from typing import Optional
 
 from robot_md.mcp.tools.spatial_eval._ctx import _frontmatter
 from robot_md.spatial_eval.execute.evidence import (
@@ -28,9 +27,9 @@ from robot_md.spatial_eval.score import (
 def run_execute_tool(
     ctx,
     *,
-    units: Optional[list[str]] = None,
+    units: list[str] | None = None,
     trials_per_unit: int = 10,
-    run_dir: Optional[Path] = None,
+    run_dir: Path | None = None,
     _robot=None,
     _judge_camera=None,
 ) -> dict:

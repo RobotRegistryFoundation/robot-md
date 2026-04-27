@@ -1,8 +1,13 @@
 from __future__ import annotations
+
 import pytest
+
 from robot_md.spatial_eval.probe.stacks import (
-    FakeStack, resolve_stack, BaselineClaudeStack,
+    BaselineClaudeStack,
+    FakeStack,
+    resolve_stack,
 )
+
 
 def test_fake_stack_returns_canned_answer():
     stack = FakeStack(answers={"o1-x": {"still_present": True, "position": [0,0,0]}})

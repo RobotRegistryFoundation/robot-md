@@ -25,5 +25,5 @@ def test_o3_disjoint_iou_0():
 def test_o3_pass_threshold_iou_05():
     # AABBs (0..1) vs (0.5..1.5): intersection 0.5, union 1.5, iou ~ 0.33 — below 0.5
     half = [(0.5 + x, y, z) for (x, y, z) in UNIT_CUBE]
-    p, s = score_answer("O3", {"bbox_corners": UNIT_CUBE}, {"bbox_corners": half})
+    p, _ = score_answer("O3", {"bbox_corners": UNIT_CUBE}, {"bbox_corners": half})
     assert p is False

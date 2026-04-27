@@ -19,7 +19,10 @@ def parse_answer(raw: dict) -> dict:
 def execute_pass(outcome: dict) -> tuple[bool, str]:
     diff = outcome.get("post_release_diff_pct", 0.0)
     if diff > POST_RELEASE_DIFF_THRESHOLD_PCT:
-        return False, f"unstable: post-release diff {diff:.1f}% > {POST_RELEASE_DIFF_THRESHOLD_PCT}%"
+        return False, (
+            f"unstable: post-release diff {diff:.1f}% "
+            f"> {POST_RELEASE_DIFF_THRESHOLD_PCT}%"
+        )
     return True, "ok"
 
 

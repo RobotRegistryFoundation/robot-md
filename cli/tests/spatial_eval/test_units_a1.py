@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 import pytest
-from robot_md.spatial_eval.units.a1_grasp import A1, parse_answer, execute_pass
+
+from robot_md.spatial_eval.units.a1_grasp import execute_pass, parse_answer
+
 
 def test_a1_parse_ranked_grasps():
     raw = {"grasps": [

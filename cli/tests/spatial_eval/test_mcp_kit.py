@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from unittest.mock import MagicMock
+
 from robot_md.mcp.tools.spatial_eval.kit import kit_tool
 
 

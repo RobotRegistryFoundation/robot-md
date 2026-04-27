@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 import pytest
-from robot_md.spatial_eval.units.o1_permanence import O1, parse_answer, execute_pass
+
+from robot_md.spatial_eval.units.o1_permanence import O1, execute_pass, parse_answer
+
 
 def test_o1_code_and_description():
     assert O1.code == "O1"

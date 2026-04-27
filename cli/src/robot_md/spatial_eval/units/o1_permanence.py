@@ -3,7 +3,10 @@ from __future__ import annotations
 from robot_md.spatial_eval.units.base import register
 
 code = "O1"
-description = "Object permanence — target visible at t=0, occluder slides over, robot answers presence + position."
+description = (
+    "Object permanence — target visible at t=0, occluder slides over, "
+    "robot answers presence + position."
+)
 
 OCCLUDER_DISTURB_THRESHOLD_PCT = 5.0
 

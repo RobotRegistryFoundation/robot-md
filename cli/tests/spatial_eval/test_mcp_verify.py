@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 from unittest.mock import MagicMock
+
+from robot_md.mcp.tools.spatial_eval.verify import verify_tool
 from robot_md.spatial_eval.score import (
     Aggregate,
     PerUnitExecuteScore,
     ProbeTrack,
     ScoreJSON,
 )
-from robot_md.mcp.tools.spatial_eval.verify import verify_tool
 
 
 def _good_score():

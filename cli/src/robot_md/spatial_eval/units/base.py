@@ -10,7 +10,7 @@ class Unit(Protocol):
     description: str  # human-readable summary
 
     @staticmethod
-    def parse_answer(raw: dict) -> "ProbeAnswer": ...
+    def parse_answer(raw: dict) -> ProbeAnswer: ...
 
     @staticmethod
     def execute_pass(trial_outcome: dict) -> tuple[bool, str]: ...
@@ -25,7 +25,7 @@ REGISTRY: dict[str, Any] = {}
 
 def register(unit_module: Any) -> Any:
     """Decorator-or-call to register a unit module by its `.code` attribute."""
-    code = getattr(unit_module, "code")
+    code = unit_module.code
     REGISTRY[code] = unit_module
     return unit_module
 

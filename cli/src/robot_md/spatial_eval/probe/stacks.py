@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 import os
 from typing import Protocol
@@ -72,7 +73,12 @@ question's required shape, no prose, no markdown fence."""
 def _frames_as_content(frames: list[str]) -> list[dict]:
     out = []
     for f in frames:
-        out.append({"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": f}})
+        out.append(
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": "image/png", "data": f},
+            }
+        )
     return out
 
 

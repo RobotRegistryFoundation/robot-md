@@ -8,11 +8,11 @@ from robot_md.spatial_eval.units.base import ProbeAnswer, Unit  # noqa: F401
 
 def test_registry_lists_all_five_v1_units():
     # Force import of all five so they self-register.
-    import robot_md.spatial_eval.units.o1_permanence  # noqa: F401
-    import robot_md.spatial_eval.units.o2_container  # noqa: F401
+    import robot_md.spatial_eval.units.a1_grasp
+    import robot_md.spatial_eval.units.a2_stability
+    import robot_md.spatial_eval.units.o1_permanence
+    import robot_md.spatial_eval.units.o2_container
     import robot_md.spatial_eval.units.o3_partial_view  # noqa: F401
-    import robot_md.spatial_eval.units.a1_grasp  # noqa: F401
-    import robot_md.spatial_eval.units.a2_stability  # noqa: F401
 
     assert sorted(REGISTRY.keys()) == ["A1", "A2", "O1", "O2", "O3"]
 

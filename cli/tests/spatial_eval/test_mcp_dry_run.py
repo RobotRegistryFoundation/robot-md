@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from unittest.mock import MagicMock
+
 from robot_md.mcp.tools.spatial_eval.dry_run import dry_run_tool
 
 
@@ -12,7 +14,10 @@ def test_dry_run_passes_when_section_present_and_apikey_set(monkeypatch):
             "units": ["O1"],
             "workspace": {"play_surface_dims_m": [0.3, 0.3],
                           "judge_camera": {"device": "phone:tripod", "resolution": [1920, 1080]}},
-            "reasoning_stack": {"baseline": "claude:claude-opus-4-7", "declared": "claude:claude-opus-4-7"},
+            "reasoning_stack": {
+                "baseline": "claude:claude-opus-4-7",
+                "declared": "claude:claude-opus-4-7",
+            },
         }
     }
     out = dry_run_tool(ctx)

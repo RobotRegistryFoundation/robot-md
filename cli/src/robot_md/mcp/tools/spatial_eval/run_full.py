@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from robot_md.mcp.tools.spatial_eval.run_execute import run_execute_tool
 from robot_md.mcp.tools.spatial_eval.run_probe import run_probe_tool
@@ -12,9 +11,9 @@ from robot_md.mcp.tools.spatial_eval.run_probe import run_probe_tool
 def run_full_tool(
     ctx,
     *,
-    units: Optional[list[str]] = None,
+    units: list[str] | None = None,
     trials_per_unit: int = 10,
-    run_dir: Optional[Path] = None,
+    run_dir: Path | None = None,
     _stacks=None,
     _robot=None,
     _judge_camera=None,

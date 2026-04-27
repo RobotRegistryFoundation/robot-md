@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 import json
 from pathlib import Path
 from unittest.mock import MagicMock
+
 from robot_md.mcp.tools.spatial_eval.replay import replay_tool
 
 

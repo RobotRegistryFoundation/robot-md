@@ -3,7 +3,10 @@ from __future__ import annotations
 from robot_md.spatial_eval.units.base import register
 
 code = "O3"
-description = "Partial-view shape inference — target partly hidden; infer full extent for safe grasp."
+description = (
+    "Partial-view shape inference — target partly hidden; "
+    "infer full extent for safe grasp."
+)
 
 LIFT_MIN_CM = 5.0
 OCCLUDER_DISTURB_THRESHOLD_PCT = 5.0

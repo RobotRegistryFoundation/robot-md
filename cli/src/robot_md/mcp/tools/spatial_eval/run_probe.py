@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime as _dt
 import uuid
-from typing import Optional
 
 from robot_md.mcp.tools.spatial_eval._ctx import _frontmatter
 from robot_md.spatial_eval.probe.datasets.loader import load_public_split
@@ -20,9 +19,9 @@ from robot_md.spatial_eval.score import (
 def run_probe_tool(
     ctx,
     *,
-    units: Optional[list[str]] = None,
+    units: list[str] | None = None,
     baseline_only: bool = False,
-    _stacks: Optional[dict] = None,
+    _stacks: dict | None = None,
 ) -> dict:
     fm = _frontmatter(ctx)
     se = fm.get("spatial-eval")

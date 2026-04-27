@@ -1,9 +1,15 @@
 from __future__ import annotations
+
 import json
+
 from robot_md.spatial_eval.score import (
-    PerUnitProbeScore, PerUnitExecuteScore, ProbeTrack, ExecuteTrack,
-    Aggregate, ScoreJSON,
+    Aggregate,
+    PerUnitExecuteScore,
+    PerUnitProbeScore,
+    ProbeTrack,
+    ScoreJSON,
 )
+
 
 def test_score_json_round_trips():
     s = ScoreJSON(

@@ -9,7 +9,7 @@ a single unit. Mean ``score`` across heterogeneous units is meaningless.
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 _SCORERS: dict[str, Callable[[dict, dict], tuple[bool, float]]] = {}
 

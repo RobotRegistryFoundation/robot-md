@@ -1,10 +1,13 @@
 from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import MagicMock
+
 import numpy as np
+
 from robot_md.mcp.tools.spatial_eval.run_full import run_full_tool
+from robot_md.spatial_eval.execute.trial import FakeJudgeCamera, FakeRobot
 from robot_md.spatial_eval.probe.stacks import FakeStack
-from robot_md.spatial_eval.execute.trial import FakeRobot, FakeJudgeCamera
 
 
 def _bgr(c):

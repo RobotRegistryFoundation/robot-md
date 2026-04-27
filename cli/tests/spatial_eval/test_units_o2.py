@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 import pytest
-from robot_md.spatial_eval.units.o2_container import O2, parse_answer, execute_pass
+
+from robot_md.spatial_eval.units.o2_container import execute_pass, parse_answer
+
 
 def test_o2_parse_answer():
     a = parse_answer({"container": "green_cup", "contained": "red_cube"})

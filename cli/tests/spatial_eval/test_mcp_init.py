@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 from pathlib import Path
 from unittest.mock import MagicMock
+
 from robot_md.mcp.tools.spatial_eval.init import init_tool
 
 ROBOT_MD_TEMPLATE = """---
