@@ -297,7 +297,12 @@ def test_cli_request_apikey_submit_prints_body_and_saves_key(home, tmp_path: Pat
             },
         )
 
-    runner = CliRunner(mix_stderr=False)
+    # Click 8.2 removed the `mix_stderr` kwarg (stderr is always separate now);
+    # Click 8.1.x still requires it to access result.stderr without ValueError.
+    try:
+        runner = CliRunner(mix_stderr=False)
+    except TypeError:
+        runner = CliRunner()
     with patch("urllib.request.urlopen", side_effect=fake_urlopen):
         result = runner.invoke(app, ["request-apikey", str(manifest), "--submit"])
 
