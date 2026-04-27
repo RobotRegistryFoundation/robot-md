@@ -18,8 +18,8 @@ pytestmark = pytest.mark.hardware
 
 
 @pytest.mark.skipif(
-    not Path("/dev/ttyACM0").exists(),
-    reason="bob's feetech bus not present at /dev/ttyACM0",
+    not Path("/dev/ttyACM0").exists() or not shutil.which("robot-md"),
+    reason="needs bob's feetech bus at /dev/ttyACM0 AND robot-md CLI on PATH",
 )
 def test_sp1_python_mcp_server_starts_and_lists_tools():
     """The robot-md mcp command starts and exposes execute_task in its
@@ -69,26 +69,26 @@ def test_sp1_lazy_recovery_simulated():
     if not (bob_dir / "ROBOT.md").exists():
         pytest.skip("bob's ROBOT.md not at ~/bob/")
 
-    result = subprocess.run(
-        ["robot-md", "mcp", str(bob_dir / "ROBOT.md")],
-        capture_output=True,
-        timeout=2,  # killed by timeout — we just want to see it starts
-    )
-    # Expected exit codes:
-    #   0     → server ran and exited cleanly (no client connected)
-    #   124   → killed by `timeout` shell command (server still running)
-    #   -15   → SIGTERM (server still running, killed by Python's timeout)
-    #   -9    → SIGKILL
-    if result.returncode not in (0, 124, -15, -9):
-        pytest.fail(
-            f"robot-md mcp failed to start: exit={result.returncode}, "
-            f"stderr={result.stderr.decode()[:500]}"
+    try:
+        result = subprocess.run(
+            ["robot-md", "mcp", str(bob_dir / "ROBOT.md")],
+            capture_output=True,
+            timeout=2,
         )
+        # Server exited on its own before timeout — check it wasn't a crash.
+        if result.returncode != 0:
+            pytest.fail(
+                f"robot-md mcp crashed: exit={result.returncode}, "
+                f"stderr={result.stderr.decode()[:500]}"
+            )
+    except subprocess.TimeoutExpired:
+        # Server still running after 2s — this is the expected success case.
+        pass
 
 
 @pytest.mark.skipif(
-    not Path("/dev/ttyACM0").exists(),
-    reason="bob's feetech bus not present",
+    not Path("/dev/ttyACM0").exists() or not shutil.which("robot-md"),
+    reason="needs bob's feetech bus at /dev/ttyACM0 AND robot-md CLI on PATH",
 )
 def test_sp1_cwd_walk_works_from_subdir():
     """The cwd-walk in `robot-md mcp` must find ROBOT.md from a subdirectory.
@@ -109,14 +109,19 @@ def test_sp1_cwd_walk_works_from_subdir():
         pytest.skip("no usable subdirectory under ~/bob/")
 
     # Run robot-md mcp from the subdirectory; cwd-walk should find ../ROBOT.md.
-    result = subprocess.run(
-        ["robot-md", "mcp"],
-        capture_output=True,
-        timeout=2,
-        cwd=str(subdir),
-    )
-    if result.returncode not in (0, 124, -15, -9):
-        pytest.fail(
-            f"cwd-walk failed from {subdir}: exit={result.returncode}, "
-            f"stderr={result.stderr.decode()[:500]}"
+    try:
+        result = subprocess.run(
+            ["robot-md", "mcp"],
+            capture_output=True,
+            timeout=2,
+            cwd=str(subdir),
         )
+        # Server exited on its own before timeout — check it wasn't a crash.
+        if result.returncode != 0:
+            pytest.fail(
+                f"cwd-walk failed from {subdir}: exit={result.returncode}, "
+                f"stderr={result.stderr.decode()[:500]}"
+            )
+    except subprocess.TimeoutExpired:
+        # Server still running after 2s — this is the expected success case.
+        pass
