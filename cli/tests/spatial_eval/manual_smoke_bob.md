@@ -2,7 +2,7 @@
 
 Run BEFORE declaring SP6 Phase 0 done. Estimated time: ~40 min.
 
-**Status: GATED on SP1.** This procedure assumes the 9 SP6 MCP tools are registered on the `robot-md mcp` server. T30 (server registration) is deferred until SP1's `cli/src/robot_md/mcp/server.py` changes land upstream and are merged into the SP6 branch — until then, the tools exist as functions but are not exposed to MCP clients.
+**Status: ready to run.** T30 (server registration) shipped in PR #14 (merge commit `f238c72`); all 9 SP6 MCP tools are registered on the `robot-md mcp` server.
 
 ## Prerequisites
 
@@ -70,4 +70,3 @@ If any criterion fails: capture the failure (logs, Score JSON, video frames) and
 - **No reset_scorer_registry consumer:** the test fixture exists but no Phase-0 test uses it; T15+ scorer dispatcher tests in v1.1 may.
 - **Production signer not wired:** `spatial_eval_verify` accepts an injected verifier in tests but has no production counterpart yet. Apikey integration is the Phase-1 item.
 - **`grid_mat.pdf` is a placeholder path:** the file does not exist on disk in v1.0.0; the BOM doc has manual print instructions instead.
-- **T30 (server registration) is gated on SP1.** Tools cannot be invoked from MCP clients until SP1's server.py work merges in.
