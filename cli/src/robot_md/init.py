@@ -1,7 +1,7 @@
 """`robot-md init` — zero-to-actuatable ROBOT.md in one command.
 
-Default flow (`default_flow`) walks six phases: write manifest → register
-(opt-in) → install MCP → install skill → sign calibration → zero
+Default flow (`default_flow`) walks five phases: write manifest → register
+(opt-in) → install skill → sign calibration → zero
 calibration. Each phase is independently callable from `init_phases/`.
 Scripted / CI callers pass `--non-interactive` to skip every phase
 except manifest write (equivalent to the pre-v0.5.0 `quick`-style path).
@@ -27,18 +27,18 @@ from robot_md.autodetect import scan_system
 
 PRESETS_DIR = Path(__file__).parent / "presets"
 
-# Capability prefixes that require the motion runtime (i.e., a backend
+# Capability prefixes that require the hardware runtime (i.e., a backend
 # that can drive hardware or read sensors). Used by
 # `_emit_motion_extras_hint` to decide whether to print the
 # `pip install 'robot-md[hardware]'` reminder.
-# Keep this in sync with skills/using-robot-md SKILL.md motion-intent stanza.
-_MOTION_CAPABILITY_PREFIXES = ("arm.", "nav.", "gripper.", "perceive.")
+# Keep this in sync with skills/using-robot-md SKILL.md hardware-intent stanza.
+_HARDWARE_RUNTIME_CAPABILITY_PREFIXES = ("arm.", "nav.", "gripper.", "perceive.")
 
 
 def _emit_motion_extras_hint(capabilities: list[str]) -> None:
-    """If manifest declares motion-relevant capabilities, print the install hint.
+    """If manifest declares hardware-relevant capabilities, print the install hint.
 
-    No-op when capabilities is empty or only contains non-motion entries
+    No-op when capabilities is empty or only contains non-hardware entries
     (e.g., compute.train, logging.publish on a sensor-aggregation robot).
     Per SP1 §2.2 + revisions R1+R3.
     """
@@ -47,16 +47,15 @@ def _emit_motion_extras_hint(capabilities: list[str]) -> None:
     if not capabilities:
         return
     has_motion = any(
-        any(cap.startswith(prefix) for prefix in _MOTION_CAPABILITY_PREFIXES)
+        any(cap.startswith(prefix) for prefix in _HARDWARE_RUNTIME_CAPABILITY_PREFIXES)
         for cap in capabilities
     )
     if not has_motion:
         return
     print(
-        "\nMotion capabilities declared. To enable runtime control:\n"
+        "\nHardware runtime capabilities declared. To enable runtime control:\n"
         "  pip install 'robot-md[hardware]'\n"
-        "Then in Claude Code: /mcp → Reconnect `robot-md` "
-        "(or restart Claude Code).",
+        "Then in Claude Code: /mcp → arrow to `robot-md` → Reconnect.",
         file=sys.stderr,
     )
 
@@ -593,7 +592,7 @@ def default_flow(
     model: str | None = None,
     version_: str | None = None,
     device_id: str | None = None,
-    do_install_mcp: bool = True,
+    do_install_mcp: bool = True,  # deprecated; ignored since 1.2.0 (SP1 R1)
     do_install_skill: bool = True,
     do_sign_cal: bool = True,
     do_zero_cal: bool = True,
@@ -749,9 +748,7 @@ def default_flow(
 
     results.append(phase_voice_setup(out_path, non_interactive=not sys.stdin.isatty()))
 
-    _print_tally(results, out_path)
-
-    # Emit pip-install hint if the manifest's capabilities require motion runtime.
+    # Emit pip-install hint if the manifest's capabilities require hardware runtime.
     # Reads capabilities from the just-written manifest. Best-effort.
     try:
         from robot_md.parser import parse_file
@@ -762,6 +759,8 @@ def default_flow(
     except Exception:
         # Hint emission must never block init success.
         pass
+
+    _print_tally(results, out_path)
 
     return 0
 
