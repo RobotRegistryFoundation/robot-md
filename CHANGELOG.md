@@ -5,6 +5,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.2] — 2026-04-27
+
+**Servo SDK rewrite to `scservo_sdk.sms_sts`.** Unblocks Phase 8 hardware
+verification on real Feetech buses. The PyPI `feetech-servo-sdk` package
+ships a `scservo_sdk` Python module whose top-level `PacketHandler()`
+factory is broken (calls undefined `SCS_SETEND` and passes the wrong
+arg count to `protocol_packet_handler`). Robot-md previously imported
+`from feetech_servo_sdk import PacketHandler, PortHandler` — that name
+isn't exported by the published wheel, so SO-ARM101 owners hit
+`ImportError` on every motion call and `context.py` silently degraded
+to "no backend".
+
+### Fixed
+
+- All servo call sites now use `scservo_sdk.sms_sts.sms_sts(portHandler)`,
+  the working SMS/STS protocol class. SO-ARM101 + every Feetech-bus
+  arm uses this protocol. Touched files:
+  - `cli/src/robot_md/calibrate.py` (read-pose, sign-test paths)
+  - `cli/src/robot_md/init_phases/_feetech_probe.py` (autodetect probe)
+  - `cli/src/robot_md/backends/feetech_depthai/servo.py` (live ServoBus)
+  - `cli/src/robot_md/bus_scan.py` (Tier B autodetect)
+- API signature now drops the leading `portHandler` argument from
+  `read2ByteTxRx` / `write1ByteTxRx` / `write2ByteTxRx` (the port is
+  bound at `sms_sts(ph)` construction time). Test stubs and arg-index
+  assertions updated to match.
+- `__version__` in `cli/src/robot_md/__init__.py` was stale at `0.7.3`;
+  now tracks `pyproject.toml` (1.2.2).
+- `load_context` now degrades to a backend-less context on port-open
+  failures (`OSError` / `pyserial.SerialException`) and backend
+  open-time validation failures (`RuntimeError`), not only missing
+  imports. A misconfigured `drivers[].port` no longer crashes MCP
+  startup; the server boots in read-only mode and `execute_capability`
+  returns `no_backend` until the operator fixes the config.
+
+### Notes
+
+- PyPI distribution name is unchanged (`feetech-servo-sdk` in extras);
+  only the Python module name (`scservo_sdk`) and the call API have
+  changed.
+- Operators on v1.2.0 / v1.2.1 must upgrade for any motion to work
+  on hardware — manifest reads / validate / render were never affected.
+
+---
+
 ## [1.2.1] — 2026-04-27
 
 **Lint cleanup of v1.2.0.** No behavior change. Wheel built from a
