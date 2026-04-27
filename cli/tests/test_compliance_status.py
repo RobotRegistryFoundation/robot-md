@@ -733,3 +733,91 @@ def test_joint_zero_sign_clean_when_calibrated(tmp_path, home):
     )
     s = gather_status(p, network_probe=False)
     assert s["first_motion_readiness"]["checks"]["joint_zero_sign"]["ok"] is True
+
+
+# ---- Task 10: tri-state sig_state tests (TDD — must fail pre-1.2.4) ---------
+
+
+def test_status_marks_artifact_invalid_when_signature_does_not_verify(manifest, home, tmp_path):
+    """Structurally-signed but cryptographically-invalid artifact must report INVALID.
+
+    Regression for the rcan-py 3.3.0 sign↔verify asymmetry: pre-1.2.4, this
+    artifact would have been reported as `(signed)` and would have passed
+    submission readiness, hiding a broken upstream signature.
+    """
+    # Provide an apikey so submission readiness evaluates the sig_state branch
+    # (not the apikey-missing branch).
+    apikey_path = home / ".robot-md" / "keys" / "RRN-000000000099.apikey"
+    apikey_path.parent.mkdir(parents=True, exist_ok=True)
+    apikey_path.write_text("dummy-apikey")
+
+    artifacts_dir = tmp_path / "compliance"
+    artifacts_dir.mkdir()
+    bad_artifact = {
+        "schema": "rcan-fria-v1",
+        "generated_at": "2026-04-27T00:00:00Z",
+        "system": {"rrn": "RRN-TEST"},
+        "deployment": {},
+        "conformance": {"score": 100, "pass_count": 5, "warn_count": 0, "fail_count": 0},
+        "pq_signing_pub": "AAAA",  # valid b64, decodes to 3 bytes — fails ML-DSA verify
+        "pq_kid": "deadbeef",
+        "sig": {
+            "ml_dsa": "AAAA",
+            "ed25519": "AAAA",
+            "ed25519_pub": "AAAA",
+        },
+    }
+    (artifacts_dir / "fria.json").write_text(json.dumps(bad_artifact))
+
+    status = gather_status(manifest, artifacts_dir=artifacts_dir, network_probe=False)
+    fria = next(a for a in status["artifacts"]["present"] if a["schema"] == "rcan-fria-v1")
+    assert fria["sig_state"] == "INVALID"
+    assert status["submission_readiness"]["fria"]["ready"] is False
+    assert "signature invalid" in status["submission_readiness"]["fria"]["reason"].lower()
+
+
+def test_status_marks_artifact_verified_when_signature_is_valid(manifest, home, tmp_path):
+    """A real signed artifact (top-level shape) reports `verified` and passes readiness."""
+    from robot_md.signing import generate_keypair, save_keypair
+
+    artifacts_dir = tmp_path / "compliance"
+    artifacts_dir.mkdir()
+
+    # Set up a valid signing keypair in the test home dir so apikey/signing checks pass.
+    kp = generate_keypair()
+    save_keypair("RRN-000000000099", kp)
+    apikey_path = home / ".robot-md" / "keys" / "RRN-000000000099.apikey"
+    apikey_path.write_text("dummy-apikey")
+
+    # Sign a minimal IFU-shaped body and write it to the artifacts dir.
+    from robot_md.signing import sign_body
+    body = {"schema": "rcan-ifu-v1", "generated_at": "2026-04-27T00:00:00Z"}
+    signed = sign_body(kp, body)
+    (artifacts_dir / "ifu.json").write_text(json.dumps(signed))
+
+    status = gather_status(manifest, artifacts_dir=artifacts_dir, network_probe=False)
+    ifu = next(a for a in status["artifacts"]["present"] if a["schema"] == "rcan-ifu-v1")
+    assert ifu["sig_state"] == "verified"
+    assert status["submission_readiness"]["ifu"]["ready"] is True
+
+
+def test_status_marks_artifact_unsigned_when_no_sig_field(manifest, home, tmp_path):
+    """Artifact with neither top-level nor nested sig reports `unsigned`."""
+    artifacts_dir = tmp_path / "compliance"
+    artifacts_dir.mkdir()
+    unsigned = {"schema": "rcan-fria-v1", "generated_at": "2026-04-27T00:00:00Z"}
+    (artifacts_dir / "fria.json").write_text(json.dumps(unsigned))
+
+    status = gather_status(manifest, artifacts_dir=artifacts_dir, network_probe=False)
+    fria = next(a for a in status["artifacts"]["present"] if a["schema"] == "rcan-fria-v1")
+    assert fria["sig_state"] == "unsigned"
+
+
+# ---- Task 12: _render_sig_state helper test ---------------------------------
+
+
+def test_render_sig_state_returns_correct_marker_and_suffix():
+    from robot_md.compliance_status import _render_sig_state
+    assert _render_sig_state("verified") == ("✓", "(signed, verified)")
+    assert _render_sig_state("INVALID") == ("✗", "(signed, INVALID)")
+    assert _render_sig_state("unsigned") == ("•", "(unsigned)")
