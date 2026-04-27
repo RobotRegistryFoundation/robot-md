@@ -89,3 +89,28 @@ jobs:
             exit 1
           fi
           echo "✓ All three schema copies match"
+
+  skill-sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify using-robot-md SKILL.md matches canonical (robot-md-mcp)
+        run: |
+          # Canonical lives in github.com/RobotRegistryFoundation/robot-md-mcp
+          # at skills/using-robot-md/SKILL.md. After editing canonical there,
+          # run scripts/sync-skill.sh in robot-md to refresh the bundled copy.
+          curl -fsSL \
+            https://raw.githubusercontent.com/RobotRegistryFoundation/robot-md-mcp/main/skills/using-robot-md/SKILL.md \
+            -o /tmp/canonical-skill.md
+          local_skill=cli/src/robot_md/skills/using-robot-md.SKILL.md
+          canon=$(md5sum /tmp/canonical-skill.md | awk '{print $1}')
+          local_md5=$(md5sum "$local_skill" | awk '{print $1}')
+          echo "canonical (robot-md-mcp main):  $canon"
+          echo "bundled CLI ($local_skill):     $local_md5"
+          if [ "$canon" != "$local_md5" ]; then
+            echo ""
+            echo "::error::SKILL.md drifted from canonical (robot-md-mcp main). Run: scripts/sync-skill.sh"
+            diff /tmp/canonical-skill.md "$local_skill" || true
+            exit 1
+          fi
+          echo "✓ SKILL.md matches canonical"

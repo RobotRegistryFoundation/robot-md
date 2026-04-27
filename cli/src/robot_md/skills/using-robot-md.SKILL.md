@@ -51,8 +51,45 @@ digraph when_to_use {
 | "Pose the arm at zero" / "calibrate zero" | `robot-md calibrate --zero ROBOT.md`. Relay interactive prompts to the operator. |
 | "Calibrate the hand-eye" / "solve the camera extrinsic" | `robot-md calibrate --hand-eye --marker-pos x,y,z ROBOT.md` |
 | "Publish my robot" / "give it a public URL" | `robot-md publish-discovery ROBOT.md --url <URL>` |
-| "Register this robot" / "get an RRN" | `robot-md register ROBOT.md --manufacturer ... --contact-email ...` |
+| "Register this robot" / "get an RRN" | `robot-md register ROBOT.md` (defaults read from the manifest). See **Registration** below for the confirm-first flow. |
 | "Unregister" / "take it down" | `robot-md unregister <rrn>` — confirm with operator first (destructive). |
+
+## Registration (RRF + RCAN 3.0)
+
+Every shared or production robot should have a public identity — an **RRN** (Robot Registry Name) minted at the [Robot Registry Foundation](https://robotregistryfoundation.org). The RRN is the permanent, cryptographically-bound id that lets this robot participate in the **RCAN 3.0+** network and be addressed by other agents. Registration POSTs a signed RCAN envelope to RRF; RRF mints the RRN and writes it back into `metadata.rrn` in the manifest.
+
+### Detect unregistered state and surface it
+
+When you read the frontmatter (resource `robot-md://<name>/frontmatter` or `robot-md render`), check `metadata.rrn`:
+
+- **Missing or empty** → the robot is unregistered. Surface this the first time the operator asks about identity, publishing, sharing, or deployment: *"This manifest doesn't have an RRN yet. Want me to register it with the Robot Registry Foundation?"*
+- **Present** → already registered. Quote the RRN and the public URL (`https://robotregistryfoundation.org/r/<rrn>`) when the operator asks "what's its name" / "what's the URL".
+
+Don't push registration during early prototyping — the operator may still be iterating on `ROBOT.md`. Surface once, respect a "not yet".
+
+### Automatic registration (one command)
+
+Once the operator approves, the simplest path is a single command. All flags are optional — defaults come from the manifest:
+
+```bash
+robot-md register ROBOT.md
+```
+
+This signs the body with the local key under `~/.robot-md/keys/` (RCAN 3.0 envelope), POSTs to the RRF mint endpoint, writes the returned RRN back into `metadata.rrn`, and prints the public URL.
+
+**Flow when the operator says "register it":**
+
+1. Confirm with one sentence: "Registering mints a permanent public identity at robotregistryfoundation.org. Ready?"
+2. Verify the manifest has `metadata.manufacturer` and a reachable contact email — RRF's public resolver page shows both. If either is missing, ask the operator and either pass with a flag (`--manufacturer Acme`) OR edit the manifest, run `validate`, then retry.
+3. Run `robot-md register ROBOT.md` via Bash.
+4. On any field-missing error, collect the specific value from the operator and retry with the matching flag rather than guessing.
+5. On success, re-read `robot-md://<name>/frontmatter` (the MCP server re-reads the file on every call, so the new RRN is visible immediately). Read the RRN back to the operator and share the public URL.
+
+### When NOT to register
+
+- Dry-run or rehearsal manifests — pass `--dry-run` to sign + print without POSTing.
+- Manifests that fail `validate` — fix schema issues first.
+- Anything the operator hasn't explicitly approved.
 
 ## Safety Protocol
 
@@ -68,7 +105,7 @@ digraph when_to_use {
 
 If `robot-md-mcp` is registered in this session (look for `robot-md://` resources), prefer MCP reads over shelling out — the resources stay in sync with the file on disk automatically, and the server advertises intent-matchable descriptions for each resource.
 
-Check with `/mcp` in Claude Code. If no MCP server is live, fall back to `robot-md <verb>` via the Bash tool.
+Check with `/mcp` in Claude Code. If no `robot-md://` resources are present, fall back to `robot-md <verb>` via the Bash tool. (When this skill is installed via the `robot-md` Claude Code plugin, the MCP server is auto-registered — expect the resources to be there.)
 
 ## Slash commands (MCP prompts, v0.2.1+)
 
@@ -131,7 +168,7 @@ This skill ships as part of the [`robot-md` Claude Code plugin](https://github.c
 /reload-plugins
 ```
 
-The plugin also auto-registers the `robot-md-mcp` MCP server. If you prefer a manual install, `pip install robot-md` and run `robot-md install-skill` to copy this file into `~/.claude/skills/using-robot-md/`.
+The plugin also auto-registers the `robot-md-mcp` MCP server, so the `robot-md://<name>/*` resources become available in the same step.
 
 ## Integration
 
