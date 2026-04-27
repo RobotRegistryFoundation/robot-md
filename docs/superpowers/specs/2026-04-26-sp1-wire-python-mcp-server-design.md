@@ -4,6 +4,8 @@
 **Status:** Design — pending implementation plan
 **Sub-project:** 1 of 5 (see `2026-04-26-robot-md-runtime-decomposition.md` for the full breakdown)
 
+> **REVISION 2026-04-27:** Several sections superseded by `2026-04-27-sp1-5-simplification-revisions.md` — Revisions 1, 6, and 7 specifically apply to SP1. Notably: drop the manifest-only npm fallback (one MCP server, Python required); collapse the two-server topology; resolve skill text drift before SP1 plan-writing.
+
 ## Problem
 
 `robot-md` declares a robot's capabilities (`arm.pick`, `arm.place`, `perceive.rgb`, …), but the only MCP server currently wired into Claude Code via the `robot-md` plugin is the npm `robot-md-mcp@^0.3` server, which exposes manifest-layer tools only (`validate`, `render`, `doctor_summary`). The Python `robot-md mcp <ROBOT.md>` command, shipped in the same `robot-md` PyPI package, exposes the runtime-layer tools (`execute_task`, `execute_capability`, `vision_find`, `estop`, …) backed by `feetech_depthai` and the entry-point backend registry. **Operators have a runtime-capable MCP server installed but never connected.**

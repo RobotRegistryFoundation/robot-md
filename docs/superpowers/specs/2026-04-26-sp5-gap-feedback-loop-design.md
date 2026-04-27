@@ -4,6 +4,8 @@
 **Status:** Design — pending implementation plan
 **Sub-project:** 5 of 5 (final; see SP1-SP4 specs in this directory)
 
+> **REVISION 2026-04-27:** One section superseded by `2026-04-27-sp1-5-simplification-revisions.md` — Revision 5 specifically applies to SP5. Notably: init's LOW-tier output uses ONE CTA (`robot-md author-backend`, with `--report-instead` flag for the report-only path) instead of two parallel one-liners. Standalone `report-hardware-gap` CLI still exists.
+
 ## Problem
 
 SP4 ships the Claude-authored driver workflow for operators willing to pair-program a backend. But many operators won't take that path — they hit unsupported hardware, want to file something for someone else to handle, and move on. Without a structured way for that signal to land, every future operator with the same hardware repeats the same dead-end discovery: lookup empty, context7 empty, WebFetch fragmented, manual SDK research from scratch.

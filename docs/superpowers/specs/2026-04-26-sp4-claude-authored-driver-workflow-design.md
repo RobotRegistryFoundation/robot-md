@@ -4,6 +4,8 @@
 **Status:** Design — pending implementation plan
 **Sub-project:** 4 of 5 (see SP1-SP3 specs in this directory)
 
+> **REVISION 2026-04-27:** Several sections superseded by `2026-04-27-sp1-5-simplification-revisions.md` — Revision 4 specifically applies to SP4. Notably: collapse 6 operator-facing phases into 3 (Setup / Motion testing / Finalize); internal AuthorGate state machine still tracks 6 sub-phases. `--strict-phases` flag preserves the original 6-phase model.
+
 ## Problem
 
 SP3 ships a backend authoring template (`examples/backend-template/`) and a guide (`docs/authoring-a-backend.md`) — operators with hardware that no installed backend supports can copy the template and fill it in. But that's still an "expert author writes a Python package" workflow. For the demo's moat narrative ("any hardware, with Claude's help"), we need an *interactive* path: operator says *"Claude, write a backend for my arm"*, and Claude walks them through it phase by phase, gated for safety, ending with a working installed backend and an optional contribution PR.

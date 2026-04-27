@@ -4,6 +4,8 @@
 **Status:** Design — pending implementation plan
 **Sub-project:** 3 of 5 (see SP1 + SP2 specs in this directory)
 
+> **REVISION 2026-04-27:** Several sections superseded by `2026-04-27-sp1-5-simplification-revisions.md` — Revision 3 specifically applies to SP3. Notably: add a `[hardware]` meta-extra that pulls all common backends in one install; granular `[lerobot]`/`[realsense]`/`[feetech-depthai]` extras stay for advanced/minimal installs.
+
 ## Problem
 
 `robot-md` has the `CapabilityBackend` ABC, the `robot_md.backends` entry-point group, and one reference implementation (`feetech_depthai`, ~1150 LoC). The runtime architecture is sound. What's missing is a *story* for how vendors (HuggingFace, Intel, Trossen, Pollen, etc.) ship their SDKs as `robot-md`-compatible backends — and how operators discover and install them. Today, owning a SO-100 with stock LeRobot tooling means there's no way to point Claude at it through `robot-md`. The runtime works, but the ecosystem doesn't yet.

@@ -4,6 +4,8 @@
 **Status:** Design — pending implementation plan
 **Sub-project:** 2 of 5 (see `2026-04-26-sp1-wire-python-mcp-server-design.md` for SP1)
 
+> **REVISION 2026-04-27:** Several sections superseded by `2026-04-27-sp1-5-simplification-revisions.md` — Revisions 2 and 6 specifically apply to SP2. Notably: silent auto-pick on MEDIUM tier (no prompt unless `--explain`); manifest schema gets only `backend:` field, not both `backend` + `preferred_backend` (the hint stays preset-internal).
+
 ## Problem
 
 `robot-md init` already runs `autodetect.scan_system()` (PCI/USB/tty/cameras/runtime probes) and scores 16 presets via `match_score()` heuristics. But it then silently picks the top scorer via `pick_best()` and writes the manifest with no operator visibility into:
