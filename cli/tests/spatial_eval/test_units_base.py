@@ -6,7 +6,6 @@ from robot_md.spatial_eval.units import REGISTRY, get_unit
 from robot_md.spatial_eval.units.base import ProbeAnswer, Unit  # noqa: F401
 
 
-@pytest.mark.skip(reason="populated by Tasks 4-8 (one unit per task)")
 def test_registry_lists_all_five_v1_units():
     # Force import of all five so they self-register.
     import robot_md.spatial_eval.units.o1_permanence  # noqa: F401
