@@ -79,10 +79,10 @@ def test_default_flow_runs_all_phases_in_order(tmp_path, fake_scan):
         )
 
     assert rc == 0
+    # install_mcp deprecated per SP1 R1 — no longer called by default_flow.
     assert calls == [
         "write_manifest",
         "register",
-        "install_mcp",
         "install_skill",
         "sign_cal",
         "zero_cal",
@@ -240,7 +240,7 @@ def test_tally_prints_one_line_per_executed_phase(tmp_path, fake_scan, capsys):
 
     err = capsys.readouterr().err
     assert "✓ manifest" in err
-    assert "install-mcp" in err
+    # install-mcp deprecated per SP1 R1 — no longer appears in tally.
     assert "install-skill" in err
     assert "sign-cal" in err
     assert "zero-cal" in err

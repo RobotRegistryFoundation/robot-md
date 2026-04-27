@@ -27,6 +27,39 @@ from robot_md.autodetect import scan_system
 
 PRESETS_DIR = Path(__file__).parent / "presets"
 
+# Capability prefixes that require the motion runtime (i.e., a backend
+# that can drive hardware or read sensors). Used by
+# `_emit_motion_extras_hint` to decide whether to print the
+# `pip install 'robot-md[hardware]'` reminder.
+# Keep this in sync with skills/using-robot-md SKILL.md motion-intent stanza.
+_MOTION_CAPABILITY_PREFIXES = ("arm.", "nav.", "gripper.", "perceive.")
+
+
+def _emit_motion_extras_hint(capabilities: list[str]) -> None:
+    """If manifest declares motion-relevant capabilities, print the install hint.
+
+    No-op when capabilities is empty or only contains non-motion entries
+    (e.g., compute.train, logging.publish on a sensor-aggregation robot).
+    Per SP1 §2.2 + revisions R1+R3.
+    """
+    import sys
+
+    if not capabilities:
+        return
+    has_motion = any(
+        any(cap.startswith(prefix) for prefix in _MOTION_CAPABILITY_PREFIXES)
+        for cap in capabilities
+    )
+    if not has_motion:
+        return
+    print(
+        "\nMotion capabilities declared. To enable runtime control:\n"
+        "  pip install 'robot-md[hardware]'\n"
+        "Then in Claude Code: /mcp → Reconnect `robot-md` "
+        "(or restart Claude Code).",
+        file=sys.stderr,
+    )
+
 
 # ---------------------------------------------------------------------- loading
 
@@ -578,7 +611,7 @@ def default_flow(
     _self = sys.modules[__name__]
     phase_write_manifest = _self.phase_write_manifest  # type: ignore[attr-defined]
     phase_register = _self.phase_register  # type: ignore[attr-defined]
-    phase_install_mcp = _self.phase_install_mcp  # type: ignore[attr-defined]
+    # install_mcp deprecated per SP1 R1 — plugin's .mcp.json handles wiring.
     phase_install_skill = _self.phase_install_skill  # type: ignore[attr-defined]
     phase_calibrate_sign = _self.phase_calibrate_sign  # type: ignore[attr-defined]
     phase_calibrate_zero = _self.phase_calibrate_zero  # type: ignore[attr-defined]
@@ -643,9 +676,7 @@ def default_flow(
     if do_refresh_claude_md:
         _refresh_claude_md(out_path)
 
-    # Phase 3: install MCP with Claude Code
-    if do_install_mcp:
-        results.append(phase_install_mcp(out_path))
+    # install_mcp deprecated per SP1 R1 — plugin's .mcp.json handles wiring.
 
     # Phase 4: install skill
     if do_install_skill:
@@ -719,6 +750,19 @@ def default_flow(
     results.append(phase_voice_setup(out_path, non_interactive=not sys.stdin.isatty()))
 
     _print_tally(results, out_path)
+
+    # Emit pip-install hint if the manifest's capabilities require motion runtime.
+    # Reads capabilities from the just-written manifest. Best-effort.
+    try:
+        from robot_md.parser import parse_file
+        _parsed = parse_file(out_path)
+        _capabilities = _parsed.frontmatter.get("capabilities") or []
+        if isinstance(_capabilities, list):
+            _emit_motion_extras_hint(_capabilities)
+    except Exception:
+        # Hint emission must never block init success.
+        pass
+
     return 0
 
 
