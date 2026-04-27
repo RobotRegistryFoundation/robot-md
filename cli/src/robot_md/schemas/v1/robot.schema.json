@@ -586,6 +586,53 @@
           "recorded_at": {"type": "string"}
         }
       }
+    },
+    "spatial-eval": {
+      "type": "object",
+      "description": "SP6 spatial intelligence eval declaration. Phase 0 ships a fixed v1 stack: Anthropic-only reasoning on both tracks, fixed unit roster (O1/O2/O3/A1/A2). Future protocol revisions widen these constraints.",
+      "additionalProperties": false,
+      "required": ["spec_version", "units", "workspace", "reasoning_stack"],
+      "properties": {
+        "spec_version": {"type": "string", "pattern": "^1\\.[0-9]+\\.[0-9]+$"},
+        "units": {
+          "type": "array",
+          "items": {"enum": ["O1", "O2", "O3", "A1", "A2"]},
+          "uniqueItems": true,
+          "minItems": 1
+        },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["play_surface_dims_m", "judge_camera"],
+          "properties": {
+            "play_surface_dims_m": {
+              "type": "array", "items": {"type": "number", "minimum": 0.05},
+              "minItems": 2, "maxItems": 2
+            },
+            "judge_camera": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["device", "resolution"],
+              "properties": {
+                "device": {"type": "string", "minLength": 1},
+                "resolution": {
+                  "type": "array", "items": {"type": "integer", "minimum": 1},
+                  "minItems": 2, "maxItems": 2
+                }
+              }
+            }
+          }
+        },
+        "reasoning_stack": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseline", "declared"],
+          "properties": {
+            "baseline": {"type": "string", "pattern": "^claude:.+"},
+            "declared": {"type": "string", "pattern": "^claude:.+"}
+          }
+        }
+      }
     }
   },
   "additionalProperties": true
