@@ -178,3 +178,50 @@ def test_register_fixture_wire_format_verifies():
     fx = json.loads(REGISTER_FIXTURE_PATH.read_text())
     signed = fx["http_body"]
     assert verify_body(signed) is True
+
+
+# ---- _verify_with_pq_pub helper (FriaDocument nested-key shape) -----------
+
+
+def test_verify_with_pq_pub_accepts_valid_nested_signature():
+    """Helper verifies a signed dict with pq_signing_pub at signing_key.public_key.
+
+    Mimics the FriaDocument shape: top-level body + sig + signing_key.public_key,
+    no top-level pq_signing_pub.
+
+    The body passed to sign_body already contains signing_key.public_key so that
+    field is part of the signed pre-image.  After signing, pq_signing_pub is
+    removed to form the "nested shape" that _verify_with_pq_pub must accept.
+    """
+    from robot_md.signing import _verify_with_pq_pub
+
+    kp = generate_keypair()
+    pub_b64 = base64.b64encode(kp.ml_dsa.public_key_bytes).decode("ascii")
+    # Include signing_key.public_key in the body BEFORE signing so it is part
+    # of the signed pre-image.  sign_body then adds pq_signing_pub at top level.
+    body = {"foo": "bar", "signing_key": {"public_key": pub_b64}}
+    signed = sign_body(kp, body)
+    # Reshape into the FriaDocument nested-key shape: remove top-level pq_signing_pub.
+    nested = {k: v for k, v in signed.items() if k != "pq_signing_pub"}
+
+    assert _verify_with_pq_pub(nested, pub_b64) is True
+
+
+def test_verify_with_pq_pub_rejects_bad_b64():
+    """Helper returns False on invalid base64 — must not raise."""
+    from robot_md.signing import _verify_with_pq_pub
+    assert _verify_with_pq_pub({"sig": {}}, "not-valid-base64-!!!") is False
+
+
+def test_verify_with_pq_pub_rejects_tampered_nested_body():
+    """Tampering with body content after signing must cause verify to return False."""
+    from robot_md.signing import _verify_with_pq_pub
+
+    kp = generate_keypair()
+    pub_b64 = base64.b64encode(kp.ml_dsa.public_key_bytes).decode("ascii")
+    body = {"foo": "bar", "signing_key": {"public_key": pub_b64}}
+    signed = sign_body(kp, body)
+    nested = {k: v for k, v in signed.items() if k != "pq_signing_pub"}
+    nested["foo"] = "tampered"
+
+    assert _verify_with_pq_pub(nested, pub_b64) is False

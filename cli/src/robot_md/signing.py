@@ -146,3 +146,23 @@ def verify_body(signed: dict[str, Any]) -> bool:
     except (ValueError, binascii.Error):
         return False
     return _rcan_verify_body(signed, pq_pub)
+
+
+def _verify_with_pq_pub(signed: dict[str, Any], pq_pub_b64: str) -> bool:
+    """Verify a signed dict where the public key is *not* at top-level ``pq_signing_pub``.
+
+    Used for the FriaDocument nested-key shape, where the public key lives under
+    ``signing_key.public_key`` rather than top-level ``pq_signing_pub``.
+
+    Re-injects ``pq_signing_pub`` from the supplied argument before delegating
+    to ``_rcan_verify_body`` so the canonicalized pre-image matches what
+    ``sign_body`` produced.
+
+    Returns False on any decode/verify error (mirrors verify_body).
+    """
+    try:
+        pq_pub = base64.b64decode(pq_pub_b64)
+    except (ValueError, binascii.Error):
+        return False
+    signed_with_pub = {**signed, "pq_signing_pub": pq_pub_b64}
+    return _rcan_verify_body(signed_with_pub, pq_pub)
