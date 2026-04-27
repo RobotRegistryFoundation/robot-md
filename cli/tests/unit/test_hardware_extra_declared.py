@@ -27,8 +27,7 @@ def test_hardware_extra_exists():
     cfg = _load_pyproject()
     extras = cfg["project"]["optional-dependencies"]
     assert "hardware" in extras, (
-        "pyproject.toml must declare [hardware] meta-extra. "
-        f"Got: {sorted(extras.keys())}"
+        f"pyproject.toml must declare [hardware] meta-extra. Got: {sorted(extras.keys())}"
     )
 
 
@@ -59,9 +58,7 @@ def test_hardware_extra_includes_pyserial():
 def test_hardware_extra_includes_opencv():
     cfg = _load_pyproject()
     extras = cfg["project"]["optional-dependencies"]["hardware"]
-    assert any("opencv" in dep for dep in extras), (
-        f"[hardware] must include opencv. Got: {extras}"
-    )
+    assert any("opencv" in dep for dep in extras), f"[hardware] must include opencv. Got: {extras}"
 
 
 def test_existing_extras_still_present():

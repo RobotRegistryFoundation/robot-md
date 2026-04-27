@@ -10,13 +10,10 @@ Verifies:
 
 from __future__ import annotations
 
-import asyncio
-
 import pytest
 
 from robot_md.mcp.context import load_context
 from robot_md.mcp.server import build_server
-
 
 # ── fixture ───────────────────────────────────────────────────────────────────
 

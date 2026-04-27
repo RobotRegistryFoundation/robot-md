@@ -18,5 +18,3 @@ def test_phase_result_accepts_skipped_and_failed():
 
     assert PhaseResult(phase="x", status="skipped", message="m", detail=None).status == "skipped"
     assert PhaseResult(phase="x", status="failed", message="m", detail={"e": 1}).detail == {"e": 1}
-
-

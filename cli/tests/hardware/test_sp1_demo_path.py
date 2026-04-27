@@ -7,7 +7,6 @@ Marked @hardware so they're skipped in CI. Run only on bob:
 from __future__ import annotations
 
 import asyncio
-import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -41,17 +40,19 @@ def test_sp1_python_mcp_server_starts_and_lists_tools():
     )
 
     async def _check_tools():
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                tools = await session.list_tools()
-                tool_names = {t.name for t in tools.tools}
-                # Must include the SP1-promised motion tools.
-                assert "execute_task" in tool_names, f"got: {tool_names}"
-                assert "execute_capability" in tool_names, f"got: {tool_names}"
-                assert "vision_find" in tool_names, f"got: {tool_names}"
-                # Plus the existing manifest tools.
-                assert "validate" in tool_names, f"got: {tool_names}"
+        async with (
+            stdio_client(params) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
+            tools = await session.list_tools()
+            tool_names = {t.name for t in tools.tools}
+            # Must include the SP1-promised motion tools.
+            assert "execute_task" in tool_names, f"got: {tool_names}"
+            assert "execute_capability" in tool_names, f"got: {tool_names}"
+            assert "vision_find" in tool_names, f"got: {tool_names}"
+            # Plus the existing manifest tools.
+            assert "validate" in tool_names, f"got: {tool_names}"
 
     asyncio.run(_check_tools())
 

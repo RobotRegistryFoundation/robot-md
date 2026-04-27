@@ -7,10 +7,6 @@ arm.*/nav.*/gripper.*/perceive.* capabilities.
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import pytest
-
 from robot_md.init import _emit_motion_extras_hint
 
 
@@ -61,7 +57,9 @@ def test_hint_mentions_mcp_reconnect(capsys):
 
 def test_hint_uses_hardware_extra_not_old_npm():
     """Sanity: the hint must not reference the deprecated npm-based command."""
-    import sys, io
+    import io
+    import sys
+
     buf = io.StringIO()
     _orig = sys.stderr
     sys.stderr = buf

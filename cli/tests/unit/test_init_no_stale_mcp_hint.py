@@ -13,9 +13,7 @@ That contradicts the new deprecation message and confuses operators.
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from robot_md.init import _print_tally
 from robot_md.init_phases import PhaseResult
@@ -55,18 +53,14 @@ def test_print_tally_does_not_emit_stale_npm_hint(capsys, tmp_path: Path):
     # "robot-md-mcp" is the old npm-binary name used only in the stale hint;
     # it must never appear in output regardless of the install_mcp status.
     assert "robot-md-mcp" not in combined, (
-        "init must not reference the stale robot-md-mcp npm binary. "
-        f"Output:\n{combined}"
+        f"init must not reference the stale robot-md-mcp npm binary. Output:\n{combined}"
     )
     assert "To register the MCP server manually" not in combined, (
-        "init must not emit the stale 'register MCP manually' prompt. "
-        f"Output:\n{combined}"
+        f"init must not emit the stale 'register MCP manually' prompt. Output:\n{combined}"
     )
 
 
-def test_print_tally_does_not_emit_stale_hint_when_install_mcp_absent(
-    capsys, tmp_path: Path
-):
+def test_print_tally_does_not_emit_stale_hint_when_install_mcp_absent(capsys, tmp_path: Path):
     """If install_mcp wasn't run at all (Phase 4 will drop it from
     default_flow), _print_tally must still not emit the stale hint."""
     results = []  # No install_mcp at all
@@ -78,10 +72,8 @@ def test_print_tally_does_not_emit_stale_hint_when_install_mcp_absent(
     captured = capsys.readouterr()
     combined = captured.out + captured.err
     assert "robot-md-mcp" not in combined, (
-        "init must not reference the stale robot-md-mcp npm binary. "
-        f"Output:\n{combined}"
+        f"init must not reference the stale robot-md-mcp npm binary. Output:\n{combined}"
     )
     assert "To register the MCP server manually" not in combined, (
-        "init must not emit the stale 'register MCP manually' prompt. "
-        f"Output:\n{combined}"
+        f"init must not emit the stale 'register MCP manually' prompt. Output:\n{combined}"
     )

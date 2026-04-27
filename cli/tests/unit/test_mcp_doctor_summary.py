@@ -17,7 +17,6 @@ import pytest
 from robot_md.mcp.tools.doctor_summary import doctor_summary_tool
 from robot_md.parser import ParsedRobotMd
 
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 
@@ -125,9 +124,7 @@ def test_doctor_summary_full_shape(valid_ctx):
         "estop",
         "notes",
     }
-    assert expected_keys.issubset(result.keys()), (
-        f"Missing keys: {expected_keys - result.keys()}"
-    )
+    assert expected_keys.issubset(result.keys()), f"Missing keys: {expected_keys - result.keys()}"
 
 
 def test_doctor_summary_invalid_manifest_schema_not_ok():
@@ -152,8 +149,17 @@ def test_doctor_summary_invalid_manifest_has_required_keys():
     ctx = _make_ctx(bad_parsed)
     result = doctor_summary_tool(ctx)
     expected_keys = {
-        "schema_ok", "schema_errors", "robot_name", "rrn", "registered",
-        "dof", "capabilities_count", "drivers", "hitl_gates", "estop", "notes",
+        "schema_ok",
+        "schema_errors",
+        "robot_name",
+        "rrn",
+        "registered",
+        "dof",
+        "capabilities_count",
+        "drivers",
+        "hitl_gates",
+        "estop",
+        "notes",
     }
     assert expected_keys.issubset(result.keys())
 
@@ -183,6 +189,4 @@ async def test_doctor_summary_tool_registered_in_server(fixtures_dir):
     server = build_server(ctx)
     tools = await server.list_tools()
     tool_names = {t.name for t in tools}
-    assert "doctor_summary" in tool_names, (
-        f"doctor_summary not in registered tools: {tool_names}"
-    )
+    assert "doctor_summary" in tool_names, f"doctor_summary not in registered tools: {tool_names}"
