@@ -38,6 +38,7 @@ import urllib.error
 import urllib.request
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from robot_md import __version__
@@ -114,10 +115,8 @@ def submit_request(
 ) -> dict[str, Any]:
     """POST a signed reissue request to RRF. Audit-logs every outcome.
 
-    Endpoint defaults to ``{endpoint}/v2/robots/<rrn>/apikey-requests``.
-    Note: probed 2026-04-25 — the server-side endpoint does not yet
-    exist on robotregistryfoundation.org. Until it does, prefer the
-    out-of-band flow (emit signed JSON, hand to RRF support).
+    Endpoint defaults to ``{endpoint}/v2/robots/<rrn>/apikey-requests``
+    (live as of RRF commit cdf5198, 2026-04-27).
 
     Returns ``{"status": int, "body": dict}``. Raises SubmitError on
     network failure or non-2xx response. Audit log records all attempts.
@@ -190,3 +189,29 @@ def submit_request(
     )
 
     return {"status": status, "body": body}
+
+
+def persist_response(result: dict, *, rrn: str) -> tuple[str, Path | None]:
+    """Save an RRF apikey-requests response body to the keystore.
+
+    If ``result['body']`` is a dict containing a string ``api_key``, write it
+    atomically to ``~/.robot-md/keys/<rrn>.apikey`` (mode 600) using the same
+    helper that ``robot-md register`` uses on initial issuance. Otherwise the
+    file is left untouched.
+
+    Returns ``(json_body_str, apikey_path_or_None)`` so callers can both
+    surface the response to the operator (stdout) and report whether a key
+    was saved.
+    """
+    body = result.get("body")
+    if not isinstance(body, dict):
+        return json.dumps(body) if body is not None else "", None
+
+    body_str = json.dumps(body, indent=2)
+    api_key = body.get("api_key")
+    if not isinstance(api_key, str) or not api_key:
+        return body_str, None
+
+    from robot_md.register import _write_apikey  # avoids import cycle at top
+
+    return body_str, _write_apikey(rrn, api_key)

@@ -564,7 +564,8 @@ def request_apikey(
         False,
         "--submit",
         help="POST the signed request to RRF /v2/robots/<rrn>/apikey-requests. "
-        "(Server-side endpoint may not be implemented yet — dry-run / out-of-band first.)",
+        "On 2xx the issued apikey is auto-saved to ~/.robot-md/keys/<rrn>.apikey "
+        "(mode 600) and the response body is printed to stdout.",
     ),
     endpoint: str = typer.Option(
         "https://robotregistryfoundation.org",
@@ -586,13 +587,15 @@ def request_apikey(
 
     Default behaviour: emit a signed JSON document to stdout that the
     operator hands to RRF support out-of-band. With --submit, POSTs to
-    the apikey-requests endpoint when/if RRF implements it.
+    the apikey-requests endpoint and auto-saves the issued apikey on
+    success.
     """
     import json as _json
 
     from robot_md.apikey_request import (
         SubmitError,
         build_request,
+        persist_response,
         sign_request,
         submit_request,
     )
@@ -643,6 +646,19 @@ def request_apikey(
             err=True,
             fg=typer.colors.GREEN,
         )
+        body_str, apikey_path = persist_response(result, rrn=rrn)
+        if apikey_path is not None:
+            typer.secho(
+                f"  saved apikey to {apikey_path} (mode 600)",
+                err=True,
+                fg=typer.colors.GREEN,
+            )
+        if output is None:
+            typer.echo(body_str)
+        else:
+            output.write_text(body_str)
+            typer.echo(f"wrote response body to {output}", err=True)
+        return
 
     out = _json.dumps(artifact, indent=2)
     if output is None:
@@ -650,13 +666,12 @@ def request_apikey(
     else:
         output.write_text(out)
         typer.echo(f"wrote {output}", err=True)
-        if not submit:
-            typer.secho(
-                "  next: hand this signed JSON to RRF support out-of-band "
-                "(email/ticket) or rerun with --submit when the endpoint exists.",
-                err=True,
-                fg=typer.colors.YELLOW,
-            )
+        typer.secho(
+            "  next: hand this signed JSON to RRF support out-of-band "
+            "(email/ticket) or rerun with --submit to POST to RRF directly.",
+            err=True,
+            fg=typer.colors.YELLOW,
+        )
 
 
 # ---------------------------------------------------------- §22 FRIA

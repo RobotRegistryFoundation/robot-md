@@ -182,3 +182,132 @@ def test_submit_records_audit_on_failure(home):
     entries = load_entries("RRN-000000000099")
     assert entries[0]["details"]["status"] == 404
     assert entries[0]["details"]["outcome"] == "failed"
+
+
+# ---- persist_response ----------------------------------------------------
+
+
+def test_persist_response_writes_apikey_with_0600(home):
+    from robot_md.apikey_request import persist_response
+
+    result = {
+        "status": 201,
+        "body": {
+            "rrn": "RRN-000000000099",
+            "api_key": "rrf_examplekeyvalue123",
+            "issued_at": "2026-04-27T16:34:06.972Z",
+            "operation": "reissue",
+            "prior_key_exists": False,
+            "api_key_reissue_count": 1,
+        },
+    }
+    body_str, path = persist_response(result, rrn="RRN-000000000099")
+    assert path is not None
+    assert path.name == "RRN-000000000099.apikey"
+    assert path.read_text().strip() == "rrf_examplekeyvalue123"
+    # Mode 600 — owner-readable only
+    assert (path.stat().st_mode & 0o777) == 0o600
+    # JSON body returned for caller to print
+    assert "rrf_examplekeyvalue123" in body_str
+    assert "issued_at" in body_str
+
+
+def test_persist_response_no_apikey_does_not_write(home):
+    from robot_md.apikey_request import persist_response
+    from robot_md.register import _keystore_dir
+
+    keystore = _keystore_dir()
+    result = {"status": 400, "body": {"error": "stale generated_at"}}
+    body_str, path = persist_response(result, rrn="RRN-000000000099")
+    assert path is None
+    assert "stale" in body_str
+    assert not (keystore / "RRN-000000000099.apikey").exists()
+
+
+def test_persist_response_handles_non_dict_body(home):
+    from robot_md.apikey_request import persist_response
+
+    result = {"status": 502, "body": "Bad Gateway"}
+    body_str, path = persist_response(result, rrn="RRN-000000000099")
+    assert path is None
+    assert "Bad Gateway" in body_str
+
+
+def test_persist_response_handles_non_string_apikey(home):
+    """Server returning api_key as something other than a string should not crash."""
+    from robot_md.apikey_request import persist_response
+
+    result = {"status": 201, "body": {"api_key": 12345}}
+    body_str, path = persist_response(result, rrn="RRN-000000000099")
+    assert path is None
+    assert "12345" in body_str
+
+
+def test_persist_response_overwrites_existing_apikey(home):
+    """Reissue replaces the prior key in the keystore atomically."""
+    from robot_md.apikey_request import persist_response
+    from robot_md.register import _keystore_dir
+
+    keystore = _keystore_dir()
+    keystore.mkdir(parents=True, exist_ok=True)
+    old_path = keystore / "RRN-000000000099.apikey"
+    old_path.write_text("rrf_oldkey")
+
+    result = {"status": 201, "body": {"api_key": "rrf_newkey"}}
+    _, path = persist_response(result, rrn="RRN-000000000099")
+    assert path == old_path
+    assert path.read_text().strip() == "rrf_newkey"
+
+
+# ---- CLI integration -----------------------------------------------------
+
+
+def test_cli_request_apikey_submit_prints_body_and_saves_key(home, tmp_path: Path):
+    """End-to-end: --submit POSTs, the response body lands on stdout, the
+    apikey is persisted to the keystore at 0600."""
+    from typer.testing import CliRunner
+
+    from robot_md.__main__ import app
+    from robot_md.signing import generate_keypair, save_keypair
+
+    rrn = "RRN-000000000099"
+    save_keypair(rrn, generate_keypair())
+
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(
+        "---\n"
+        f'metadata:\n  rrn: "{rrn}"\n'
+        'rcan_version: "3.0"\n'
+        "physics: {dof: 6, joints: []}\n"
+        "drivers: []\n"
+        'safety:\n  description: "test"\n'
+        "---\nbody\n"
+    )
+
+    def fake_urlopen(req, timeout=None):
+        return _mock_response(
+            201,
+            {
+                "rrn": rrn,
+                "api_key": "rrf_clikey_xyz",
+                "issued_at": "2026-04-27T16:34:06.972Z",
+                "operation": "reissue",
+                "prior_key_exists": False,
+                "api_key_reissue_count": 1,
+            },
+        )
+
+    runner = CliRunner(mix_stderr=False)
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        result = runner.invoke(app, ["request-apikey", str(manifest), "--submit"])
+
+    assert result.exit_code == 0, result.stderr or result.stdout
+    # stdout shows the response body — operator can see the apikey
+    assert "rrf_clikey_xyz" in result.stdout
+    assert "issued_at" in result.stdout
+    # apikey persisted to keystore at canonical path, mode 0600
+    keystore = home / ".robot-md" / "keys"
+    apikey_file = keystore / f"{rrn}.apikey"
+    assert apikey_file.exists()
+    assert apikey_file.read_text().strip() == "rrf_clikey_xyz"
+    assert (apikey_file.stat().st_mode & 0o777) == 0o600
