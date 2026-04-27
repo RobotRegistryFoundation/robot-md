@@ -6,6 +6,13 @@
 
 > **REVISION 2026-04-27:** Several sections superseded by `2026-04-27-sp1-5-simplification-revisions.md` — Revision 3 specifically applies to SP3. Notably: add a `[hardware]` meta-extra that pulls all common backends in one install; granular `[lerobot]`/`[realsense]`/`[feetech-depthai]` extras stay for advanced/minimal installs.
 
+> **ADDENDUM 2026-04-27 — Capability Metadata.** SP3 also adds a transport-agnostic `Capability` dataclass + optional `describe_capabilities()` ABC method + module-level `enumerate_capabilities(registry)` walker. See [§ Capability Metadata Addendum](#capability-metadata-addendum-2026-04-27) below. This addendum is orthogonal to Revision 3 (`[hardware]` meta-extra) — both apply.
+
+> **See also:** companion specs to SP3 (not numbered in the SP1-5 sequence):
+> - `2026-04-27-sp-hp-hotplug-daemon-design.md` — runtime device hot-plug detection + manifest auto-merge.
+> - `2026-04-27-sp-an-announce-confirm-design.md` — operator-facing surfaces (audio/screen + Claude chat) for hot-plug events.
+> Both consume the metadata APIs introduced in this addendum.
+
 ## Problem
 
 `robot-md` has the `CapabilityBackend` ABC, the `robot_md.backends` entry-point group, and one reference implementation (`feetech_depthai`, ~1150 LoC). The runtime architecture is sound. What's missing is a *story* for how vendors (HuggingFace, Intel, Trossen, Pollen, etc.) ship their SDKs as `robot-md`-compatible backends — and how operators discover and install them. Today, owning a SO-100 with stock LeRobot tooling means there's no way to point Claude at it through `robot-md`. The runtime works, but the ecosystem doesn't yet.
@@ -580,6 +587,135 @@ SP3 is done when:
 - [ ] Authoring guide reviewed by one external robotics engineer; feedback incorporated.
 - [ ] Backend template scaffolds in <60 seconds end-to-end (`cp` + `pip install -e .` + `pytest`).
 - [ ] Demo dry-run: `pip install robot-md[lerobot]; robot-md init so100; claude; "find a red lego"` end-to-end on a stock SO-100 (no RRF-specific config).
+
+## Capability Metadata Addendum (2026-04-27)
+
+This addendum extends SP3 with a transport-agnostic capability metadata layer so future surfaces (the SP-HP hot-plug daemon, the SP-AN announce/confirm flow, and an eventual `robot-md-http` OpenAPI bridge) can introspect the capability catalog without each rewriting it. The original `capabilities() -> frozenset[str]` ABC method is **preserved unchanged** for backward compatibility; existing `feetech_depthai` ships green with no edits.
+
+### Why now
+
+Three downstream consumers need the same data:
+
+1. **MCP server tool registration** (today). Walks `BackendRegistry`, builds tool schemas. Currently has to look up arg shapes in `capabilities.json` itself.
+2. **SP-HP hot-plug daemon**. When a device hot-plug event resolves, the daemon needs to surface to operators "this backend would expose these capabilities" without instantiating the backend.
+3. **Future `robot-md-http` OpenAPI bridge**. The HTTP server needs the same metadata to generate an OpenAPI spec — same source of truth, no parallel definition.
+
+Without this addendum, each downstream rebuilds the lookup. With it, all three call one helper.
+
+### New public API
+
+#### `Capability` dataclass
+
+```python
+# cli/src/robot_md/backends/capability.py (NEW)
+# Re-exported from cli/src/robot_md/backends/__init__.py for stable import path.
+
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Literal
+
+@dataclass(frozen=True)
+class Capability:
+    name: str                        # e.g. "arm.pick", "lerobot.teleop"
+    namespace: Literal["core", "vendor"]
+    arg_schema: dict | None          # JSON-Schema fragment from capabilities.json, or None
+    description: str                 # short human-readable; "" if none available
+```
+
+`namespace` is derived from the prefix: `"core"` if `name` starts with one of `CORE_CAPABILITY_PREFIXES`; `"vendor"` if it matches the `<vendor>.<name>` pattern.
+
+#### `describe_capabilities()` — new optional ABC method
+
+Added to `CapabilityBackend` with a **concrete default implementation** (NOT abstract). Adapters MAY override.
+
+```python
+class CapabilityBackend(ABC):
+    # ... existing abstract methods unchanged ...
+
+    def describe_capabilities(self) -> list[Capability]:
+        """Return rich metadata for each capability this backend declares.
+
+        Default: walk self.capabilities(), look each up in
+        cli/src/robot_md/schemas/capabilities.json for arg_schema +
+        description; vendor capabilities not in the schema get
+        arg_schema=None, description="".
+
+        Adapters MAY override to provide richer vendor metadata
+        (e.g., lerobot.teleop description, dynamixel.indirect_address
+        arg shapes).
+        """
+        from robot_md.backends._capability_default import describe_default
+        return describe_default(self.name, self.capabilities())
+```
+
+#### `enumerate_capabilities(registry)` — module-level walker
+
+```python
+# cli/src/robot_md/backends/__init__.py
+
+def enumerate_capabilities(
+    registry: BackendRegistry,
+) -> list[tuple[str, Capability]]:
+    """Walk all registered backends, return (backend_name, Capability) pairs.
+
+    Used by:
+      - MCP server tool registration (build tool schemas)
+      - SP-HP daemon (preview backend's capabilities at hot-plug time)
+      - robot-md-http OpenAPI generator (future)
+    """
+    out: list[tuple[str, Capability]] = []
+    for backend_name, backend_cls in registry.iter_classes():
+        instance = backend_cls()
+        for cap in instance.describe_capabilities():
+            out.append((backend_name, cap))
+    return out
+```
+
+`registry.iter_classes()` is added to `BackendRegistry` (returns `(name, cls)` pairs without `open()`-ing instances). Existing `resolve()` path is untouched.
+
+### Default-impl behavior — explicit cases
+
+| Capability case | `arg_schema` | `description` |
+|---|---|---|
+| Core (`arm.pick` etc.) listed in `capabilities.json` | the schema fragment | schema's `description` field if present, else `""` |
+| Core capability NOT in `capabilities.json` (drift) | `None` | `""` — and tier validator already warns about this |
+| Vendor capability (`lerobot.teleop`) not in `capabilities.json` | `None` | `""` — adapter author overrides `describe_capabilities()` to fill in |
+| Vendor capability where adapter overrides | adapter's value | adapter's value |
+
+Vendor capabilities are deliberately NOT required to be in `capabilities.json` (which is RRF-canonical for core only). Vendors fill in their own arg shapes via override.
+
+### Backward compatibility
+
+| Existing code | Behavior with addendum |
+|---|---|
+| `feetech_depthai`'s `capabilities()` returning `frozenset[str]` | Unchanged. `describe_capabilities()` default returns `Capability` objects with arg_schemas pulled from `capabilities.json`. |
+| Third-party adapter that has not opted in | Same. Default `describe_capabilities()` works. |
+| MCP server's existing tool registration code path | Migrates to `enumerate_capabilities()`; output shape compatible (backend_name, name, arg_schema). |
+
+Net code addition: ~120 LoC across `base.py`, `__init__.py`, `_capability_default.py`, plus tests.
+
+### Files affected by the addendum
+
+- `cli/src/robot_md/backends/base.py` — add `Capability` dataclass + `describe_capabilities()` default method.
+- `cli/src/robot_md/backends/__init__.py` — re-export `Capability` + `enumerate_capabilities`; expose `BackendRegistry.iter_classes()`.
+- `cli/src/robot_md/backends/_capability_default.py` (NEW) — `describe_default(backend_name, caps)` helper that loads `capabilities.json` + builds `Capability` objects.
+- `cli/src/robot_md/mcp/server.py` (or wherever tools are registered) — migrate to `enumerate_capabilities()`. No behavior change, single source of truth.
+- `cli/tests/backends/test_capability_metadata.py` (NEW) — unit tests:
+  - `test_describe_default_core_with_schema` — `arm.pick` → arg_schema present.
+  - `test_describe_default_vendor_no_schema` — `lerobot.teleop` → arg_schema=None.
+  - `test_describe_default_namespace_derived` — `arm.*` → "core"; `lerobot.*` → "vendor".
+  - `test_enumerate_capabilities_walks_registry` — two backends → all pairs returned.
+  - `test_describe_capabilities_override_wins` — adapter's override overrides default.
+  - `test_existing_capabilities_method_unchanged` — `feetech_depthai.capabilities()` still returns same frozenset.
+- `cli/tests/integration/test_mcp_tool_registration_uses_enumerate.py` (NEW) — integration test that MCP server tool list matches `enumerate_capabilities()` output.
+
+### Net effect on SP3 success criteria
+
+Addendum adds: "✓ `enumerate_capabilities()` returns the same data MCP server uses for tool registration; `describe_capabilities()` default works for all in-tree backends without override."
+
+Estimated size: SP3 grows ~10–15% over the original spec — small price to avoid the same refactor when the future HTTP bridge lands.
+
+---
 
 ## Sub-project Relationships
 
