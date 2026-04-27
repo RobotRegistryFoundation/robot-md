@@ -91,6 +91,22 @@ This signs the body with the local key under `~/.robot-md/keys/` (RCAN 3.0 envel
 - Manifests that fail `validate` — fix schema issues first.
 - Anything the operator hasn't explicitly approved.
 
+## Motion intent without motion tools
+
+If the operator requests physical motion (any of `arm.*`, `nav.*`, `gripper.*` capabilities, or English phrasing like "find / move / grasp / place / pick up / put"), AND the `execute_task` tool is NOT in your available tools, **stop before issuing any action**. Output the upgrade instructions verbatim:
+
+> "This robot's manifest declares motion capabilities, but the runtime isn't installed in this environment. To enable motion:
+>
+> 1. `pip install 'robot-md[hardware]'`
+> 2. (Verify with `which robot-md` first to make sure it's on your shell PATH.)
+> 3. In Claude Code: `/mcp` → arrow to `robot-md` → Reconnect.
+>
+> Then ask me again."
+
+Wait for the operator to confirm. Do NOT attempt manifest reads as a substitute for motion. Do NOT attempt motion via wrong tools.
+
+**False-positive guard:** Documentation lookups ("find docs", "find the file", "find the README") are NOT motion intent — proceed normally with manifest tools.
+
 ## Safety Protocol
 
 **Before ANY physical motion — no exceptions:**
