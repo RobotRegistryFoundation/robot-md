@@ -55,7 +55,13 @@ class BaselineClaudeStack:
         )
         # Expect a single text block with JSON body.
         text = "".join(b.text for b in msg.content if b.type == "text")
-        return json.loads(text)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            raise ValueError(
+                f"BaselineClaudeStack({self.model}) returned non-JSON for probe "
+                f"{probe.get('id')!r}: {text[:200]!r}"
+            ) from e
 
 
 _SYSTEM_PROMPT = """You are evaluating spatial-intelligence probes for an embodied robot benchmark.
