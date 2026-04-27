@@ -63,6 +63,17 @@ feetech-depthai = [
     "numpy>=1.24",
     "feetech-servo-sdk>=1.0",
 ]
+# Meta-extra: pulls everything an operator needs for common hardware
+# (SO-ARM101 + OAK-D today; SP3 will extend with lerobot + realsense).
+# Operators run `pip install 'robot-md[hardware]'` for the recommended
+# all-in-one install.
+hardware = [
+    "pyserial>=3.5",
+    "depthai>=2.24",
+    "opencv-python>=4.8",
+    "numpy>=1.24",
+    "feetech-servo-sdk>=1.0",
+]
 
 [project.scripts]
 robot-md = "robot_md.__main__:app"
