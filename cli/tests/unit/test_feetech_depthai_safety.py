@@ -16,10 +16,12 @@ def _install_fake_feetech(monkeypatch):
     fp.openPort.return_value = True
     fp.setBaudRate.return_value = True
     fake.PortHandler.return_value = fp
-    ph = MagicMock()
-    ph.read2ByteTxRx.return_value = (2048, 0, 0)
-    fake.PacketHandler.return_value = ph
-    monkeypatch.setitem(sys.modules, "feetech_servo_sdk", fake)
+    sms = MagicMock()
+    sms.read2ByteTxRx.return_value = (2048, 0, 0)
+    fake_sms_module = MagicMock()
+    fake_sms_module.sms_sts.return_value = sms
+    monkeypatch.setitem(sys.modules, "scservo_sdk", fake)
+    monkeypatch.setitem(sys.modules, "scservo_sdk.sms_sts", fake_sms_module)
     monkeypatch.setitem(sys.modules, "depthai", None)
 
 

@@ -14,16 +14,22 @@ import pytest
 # tests that go through load_context() don't blow up on import. The backend
 # still fails to actually talk to hardware — that's expected; hardware tests
 # are gated behind --run-hardware and the real modules.
-if importlib.util.find_spec("feetech_servo_sdk") is None:
-    _fake_feetech = MagicMock()
+#
+# PyPI dist `feetech-servo-sdk` ships the `scservo_sdk` Python module; we use
+# `scservo_sdk.sms_sts.sms_sts` directly because the bare `PacketHandler()`
+# factory in scservo_sdk is broken upstream.
+if importlib.util.find_spec("scservo_sdk") is None:
+    _fake_scservo = MagicMock()
     _fake_port = MagicMock()
     _fake_port.openPort.return_value = True
     _fake_port.setBaudRate.return_value = True
-    _fake_feetech.PortHandler.return_value = _fake_port
-    _fake_ph = MagicMock()
-    _fake_ph.read2ByteTxRx.return_value = (2048, 0, 0)
-    _fake_feetech.PacketHandler.return_value = _fake_ph
-    sys.modules.setdefault("feetech_servo_sdk", _fake_feetech)
+    _fake_scservo.PortHandler.return_value = _fake_port
+    _fake_sms = MagicMock()
+    _fake_sms.read2ByteTxRx.return_value = (2048, 0, 0)
+    _fake_sms_module = MagicMock()
+    _fake_sms_module.sms_sts.return_value = _fake_sms
+    sys.modules.setdefault("scservo_sdk", _fake_scservo)
+    sys.modules.setdefault("scservo_sdk.sms_sts", _fake_sms_module)
 
 
 def pytest_configure(config):

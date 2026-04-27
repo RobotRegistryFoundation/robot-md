@@ -73,10 +73,12 @@ def scan_feetech(port: str, baud: int = 1_000_000) -> list[ServoEntry]:
     transient bus collisions.
     """
     try:
-        from feetech_servo_sdk import PacketHandler, PortHandler  # type: ignore[import]
+        from scservo_sdk import PortHandler  # type: ignore[import]
+        from scservo_sdk.sms_sts import sms_sts  # type: ignore[import]
     except ImportError as e:
         raise RuntimeError(
-            "bus scan requires feetech_servo_sdk — install the feetech extra:\n"
+            "bus scan requires scservo_sdk (PyPI dist `feetech-servo-sdk`) — "
+            "install the feetech extra:\n"
             "    pip install 'robot-md[feetech]'"
         ) from e
 
@@ -96,13 +98,13 @@ def scan_feetech(port: str, baud: int = 1_000_000) -> list[ServoEntry]:
     try:
         if not ph.setBaudRate(baud):
             raise RuntimeError(f"failed to set baud {baud} on {port}")
-        pk = PacketHandler(0)  # SCServo protocol version
+        pk = sms_sts(ph)  # SMS/STS protocol (SCServo v0)
         found: list[ServoEntry] = []
         for sid in range(_ID_MIN, _ID_MAX + 1):
             # Ping with retries — absence of response after N tries = no servo.
             present = None
             for _ in range(_PING_RETRIES):
-                val, comm, err = pk.read2ByteTxRx(ph, sid, _ADDR_PRESENT_POSITION)
+                val, comm, err = pk.read2ByteTxRx(sid, _ADDR_PRESENT_POSITION)
                 if comm == 0 and err == 0:
                     present = int(val)
                     break
@@ -111,8 +113,8 @@ def scan_feetech(port: str, baud: int = 1_000_000) -> list[ServoEntry]:
                 continue
 
             # If it responded, read limits. Failures here are soft — record None.
-            lo_val, lo_comm, lo_err = pk.read2ByteTxRx(ph, sid, _ADDR_MIN_ANGLE_LIMIT)
-            hi_val, hi_comm, hi_err = pk.read2ByteTxRx(ph, sid, _ADDR_MAX_ANGLE_LIMIT)
+            lo_val, lo_comm, lo_err = pk.read2ByteTxRx(sid, _ADDR_MIN_ANGLE_LIMIT)
+            hi_val, hi_comm, hi_err = pk.read2ByteTxRx(sid, _ADDR_MAX_ANGLE_LIMIT)
             found.append(
                 ServoEntry(
                     servo_id=sid,

@@ -10,7 +10,7 @@ import pytest
 pytestmark = pytest.mark.hardware
 
 pytest.importorskip("depthai")
-pytest.importorskip("feetech_servo_sdk")
+pytest.importorskip("scservo_sdk")
 
 
 def test_snapshot_publishes_frame_event(tmp_path, fixtures_dir, monkeypatch):

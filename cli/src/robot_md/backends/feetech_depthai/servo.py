@@ -53,7 +53,8 @@ class ServoBus:
         )
 
     def open(self) -> None:
-        from feetech_servo_sdk import PacketHandler, PortHandler
+        from scservo_sdk import PortHandler
+        from scservo_sdk.sms_sts import sms_sts
 
         p = PortHandler(self.port)
         if not p.openPort():
@@ -62,7 +63,7 @@ class ServoBus:
             p.closePort()
             raise RuntimeError(f"cannot set baud {self.baud} on {self.port}")
         self._port = p
-        self._ph = PacketHandler(0)
+        self._ph = sms_sts(p)
 
     def close(self) -> None:
         if self._port is not None:
@@ -83,7 +84,7 @@ class ServoBus:
             return {}
         out: dict[str, int] = {}
         for sid, name in zip(self.joint_ids, self.joint_names, strict=True):
-            pos, result, err = self._ph.read2ByteTxRx(self._port, sid, ADDR_PRESENT_POSITION)
+            pos, result, err = self._ph.read2ByteTxRx(sid, ADDR_PRESENT_POSITION)
             if result == 0 and err == 0:
                 out[name] = int(pos)
         return out
@@ -99,7 +100,7 @@ class ServoBus:
             sid = name_to_id.get(name)
             if sid is None:
                 continue
-            self._ph.write2ByteTxRx(self._port, sid, ADDR_GOAL_POSITION, int(target))
+            self._ph.write2ByteTxRx(sid, ADDR_GOAL_POSITION, int(target))
 
     def torque(self, on: bool) -> None:
         """Enable/disable torque on every joint."""
@@ -107,7 +108,7 @@ class ServoBus:
             raise RuntimeError("ServoBus not open")
         val = 1 if on else 0
         for sid in self.joint_ids:
-            self._ph.write1ByteTxRx(self._port, sid, ADDR_TORQUE_ENABLE, val)
+            self._ph.write1ByteTxRx(sid, ADDR_TORQUE_ENABLE, val)
 
     # ----------------------------------------------------------- interpolate
 
@@ -143,5 +144,5 @@ class ServoBus:
                 if sid is None:
                     continue
                 val = round(start[n] + alpha * d)
-                self._ph.write2ByteTxRx(self._port, sid, ADDR_GOAL_POSITION, val)
+                self._ph.write2ByteTxRx(sid, ADDR_GOAL_POSITION, val)
             time.sleep(dt)

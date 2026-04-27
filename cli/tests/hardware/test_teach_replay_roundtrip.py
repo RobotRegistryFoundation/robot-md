@@ -12,7 +12,7 @@ import pytest
 
 pytestmark = pytest.mark.hardware
 
-pytest.importorskip("feetech_servo_sdk")
+pytest.importorskip("scservo_sdk")
 
 
 class _NoopEstop:

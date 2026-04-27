@@ -17,11 +17,13 @@ def _install_fake_sdk(monkeypatch):
     fake_port.openPort.return_value = True
     fake_port.setBaudRate.return_value = True
     fake_sdk.PortHandler.return_value = fake_port
-    fake_ph = MagicMock()
-    fake_ph.read2ByteTxRx.return_value = (2048, 0, 0)
-    fake_sdk.PacketHandler.return_value = fake_ph
-    monkeypatch.setitem(sys.modules, "feetech_servo_sdk", fake_sdk)
-    return fake_sdk, fake_port, fake_ph
+    fake_sms = MagicMock()
+    fake_sms.read2ByteTxRx.return_value = (2048, 0, 0)
+    fake_sms_module = MagicMock()
+    fake_sms_module.sms_sts.return_value = fake_sms
+    monkeypatch.setitem(sys.modules, "scservo_sdk", fake_sdk)
+    monkeypatch.setitem(sys.modules, "scservo_sdk.sms_sts", fake_sms_module)
+    return fake_sdk, fake_port, fake_sms
 
 
 def test_open_from_spec_opens_port(monkeypatch, fixtures_dir):
@@ -58,7 +60,7 @@ def test_read_positions_returns_named_dict(monkeypatch, fixtures_dir):
 def test_read_positions_skips_nonresponders(monkeypatch, fixtures_dir):
     _, _, fake_ph = _install_fake_sdk(monkeypatch)
 
-    def _fake_read(port, sid, addr):
+    def _fake_read(sid, addr):
         if sid == 3:
             return (0, 1, 0)
         return (2048, 0, 0)
@@ -83,9 +85,9 @@ def test_write_positions_sends_goal(monkeypatch, fixtures_dir):
     bus.open()
     bus.write_positions({"shoulder_pan": 2100, "gripper": 1700})
     calls = bus._ph.write2ByteTxRx.call_args_list
-    sids = sorted(c.args[1] for c in calls)
+    sids = sorted(c.args[0] for c in calls)
     assert sids == [1, 6]
-    assert all(c.args[2] == ADDR_GOAL_POSITION for c in calls)
+    assert all(c.args[1] == ADDR_GOAL_POSITION for c in calls)
     bus.close()
 
 
@@ -98,8 +100,8 @@ def test_torque_writes_all_servos(monkeypatch, fixtures_dir):
     bus.torque(True)
     calls = bus._ph.write1ByteTxRx.call_args_list
     assert len(calls) == 6
-    assert all(c.args[2] == ADDR_TORQUE_ENABLE for c in calls)
-    assert all(c.args[3] == 1 for c in calls)
+    assert all(c.args[1] == ADDR_TORQUE_ENABLE for c in calls)
+    assert all(c.args[2] == 1 for c in calls)
     bus.close()
 
 
@@ -156,7 +158,7 @@ def test_interpolate_interpolates_monotonic(monkeypatch, fixtures_dir):
     target = {**start, "shoulder_pan": 2200}
     bus.interpolate(start, target, hz=200, max_steps_per_tick=10, estop=_NoopEstop())
 
-    shoulder_writes = [c.args[3] for c in bus._ph.write2ByteTxRx.call_args_list if c.args[1] == 1]
+    shoulder_writes = [c.args[2] for c in bus._ph.write2ByteTxRx.call_args_list if c.args[0] == 1]
     assert shoulder_writes[0] > 2048 and shoulder_writes[-1] == 2200
     assert all(
         shoulder_writes[i] <= shoulder_writes[i + 1] for i in range(len(shoulder_writes) - 1)

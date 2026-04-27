@@ -78,14 +78,14 @@ def test_render_bus_scan_includes_all_servos():
 
 
 def test_scan_feetech_errors_cleanly_without_sdk(monkeypatch):
-    """If `feetech_servo_sdk` isn't importable, the scan raises a helpful
+    """If `scservo_sdk` isn't importable, the scan raises a helpful
     RuntimeError pointing at the optional extras install."""
     import sys
 
-    monkeypatch.setitem(sys.modules, "feetech_servo_sdk", None)
+    monkeypatch.setitem(sys.modules, "scservo_sdk", None)
     with pytest.raises(RuntimeError) as exc:
         scan_feetech("/dev/does-not-exist")
-    assert "feetech_servo_sdk" in str(exc.value)
+    assert "scservo_sdk" in str(exc.value)
 
 
 def test_scan_feetech_errors_cleanly_on_missing_port(monkeypatch):
@@ -101,8 +101,8 @@ def test_scan_feetech_errors_cleanly_on_missing_port(monkeypatch):
     import sys
 
     # Force the ImportError path so the test is deterministic across envs.
-    monkeypatch.setitem(sys.modules, "feetech_servo_sdk", None)
+    monkeypatch.setitem(sys.modules, "scservo_sdk", None)
     with pytest.raises(RuntimeError) as exc:
         scan_feetech("/dev/does-not-exist-nowhere-12345")
     msg = str(exc.value).lower()
-    assert any(hint in msg for hint in ("gateway", "open", "feetech_servo_sdk", "feetech extra"))
+    assert any(hint in msg for hint in ("gateway", "open", "scservo_sdk", "feetech extra"))

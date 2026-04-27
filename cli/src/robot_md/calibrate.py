@@ -79,8 +79,12 @@ def read_current_pose(
     readings: list[JointReading] = []
 
     # Feetech SDK is optional at import time so tests can run without the hardware
-    # dependency. Import inside the function.
-    from feetech_servo_sdk import PacketHandler, PortHandler
+    # dependency. Import inside the function. PyPI dist `feetech-servo-sdk`
+    # ships the `scservo_sdk` Python module; the bare `PacketHandler()` factory
+    # in scservo_sdk is broken upstream, so use the working `sms_sts` class
+    # directly (SO-ARM101 uses the SMS/STS protocol).
+    from scservo_sdk import PortHandler
+    from scservo_sdk.sms_sts import sms_sts
 
     ADDR_PRESENT_POS = 56
     ph = PortHandler(port)
@@ -92,14 +96,14 @@ def read_current_pose(
     try:
         if not ph.setBaudRate(baud):
             raise RuntimeError(f"failed to set baud {baud} on {port}")
-        pk = PacketHandler(0)  # SCServo protocol
+        pk = sms_sts(ph)
         for j in kin:
             sid = j.get("servo_id")
             jid = j.get("id")
             if sid is None:
                 readings.append(JointReading(jid, -1, None))
                 continue
-            val, comm, err = pk.read2ByteTxRx(ph, int(sid), ADDR_PRESENT_POS)
+            val, comm, err = pk.read2ByteTxRx(int(sid), ADDR_PRESENT_POS)
             if comm != 0 or err != 0:
                 readings.append(JointReading(jid, int(sid), None))
             else:
@@ -191,7 +195,8 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
     port = drivers[0].get("port") or "/dev/ttyACM0"
     baud = int(drivers[0].get("baud_rate") or 1_000_000)
 
-    from feetech_servo_sdk import PacketHandler, PortHandler  # lazy
+    from scservo_sdk import PortHandler  # lazy
+    from scservo_sdk.sms_sts import sms_sts
 
     ADDR_TORQUE = 40
     ADDR_GOAL = 42
@@ -215,7 +220,7 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
     except Exception as e:
         return die(f"port open failed: {e}")
 
-    pk = PacketHandler(0)
+    pk = sms_sts(ph)
     signs: dict[str, int] = {}
     try:
         for j in kin:
@@ -226,7 +231,7 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
                 print(f"  {jid}: no servo_id — skipping", file=sys.stderr)
                 continue
             # Read start
-            start, comm, err = pk.read2ByteTxRx(ph, int(sid), ADDR_PRESENT)
+            start, comm, err = pk.read2ByteTxRx(int(sid), ADDR_PRESENT)
             if comm != 0 or err != 0:
                 print(f"  {jid}: read failed — skipping", file=sys.stderr)
                 continue
@@ -243,8 +248,8 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
             )
 
             # Torque on + command move
-            pk.write1ByteTxRx(ph, int(sid), ADDR_TORQUE, 1)
-            pk.write2ByteTxRx(ph, int(sid), ADDR_GOAL, start + delta_steps)
+            pk.write1ByteTxRx(int(sid), ADDR_TORQUE, 1)
+            pk.write2ByteTxRx(int(sid), ADDR_GOAL, start + delta_steps)
             time.sleep(0.9)
 
             try:
@@ -257,15 +262,15 @@ def cli_calibrate_sign(manifest_path: str, *, delta_steps: int = 80) -> int:
                 )
             except (EOFError, KeyboardInterrupt):
                 print("\n  aborted — restoring position.", file=sys.stderr)
-                pk.write2ByteTxRx(ph, int(sid), ADDR_GOAL, start)
+                pk.write2ByteTxRx(int(sid), ADDR_GOAL, start)
                 time.sleep(0.8)
-                pk.write1ByteTxRx(ph, int(sid), ADDR_TORQUE, 0)
+                pk.write1ByteTxRx(int(sid), ADDR_TORQUE, 0)
                 return 1
 
             # Restore
-            pk.write2ByteTxRx(ph, int(sid), ADDR_GOAL, start)
+            pk.write2ByteTxRx(int(sid), ADDR_GOAL, start)
             time.sleep(0.8)
-            pk.write1ByteTxRx(ph, int(sid), ADDR_TORQUE, 0)
+            pk.write1ByteTxRx(int(sid), ADDR_TORQUE, 0)
 
             if ans.startswith("s"):
                 print("  (skipped)", file=sys.stderr)

@@ -95,7 +95,7 @@ def test_only_acm_and_usb_paths_probed():
 
 
 def test_missing_feetech_sdk_silently_skips():
-    # If feetech_servo_sdk isn't installed, bus_scan's scan_feetech raises
+    # If scservo_sdk isn't installed, bus_scan's scan_feetech raises
     # ImportError on call (per its own docstring). Probe must still
     # degrade to "no promotion" rather than crashing.
     devices = [_tty("/dev/ttyACM0")]
