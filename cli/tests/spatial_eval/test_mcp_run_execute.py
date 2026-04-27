@@ -20,17 +20,24 @@ def test_run_execute_emits_score_and_evidence(tmp_path: Path):
     ctx.parsed = {
         "id": "bob",
         "spatial-eval": {
-            "spec_version": "1.0.0", "units": ["O1"],
-            "workspace": {"play_surface_dims_m": [0.3, 0.3],
-                          "judge_camera": {"device": "phone:tripod", "resolution": [1920, 1080]}},
+            "spec_version": "1.0.0",
+            "units": ["O1"],
+            "workspace": {
+                "play_surface_dims_m": [0.3, 0.3],
+                "judge_camera": {"device": "phone:tripod", "resolution": [1920, 1080]},
+            },
             "reasoning_stack": {"baseline": "claude:c", "declared": "claude:c"},
         },
     }
     robot = FakeRobot(actions=["pick_target_color:red_cube"])
     cam = FakeJudgeCamera(frames=[_bgr((0, 0, 255))] * 3)
     out = run_execute_tool(
-        ctx, units=["O1"], trials_per_unit=2, run_dir=tmp_path,
-        _robot=robot, _judge_camera=cam,
+        ctx,
+        units=["O1"],
+        trials_per_unit=2,
+        run_dir=tmp_path,
+        _robot=robot,
+        _judge_camera=cam,
     )
     assert out["ok"] is True
     assert (tmp_path / "Score.json").is_file()

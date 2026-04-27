@@ -38,9 +38,11 @@ class Aggregate:
     def compute(cls, *, probe: ProbeTrack, execute: ExecuteTrack) -> Aggregate:
         def _mean(d: dict[str, PerUnitProbeScore]) -> float:
             return sum(v.score for v in d.values()) / max(1, len(d))
+
         ex_mean = (
             sum(v.passed / max(1, v.n) for v in execute.values()) / max(1, len(execute))
-            if execute else 0.0
+            if execute
+            else 0.0
         )
         return cls(
             probe_baseline=_mean(probe.baseline_claude),
@@ -64,6 +66,7 @@ class ScoreJSON:
     def to_dict(self) -> dict:
         def _dump_unit_map(m: dict) -> dict:
             return {k: asdict(v) for k, v in m.items()}
+
         return {
             "spec_version": self.spec_version,
             "rrn": self.rrn,
@@ -88,10 +91,13 @@ class ScoreJSON:
     @classmethod
     def from_json(cls, blob: str) -> ScoreJSON:
         d = json.loads(blob)
+
         def _load_probe(m: dict) -> dict[str, PerUnitProbeScore]:
             return {k: PerUnitProbeScore(**v) for k, v in m.items()}
+
         def _load_exec(m: dict) -> dict[str, PerUnitExecuteScore]:
             return {k: PerUnitExecuteScore(**v) for k, v in m.items()}
+
         return cls(
             spec_version=d["spec_version"],
             rrn=d["rrn"],

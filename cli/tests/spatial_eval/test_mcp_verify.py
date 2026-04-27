@@ -14,10 +14,15 @@ from robot_md.spatial_eval.score import (
 def _good_score():
     pt = ProbeTrack(baseline_claude={}, robot_declared={}, delta_per_unit={})
     return ScoreJSON(
-        spec_version="1.0.0", rrn="RRN-x", run_id="r-1", timestamp="t",
-        tracks_probe=pt, tracks_execute={"O1": PerUnitExecuteScore(7, 10, "abc")},
+        spec_version="1.0.0",
+        rrn="RRN-x",
+        run_id="r-1",
+        timestamp="t",
+        tracks_probe=pt,
+        tracks_execute={"O1": PerUnitExecuteScore(7, 10, "abc")},
         aggregate=Aggregate(0, 0, 0.7),
-        rcan_signature="sig-123", evidence_root="sha256:abc",
+        rcan_signature="sig-123",
+        evidence_root="sha256:abc",
     )
 
 

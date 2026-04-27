@@ -36,6 +36,7 @@ def test_score_json_round_trips():
     s2 = ScoreJSON.from_json(blob)
     assert s2 == s
 
+
 def test_aggregate_recomputes_from_per_unit():
     pt = ProbeTrack(
         baseline_claude={

@@ -38,9 +38,7 @@ def run_probe_tool(
         declared = _stacks["declared"]
     else:
         baseline = resolve_stack(se["reasoning_stack"]["baseline"])
-        declared = (
-            baseline if baseline_only else resolve_stack(se["reasoning_stack"]["declared"])
-        )
+        declared = baseline if baseline_only else resolve_stack(se["reasoning_stack"]["declared"])
 
     try:
         result = run_probes(

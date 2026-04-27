@@ -22,7 +22,7 @@ def test_init_adds_spatial_eval_block(tmp_path: Path):
     assert out["ok"] is True
     text = f.read_text()
     assert "spatial-eval:" in text
-    assert "spec_version: \"1.0.0\"" in text
+    assert 'spec_version: "1.0.0"' in text
     assert "O1" in text and "O2" in text
 
 

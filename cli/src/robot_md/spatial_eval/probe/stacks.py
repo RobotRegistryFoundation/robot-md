@@ -34,6 +34,7 @@ class BaselineClaudeStack:
     def _client_now(self):
         if self._client is None:
             from anthropic import Anthropic
+
             self._client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         return self._client
 

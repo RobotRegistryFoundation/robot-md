@@ -12,8 +12,10 @@ def test_dry_run_passes_when_section_present_and_apikey_set(monkeypatch):
         "spatial-eval": {
             "spec_version": "1.0.0",
             "units": ["O1"],
-            "workspace": {"play_surface_dims_m": [0.3, 0.3],
-                          "judge_camera": {"device": "phone:tripod", "resolution": [1920, 1080]}},
+            "workspace": {
+                "play_surface_dims_m": [0.3, 0.3],
+                "judge_camera": {"device": "phone:tripod", "resolution": [1920, 1080]},
+            },
             "reasoning_stack": {
                 "baseline": "claude:claude-opus-4-7",
                 "declared": "claude:claude-opus-4-7",

@@ -51,11 +51,14 @@ def run_probes(
             d_pass, d_score = _score_one(unit, d_raw, truth)
         by_unit_declared[unit].append((d_pass, d_score))
 
-        per_probe.append({
-            "id": p["id"], "unit": unit,
-            "baseline": {"answer": b_raw, "passed": b_pass, "score": b_score},
-            "declared": {"answer": d_raw, "passed": d_pass, "score": d_score},
-        })
+        per_probe.append(
+            {
+                "id": p["id"],
+                "unit": unit,
+                "baseline": {"answer": b_raw, "passed": b_pass, "score": b_score},
+                "declared": {"answer": d_raw, "passed": d_pass, "score": d_score},
+            }
+        )
         if progress_cb is not None:
             progress_cb(i + 1, total, unit)
 

@@ -69,9 +69,7 @@ def run_execute_tool(
             trials_records.append(outcome)
             if outcome.get("passed"):
                 passed += 1
-        per_unit[unit] = PerUnitExecuteScore(
-            passed=passed, n=trials_per_unit, evidence_sha256=""
-        )
+        per_unit[unit] = PerUnitExecuteScore(passed=passed, n=trials_per_unit, evidence_sha256="")
 
     pt = ProbeTrack(baseline_claude={}, robot_declared={}, delta_per_unit={})
     score = ScoreJSON(

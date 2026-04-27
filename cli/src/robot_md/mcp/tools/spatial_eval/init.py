@@ -32,7 +32,7 @@ def init_tool(ctx, *, units: list[str]) -> dict:
         end = text.find("\n---\n", 4)
         if end == -1:
             return {"ok": False, "error": "ROBOT.md frontmatter unterminated"}
-        f.write_text(text[: end + 1] + block + text[end + 1:])
+        f.write_text(text[: end + 1] + block + text[end + 1 :])
     else:
         f.write_text(text.rstrip() + "\n\n" + block)
     return {"ok": True, "status": "added", "units": units}

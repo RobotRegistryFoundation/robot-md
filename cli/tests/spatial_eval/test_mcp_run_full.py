@@ -21,23 +21,32 @@ def test_run_full_merges_both_tracks(tmp_path: Path):
     ctx.parsed = {
         "id": "bob",
         "spatial-eval": {
-            "spec_version": "1.0.0", "units": ["O1"],
-            "workspace": {"play_surface_dims_m": [0.3, 0.3],
-                          "judge_camera": {"device": "phone:tripod", "resolution": [1920, 1080]}},
+            "spec_version": "1.0.0",
+            "units": ["O1"],
+            "workspace": {
+                "play_surface_dims_m": [0.3, 0.3],
+                "judge_camera": {"device": "phone:tripod", "resolution": [1920, 1080]},
+            },
             "reasoning_stack": {"baseline": "claude:c", "declared": "claude:c"},
         },
     }
-    fake = FakeStack({
-        "o1-public-001": {"still_present": True, "position": [0.0, 0.05, 0.0]},
-        "o1-public-002": {"still_present": True, "position": [0.10, 0.0, 0.0]},
-        "o1-public-003": {"still_present": False, "position": [-0.05, 0.08, 0.0]},
-    })
+    fake = FakeStack(
+        {
+            "o1-public-001": {"still_present": True, "position": [0.0, 0.05, 0.0]},
+            "o1-public-002": {"still_present": True, "position": [0.10, 0.0, 0.0]},
+            "o1-public-003": {"still_present": False, "position": [-0.05, 0.08, 0.0]},
+        }
+    )
     robot = FakeRobot(actions=["pick"])
     cam = FakeJudgeCamera(frames=[_bgr((0, 0, 255))] * 3)
     out = run_full_tool(
-        ctx, units=["O1"], trials_per_unit=2, run_dir=tmp_path,
+        ctx,
+        units=["O1"],
+        trials_per_unit=2,
+        run_dir=tmp_path,
         _stacks={"baseline": fake, "declared": fake},
-        _robot=robot, _judge_camera=cam,
+        _robot=robot,
+        _judge_camera=cam,
     )
     assert out["ok"] is True
     assert "baseline_claude" in out["score"]["tracks"]["probe"]

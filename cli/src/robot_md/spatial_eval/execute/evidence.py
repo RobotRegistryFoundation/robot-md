@@ -15,9 +15,7 @@ def write_evidence_packet(
     videos: dict[str, bytes],
 ) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "manifest.json").write_text(
-        json.dumps({"trials": trials}, sort_keys=True, indent=2)
-    )
+    (run_dir / "manifest.json").write_text(json.dumps({"trials": trials}, sort_keys=True, indent=2))
     (run_dir / "Score.json").write_text(score.to_json())
     vdir = run_dir / "videos"
     vdir.mkdir(exist_ok=True)

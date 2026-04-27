@@ -22,9 +22,7 @@ def test_o1_pass_when_target_retrieved_and_occluder_steady(tmp_path: Path):
             _bgr((0, 0, 255)),  # t2: red retrieved (post-action)
         ]
     )
-    outcome = run_trial(
-        unit="O1", trial_id="o1-1", robot=robot, judge_camera=cam, run_dir=tmp_path
-    )
+    outcome = run_trial(unit="O1", trial_id="o1-1", robot=robot, judge_camera=cam, run_dir=tmp_path)
     assert outcome["passed"] is True
 
 
@@ -37,7 +35,5 @@ def test_o1_fail_when_target_not_retrieved(tmp_path: Path):
             _bgr((0, 200, 0)),  # never reappears
         ]
     )
-    outcome = run_trial(
-        unit="O1", trial_id="o1-2", robot=robot, judge_camera=cam, run_dir=tmp_path
-    )
+    outcome = run_trial(unit="O1", trial_id="o1-2", robot=robot, judge_camera=cam, run_dir=tmp_path)
     assert outcome["passed"] is False

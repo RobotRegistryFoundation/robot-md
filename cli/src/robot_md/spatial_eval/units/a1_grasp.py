@@ -4,8 +4,7 @@ from robot_md.spatial_eval.units.base import register
 
 code = "A1"
 description = (
-    "Graspable region on novel objects — identify graspable region(s) "
-    "and pick orientation."
+    "Graspable region on novel objects — identify graspable region(s) and pick orientation."
 )
 
 LIFT_MIN_CM = 5.0
@@ -20,11 +19,13 @@ def parse_answer(raw: dict) -> dict:
     for g in grasps:
         if not all(k in g for k in ("position", "orientation", "score")):
             raise ValueError("each grasp requires position, orientation, score")
-        parsed.append({
-            "position": tuple(float(v) for v in g["position"]),
-            "orientation": tuple(float(v) for v in g["orientation"]),
-            "score": float(g["score"]),
-        })
+        parsed.append(
+            {
+                "position": tuple(float(v) for v in g["position"]),
+                "orientation": tuple(float(v) for v in g["orientation"]),
+                "score": float(g["score"]),
+            }
+        )
     parsed.sort(key=lambda g: g["score"], reverse=True)
     return {"grasps": parsed}
 

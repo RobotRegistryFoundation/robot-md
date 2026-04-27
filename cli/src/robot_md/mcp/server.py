@@ -177,9 +177,7 @@ def build_server(ctx: McpContext):
         return kit_tool(ctx)
 
     @server.tool()
-    def spatial_eval_run_probe(
-        units: list[str] | None = None, baseline_only: bool = False
-    ) -> dict:
+    def spatial_eval_run_probe(units: list[str] | None = None, baseline_only: bool = False) -> dict:
         """Run the probe track. Returns Score JSON probe section."""
         from robot_md.mcp.tools.spatial_eval.run_probe import run_probe_tool
 

@@ -36,9 +36,7 @@ def list_pending_reviews(run_dir: Path) -> list[dict]:
     return [json.loads(p.read_text()) for p in sorted(pending.glob("*.json"))]
 
 
-def resolve_review(
-    run_dir: Path, *, trial_id: str, verdict_passed: bool, reviewer: str
-) -> None:
+def resolve_review(run_dir: Path, *, trial_id: str, verdict_passed: bool, reviewer: str) -> None:
     pending = run_dir / "pending_review"
     f = pending / f"{trial_id}.json"
     if not f.is_file():
