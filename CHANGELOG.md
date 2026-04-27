@@ -5,6 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.1] — 2026-04-27
+
+**Lint cleanup of v1.2.0.** No behavior change. Wheel built from a
+green-CI commit so future maintainers can rely on the published artifact
+matching `ruff check`/`format` clean.
+
+### Fixed
+
+- `ruff check src tests` now passes (66 → 0 errors). Combined manual
+  fixes (broke prompt content strings in `mcp/server.py` for E501,
+  combined nested `async with` in `tests/hardware/test_sp1_demo_path.py`
+  for SIM117) with auto-fix + `ruff format`. v1.2.0's published wheel
+  was functional but failed lint.
+
+---
+
 ## [1.2.0] — 2026-04-27
 
 **SP1: One MCP server.** The `robot-md` plugin now ships the Python
