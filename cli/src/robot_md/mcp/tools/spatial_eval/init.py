@@ -19,7 +19,10 @@ DEFAULT_BLOCK = """spatial-eval:
 
 
 def init_tool(ctx, *, units: list[str]) -> dict:
-    f: Path = Path(getattr(ctx, "manifest_path"))
+    mp = getattr(ctx, "manifest_path", None)
+    if mp is None:
+        return {"ok": False, "error": "ctx.manifest_path not set"}
+    f: Path = Path(mp)
     text = f.read_text()
     if "spatial-eval:" in text:
         return {"ok": True, "status": "already_present"}

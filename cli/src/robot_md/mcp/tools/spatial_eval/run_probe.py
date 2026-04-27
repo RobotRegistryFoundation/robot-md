@@ -6,6 +6,7 @@ import datetime as _dt
 import uuid
 from typing import Optional
 
+from robot_md.mcp.tools.spatial_eval._ctx import _frontmatter
 from robot_md.spatial_eval.probe.datasets.loader import load_public_split
 from robot_md.spatial_eval.probe.runner import run_probes
 from robot_md.spatial_eval.probe.stacks import resolve_stack
@@ -23,7 +24,8 @@ def run_probe_tool(
     baseline_only: bool = False,
     _stacks: Optional[dict] = None,
 ) -> dict:
-    se = (getattr(ctx, "parsed", {}) or {}).get("spatial-eval")
+    fm = _frontmatter(ctx)
+    se = fm.get("spatial-eval")
     if not se:
         return {"ok": False, "error": "spatial-eval section missing in ROBOT.md"}
     chosen = units or se["units"]
@@ -58,10 +60,9 @@ def run_probe_tool(
         robot_declared={} if baseline_only else result.declared_per_unit,
         delta_per_unit={} if baseline_only else result.delta_per_unit,
     )
-    parsed = getattr(ctx, "parsed", {}) or {}
     score = ScoreJSON(
-        spec_version=se["spec_version"],
-        rrn=parsed.get("id", "RRN-unknown"),
+        spec_version=se.get("spec_version", "1.0.0"),
+        rrn=fm.get("id", "RRN-unknown"),
         run_id=str(uuid.uuid4()),
         timestamp=_dt.datetime.utcnow().isoformat() + "Z",
         tracks_probe=pt,

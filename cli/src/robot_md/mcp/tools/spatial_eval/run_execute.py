@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from robot_md.mcp.tools.spatial_eval._ctx import _frontmatter
 from robot_md.spatial_eval.execute.evidence import (
     packet_root_sha256,
     write_evidence_packet,
@@ -33,7 +34,8 @@ def run_execute_tool(
     _robot=None,
     _judge_camera=None,
 ) -> dict:
-    se = (getattr(ctx, "parsed", {}) or {}).get("spatial-eval")
+    fm = _frontmatter(ctx)
+    se = fm.get("spatial-eval")
     if not se:
         return {"ok": False, "error": "spatial-eval section missing in ROBOT.md"}
     chosen = units or se["units"]
@@ -73,10 +75,9 @@ def run_execute_tool(
         )
 
     pt = ProbeTrack(baseline_claude={}, robot_declared={}, delta_per_unit={})
-    parsed = getattr(ctx, "parsed", {}) or {}
     score = ScoreJSON(
-        spec_version=se["spec_version"],
-        rrn=parsed.get("id", "RRN-unknown"),
+        spec_version=se.get("spec_version", "1.0.0"),
+        rrn=fm.get("id", "RRN-unknown"),
         run_id=rd.name,
         timestamp=_dt.datetime.utcnow().isoformat() + "Z",
         tracks_probe=pt,
