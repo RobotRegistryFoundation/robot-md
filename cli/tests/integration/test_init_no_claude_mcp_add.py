@@ -25,25 +25,10 @@ def _skip(phase: str, msg: str = "skipped") -> PhaseResult:
     return PhaseResult(phase=phase, status="skipped", message=msg, detail={})
 
 
-class _Device:
-    def __init__(self, bus=None, protocol=None, label="", path=None):
-        self.bus = bus
-        self.protocol = protocol
-        self.label = label
-        self.path = path
-
-
 class _Scan:
     def __init__(self, devices=None):
         self.devices = devices or []
         self.cameras: list = []
-
-
-@pytest.fixture
-def fake_scan():
-    return _Scan(
-        [_Device(bus="usb", protocol="feetech", label="Feetech servo bus", path="/dev/ttyACM0")]
-    )
 
 
 def _hardware_phase_patches(extra_patches=()):
@@ -78,58 +63,9 @@ def test_default_flow_does_not_shell_out_to_claude_mcp(tmp_path: Path):
     """End-to-end: default_flow with all hardware phases stubbed must not
     call subprocess.run with `claude mcp …` at any point.
 
-    This catches future regressions where someone re-adds `claude mcp add`
-    inside a phase.  The real phase_write_manifest runs so the actual init
-    code paths (including any dormant subprocess call sites) are exercised.
-    """
-    out_path = tmp_path / "ROBOT.md"
-
-    from robot_md.init import default_flow
-
-    with patch("subprocess.run") as mock_run:
-        for ctx in _hardware_phase_patches():
-            ctx.__enter__()
-
-        try:
-            default_flow(
-                out_path,
-                robot_name="testbot",
-                preset_name="minimal",
-                do_register=False,
-                do_install_mcp=False,
-                do_install_skill=False,
-                do_sign_cal=False,
-                do_zero_cal=False,
-                do_auto_calibrate=False,
-                do_teach_poses=False,
-                do_refresh_claude_md=False,
-            )
-        finally:
-            for ctx in reversed(_hardware_phase_patches()):
-                ctx.__exit__(None, None, None)
-
-        # Assert: no subprocess.run call targeted `claude mcp …`
-        for call in mock_run.call_args_list:
-            args = call.args[0] if call.args else []
-            if not isinstance(args, (list, tuple)):
-                continue
-            args_list = list(args)
-            assert not (
-                len(args_list) >= 2
-                and str(args_list[0]) == "claude"
-                and str(args_list[1]) == "mcp"
-            ), f"default_flow shelled out to `claude mcp …`: {args_list}"
-
-
-# ---------------------------------------------------------------------------
-# Test 1 (cleaner form using nested with)
-# ---------------------------------------------------------------------------
-
-
-def test_default_flow_does_not_shell_out_to_claude_mcp_v2(tmp_path: Path):
-    """Cleaner nested-with version of the shell-out guard.
-
-    Uses contextlib.ExitStack so we avoid the manual enter/exit dance above.
+    Uses contextlib.ExitStack so patches are entered and exited on the same
+    objects.  This catches future regressions where someone re-adds
+    `claude mcp add` inside a phase.
     """
     import contextlib
 
@@ -286,21 +222,20 @@ def test_default_flow_invokes_motion_extras_hint_for_motion_manifest(
                 do_teach_poses=False,
                 do_refresh_claude_md=False,
             )
-        except Exception as exc:
-            pytest.skip(f"so_arm101 preset not usable in test env: {exc}")
+        except (TypeError, ModuleNotFoundError) as exc:
+            pytest.skip(f"so_arm101 preset signature/dep issue: {exc}")
 
     assert rc == 0
 
     manifest_text = out_path.read_text()
     err = capsys.readouterr().err
 
-    if "arm." in manifest_text:
-        assert "pip install" in err and "robot-md[hardware]" in err, (
-            f"Expected motion-extras hint in stderr but it was absent.\n"
-            f"stderr:\n{err}"
-        )
-    else:
-        pytest.skip("so_arm101 preset did not produce arm.* capabilities in this env")
+    assert "arm." in manifest_text, (
+        "so_arm101 preset must declare arm.* capabilities — preset YAML drift?"
+    )
+    assert "pip install" in err and "robot-md[hardware]" in err, (
+        f"Expected motion-extras hint. Output:\n{err}"
+    )
 
 
 # ---------------------------------------------------------------------------

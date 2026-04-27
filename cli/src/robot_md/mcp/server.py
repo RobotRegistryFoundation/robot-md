@@ -11,6 +11,7 @@ from pathlib import Path
 from mcp.server.fastmcp import Context
 
 from robot_md.mcp.context import McpContext, load_context
+from robot_md.mcp.tools.doctor_summary import doctor_summary_tool
 from robot_md.mcp.tools.estop import estop_clear_tool, estop_tool
 from robot_md.mcp.tools.render import render_tool
 from robot_md.mcp.tools.validate import validate_tool
@@ -136,6 +137,19 @@ def build_server(ctx: McpContext):
 
         return await discover_tool(ctx, steps=steps, mcp_ctx=mcp_ctx)
 
+    @server.tool()
+    def doctor_summary() -> dict:
+        """Read-only manifest-only sanity check.
+
+        Returns schema status, identity fields, driver summary, HITL gates,
+        E-stop config, and registration status. Cheaper and safer than
+        `robot-md doctor` (which also probes network + drivers). Use when
+        the operator asks "is everything OK", "quick-check", or "what's the
+        state of the manifest". For live hardware diagnostics, tell the
+        operator to run `robot-md doctor` from the shell.
+        """
+        return doctor_summary_tool(ctx)
+
     from robot_md.mcp.resources import _sanitize_robot_name
 
     robot_name = _sanitize_robot_name(ctx.spec.metadata.robot_name if ctx.spec else None)
@@ -179,6 +193,123 @@ def build_server(ctx: McpContext):
         from robot_md.mcp.resources import recent_errors as _re
 
         return json.dumps(_re(ctx), indent=2)
+
+    # ── Prompts (slash commands in Claude Desktop/Code) ──────────────────────
+    # Raw robot name for human-readable prompt text (trimmed, not URI-sanitized).
+    _raw_robot_name = (
+        (ctx.spec.metadata.robot_name if ctx.spec else None) or robot_name
+    )
+
+    @server.prompt(
+        name="brief-me",
+        title=f"Brief me on {_raw_robot_name}",
+        description=(
+            f"Produce a concise operator briefing on {_raw_robot_name}: identity, "
+            "capabilities, safety gates, current registration status. Read the context "
+            "resource; do not guess."
+        ),
+    )
+    def _prompt_brief_me() -> list[dict]:
+        return [
+            {
+                "role": "user",
+                "content": (
+                    f"Read the resource `robot-md://{robot_name}/context` (or its narrower cousins "
+                    f"`/identity`, `/capabilities`, `/safety`) and produce a short operator briefing "
+                    f"on {_raw_robot_name}:\n\n"
+                    "1. **Identity** — one line (name, type, DoF, manufacturer/model/version, RRN).\n"
+                    "2. **Capabilities** — bullet list of declared actions.\n"
+                    "3. **Safety posture** — declared HITL gates, E-stop config, payload limits.\n"
+                    "4. **Registration** — registered on rcan.dev? If so, include the public resolver URL.\n\n"
+                    "Keep it to under 200 words. Do not invent capabilities or limits not in the manifest."
+                ),
+            }
+        ]
+
+    @server.prompt(
+        name="check-safety",
+        title="Is this action safe?",
+        description=(
+            f"Check a proposed action against {_raw_robot_name}'s declared HITL gates "
+            "and safety envelope. Use before issuing any physical motion."
+        ),
+    )
+    def _prompt_check_safety(action: str) -> list[dict]:
+        return [
+            {
+                "role": "user",
+                "content": (
+                    f"The operator wants {_raw_robot_name} to do: **{action}**\n\n"
+                    f"Read `robot-md://{robot_name}/safety` and determine:\n\n"
+                    "1. Does this action's scope match a declared `hitl_gates[]` entry with "
+                    "`require_auth: true`? If yes, name the gate and tell the operator you need "
+                    "explicit authorization before proceeding.\n"
+                    "2. Does the action stay within `payload_kg`, `max_joint_velocity_dps`, and "
+                    "`workspace_bounds_m` (if declared)?\n"
+                    "3. Is `estop.software` available? Confirm the driver command path to trigger it.\n"
+                    "4. If no matching gate exists AND the action is potentially harmful (unknown objects, "
+                    "high velocity, collision risk, workspace-boundary-approaching): **surface the gap to "
+                    "the operator** — say the manifest doesn't declare a gate for this scope and ask "
+                    "whether to add one or to authorize this specific action.\n\n"
+                    'Reply with one of: "✓ safe to proceed", "⚠ authorization required — '
+                    '<gate scope>", or "⚠ gate gap — <explanation>". Do not assume; only answer '
+                    "from the declared manifest."
+                ),
+            }
+        ]
+
+    @server.prompt(
+        name="explain-capability",
+        title="Explain a capability",
+        description=(
+            f"Explain what one of {_raw_robot_name}'s declared capabilities does, "
+            "which drivers it uses, and which safety gates apply."
+        ),
+    )
+    def _prompt_explain_capability(capability: str) -> list[dict]:
+        return [
+            {
+                "role": "user",
+                "content": (
+                    f"The operator asked about the `{capability}` capability on {_raw_robot_name}.\n\n"
+                    f"1. Read `robot-md://{robot_name}/capabilities`. Confirm the capability is actually "
+                    "declared. If not, tell the operator the capability is NOT declared and list what IS declared.\n"
+                    f"2. If declared, read `robot-md://{robot_name}/frontmatter` and `/body` to find which "
+                    "drivers + kinematics this capability uses and any operator-authored prose about it.\n"
+                    f"3. Read `robot-md://{robot_name}/safety` and identify any `hitl_gates[]` whose scope "
+                    "would apply when this capability is invoked.\n"
+                    "4. Produce an answer with: what the capability does, hardware path, safety gates that apply. "
+                    "Keep to under 150 words."
+                ),
+            }
+        ]
+
+    @server.prompt(
+        name="manifest-status",
+        title="Quick status check on the ROBOT.md",
+        description=(
+            f"Run the doctor_summary tool and translate the JSON into a "
+            f"human-readable health summary for {_raw_robot_name}."
+        ),
+    )
+    def _prompt_manifest_status() -> list[dict]:
+        return [
+            {
+                "role": "user",
+                "content": (
+                    f"Call the `doctor_summary` tool and translate its JSON output into a short status "
+                    f"report for {_raw_robot_name}:\n\n"
+                    "- ✓ Schema valid? (if not, list the errors)\n"
+                    "- ✓ Registered on rcan.dev? (if so, note the RRN)\n"
+                    "- Drivers: per-driver port/host summary\n"
+                    "- HITL gates: count + scopes\n"
+                    "- E-stop: software/hardware/response time\n"
+                    "- Any obvious gaps or things the operator should know\n\n"
+                    "Keep it under 150 words. This is a quick-check, not a full diagnosis — for that, "
+                    "suggest the operator run `robot-md doctor` from the shell."
+                ),
+            }
+        ]
 
     return server
 
