@@ -16,6 +16,23 @@ from robot_md.mcp.tools.render import render_tool
 from robot_md.mcp.tools.validate import validate_tool
 
 
+def find_manifest_via_cwd_walk(start: Path) -> Path | None:
+    """Walk up from `start` looking for ROBOT.md. Returns the path or None.
+
+    Stops at the filesystem root. Used by `robot-md mcp` (no positional arg)
+    and by the plugin's .mcp.json that spawns `robot-md mcp` from the
+    project directory at session start.
+    """
+    current = start.resolve()
+    while True:
+        candidate = current / "ROBOT.md"
+        if candidate.is_file():
+            return candidate
+        if current.parent == current:  # filesystem root
+            return None
+        current = current.parent
+
+
 def build_server(ctx: McpContext):
     """Build a FastMCP server with the render/validate/estop tools bound to ctx."""
     from mcp.server.fastmcp import FastMCP

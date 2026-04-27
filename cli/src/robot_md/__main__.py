@@ -1840,12 +1840,31 @@ def calibrate_intrinsic_cmd(
 
 @app.command()
 def mcp(
-    manifest: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    manifest: Path | None = typer.Argument(
+        None,
+        help="Path to a ROBOT.md file. If omitted, walks up from cwd to find one.",
+    ),
 ) -> None:
-    """Start the robot-md MCP server over stdio (same as `robot-md-mcp`)."""
-    import sys as _sys
+    """Start the robot-md MCP server over stdio (same as `robot-md-mcp`).
 
-    from robot_md.mcp.server import main as _mcp_main
+    When invoked without a manifest argument (the plugin's default),
+    auto-discovers ROBOT.md by walking up from the current working directory.
+    """
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    from robot_md.mcp.server import find_manifest_via_cwd_walk, main as _mcp_main
+
+    if manifest is None:
+        found = find_manifest_via_cwd_walk(_Path.cwd())
+        if found is None:
+            print(
+                f"error: no ROBOT.md found walking up from {_Path.cwd()}. "
+                f"Pass a path explicitly: robot-md mcp /path/to/ROBOT.md",
+                file=_sys.stderr,
+            )
+            raise typer.Exit(code=2)
+        manifest = found
 
     _sys.argv = ["robot-md-mcp", str(manifest)]
     raise typer.Exit(code=_mcp_main())
