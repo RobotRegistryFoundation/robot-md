@@ -5,10 +5,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [Unreleased]
+## [1.2.0] — 2026-04-27
+
+**SP1: One MCP server.** The `robot-md` plugin now ships the Python
+`robot-md mcp` server directly via its `.mcp.json` (drops the npm
+`robot-md-mcp@^0.3` fallback). Operators get manifest reads AND motion
+(`execute_task`, `execute_capability`, `vision_find`, `estop`, …) in one
+MCP server. Plugin requires `pip install 'robot-md[hardware]'`.
+
+See `docs/superpowers/specs/2026-04-26-sp1-wire-python-mcp-server-design.md`
+and `docs/superpowers/specs/2026-04-27-sp1-5-simplification-revisions.md`.
 
 ### Added
 
+- `robot-md mcp` (no positional argument) walks up from cwd to find
+  `ROBOT.md`. Enables the plugin's no-arg invocation. Pass
+  `robot-md mcp /path/to/ROBOT.md` to override.
+- `[hardware]` meta-extra in `pyproject.toml` — pulls common backends in
+  one install: `pip install 'robot-md[hardware]'`. Equivalent to
+  `[feetech-depthai]` today; SP3 will extend with lerobot + realsense.
+- `_emit_motion_extras_hint` in `init.py` — when manifest declares
+  `arm.*`/`nav.*`/`gripper.*`/`perceive.*` capabilities, prints the
+  `pip install 'robot-md[hardware]'` reminder + `/mcp → Reconnect`
+  guidance. Fires from both `default_flow` and `non_interactive`.
+- `doctor_summary` MCP tool — wraps `validate` with a structured
+  human-readable health summary (matches the npm v0.3 server's contract).
+- 4 new MCP prompts: `brief-me`, `check-safety`, `explain-capability`,
+  `manifest-status`. Activated via `/<name>` in Claude Code (matches the
+  npm v0.3 server's prompt set).
+- `using-robot-md` skill: `## Motion intent without motion tools` stanza.
+  When operator requests motion AND `execute_task` tool is missing,
+  skill halts and emits verbatim upgrade instructions
+  (lazy-discovery path).
+- `scripts/sync-skill.sh` + CI `skill-sync-check` job — keeps the
+  bundled `using-robot-md` SKILL.md in sync with the canonical at
+  `robot-md-mcp/skills/using-robot-md/SKILL.md`.
 - Six new `robot-md init --preset` targets in
   `cli/src/robot_md/presets/`. Brings the bundled count from 11 to 17:
   - `reachy2` — Pollen Robotics open-source humanoid (bimanual 7-DoF
@@ -34,6 +65,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
   All six pass the standard round-trip
   (`robot-md init … --non-interactive | robot-md validate`).
+
+### Changed
+
+- Plugin `.mcp.json` (in `RobotRegistryFoundation/robot-md-mcp` repo):
+  spawns `robot-md mcp` (Python) instead of `npx -y robot-md-mcp@^0.3`.
+- Plugin description tells operators upfront that the Python CLI is
+  required.
+- `using-robot-md` skill drift between the two repos resolved:
+  `robot-md-mcp/skills/using-robot-md/SKILL.md` is canonical; the
+  bundled CLI copy syncs from it.
+- `init` no longer calls `phase_install_mcp` from `default_flow`. Plugin
+  handles MCP wiring; init's job is just the manifest + skill + cal.
+- `non_interactive()` no longer prints stale
+  `claude mcp add ... robot-md-mcp` Next: line; emits motion-extras hint
+  in parity with `default_flow`.
+
+### Deprecated
+
+- `phase_install_mcp` is now a no-op returning
+  `PhaseResult(status="skipped", ...)`. Function signature preserved
+  for backward compat. `install_mcp_claude_code.add()` still exported
+  for non-plugin operators who explicitly call it.
+- `--no-install-mcp` CLI flag is a no-op; help text marks the
+  deprecation.
+
+### Migration
+
+- Existing manifests continue to work unchanged.
+- Existing operators upgrade with: `pip install --upgrade robot-md` then
+  `/plugin update robot-md` in Claude Code. No re-init required.
 
 ---
 
