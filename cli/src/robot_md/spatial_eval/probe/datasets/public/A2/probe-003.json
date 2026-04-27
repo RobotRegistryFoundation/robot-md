@@ -1,0 +1,13 @@
+{
+  "id": "a2-public-003",
+  "unit": "A2",
+  "scenario_header": "Flat plate; two stable placement clusters either side of center; one centered, one offset +x.",
+  "frames": [],
+  "question": {"type": "stable_placement"},
+  "ground_truth": {
+    "gold_stable_clusters": [
+      {"x": 0.00, "y": 0.00, "yaw_rad": 0.0, "xy_tolerance_m": 0.025, "yaw_tolerance_rad": 0.5},
+      {"x": 0.08, "y": 0.00, "yaw_rad": 1.5708, "xy_tolerance_m": 0.025, "yaw_tolerance_rad": 0.5}
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "o3-public-001",
+  "unit": "O3",
+  "scenario_header": "Red 5cm cube partly behind a vertical cardboard wall; only -x face visible.",
+  "frames": [],
+  "question": {"type": "infer_full_extent"},
+  "ground_truth": {
+    "bbox_corners": [
+      [0.00, 0.00, 0.00],
+      [0.05, 0.00, 0.00],
+      [0.00, 0.05, 0.00],
+      [0.05, 0.05, 0.00],
+      [0.00, 0.00, 0.05],
+      [0.05, 0.00, 0.05],
+      [0.00, 0.05, 0.05],
+      [0.05, 0.05, 0.05]
+    ]
+  }
+}

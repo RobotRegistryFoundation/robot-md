@@ -1,0 +1,14 @@
+{
+  "id": "a1-public-002",
+  "unit": "A1",
+  "scenario_header": "Wooden spoon (handle along +x) at (-0.05, 0.05, 0.02); preferred grasp at handle midpoint.",
+  "frames": [],
+  "question": {"type": "rank_grasps"},
+  "ground_truth": {
+    "gold_grasps_top_k": [
+      {"position": [-0.05, 0.05, 0.02], "orientation": [0.0, 0.0, 0.7071, 0.7071], "score": 1.0}
+    ],
+    "k": 3,
+    "tolerance_m": 0.02
+  }
+}

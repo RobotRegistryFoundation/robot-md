@@ -1,0 +1,11 @@
+{
+  "id": "o1-public-002",
+  "unit": "O1",
+  "scenario_header": "Red cube placed at (0.10, 0.00, 0.00); green opaque cup occludes from above.",
+  "frames": [],
+  "question": {"type": "presence_and_position"},
+  "ground_truth": {
+    "still_present": true,
+    "position": [0.10, 0.00, 0.00]
+  }
+}

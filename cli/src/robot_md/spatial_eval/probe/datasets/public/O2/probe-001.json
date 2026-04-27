@@ -1,0 +1,11 @@
+{
+  "id": "o2-public-001",
+  "unit": "O2",
+  "scenario_header": "Red cube placed inside an inverted green opaque cup at (0.10, 0.00).",
+  "frames": [],
+  "question": {"type": "container_relationship"},
+  "ground_truth": {
+    "container": "green_cup",
+    "contained": "red_cube"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "o3-public-002",
+  "unit": "O3",
+  "scenario_header": "Rectangular block 0.08x0.04x0.03 partly under a paper sheet; long side aligned with x.",
+  "frames": [],
+  "question": {"type": "infer_full_extent"},
+  "ground_truth": {
+    "bbox_corners": [
+      [0.10, 0.05, 0.00],
+      [0.18, 0.05, 0.00],
+      [0.10, 0.09, 0.00],
+      [0.18, 0.09, 0.00],
+      [0.10, 0.05, 0.03],
+      [0.18, 0.05, 0.03],
+      [0.10, 0.09, 0.03],
+      [0.18, 0.09, 0.03]
+    ]
+  }
+}

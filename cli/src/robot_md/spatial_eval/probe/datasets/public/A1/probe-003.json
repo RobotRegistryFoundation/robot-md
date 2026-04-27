@@ -1,0 +1,16 @@
+{
+  "id": "a1-public-003",
+  "unit": "A1",
+  "scenario_header": "Small irregular plush toy at (0.00, 0.10, 0.04); two acceptable grasps along symmetry axis.",
+  "frames": [],
+  "question": {"type": "rank_grasps"},
+  "ground_truth": {
+    "gold_grasps_top_k": [
+      {"position": [0.00, 0.10, 0.04], "orientation": [0.0, 0.0, 0.0, 1.0], "score": 1.0},
+      {"position": [0.00, 0.12, 0.04], "orientation": [0.0, 0.0, 0.0, 1.0], "score": 0.9},
+      {"position": [0.00, 0.08, 0.04], "orientation": [0.0, 0.0, 0.0, 1.0], "score": 0.7}
+    ],
+    "k": 3,
+    "tolerance_m": 0.02
+  }
+}

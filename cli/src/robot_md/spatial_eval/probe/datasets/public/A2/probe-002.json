@@ -1,0 +1,12 @@
+{
+  "id": "a2-public-002",
+  "unit": "A2",
+  "scenario_header": "Tall narrow bottle; only stable yaw is upright at (-0.05, 0.10) parallel to y-axis.",
+  "frames": [],
+  "question": {"type": "stable_placement"},
+  "ground_truth": {
+    "gold_stable_clusters": [
+      {"x": -0.05, "y": 0.10, "yaw_rad": 0.0, "xy_tolerance_m": 0.015, "yaw_tolerance_rad": 0.2}
+    ]
+  }
+}
