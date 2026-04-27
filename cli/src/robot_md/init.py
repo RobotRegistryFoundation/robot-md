@@ -31,7 +31,8 @@ PRESETS_DIR = Path(__file__).parent / "presets"
 # that can drive hardware or read sensors). Used by
 # `_emit_motion_extras_hint` to decide whether to print the
 # `pip install 'robot-md[hardware]'` reminder.
-# Keep this in sync with skills/using-robot-md SKILL.md hardware-intent stanza.
+# Keep this in sync with skills/using-robot-md SKILL.md
+# 'Motion intent without motion tools' stanza.
 _HARDWARE_RUNTIME_CAPABILITY_PREFIXES = ("arm.", "nav.", "gripper.", "perceive.")
 
 
@@ -496,6 +497,16 @@ def non_interactive(
     text = render_draft(fm, body_hints)
     out_path.write_text(text)
 
+    try:
+        from robot_md.parser import parse_file
+        _parsed = parse_file(out_path)
+        _capabilities = _parsed.frontmatter.get("capabilities") or []
+        if isinstance(_capabilities, list):
+            _emit_motion_extras_hint(_capabilities)
+    except Exception:
+        # Hint emission must never block init success.
+        pass
+
     print(
         f"✓ wrote {out_path}\n"
         f"  preset: {chosen.preset.display_name}"
@@ -503,8 +514,7 @@ def non_interactive(
         + "\n"
         f"\nNext:\n"
         f"  robot-md validate {out_path}\n"
-        f"  robot-md calibrate --zero {out_path}    # pose arm, record zero_pose_steps\n"
-        f'  claude mcp add robot-md -- robot-md-mcp "$(pwd)/{out_path.name}"\n',
+        f"  robot-md calibrate --zero {out_path}    # pose arm, record zero_pose_steps\n",
         file=sys.stderr,
     )
     return 0
@@ -786,7 +796,7 @@ def _print_tally(results: list[Any], out_path: Path) -> None:
     if any_failed or any_skipped:
         print(
             "Some steps were skipped or failed — rerun the individual verbs "
-            "(robot-md calibrate, install-skill, claude mcp add) as needed.",
+            "(robot-md calibrate, install-skill) as needed.",
             file=sys.stderr,
         )
 

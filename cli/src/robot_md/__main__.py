@@ -205,7 +205,7 @@ def init(
         help="Also generate a CLAUDE.md next to the manifest.",
     ),
     no_install_mcp: bool = typer.Option(
-        False, "--no-install-mcp", help="Skip the Claude Code MCP registration step."
+        False, "--no-install-mcp", help="(deprecated since 1.2.0; no-op — plugin handles MCP wiring)"
     ),
     no_install_skill: bool = typer.Option(
         False, "--no-install-skill", help="Skip the using-robot-md skill install step."
@@ -225,8 +225,8 @@ def init(
 ) -> None:
     """Zero-to-actuatable-ROBOT.md in one command.
 
-    Default flow walks six phases: write manifest → (register) → install MCP
-    with Claude Code → install skill → prompt + sign-cal → prompt + zero-cal.
+    Default flow walks five phases: write manifest → (register) → install
+    skill → prompt + sign-cal → prompt + zero-cal.
     Headless (no-TTY) callers auto-skip the calibration phases.
 
     Examples:
