@@ -44,10 +44,15 @@ def _hardware_phase_patches(extra_patches=()):
         patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill")),
         patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal")),
         patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal")),
-        patch("robot_md.init.phase_auto_calibrate_ready", return_value=_skip("auto_calibrate_ready")),
+        patch(
+            "robot_md.init.phase_auto_calibrate_ready", return_value=_skip("auto_calibrate_ready")
+        ),
         patch("robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")),
         patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses")),
-        patch("robot_md.init_phases.phase_compliance_scaffold", return_value=_skip("compliance_scaffold")),
+        patch(
+            "robot_md.init_phases.phase_compliance_scaffold",
+            return_value=_skip("compliance_scaffold"),
+        ),
         patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup")),
         patch("robot_md.init._refresh_claude_md"),
         *extra_patches,
@@ -76,14 +81,38 @@ def test_default_flow_does_not_shell_out_to_claude_mcp(tmp_path: Path):
         mock_run = stack.enter_context(patch("subprocess.run"))
         stack.enter_context(patch("robot_md.init.scan_system", return_value=_Scan()))
         stack.enter_context(patch("robot_md.init.phase_register", return_value=_skip("register")))
-        stack.enter_context(patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal")))
-        stack.enter_context(patch("robot_md.init.phase_auto_calibrate_ready", return_value=_skip("auto_calibrate_ready")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")))
-        stack.enter_context(patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses")))
-        stack.enter_context(patch("robot_md.init_phases.phase_compliance_scaffold", return_value=_skip("compliance_scaffold")))
-        stack.enter_context(patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup")))
+        stack.enter_context(
+            patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill"))
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal"))
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal"))
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init.phase_auto_calibrate_ready",
+                return_value=_skip("auto_calibrate_ready"),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")
+            )
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses"))
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init_phases.phase_compliance_scaffold",
+                return_value=_skip("compliance_scaffold"),
+            )
+        )
+        stack.enter_context(
+            patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup"))
+        )
         stack.enter_context(patch("robot_md.init._refresh_claude_md"))
 
         rc = default_flow(
@@ -108,9 +137,7 @@ def test_default_flow_does_not_shell_out_to_claude_mcp(tmp_path: Path):
             continue
         args_list = list(args)
         assert not (
-            len(args_list) >= 2
-            and str(args_list[0]) == "claude"
-            and str(args_list[1]) == "mcp"
+            len(args_list) >= 2 and str(args_list[0]) == "claude" and str(args_list[1]) == "mcp"
         ), f"default_flow shelled out to `claude mcp …`: {args_list}"
 
 
@@ -136,17 +163,44 @@ def test_install_mcp_absent_from_tally(tmp_path: Path, capsys):
         stack.enter_context(patch("robot_md.init.scan_system", return_value=_Scan()))
         # Patch install_mcp to make it observable if it fires
         mock_install_mcp = stack.enter_context(
-            patch("robot_md.init.phase_install_mcp", return_value=_ok("install_mcp", "should not appear"))
+            patch(
+                "robot_md.init.phase_install_mcp",
+                return_value=_ok("install_mcp", "should not appear"),
+            )
         )
         stack.enter_context(patch("robot_md.init.phase_register", return_value=_skip("register")))
-        stack.enter_context(patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal")))
-        stack.enter_context(patch("robot_md.init.phase_auto_calibrate_ready", return_value=_skip("auto_calibrate_ready")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")))
-        stack.enter_context(patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses")))
-        stack.enter_context(patch("robot_md.init_phases.phase_compliance_scaffold", return_value=_skip("compliance_scaffold")))
-        stack.enter_context(patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup")))
+        stack.enter_context(
+            patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill"))
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal"))
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal"))
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init.phase_auto_calibrate_ready",
+                return_value=_skip("auto_calibrate_ready"),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")
+            )
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses"))
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init_phases.phase_compliance_scaffold",
+                return_value=_skip("compliance_scaffold"),
+            )
+        )
+        stack.enter_context(
+            patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup"))
+        )
         stack.enter_context(patch("robot_md.init._refresh_claude_md"))
 
         rc = default_flow(
@@ -180,9 +234,7 @@ def test_install_mcp_absent_from_tally(tmp_path: Path, capsys):
 # ---------------------------------------------------------------------------
 
 
-def test_default_flow_invokes_motion_extras_hint_for_motion_manifest(
-    tmp_path: Path, capsys
-):
+def test_default_flow_invokes_motion_extras_hint_for_motion_manifest(tmp_path: Path, capsys):
     """End-to-end: when default_flow writes a manifest with motion
     capabilities (so_arm101 declares arm.*), _emit_motion_extras_hint
     must fire and produce the pip install hint on stderr.
@@ -198,21 +250,45 @@ def test_default_flow_invokes_motion_extras_hint_for_motion_manifest(
     with contextlib.ExitStack() as stack:
         stack.enter_context(patch("robot_md.init.scan_system", return_value=_Scan()))
         stack.enter_context(patch("robot_md.init.phase_register", return_value=_skip("register")))
-        stack.enter_context(patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal")))
-        stack.enter_context(patch("robot_md.init.phase_auto_calibrate_ready", return_value=_skip("auto_calibrate_ready")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")))
-        stack.enter_context(patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses")))
-        stack.enter_context(patch("robot_md.init_phases.phase_compliance_scaffold", return_value=_skip("compliance_scaffold")))
-        stack.enter_context(patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup")))
+        stack.enter_context(
+            patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill"))
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal"))
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal"))
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init.phase_auto_calibrate_ready",
+                return_value=_skip("auto_calibrate_ready"),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")
+            )
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses"))
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init_phases.phase_compliance_scaffold",
+                return_value=_skip("compliance_scaffold"),
+            )
+        )
+        stack.enter_context(
+            patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup"))
+        )
         stack.enter_context(patch("robot_md.init._refresh_claude_md"))
 
         try:
             rc = default_flow(
                 out_path,
                 robot_name="testbot",
-                preset_name="so_arm101",   # arm.* capabilities → hint must fire
+                preset_name="so_arm101",  # arm.* capabilities → hint must fire
                 do_register=False,
                 do_install_mcp=False,
                 do_install_skill=False,
@@ -243,9 +319,7 @@ def test_default_flow_invokes_motion_extras_hint_for_motion_manifest(
 # ---------------------------------------------------------------------------
 
 
-def test_default_flow_does_not_emit_hint_for_nonmotion_manifest(
-    tmp_path: Path, capsys
-):
+def test_default_flow_does_not_emit_hint_for_nonmotion_manifest(tmp_path: Path, capsys):
     """Sanity: minimal preset (status.report + vision.describe, no arm.*)
     must NOT produce the hardware-runtime pip-install hint.
     """
@@ -257,14 +331,38 @@ def test_default_flow_does_not_emit_hint_for_nonmotion_manifest(
     with contextlib.ExitStack() as stack:
         stack.enter_context(patch("robot_md.init.scan_system", return_value=_Scan()))
         stack.enter_context(patch("robot_md.init.phase_register", return_value=_skip("register")))
-        stack.enter_context(patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal")))
-        stack.enter_context(patch("robot_md.init.phase_auto_calibrate_ready", return_value=_skip("auto_calibrate_ready")))
-        stack.enter_context(patch("robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")))
-        stack.enter_context(patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses")))
-        stack.enter_context(patch("robot_md.init_phases.phase_compliance_scaffold", return_value=_skip("compliance_scaffold")))
-        stack.enter_context(patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup")))
+        stack.enter_context(
+            patch("robot_md.init.phase_install_skill", return_value=_skip("install_skill"))
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_calibrate_sign", return_value=_skip("sign_cal"))
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_calibrate_zero", return_value=_skip("zero_cal"))
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init.phase_auto_calibrate_ready",
+                return_value=_skip("auto_calibrate_ready"),
+            )
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init.phase_calibrate_extrinsic", return_value=_skip("calibrate_extrinsic")
+            )
+        )
+        stack.enter_context(
+            patch("robot_md.init.phase_teach_poses", return_value=_skip("teach_poses"))
+        )
+        stack.enter_context(
+            patch(
+                "robot_md.init_phases.phase_compliance_scaffold",
+                return_value=_skip("compliance_scaffold"),
+            )
+        )
+        stack.enter_context(
+            patch("robot_md.init_phases.phase_voice_setup", return_value=_skip("voice_setup"))
+        )
         stack.enter_context(patch("robot_md.init._refresh_claude_md"))
 
         rc = default_flow(
@@ -287,8 +385,7 @@ def test_default_flow_does_not_emit_hint_for_nonmotion_manifest(
     err = capsys.readouterr().err
 
     has_motion_caps = any(
-        prefix in manifest_text
-        for prefix in ("arm.", "nav.", "gripper.", "perceive.")
+        prefix in manifest_text for prefix in ("arm.", "nav.", "gripper.", "perceive.")
     )
     if not has_motion_caps:
         assert "pip install 'robot-md[hardware]'" not in err, (

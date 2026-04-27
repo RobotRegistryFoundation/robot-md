@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from robot_md.mcp.server import find_manifest_via_cwd_walk
 
 

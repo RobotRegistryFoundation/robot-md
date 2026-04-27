@@ -499,6 +499,7 @@ def non_interactive(
 
     try:
         from robot_md.parser import parse_file
+
         _parsed = parse_file(out_path)
         _capabilities = _parsed.frontmatter.get("capabilities") or []
         if isinstance(_capabilities, list):
@@ -762,6 +763,7 @@ def default_flow(
     # Reads capabilities from the just-written manifest. Best-effort.
     try:
         from robot_md.parser import parse_file
+
         _parsed = parse_file(out_path)
         _capabilities = _parsed.frontmatter.get("capabilities") or []
         if isinstance(_capabilities, list):

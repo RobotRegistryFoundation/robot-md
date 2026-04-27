@@ -295,9 +295,7 @@ def build_server(ctx: McpContext):
 
     # ── Prompts (slash commands in Claude Desktop/Code) ──────────────────────
     # Raw robot name for human-readable prompt text (trimmed, not URI-sanitized).
-    _raw_robot_name = (
-        (ctx.spec.metadata.robot_name if ctx.spec else None) or robot_name
-    )
+    _raw_robot_name = (ctx.spec.metadata.robot_name if ctx.spec else None) or robot_name
 
     @server.prompt(
         name="brief-me",
@@ -313,14 +311,17 @@ def build_server(ctx: McpContext):
             {
                 "role": "user",
                 "content": (
-                    f"Read the resource `robot-md://{robot_name}/context` (or its narrower cousins "
-                    f"`/identity`, `/capabilities`, `/safety`) and produce a short operator briefing "
-                    f"on {_raw_robot_name}:\n\n"
-                    "1. **Identity** — one line (name, type, DoF, manufacturer/model/version, RRN).\n"
+                    f"Read the resource `robot-md://{robot_name}/context` (or its narrower "
+                    f"cousins `/identity`, `/capabilities`, `/safety`) and produce a short "
+                    f"operator briefing on {_raw_robot_name}:\n\n"
+                    "1. **Identity** — one line (name, type, DoF, manufacturer/model/"
+                    "version, RRN).\n"
                     "2. **Capabilities** — bullet list of declared actions.\n"
                     "3. **Safety posture** — declared HITL gates, E-stop config, payload limits.\n"
-                    "4. **Registration** — registered on rcan.dev? If so, include the public resolver URL.\n\n"
-                    "Keep it to under 200 words. Do not invent capabilities or limits not in the manifest."
+                    "4. **Registration** — registered on rcan.dev? If so, include the "
+                    "public resolver URL.\n\n"
+                    "Keep it to under 200 words. Do not invent capabilities or limits "
+                    "not in the manifest."
                 ),
             }
         ]
@@ -345,10 +346,14 @@ def build_server(ctx: McpContext):
                     "explicit authorization before proceeding.\n"
                     "2. Does the action stay within `payload_kg`, `max_joint_velocity_dps`, and "
                     "`workspace_bounds_m` (if declared)?\n"
-                    "3. Is `estop.software` available? Confirm the driver command path to trigger it.\n"
-                    "4. If no matching gate exists AND the action is potentially harmful (unknown objects, "
-                    "high velocity, collision risk, workspace-boundary-approaching): **surface the gap to "
-                    "the operator** — say the manifest doesn't declare a gate for this scope and ask "
+                    "3. Is `estop.software` available? Confirm the driver command path "
+                    "to trigger it.\n"
+                    "4. If no matching gate exists AND the action is potentially harmful "
+                    "(unknown objects, "
+                    "high velocity, collision risk, workspace-boundary-approaching): "
+                    "**surface the gap to "
+                    "the operator** — say the manifest doesn't declare a gate for this "
+                    "scope and ask "
                     "whether to add one or to authorize this specific action.\n\n"
                     'Reply with one of: "✓ safe to proceed", "⚠ authorization required — '
                     '<gate scope>", or "⚠ gate gap — <explanation>". Do not assume; only answer '
@@ -370,15 +375,18 @@ def build_server(ctx: McpContext):
             {
                 "role": "user",
                 "content": (
-                    f"The operator asked about the `{capability}` capability on {_raw_robot_name}.\n\n"
-                    f"1. Read `robot-md://{robot_name}/capabilities`. Confirm the capability is actually "
-                    "declared. If not, tell the operator the capability is NOT declared and list what IS declared.\n"
-                    f"2. If declared, read `robot-md://{robot_name}/frontmatter` and `/body` to find which "
-                    "drivers + kinematics this capability uses and any operator-authored prose about it.\n"
-                    f"3. Read `robot-md://{robot_name}/safety` and identify any `hitl_gates[]` whose scope "
-                    "would apply when this capability is invoked.\n"
-                    "4. Produce an answer with: what the capability does, hardware path, safety gates that apply. "
-                    "Keep to under 150 words."
+                    f"The operator asked about the `{capability}` capability on "
+                    f"{_raw_robot_name}.\n\n"
+                    f"1. Read `robot-md://{robot_name}/capabilities`. Confirm the capability "
+                    "is actually declared. If not, tell the operator the capability is NOT "
+                    "declared and list what IS declared.\n"
+                    f"2. If declared, read `robot-md://{robot_name}/frontmatter` and `/body` "
+                    "to find which drivers + kinematics this capability uses and any "
+                    "operator-authored prose about it.\n"
+                    f"3. Read `robot-md://{robot_name}/safety` and identify any `hitl_gates[]` "
+                    "whose scope would apply when this capability is invoked.\n"
+                    "4. Produce an answer with: what the capability does, hardware path, "
+                    "safety gates that apply. Keep to under 150 words."
                 ),
             }
         ]
@@ -396,16 +404,16 @@ def build_server(ctx: McpContext):
             {
                 "role": "user",
                 "content": (
-                    f"Call the `doctor_summary` tool and translate its JSON output into a short status "
-                    f"report for {_raw_robot_name}:\n\n"
+                    f"Call the `doctor_summary` tool and translate its JSON output into a "
+                    f"short status report for {_raw_robot_name}:\n\n"
                     "- ✓ Schema valid? (if not, list the errors)\n"
                     "- ✓ Registered on rcan.dev? (if so, note the RRN)\n"
                     "- Drivers: per-driver port/host summary\n"
                     "- HITL gates: count + scopes\n"
                     "- E-stop: software/hardware/response time\n"
                     "- Any obvious gaps or things the operator should know\n\n"
-                    "Keep it under 150 words. This is a quick-check, not a full diagnosis — for that, "
-                    "suggest the operator run `robot-md doctor` from the shell."
+                    "Keep it under 150 words. This is a quick-check, not a full diagnosis "
+                    "— for that, suggest the operator run `robot-md doctor` from the shell."
                 ),
             }
         ]

@@ -205,7 +205,9 @@ def init(
         help="Also generate a CLAUDE.md next to the manifest.",
     ),
     no_install_mcp: bool = typer.Option(
-        False, "--no-install-mcp", help="(deprecated since 1.2.0; no-op — plugin handles MCP wiring)"
+        False,
+        "--no-install-mcp",
+        help="(deprecated since 1.2.0; no-op — plugin handles MCP wiring)",
     ),
     no_install_skill: bool = typer.Option(
         False, "--no-install-skill", help="Skip the using-robot-md skill install step."
@@ -1853,7 +1855,8 @@ def mcp(
     import sys as _sys
     from pathlib import Path as _Path
 
-    from robot_md.mcp.server import find_manifest_via_cwd_walk, main as _mcp_main
+    from robot_md.mcp.server import find_manifest_via_cwd_walk
+    from robot_md.mcp.server import main as _mcp_main
 
     if manifest is None:
         found = find_manifest_via_cwd_walk(_Path.cwd())

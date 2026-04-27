@@ -24,9 +24,9 @@ def doctor_summary_tool(ctx: McpContext) -> dict:
     schema_ok = result.code == VALID
     schema_errors = list(result.errors)
 
-    md = (fm.get("metadata") or {})
-    safety = (fm.get("safety") or {})
-    physics = (fm.get("physics") or {})
+    md = fm.get("metadata") or {}
+    safety = fm.get("safety") or {}
+    physics = fm.get("physics") or {}
     drivers_raw = fm.get("drivers") or []
 
     drivers = [
@@ -40,7 +40,7 @@ def doctor_summary_tool(ctx: McpContext) -> dict:
         if isinstance(d, dict)
     ]
 
-    gates_raw = (safety.get("hitl_gates") or [])
+    gates_raw = safety.get("hitl_gates") or []
     hitl_gates = [
         {
             "scope": g.get("scope"),
