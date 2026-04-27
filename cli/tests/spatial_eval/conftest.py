@@ -17,3 +17,11 @@ def reset_registry():
     yield REGISTRY
     REGISTRY.clear()
     REGISTRY.update(saved)
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _bootstrap_scorers():
+    """Force scorer self-registration once per session before any test runs."""
+    from robot_md.spatial_eval.probe.scorer import _bootstrap
+
+    _bootstrap()
