@@ -202,6 +202,7 @@ def build_server(ctx: McpContext):
 
     @server.prompt(
         name="brief-me",
+        title=f"Brief me on {_raw_robot_name}",
         description=(
             f"Produce a concise operator briefing on {_raw_robot_name}: identity, "
             "capabilities, safety gates, current registration status. Read the context "
@@ -227,6 +228,7 @@ def build_server(ctx: McpContext):
 
     @server.prompt(
         name="check-safety",
+        title="Is this action safe?",
         description=(
             f"Check a proposed action against {_raw_robot_name}'s declared HITL gates "
             "and safety envelope. Use before issuing any physical motion."
@@ -258,6 +260,7 @@ def build_server(ctx: McpContext):
 
     @server.prompt(
         name="explain-capability",
+        title="Explain a capability",
         description=(
             f"Explain what one of {_raw_robot_name}'s declared capabilities does, "
             "which drivers it uses, and which safety gates apply."
@@ -283,6 +286,7 @@ def build_server(ctx: McpContext):
 
     @server.prompt(
         name="manifest-status",
+        title="Quick status check on the ROBOT.md",
         description=(
             f"Run the doctor_summary tool and translate the JSON into a "
             f"human-readable health summary for {_raw_robot_name}."

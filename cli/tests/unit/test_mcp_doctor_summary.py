@@ -169,3 +169,20 @@ def test_doctor_summary_registered_with_rrn():
     result = doctor_summary_tool(ctx)
     assert result["rrn"] == "RRN-000000000001"
     assert result["registered"] is True
+
+
+# ── server registration test ──────────────────────────────────────────────────
+
+
+async def test_doctor_summary_tool_registered_in_server(fixtures_dir):
+    """doctor_summary must appear in server.list_tools() — catches decorator failures."""
+    from robot_md.mcp.context import load_context
+    from robot_md.mcp.server import build_server
+
+    ctx = load_context(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
+    server = build_server(ctx)
+    tools = await server.list_tools()
+    tool_names = {t.name for t in tools}
+    assert "doctor_summary" in tool_names, (
+        f"doctor_summary not in registered tools: {tool_names}"
+    )
