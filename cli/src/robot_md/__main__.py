@@ -680,7 +680,11 @@ def request_apikey(
 def _maybe_submit(
     artifact: dict, *, rrn: str, kind: str, do_submit: bool, api_key: str | None
 ) -> None:
-    """Optionally POST `artifact` to RRF /v2/robots/<rrn>/<kind>. P2 helper.
+    """Optionally POST `artifact` to the kind-specific RRF endpoint. P2 helper.
+
+    For kind="eu-register" the URL is /v2/models/<rmn>/eu-register and rmn is
+    extracted from the artifact (top-level or system.rmn — both populated by
+    build_artifact). For all other kinds the URL is /v2/robots/<rrn>/<kind>.
 
     Audit-records every attempt (success or failure). Aborts the CLI with
     exit 3 on any submission failure so the operator knows the artifact
@@ -695,15 +699,32 @@ def _maybe_submit(
             fg=typer.colors.RED,
         )
         raise typer.Exit(code=2)
-    from robot_md.submit import SubmitError, submit_artifact
+    from robot_md.submit import KIND_REGISTRY, SubmitError, submit_artifact
+
+    rmn: str | None = None
+    if kind == "eu-register":
+        rmn = artifact.get("rmn") or (artifact.get("system") or {}).get("rmn") or None
+        if not rmn:
+            typer.secho(
+                "error: --submit eu-register requires metadata.rmn in the "
+                "manifest (per rcan-spec §26: rmn MUST). Register a model "
+                "first via /v2/models/register and add `metadata.rmn: RMN-...` "
+                "to the manifest.",
+                err=True,
+                fg=typer.colors.RED,
+            )
+            raise typer.Exit(code=2)
 
     try:
-        result = submit_artifact(artifact, rrn=rrn, kind=kind, api_key=api_key)
+        result = submit_artifact(artifact, rrn=rrn, kind=kind, rmn=rmn, api_key=api_key)
     except SubmitError as e:
         typer.secho(f"submit failed: {e}", err=True, fg=typer.colors.RED)
         raise typer.Exit(code=3) from e
+    spec = KIND_REGISTRY[kind]
+    subject_id = rrn if spec["id"] == "rrn" else rmn
+    submitted_path = spec["path"].format(id=subject_id)
     typer.secho(
-        f"submitted to RRF /v2/robots/{rrn}/{kind} (HTTP {result['status']})",
+        f"submitted to RRF {submitted_path} (HTTP {result['status']})",
         err=True,
         fg=typer.colors.GREEN,
     )
@@ -825,7 +846,8 @@ def emit_eu_register(
     submit: bool = typer.Option(
         False,
         "--submit",
-        help="POST the artifact to RRF /v2/robots/<rrn>/eu-register after emit.",
+        help="POST the artifact to RRF /v2/models/<rmn>/eu-register after emit. "
+        "Requires metadata.rmn (per rcan-spec §26).",
     ),
     api_key: str | None = typer.Option(None, "--api-key", help="Override apikey for --submit."),
 ) -> None:

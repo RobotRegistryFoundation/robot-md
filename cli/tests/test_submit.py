@@ -170,3 +170,39 @@ def test_submit_accepts_explicit_apikey(home):
 
     auth = next((v for k, v in captured["headers"].items() if k.lower() == "authorization"), None)
     assert auth == "Bearer ad-hoc-token-abc"
+
+
+def test_submit_eu_register_uses_models_url_and_no_bearer(home):
+    """eu-register routes to /v2/models/<rmn>/eu-register and does NOT
+    send Bearer auth — RRF derives submitter from the signed payload
+    (functions/v2/models/[rmn]/eu-register.ts has no Authorization check).
+    """
+    captured: dict = {}
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["headers"] = dict(req.header_items())
+        return _mock_response(201, {"rmn": "RMN-000000000004"})
+
+    artifact = {"schema": "rcan-eu-register-v1"}
+    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        submit_artifact(
+            artifact,
+            rrn="RRN-000000000099",
+            rmn="RMN-000000000004",
+            kind="eu-register",
+        )
+
+    assert captured["url"].endswith("/v2/models/RMN-000000000004/eu-register")
+    auth = next((v for k, v in captured["headers"].items() if k.lower() == "authorization"), None)
+    assert auth is None, "eu-register MUST NOT send Bearer; RRF uses signed-body auth"
+
+
+def test_submit_eu_register_requires_rmn(with_apikey):
+    """eu-register without rmn is a programmer error — fail loudly."""
+    with pytest.raises(SubmitError, match="rmn"):
+        submit_artifact(
+            {"schema": "rcan-eu-register-v1"},
+            rrn="RRN-000000000099",
+            kind="eu-register",
+        )

@@ -28,6 +28,7 @@ metadata:
   firmware_version: 1.0.0
   author: safety@acme.example
   rrn: RRN-000000000042
+  rmn: RMN-000000000099
   rrn_uri: rrn://acme/robot/rx-1/bob
 physics:
   type: arm
@@ -111,11 +112,19 @@ def test_system_includes_rcn_rmn_rhn_when_present(tmp_path):
     assert art["system"]["rhn_ids"] == ["RHN-000000000099"]
 
 
-def test_system_id_fields_default_empty(tmp_path):
+def test_rcn_rhn_default_to_empty_lists(tmp_path):
+    """RCN/RHN are optional sibling registry IDs and default to empty lists.
+    rmn is NOT optional — see test_errors_when_rmn_missing."""
     art = build_artifact(_write_manifest(tmp_path), fria_path=_write_fria(tmp_path))
     assert art["system"]["rcn_ids"] == []
-    assert art["system"]["rmn"] == ""
     assert art["system"]["rhn_ids"] == []
+
+
+def test_errors_when_rmn_missing(tmp_path):
+    """rcan-spec §26 makes rmn MUST. Builder errors instead of emitting empty."""
+    no_rmn = BOB_MIN.replace("  rmn: RMN-000000000099\n", "")
+    with pytest.raises(EuRegisterError, match="metadata.rmn required"):
+        build_artifact(_write_manifest(tmp_path, no_rmn), fria_path=_write_fria(tmp_path))
 
 
 def test_fria_ref_uses_basename_not_full_path(tmp_path):

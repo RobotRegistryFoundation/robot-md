@@ -56,15 +56,21 @@ def _system(fm: dict, opencastor_version: str | None) -> dict:
             "metadata.rrn required — register the robot first "
             "(`robot-md register`) before emitting §26."
         )
+    rmn = (meta.get("rmn") or "").strip()
+    if not rmn:
+        raise EuRegisterError(
+            "metadata.rmn required — per rcan-spec §26 the top-level rmn is "
+            "MUST. Register a model first via POST /v2/models/register and "
+            "add `metadata.rmn: RMN-...` to the manifest."
+        )
     return {
         "rrn": rrn,
         "rrn_uri": meta.get("rrn_uri") or "",
         "robot_name": meta.get("robot_name") or "",
         "rcan_version": str(fm.get("rcan_version") or "3.0"),
         "opencastor_version": opencastor_version or "",
-        # v0.9.6 — sibling RCAN §21 registry IDs (RCN/RMN/RHN). Empty when absent.
         "rcn_ids": list(meta.get("rcn_ids") or ()),
-        "rmn": meta.get("rmn") or "",
+        "rmn": rmn,
         "rhn_ids": list(meta.get("rhn_ids") or ()),
     }
 

@@ -2,15 +2,22 @@
 
 Single helper that POSTs an emitted artifact to the matching RRF endpoint,
 records the submission in the local audit log (audit.py), and returns the
-parsed response. Bearer-authed with the apikey from
-~/.robot-md/keys/<rrn>.apikey (or supplied explicitly).
+parsed response.
 
-Wire path mapping:
-- fria             → /v2/robots/<rrn>/fria
-- ifu              → /v2/robots/<rrn>/ifu
-- safety-benchmark → /v2/robots/<rrn>/safety-benchmark
-- incident-report  → /v2/robots/<rrn>/incident-report
-- eu-register      → /v2/robots/<rrn>/eu-register
+Wire path mapping (per kind):
+- fria             → POST /v2/robots/<rrn>/fria              (Bearer-auth via apikey)
+- ifu              → POST /v2/robots/<rrn>/ifu               (Bearer-auth via apikey)
+- safety-benchmark → POST /v2/robots/<rrn>/safety-benchmark  (Bearer-auth via apikey)
+- incident-report  → POST /v2/robots/<rrn>/incident-report   (Bearer-auth via apikey)
+- eu-register      → POST /v2/models/<rmn>/eu-register       (signed-body auth; NO bearer)
+
+Per Art. 49 of the EU AI Act, eu-register is scoped per AI system (per
+model), so it routes through the model namespace using the RMN from the
+signed artifact. Submitter ownership is derived from the signed payload,
+not the bearer apikey (RRF: functions/v2/models/[rmn]/eu-register.ts).
+
+Audit log is always keyed by `rrn` regardless of kind — that is the robot
+that produced the artifact.
 """
 
 from __future__ import annotations
@@ -26,24 +33,25 @@ from robot_md.register import load_apikey
 
 DEFAULT_RRF_ENDPOINT = "https://robotregistryfoundation.org"
 
-SUPPORTED_KINDS: tuple[str, ...] = (
-    "fria",
-    "ifu",
-    "safety-benchmark",
-    "incident-report",
-    "eu-register",
-)
+# kind → URL template + auth requirements. {id} is filled with rrn or rmn
+# depending on the "id" field. "bearer": True → Authorization: Bearer apikey.
+KIND_REGISTRY: dict[str, dict[str, Any]] = {
+    "fria":             {"id": "rrn", "path": "/v2/robots/{id}/fria",             "bearer": True},
+    "ifu":              {"id": "rrn", "path": "/v2/robots/{id}/ifu",              "bearer": True},
+    "safety-benchmark": {"id": "rrn", "path": "/v2/robots/{id}/safety-benchmark", "bearer": True},
+    "incident-report":  {"id": "rrn", "path": "/v2/robots/{id}/incident-report",  "bearer": True},
+    "eu-register":      {"id": "rmn", "path": "/v2/models/{id}/eu-register",      "bearer": False},
+}
+SUPPORTED_KINDS: tuple[str, ...] = tuple(KIND_REGISTRY.keys())
 
 
 class SubmitError(RuntimeError):
     """Raised on validation failures or non-2xx HTTP responses."""
 
 
-def _build_url(endpoint: str, rrn: str, kind: str) -> str:
+def _build_url(endpoint: str, kind: str, subject_id: str) -> str:
     base = endpoint.rstrip("/")
-    if base.endswith("/v2/robots"):
-        return f"{base}/{rrn}/{kind}"
-    return f"{base}/v2/robots/{rrn}/{kind}"
+    return base + KIND_REGISTRY[kind]["path"].format(id=subject_id)
 
 
 def submit_artifact(
@@ -51,41 +59,58 @@ def submit_artifact(
     *,
     rrn: str,
     kind: str,
+    rmn: str | None = None,
     endpoint: str = DEFAULT_RRF_ENDPOINT,
     api_key: str | None = None,
     timeout: float = 15.0,
 ) -> dict[str, Any]:
-    """POST `artifact` to RRF /v2/robots/<rrn>/<kind>. Audit-records on every outcome.
+    """POST `artifact` to the kind-specific RRF endpoint. Audit-records on every outcome.
 
     Returns ``{"status": int, "body": dict}``. Raises SubmitError on
-    missing apikey, unsupported kind, or any non-2xx HTTP response —
-    the failure path also records to the audit log so the operator has
-    a tamper-evident trail of attempts.
+    missing required ID, missing apikey (when bearer-required), unsupported
+    kind, or any non-2xx HTTP response — the failure path also records to
+    the audit log so the operator has a tamper-evident trail of attempts.
+
+    For kind="eu-register" the URL is /v2/models/<rmn>/eu-register and
+    no Bearer header is sent (RRF derives the submitter from the signed
+    payload). Caller MUST pass rmn= for that kind; the rrn is still
+    required for audit logging.
     """
-    if kind not in SUPPORTED_KINDS:
+    if kind not in KIND_REGISTRY:
         raise SubmitError(
             f"unsupported kind {kind!r}; expected one of {', '.join(SUPPORTED_KINDS)}"
         )
 
-    if api_key is None:
-        api_key = load_apikey(rrn)
-    if not api_key:
+    spec = KIND_REGISTRY[kind]
+    subject_id = rrn if spec["id"] == "rrn" else rmn
+    if not subject_id:
         raise SubmitError(
-            f"no apikey for {rrn} in ~/.robot-md/keys/. Pass --api-key, "
-            f"or run `robot-md register` to mint one."
+            f"kind={kind!r} requires {spec['id']}; "
+            f"call submit_artifact(..., {spec['id']}=<value>)."
         )
 
-    url = _build_url(endpoint, rrn, kind)
+    headers: dict[str, str] = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": f"robot-md/{__version__}",
+    }
+
+    if spec["bearer"]:
+        if api_key is None:
+            api_key = load_apikey(rrn)
+        if not api_key:
+            raise SubmitError(
+                f"no apikey for {rrn} in ~/.robot-md/keys/. Pass --api-key, "
+                f"or run `robot-md register` to mint one."
+            )
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    url = _build_url(endpoint, kind, subject_id)
     payload = json.dumps(artifact).encode("utf-8")
     req = urllib.request.Request(
         url,
         method="POST",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": f"robot-md/{__version__}",
-        },
+        headers=headers,
         data=payload,
     )
 

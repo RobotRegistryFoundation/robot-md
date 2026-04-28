@@ -5,6 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.5] — 2026-04-28
+
+**`emit-eu-register --submit` now POSTs to the correct RRF endpoint.** The §26 / Art. 49 submission lives at `/v2/models/<rmn>/eu-register` (per-AI-system, not per-robot); robot-md was POSTing to `/v2/robots/<rrn>/eu-register` and getting a 405 from Cloudflare's default-no-handler response. Builder also now enforces `metadata.rmn` per rcan-spec §26 MUST. Closes RRF #72.
+
+### Fixed
+- `submit.py`: introduced `KIND_REGISTRY` mapping `kind → {id, path, bearer}`. eu-register routes to `/v2/models/<rmn>/eu-register` and skips the Bearer header (RRF derives submitter from the signed payload, not Authorization). Other kinds unchanged. `submit_artifact()` now accepts `rmn=...` kwarg in addition to `rrn`. The audit log is still keyed by rrn for all kinds.
+- `eu_register.py`: builder now raises `EuRegisterError` when `metadata.rmn` is empty, mirroring the existing `metadata.rrn` check. Per rcan-spec §26 the top-level rmn is MUST.
+- `__main__.py:_maybe_submit`: extracts `rmn` from the artifact (top-level or `system.rmn`) when kind=eu-register and passes it to `submit_artifact`. Help text on `emit-eu-register --submit` updated to point at the correct URL.
+
+### Added
+- New regression tests: `test_submit_eu_register_uses_models_url_and_no_bearer`, `test_submit_eu_register_requires_rmn`, `test_errors_when_rmn_missing`. Existing tests kept for `metadata.rrn` parity.
+
+### Notes
+
+- Wire-format unchanged. Existing eu-register artifacts on disk that were emitted with empty rmn under 1.2.4 are no longer valid §26 submissions — re-emit under 1.2.5 against a manifest that has `metadata.rmn: RMN-...`. Mint an RMN via `POST /v2/models/register` (signed body required per RCAN 3.0 §2.2).
+- Closes RRF #72.
+
 ## [1.2.4] — 2026-04-27
 
 **`compliance status` now cryptographically verifies signatures.** Previously checked only that a `sig` field was present, leaving structurally-signed-but-cryptographically-invalid artifacts (e.g. those produced by 1.2.2 emitters against rcan-py 3.3.0's sign↔verify asymmetry) reported as `(signed)` with green submission readiness. Now reports a tri-state per artifact and gates submission readiness on cryptographic validity.
