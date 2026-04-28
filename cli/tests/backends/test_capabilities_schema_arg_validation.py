@@ -6,7 +6,6 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-
 _SCHEMA_PATH = Path(__file__).parents[2] / "src" / "robot_md" / "schemas" / "capabilities.json"
 
 

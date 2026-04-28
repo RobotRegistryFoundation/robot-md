@@ -11,15 +11,15 @@ from robot_md.backends.registry import (
 @pytest.mark.parametrize(
     "bad_capability",
     [
-        "pick",        # no namespace
-        "Arm.pick",    # uppercase
-        "arm-pick",    # hyphen
-        ".arm.pick",   # leading dot
-        "arm.",        # trailing dot in vendor segment (empty name)
-        "1arm.pick",   # leading digit
-        "arm. pick",   # whitespace
-        "arm.pick.",   # trailing dot in name segment
-        "",            # empty
+        "pick",  # no namespace
+        "Arm.pick",  # uppercase
+        "arm-pick",  # hyphen
+        ".arm.pick",  # leading dot
+        "arm.",  # trailing dot in vendor segment (empty name)
+        "1arm.pick",  # leading digit
+        "arm. pick",  # whitespace
+        "arm.pick.",  # trailing dot in name segment
+        "",  # empty
     ],
 )
 def test_malformed_capability_rejected(bad_capability: str) -> None:

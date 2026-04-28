@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 _SCHEMA_PATH = Path(__file__).parents[2] / "src" / "robot_md" / "schemas" / "capabilities.json"
 
 # Mirrors backends/registry.py CORE_CAPABILITY_PREFIXES (introduced in Task 2).
