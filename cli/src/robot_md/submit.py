@@ -36,11 +36,11 @@ DEFAULT_RRF_ENDPOINT = "https://robotregistryfoundation.org"
 # kind → URL template + auth requirements. {id} is filled with rrn or rmn
 # depending on the "id" field. "bearer": True → Authorization: Bearer apikey.
 KIND_REGISTRY: dict[str, dict[str, Any]] = {
-    "fria":             {"id": "rrn", "path": "/v2/robots/{id}/fria",             "bearer": True},
-    "ifu":              {"id": "rrn", "path": "/v2/robots/{id}/ifu",              "bearer": True},
+    "fria": {"id": "rrn", "path": "/v2/robots/{id}/fria", "bearer": True},
+    "ifu": {"id": "rrn", "path": "/v2/robots/{id}/ifu", "bearer": True},
     "safety-benchmark": {"id": "rrn", "path": "/v2/robots/{id}/safety-benchmark", "bearer": True},
-    "incident-report":  {"id": "rrn", "path": "/v2/robots/{id}/incident-report",  "bearer": True},
-    "eu-register":      {"id": "rmn", "path": "/v2/models/{id}/eu-register",      "bearer": False},
+    "incident-report": {"id": "rrn", "path": "/v2/robots/{id}/incident-report", "bearer": True},
+    "eu-register": {"id": "rmn", "path": "/v2/models/{id}/eu-register", "bearer": False},
 }
 SUPPORTED_KINDS: tuple[str, ...] = tuple(KIND_REGISTRY.keys())
 
@@ -85,8 +85,7 @@ def submit_artifact(
     subject_id = rrn if spec["id"] == "rrn" else rmn
     if not subject_id:
         raise SubmitError(
-            f"kind={kind!r} requires {spec['id']}; "
-            f"call submit_artifact(..., {spec['id']}=<value>)."
+            f"kind={kind!r} requires {spec['id']}; call submit_artifact(..., {spec['id']}=<value>)."
         )
 
     headers: dict[str, str] = {
