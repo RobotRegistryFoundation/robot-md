@@ -2,10 +2,47 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from robot_md.backends.base import CapabilityBackend
 from robot_md.robot_spec import RobotSpec
+
+CORE_CAPABILITY_PREFIXES = frozenset({"arm.", "nav.", "perceive.", "gripper.", "safety."})
+_VENDOR_CAPABILITY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$")
+
+
+class BackendRegistrationError(Exception):
+    """Raised when a backend declares a malformed capability name."""
+
+
+def _validate_capability_namespace(backend_name: str, caps: frozenset[str]) -> None:
+    """Reject backend registration if any capability is malformed.
+
+    Every capability name must match `<vendor>.<name>` shape:
+    `^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_.]*$`. Core capabilities
+    (`arm.pick`, `nav.go_to`, etc.) match the same regex by design.
+
+    `CORE_CAPABILITY_PREFIXES` identifies which prefixes are RRF-canonical
+    "core"; downstream consumers (Task 5's `describe_default()`, Task 7's
+    `enumerate_capabilities()`) use it for tier classification. A
+    well-formed capability whose prefix is not in that set is treated as
+    vendor-shaped.
+
+    Raises BackendRegistrationError on first violation.
+
+    Note: the existing feetech_depthai backend declares `vision.describe`
+    and `status.report`. Both match the regex (they look like
+    <vendor>.<name>) so the registry accepts them as vendor-shaped, even
+    though they're shipped in a first-party backend. Do NOT expand
+    CORE_CAPABILITY_PREFIXES here — that list is RRF-canonical core only.
+    """
+    for cap in caps:
+        if not _VENDOR_CAPABILITY_PATTERN.match(cap):
+            raise BackendRegistrationError(
+                f"Backend '{backend_name}' declared capability '{cap}': "
+                f"not in <vendor>.<name> form."
+            )
 
 
 def discover_backends() -> list[CapabilityBackend]:
