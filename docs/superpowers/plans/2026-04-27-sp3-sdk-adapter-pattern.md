@@ -398,9 +398,11 @@ from robot_md.backends.registry import (
         "Arm.pick",    # uppercase
         "arm-pick",    # hyphen
         ".arm.pick",   # leading dot
-        "arm.",        # trailing dot
+        "arm.",        # trailing dot in vendor segment (empty name)
         "1arm.pick",   # leading digit
         "arm. pick",   # whitespace
+        "arm.pick.",   # trailing dot in name segment
+        "",            # empty
     ],
 )
 def test_malformed_capability_rejected(bad_capability: str) -> None:
@@ -426,7 +428,7 @@ Edit `cli/src/robot_md/backends/registry.py`. After the existing imports (line 1
 import re
 
 CORE_CAPABILITY_PREFIXES = frozenset({"arm.", "nav.", "perceive.", "gripper.", "safety."})
-_VENDOR_CAPABILITY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$")
+_VENDOR_CAPABILITY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z]([a-z0-9_.]*[a-z0-9_])?$")
 
 
 class BackendRegistrationError(Exception):
@@ -436,29 +438,52 @@ class BackendRegistrationError(Exception):
 def _validate_capability_namespace(backend_name: str, caps: frozenset[str]) -> None:
     """Reject backend registration if any capability is malformed.
 
-    Allowed:
-      - Core: starts with one of CORE_CAPABILITY_PREFIXES.
-      - Vendor: matches r"^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_.]*$".
+    Every capability name must match `<vendor>.<name>` shape:
+    `^[a-z][a-z0-9_]*\\.[a-z]([a-z0-9_.]*[a-z0-9_])?$`. Core capabilities
+    (`arm.pick`, `nav.go_to`, etc.) match the same regex by design.
 
-    Raises BackendRegistrationError on first violation.
+    Allowed characters are ASCII lowercase letters, digits, and underscore.
+    Multi-dot hierarchies are valid (`acme.robotics.servo`,
+    `lerobot.motion.cartesian`) — the vendor is the first component, the
+    name is everything after the first dot. The name segment must not
+    start or end with a dot.
+
+    `CORE_CAPABILITY_PREFIXES` identifies which prefixes are RRF-canonical
+    "core"; downstream consumers (Task 5's `describe_default()`, Task 7's
+    `enumerate_capabilities()`) use it for tier classification. A
+    well-formed capability whose prefix is not in that set is treated as
+    vendor-shaped.
+
+    Args:
+        backend_name: entry-point name of the backend being registered;
+            used in the error message to identify the offender.
+        caps: the set returned from `backend.capabilities()`.
+
+    Raises:
+        BackendRegistrationError on first violation.
 
     Note: the existing feetech_depthai backend declares `vision.describe`
-    and `status.report`. Both pass the vendor regex (they look like
+    and `status.report`. Both match the regex (they look like
     <vendor>.<name>) so the registry accepts them as vendor-shaped, even
     though they're shipped in a first-party backend. Do NOT expand
-    CORE_CAPABILITY_PREFIXES here without coordinating with the SP3 spec
-    section on namespacing (the prefix list is RRF-canonical for core
-    capabilities only).
+    CORE_CAPABILITY_PREFIXES here — that list is RRF-canonical core only.
     """
     for cap in caps:
-        is_core = any(cap.startswith(p) for p in CORE_CAPABILITY_PREFIXES)
-        is_vendor_shaped = bool(_VENDOR_CAPABILITY_PATTERN.match(cap))
-        if not (is_core or is_vendor_shaped):
+        if not _VENDOR_CAPABILITY_PATTERN.match(cap):
             raise BackendRegistrationError(
                 f"Backend '{backend_name}' declared capability '{cap}': "
-                f"not a core prefix and not in <vendor>.<name> form."
+                f"not in <vendor>.<name> form "
+                f"(e.g. 'arm.pick', 'lerobot.teleop')."
             )
 ```
+
+> **Why a single regex check (no `is_core` short-circuit):** the original draft used
+> `is_core = any(cap.startswith(p) for p in CORE_CAPABILITY_PREFIXES)` as a fast path,
+> but `"arm."` and `"arm. pike"` both `.startswith("arm.")`, so they would pass the
+> `is_core` check and bypass the regex. The regex correctly rejects both. Since core
+> capabilities like `arm.pick` match the regex by design, the prefix short-circuit
+> adds no value and creates a hole. The malformed-rejected test (Step 3) exercises
+> exactly these cases.
 
 - [ ] **Step 6: Run all three validator tests to verify they pass**
 
@@ -593,7 +618,7 @@ from robot_md.robot_spec import RobotSpec
 _log = logging.getLogger(__name__)
 
 CORE_CAPABILITY_PREFIXES = frozenset({"arm.", "nav.", "perceive.", "gripper.", "safety."})
-_VENDOR_CAPABILITY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$")
+_VENDOR_CAPABILITY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z]([a-z0-9_.]*[a-z0-9_])?$")
 
 
 class BackendRegistrationError(Exception):
@@ -603,12 +628,11 @@ class BackendRegistrationError(Exception):
 def _validate_capability_namespace(backend_name: str, caps: frozenset[str]) -> None:
     """(See Task 2 docstring — body unchanged.)"""
     for cap in caps:
-        is_core = any(cap.startswith(p) for p in CORE_CAPABILITY_PREFIXES)
-        is_vendor_shaped = bool(_VENDOR_CAPABILITY_PATTERN.match(cap))
-        if not (is_core or is_vendor_shaped):
+        if not _VENDOR_CAPABILITY_PATTERN.match(cap):
             raise BackendRegistrationError(
                 f"Backend '{backend_name}' declared capability '{cap}': "
-                f"not a core prefix and not in <vendor>.<name> form."
+                f"not in <vendor>.<name> form "
+                f"(e.g. 'arm.pick', 'lerobot.teleop')."
             )
 
 

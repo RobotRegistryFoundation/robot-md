@@ -9,7 +9,7 @@ from robot_md.backends.base import CapabilityBackend
 from robot_md.robot_spec import RobotSpec
 
 CORE_CAPABILITY_PREFIXES = frozenset({"arm.", "nav.", "perceive.", "gripper.", "safety."})
-_VENDOR_CAPABILITY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_.]*$")
+_VENDOR_CAPABILITY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z]([a-z0-9_.]*[a-z0-9_])?$")
 
 
 class BackendRegistrationError(Exception):
@@ -20,8 +20,14 @@ def _validate_capability_namespace(backend_name: str, caps: frozenset[str]) -> N
     """Reject backend registration if any capability is malformed.
 
     Every capability name must match `<vendor>.<name>` shape:
-    `^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_.]*$`. Core capabilities
+    `^[a-z][a-z0-9_]*\\.[a-z]([a-z0-9_.]*[a-z0-9_])?$`. Core capabilities
     (`arm.pick`, `nav.go_to`, etc.) match the same regex by design.
+
+    Allowed characters are ASCII lowercase letters, digits, and underscore.
+    Multi-dot hierarchies are valid (`acme.robotics.servo`,
+    `lerobot.motion.cartesian`) — the vendor is the first component, the
+    name is everything after the first dot. The name segment must not
+    start or end with a dot.
 
     `CORE_CAPABILITY_PREFIXES` identifies which prefixes are RRF-canonical
     "core"; downstream consumers (Task 5's `describe_default()`, Task 7's
@@ -29,7 +35,13 @@ def _validate_capability_namespace(backend_name: str, caps: frozenset[str]) -> N
     well-formed capability whose prefix is not in that set is treated as
     vendor-shaped.
 
-    Raises BackendRegistrationError on first violation.
+    Args:
+        backend_name: entry-point name of the backend being registered;
+            used in the error message to identify the offender.
+        caps: the set returned from `backend.capabilities()`.
+
+    Raises:
+        BackendRegistrationError on first violation.
 
     Note: the existing feetech_depthai backend declares `vision.describe`
     and `status.report`. Both match the regex (they look like
@@ -41,7 +53,8 @@ def _validate_capability_namespace(backend_name: str, caps: frozenset[str]) -> N
         if not _VENDOR_CAPABILITY_PATTERN.match(cap):
             raise BackendRegistrationError(
                 f"Backend '{backend_name}' declared capability '{cap}': "
-                f"not in <vendor>.<name> form."
+                f"not in <vendor>.<name> form "
+                f"(e.g. 'arm.pick', 'lerobot.teleop')."
             )
 
 
