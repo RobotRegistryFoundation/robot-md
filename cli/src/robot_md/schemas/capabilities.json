@@ -6,6 +6,7 @@
     "arm.pick": {
       "type": "object",
       "required": ["target"],
+      "additionalProperties": false,
       "properties": {
         "target": {
           "type": "string",
@@ -17,6 +18,7 @@
     "arm.place": {
       "type": "object",
       "required": ["destination"],
+      "additionalProperties": false,
       "properties": {
         "destination": {"type": "string"},
         "release_height_mm": {"type": "number", "minimum": 0, "default": 30}
@@ -30,6 +32,7 @@
     "nav.go_to": {
       "type": "object",
       "required": ["pose"],
+      "additionalProperties": false,
       "properties": {"pose": {"type": "object"}}
     },
     "safety.estop": {"type": "object", "additionalProperties": false}

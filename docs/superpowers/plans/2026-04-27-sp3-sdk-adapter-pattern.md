@@ -147,6 +147,7 @@ Expected: FAIL with `FileNotFoundError` because `cli/src/robot_md/schemas/capabi
     "arm.pick": {
       "type": "object",
       "required": ["target"],
+      "additionalProperties": false,
       "properties": {
         "target": {
           "type": "string",
@@ -158,6 +159,7 @@ Expected: FAIL with `FileNotFoundError` because `cli/src/robot_md/schemas/capabi
     "arm.place": {
       "type": "object",
       "required": ["destination"],
+      "additionalProperties": false,
       "properties": {
         "destination": {"type": "string"},
         "release_height_mm": {"type": "number", "minimum": 0, "default": 30}
@@ -171,6 +173,7 @@ Expected: FAIL with `FileNotFoundError` because `cli/src/robot_md/schemas/capabi
     "nav.go_to": {
       "type": "object",
       "required": ["pose"],
+      "additionalProperties": false,
       "properties": {"pose": {"type": "object"}}
     },
     "safety.estop": {"type": "object", "additionalProperties": false}
@@ -226,6 +229,30 @@ def test_arm_pick_rejects_wrong_target_type() -> None:
 def test_arm_home_rejects_extra_properties() -> None:
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate({"surprise": True}, _load_def("arm.home"))
+
+
+def test_arm_pick_rejects_extra_properties() -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            {"target": "red_lego", "apporoach_height_mm": 100},
+            _load_def("arm.pick"),
+        )
+
+
+def test_arm_place_rejects_extra_properties() -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            {"destination": "bin", "release_hieght_mm": 30},
+            _load_def("arm.place"),
+        )
+
+
+def test_nav_go_to_rejects_extra_properties() -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            {"pose": {}, "speed": 0.5},
+            _load_def("nav.go_to"),
+        )
 ```
 
 - [ ] **Step 6: Run validation tests**
@@ -234,7 +261,17 @@ def test_arm_home_rejects_extra_properties() -> None:
 cd cli && PYTHONPATH=src python -m pytest tests/backends/test_capabilities_schema_arg_validation.py -v
 ```
 
-Expected: PASS (4/4).
+Expected: PASS (7/7).
+
+> **Schema closure note:** Every capability uses `additionalProperties: false`. Typo in
+> a parameter name → ValidationError, not silent acceptance. Param-bearing capabilities
+> (`arm.pick`, `arm.place`, `nav.go_to`) gain new optional fields by adding them to
+> `properties:` here first, then in the backend handler — additive evolution by design.
+>
+> **Known debt — `nav.go_to.pose` shape.** `pose` is currently `{"type": "object"}` with no
+> property constraints. The first nav backend (post-SP3) must lock down whether `pose` is
+> 2D `{x, y, theta}`, 3D `{frame_id, xyz, quaternion}`, or both, and update this schema +
+> drift tests. Tracked at the moment a nav backend lands; not blocking SP3.
 
 - [ ] **Step 7: Add the all-core-prefixes-present drift test**
 

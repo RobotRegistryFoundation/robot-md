@@ -32,3 +32,27 @@ def test_arm_pick_rejects_wrong_target_type() -> None:
 def test_arm_home_rejects_extra_properties() -> None:
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate({"surprise": True}, _load_def("arm.home"))
+
+
+def test_arm_pick_rejects_extra_properties() -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            {"target": "red_lego", "apporoach_height_mm": 100},
+            _load_def("arm.pick"),
+        )
+
+
+def test_arm_place_rejects_extra_properties() -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            {"destination": "bin", "release_hieght_mm": 30},
+            _load_def("arm.place"),
+        )
+
+
+def test_nav_go_to_rejects_extra_properties() -> None:
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            {"pose": {}, "speed": 0.5},
+            _load_def("nav.go_to"),
+        )
