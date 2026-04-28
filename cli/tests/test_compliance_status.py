@@ -791,6 +791,7 @@ def test_status_marks_artifact_verified_when_signature_is_valid(manifest, home, 
 
     # Sign a minimal IFU-shaped body and write it to the artifacts dir.
     from robot_md.signing import sign_body
+
     body = {"schema": "rcan-ifu-v1", "generated_at": "2026-04-27T00:00:00Z"}
     signed = sign_body(kp, body)
     (artifacts_dir / "ifu.json").write_text(json.dumps(signed))
@@ -818,6 +819,7 @@ def test_status_marks_artifact_unsigned_when_no_sig_field(manifest, home, tmp_pa
 
 def test_render_sig_state_returns_correct_marker_and_suffix():
     from robot_md.compliance_status import _render_sig_state
+
     assert _render_sig_state("verified") == ("✓", "(signed, verified)")
     assert _render_sig_state("INVALID") == ("✗", "(signed, INVALID)")
     assert _render_sig_state("unsigned") == ("•", "(unsigned)")

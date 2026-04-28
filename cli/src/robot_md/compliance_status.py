@@ -146,9 +146,7 @@ def _check_artifacts(artifacts_dir: Path | None) -> dict[str, Any]:
         elif doc.get("signing_key") and doc.get("sig"):
             pq_pub_b64 = (doc.get("signing_key") or {}).get("public_key")
             sig_state = (
-                "verified"
-                if pq_pub_b64 and _verify_with_pq_pub(doc, pq_pub_b64)
-                else "INVALID"
+                "verified" if pq_pub_b64 and _verify_with_pq_pub(doc, pq_pub_b64) else "INVALID"
             )
         else:
             sig_state = "unsigned"

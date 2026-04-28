@@ -210,6 +210,7 @@ def test_verify_with_pq_pub_accepts_valid_nested_signature():
 def test_verify_with_pq_pub_rejects_bad_b64():
     """Helper returns False on invalid base64 — must not raise."""
     from robot_md.signing import _verify_with_pq_pub
+
     assert _verify_with_pq_pub({"sig": {}}, "not-valid-base64-!!!") is False
 
 
