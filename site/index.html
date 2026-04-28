@@ -1585,6 +1585,61 @@
     <p style="margin-top:20px; font-size:13px; color:var(--ink-4)">Same <code>ROBOT.md</code>, one identity via <code>RRN</code>, every planner reads it. No provider lock-in — Gemini CLI and Codex CLI verified above; any other MCP-aware agent (Cursor, Zed, Continue) uses the same <code>npx robot-md-mcp</code> entry; any web-browsing LLM reads the RRF URL. Compatibility status tracked in <a href="https://github.com/RobotRegistryFoundation/robot-md-surfaces" style="color:var(--accent-ink)">robot-md-surfaces</a>.</p>
   </div>
 
+  <!-- ================= EXPERIENCE / EASE-OF-USE STORY ================= -->
+  <section class="sec" id="experience">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="sec-num">§ Experience · what it feels like</div>
+        <div>
+          <h2 class="sec-title">Two minutes from box to first pick.<br>You just say what you want.</h2>
+          <p class="sec-lede">A complete novice plugs in their robot, opens any Claude surface, and within a couple of minutes is asking it to pick things up — in plain English. No depth bounds to tune. No axis conventions to learn. No manifest to hand-edit. The agent reasons; the operator just talks.</p>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; margin-top:8px">
+
+        <div style="padding:20px; background:var(--paper-2); border-left:3px solid var(--accent)">
+          <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">Out of the box</div>
+          <b style="font-family:var(--serif); font-style:italic; font-size:18px; color:var(--ink)">Power on. Open Claude. Ask.</b>
+          <p style="margin-top:10px; color:var(--ink-2); font-size:14px">Pre-calibrated robots ship with a populated <code>ROBOT.md</code>: zero pose, camera extrinsic, workspace bounds, declared object descriptors. The MCP plugin announces the robot to your logged-in Claude account. First pick happens in your first conversation.</p>
+        </div>
+
+        <div style="padding:20px; background:var(--paper-2); border-left:3px solid var(--accent)">
+          <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">DIY robots · one tape-down</div>
+          <b style="font-family:var(--serif); font-style:italic; font-size:18px; color:var(--ink)">Print a fiducial. Tape it on the gripper. Done.</b>
+          <p style="margin-top:10px; color:var(--ink-2); font-size:14px">Home-built robots get the same UX baseline. The operator's only manual step is taping a printable ChArUco patch onto the gripper face. The agent handles zero-pose discovery, hand-eye extrinsic, and workspace bounds autonomously — no measuring, no axis-convention reasoning, no YAML edits.</p>
+        </div>
+
+        <div style="padding:20px; background:var(--paper-2); border-left:3px solid var(--accent)">
+          <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">Every Anthropic surface</div>
+          <b style="font-family:var(--serif); font-style:italic; font-size:18px; color:var(--ink)">Same robot. Same conversation. Surface-tailored UI.</b>
+          <p style="margin-top:10px; color:var(--ink-2); font-size:14px">Claude Code stays text-mostly. claude.ai web/desktop and Claude mobile show a live camera panel with target and grip overlays. Voice narrates richly. The MCP server is identical across all of them; each surface uses its native strengths.</p>
+        </div>
+
+        <div style="padding:20px; background:var(--paper-2); border-left:3px solid var(--accent)">
+          <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:10px">Reactive agent</div>
+          <b style="font-family:var(--serif); font-style:italic; font-size:18px; color:var(--ink)">Claude is the perception brain.</b>
+          <p style="margin-top:10px; color:var(--ink-2); font-size:14px">The robot exposes data-rich primitives: frames, depth maps, candidate detections, FK + IK traces. Claude's multimodal vision identifies objects, picks among ambiguous candidates, retries silently when a primitive fails — all inside the agent's loop. The operator never sees an opaque error code.</p>
+        </div>
+
+      </div>
+
+      <!-- Conversation snippet — minimal UX, single utterance -->
+      <div style="margin-top:32px; background:var(--paper-3); border:1px solid var(--rule); padding:24px; max-width:720px">
+        <div style="font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:14px">Routine pick · what minimal UX sounds like</div>
+        <div style="font-family:var(--mono); font-size:14px; line-height:2; color:var(--ink-2)">
+          <div><span style="color:var(--accent-ink); font-weight:600">You:</span> pick the red lego and put it in the bowl</div>
+          <div style="color:var(--ink-4); font-style:italic; font-size:13px; padding-left:24px">— arm motion, ~5 seconds —</div>
+          <div><span style="color:var(--accent); font-weight:600">Bob:</span> done</div>
+        </div>
+      </div>
+
+      <p style="margin-top:32px; font-size:13px; color:var(--ink-4); max-width:720px">Failures degrade gracefully: the agent retries silently first (alternative IK branches, refined detectors, panning to clear occlusion); surfaces with screens highlight competing candidates when there's genuine ambiguity; plain-English fallback when fundamentally blocked (<em>"can't reach that — about 5 cm below my arm's range; try moving it up a bit"</em>). The operator never tunes a depth bound.</p>
+
+      <p style="margin-top:16px; font-size:13px; color:var(--ink-4); max-width:720px">This is the design target. Architecture, primitives, and calibration flows that deliver it are specified in the design docs at <a href="https://github.com/RobotRegistryFoundation/robot-md/tree/main/docs" style="color:var(--accent-ink)">github.com/RobotRegistryFoundation/robot-md/docs</a>.</p>
+    </div>
+  </section>
+
   <!-- ================= §01 THE FILE ================= -->
   <section class="sec" id="spec">
     <div class="wrap">
