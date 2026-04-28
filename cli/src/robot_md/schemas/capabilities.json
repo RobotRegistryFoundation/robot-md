@@ -1,0 +1,40 @@
+{
+  "$id": "https://robotmd.dev/schemas/capabilities.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "robot-md core capability arg shapes",
+  "definitions": {
+    "arm.pick": {
+      "type": "object",
+      "required": ["target"],
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "Object descriptor id from manifest.vision.object_descriptors"
+        },
+        "approach_height_mm": {"type": "number", "minimum": 0, "default": 50}
+      }
+    },
+    "arm.place": {
+      "type": "object",
+      "required": ["destination"],
+      "additionalProperties": false,
+      "properties": {
+        "destination": {"type": "string"},
+        "release_height_mm": {"type": "number", "minimum": 0, "default": 30}
+      }
+    },
+    "arm.home": {"type": "object", "additionalProperties": false},
+    "perceive.rgb": {"type": "object", "additionalProperties": false},
+    "perceive.depth": {"type": "object", "additionalProperties": false},
+    "gripper.open": {"type": "object", "additionalProperties": false},
+    "gripper.close": {"type": "object", "additionalProperties": false},
+    "nav.go_to": {
+      "type": "object",
+      "required": ["pose"],
+      "additionalProperties": false,
+      "properties": {"pose": {"type": "object"}}
+    },
+    "safety.estop": {"type": "object", "additionalProperties": false}
+  }
+}
