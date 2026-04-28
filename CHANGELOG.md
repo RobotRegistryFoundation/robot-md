@@ -5,6 +5,35 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.2.4] — 2026-04-27
+
+**`compliance status` now cryptographically verifies signatures.** Previously checked only that a `sig` field was present, leaving structurally-signed-but-cryptographically-invalid artifacts (e.g. those produced by 1.2.2 emitters against rcan-py 3.3.0's sign↔verify asymmetry) reported as `(signed)` with green submission readiness. Now reports a tri-state per artifact and gates submission readiness on cryptographic validity.
+
+### Fixed
+- `robot-md compliance status` now calls `rcan.hybrid.verify_body` per artifact instead of just checking for the presence of a `sig` field. Artifacts with invalid signatures report as `(signed, INVALID)` and fail submission readiness with reason `signature invalid for <schema> — re-emit with a recent rcan-py (>=3.3.1) and check rcan.hybrid.verify_body`.
+
+### Added
+- `robot_md.signing._verify_with_pq_pub(signed, pq_pub_b64)` — verify helper for the FriaDocument nested-key shape (where `pq_signing_pub` is at `signing_key.public_key` rather than top-level). Re-injects `pq_signing_pub` into the dict before delegating to `rcan.hybrid.verify_body` so the canonical pre-image matches `sign_body` output.
+- `robot_md.compliance_status._render_sig_state(state)` — renders `(✓, "(signed, verified)")` / `(✗, "(signed, INVALID)")` / `(•, "(unsigned)")` for the three artifact states.
+- `_KIND_TO_SCHEMA` mapping in `compliance_status.py` — links each `SUBMISSION_KIND` (`fria`, `ifu`, `safety-benchmark`, `incident-report`, `eu-register`) to its corresponding artifact schema, so per-kind readiness can read the right artifact's `sig_state`.
+
+### Changed
+- `compliance status` per-artifact output: `(signed)` → `(signed, verified)` or `(signed, INVALID)`.
+- `_check_submission_readiness` signature now also takes the artifacts inventory: `_check_submission_readiness(apikey_present, artifacts_present)`. Per-kind readiness now requires `sig_state == "verified"` on the corresponding artifact (when one exists on disk).
+
+### Tests
+- `tests/test_compliance_status.py::test_status_marks_artifact_invalid_when_signature_does_not_verify`
+- `tests/test_compliance_status.py::test_status_marks_artifact_verified_when_signature_is_valid`
+- `tests/test_compliance_status.py::test_status_marks_artifact_unsigned_when_no_sig_field`
+- `tests/test_compliance_status.py::test_render_sig_state_returns_correct_marker_and_suffix`
+- `tests/test_signing.py::test_verify_with_pq_pub_*` (3 tests)
+
+### Related
+- Pairs with `rcan-py 3.3.1` ([continuonai/rcan-py#49](https://github.com/continuonai/rcan-py/pull/49), released 2026-04-27) which fixed the upstream `sign_body` / `verify_body` asymmetry that surfaced this gap.
+- RRF backend issues opened separately: [#71](https://github.com/craigm26/RobotRegistryFoundation/issues/71) `/safety-benchmark` returns 401 on bodies that locally verify; [#72](https://github.com/craigm26/RobotRegistryFoundation/issues/72) `/eu-register` returns 405 for POST/PUT/PATCH.
+
+---
+
 ## [1.2.3] — 2026-04-27
 
 **`request-apikey --submit` now usable end-to-end.** Closes the apikey gap

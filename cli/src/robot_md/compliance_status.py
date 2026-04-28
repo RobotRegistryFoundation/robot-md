@@ -35,7 +35,7 @@ from robot_md.audit import AuditChainError
 from robot_md.audit import verify_chain as audit_verify_chain
 from robot_md.parser import parse_file
 from robot_md.register import load_apikey
-from robot_md.signing import load_keypair
+from robot_md.signing import _verify_with_pq_pub, load_keypair, verify_body
 
 DEFAULT_RRF_ENDPOINT = "https://robotregistryfoundation.org"
 
@@ -131,19 +131,31 @@ def _check_artifacts(artifacts_dir: Path | None) -> dict[str, Any]:
         except json.JSONDecodeError:
             continue
         schema = doc.get("schema") or "unknown"
+        # Three signature states reported back to operators (post-1.2.4):
+        #   "verified" — sig present and rcan.hybrid.verify_body returns True
+        #   "INVALID"  — sig present but verify_body returns False
+        #                (e.g. tampered, key drift, or upstream sign↔verify bug)
+        #   "unsigned" — no sig field at all
         # Two signed-envelope shapes in the ecosystem:
         #   1. sign_body output: top-level pq_signing_pub + pq_kid + sig
         #      (used by register, IFU, benchmarks, incidents, eu-register, art-11, apikey-request)
-        #   2. FriaDocument shape: nested signing_key dataclass + sig
+        #   2. FriaDocument shape: nested signing_key.public_key + sig
         #      (used by fria.py — rcan-py 3.3.0 wire format)
-        has_top_level_sig = bool(doc.get("sig")) and bool(doc.get("pq_signing_pub"))
-        has_nested_sig = bool(doc.get("sig")) and bool(doc.get("signing_key"))
-        signed = has_top_level_sig or has_nested_sig
+        if doc.get("pq_signing_pub") and doc.get("sig"):
+            sig_state = "verified" if verify_body(doc) else "INVALID"
+        elif doc.get("signing_key") and doc.get("sig"):
+            pq_pub_b64 = (doc.get("signing_key") or {}).get("public_key")
+            sig_state = (
+                "verified" if pq_pub_b64 and _verify_with_pq_pub(doc, pq_pub_b64) else "INVALID"
+            )
+        else:
+            sig_state = "unsigned"
         present.append(
             {
                 "schema": schema,
                 "path": str(path),
-                "signed": signed,
+                "sig_state": sig_state,
+                "signed": sig_state != "unsigned",  # backwards-compat
                 "size_bytes": path.stat().st_size,
             }
         )
@@ -767,12 +779,25 @@ def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, An
     }
 
 
-def _check_submission_readiness(apikey_present: bool) -> dict[str, dict[str, Any]]:
+# Mapping from emit-kind to the schema of the artifact it produces.
+# Used to gate readiness on per-artifact sig_state.
+_KIND_TO_SCHEMA: dict[str, str] = {
+    "fria": "rcan-fria-v1",
+    "ifu": "rcan-ifu-v1",
+    "safety-benchmark": "rcan-safety-benchmark-v1",
+    "incident-report": "rcan-incidents-v1",
+    "eu-register": "rcan-eu-register-v1",
+}
+
+
+def _check_submission_readiness(
+    apikey_present: bool,
+    artifacts_present: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    by_schema = {a["schema"]: a for a in artifacts_present}
     out: dict[str, dict[str, Any]] = {}
     for kind in SUBMISSION_KINDS:
-        if apikey_present:
-            out[kind] = {"ready": True, "reason": ""}
-        else:
+        if not apikey_present:
             out[kind] = {
                 "ready": False,
                 "reason": (
@@ -781,6 +806,24 @@ def _check_submission_readiness(apikey_present: bool) -> dict[str, dict[str, Any
                     "and submit it to RRF support"
                 ),
             }
+            continue
+        schema = _KIND_TO_SCHEMA.get(kind)
+        art = by_schema.get(schema) if schema else None
+        if art is None:
+            # No corresponding artifact on disk — leave readiness as "ready" since
+            # `--submit` will trigger a fresh emit. Existing behavior pre-1.2.4.
+            out[kind] = {"ready": True, "reason": ""}
+        elif art["sig_state"] == "INVALID":
+            out[kind] = {
+                "ready": False,
+                "reason": (
+                    f"signature invalid for {schema} — re-emit with "
+                    f"a recent rcan-py (>=3.3.1) and check rcan.hybrid.verify_body"
+                ),
+            }
+        else:
+            # "verified" or "unsigned" both ready (unsigned means a fresh emit on submit).
+            out[kind] = {"ready": True, "reason": ""}
     return out
 
 
@@ -869,7 +912,9 @@ def gather_status(
         ),
     }
     apikey_present = status["keystore"]["apikey"]["present"]
-    status["submission_readiness"] = _check_submission_readiness(apikey_present)
+    status["submission_readiness"] = _check_submission_readiness(
+        apikey_present, status["artifacts"]["present"]
+    )
     status["first_motion_readiness"] = _check_first_motion_readiness(fm, manifest_path)
     status["blockers"] = _aggregate_blockers(status)
     return status
@@ -882,6 +927,15 @@ def _icon(ok: bool, neutral: bool = False) -> str:
     if neutral:
         return "—"
     return "✓" if ok else "✗"
+
+
+def _render_sig_state(sig_state: str) -> tuple[str, str]:
+    """Return (marker, suffix) for an artifact's sig_state."""
+    if sig_state == "verified":
+        return ("✓", "(signed, verified)")
+    if sig_state == "INVALID":
+        return ("✗", "(signed, INVALID)")
+    return ("•", "(unsigned)")
 
 
 def format_status_text(status: dict[str, Any]) -> str:
@@ -926,14 +980,14 @@ def format_status_text(status: dict[str, Any]) -> str:
     for schema in EXPECTED_ARTIFACT_SCHEMAS:
         if schema in present_by_schema:
             a = present_by_schema[schema]
-            sig = "signed" if a["signed"] else "unsigned"
-            lines.append(f"  ✓ {schema:<28}  {a['size_bytes']:>5} bytes  ({sig})")
+            marker, suffix = _render_sig_state(a.get("sig_state", "unsigned"))
+            lines.append(f"  {marker} {schema:<28}  {a['size_bytes']:>5} bytes  {suffix}")
         else:
             lines.append(f"  ✗ {schema:<28}  missing")
     extras = [a for a in status["artifacts"]["present"] if a["schema"] not in expected_set]
     for a in extras:
-        sig = "signed" if a["signed"] else "unsigned"
-        lines.append(f"  • {a['schema']:<28}  {a['size_bytes']:>5} bytes  ({sig}) [extra]")
+        marker, suffix = _render_sig_state(a.get("sig_state", "unsigned"))
+        lines.append(f"  {marker} {a['schema']:<28}  {a['size_bytes']:>5} bytes  {suffix} [extra]")
     lines.append("")
 
     # Registry
