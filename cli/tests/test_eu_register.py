@@ -123,7 +123,7 @@ def test_rcn_rhn_default_to_empty_lists(tmp_path):
 def test_errors_when_rmn_missing(tmp_path):
     """rcan-spec §26 makes rmn MUST. Builder errors instead of emitting empty."""
     no_rmn = BOB_MIN.replace("  rmn: RMN-000000000099\n", "")
-    with pytest.raises(EuRegisterError, match="metadata.rmn required"):
+    with pytest.raises(EuRegisterError, match=r"metadata\.rmn required"):
         build_artifact(_write_manifest(tmp_path, no_rmn), fria_path=_write_fria(tmp_path))
 
 
