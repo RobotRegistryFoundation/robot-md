@@ -1,6 +1,8 @@
 # cli/tests/backends/test_capability_dataclass.py
 from __future__ import annotations
 
+from dataclasses import FrozenInstanceError
+
 import pytest
 
 from robot_md.backends.capability import Capability, derive_namespace
@@ -8,7 +10,7 @@ from robot_md.backends.capability import Capability, derive_namespace
 
 def test_capability_is_frozen_dataclass() -> None:
     cap = Capability(name="arm.pick", namespace="core", arg_schema=None, description="")
-    with pytest.raises(Exception):
+    with pytest.raises(FrozenInstanceError):
         cap.name = "arm.place"  # frozen — must raise
 
 

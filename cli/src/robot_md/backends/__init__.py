@@ -9,9 +9,9 @@ from __future__ import annotations
 from robot_md.backends.base import CapabilityBackend, ExecutionEvent, ExecutionResult, SceneSnapshot
 from robot_md.backends.capability import Capability, derive_namespace
 from robot_md.backends.registry import (
+    CORE_CAPABILITY_PREFIXES,
     BackendRegistrationError,
     BackendRegistry,
-    CORE_CAPABILITY_PREFIXES,
     discover_backends,
 )
 
@@ -35,9 +35,9 @@ def enumerate_capabilities(registry: BackendRegistry) -> list[tuple[str, Capabil
 
 
 __all__ = [
+    "CORE_CAPABILITY_PREFIXES",
     "BackendRegistrationError",
     "BackendRegistry",
-    "CORE_CAPABILITY_PREFIXES",
     "Capability",
     "CapabilityBackend",
     "ExecutionEvent",

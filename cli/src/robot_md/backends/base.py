@@ -5,9 +5,12 @@ from __future__ import annotations
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from robot_md.robot_spec import RobotSpec
+
+if TYPE_CHECKING:
+    from robot_md.backends.capability import Capability
 
 
 @dataclass(frozen=True)
@@ -60,7 +63,7 @@ class CapabilityBackend(ABC):
         estop: Any,
     ) -> ExecutionResult: ...
 
-    def describe_capabilities(self) -> "list[Capability]":
+    def describe_capabilities(self) -> list[Capability]:
         """Return rich metadata for each capability this backend declares.
 
         Default: walk self.capabilities(), look each up in

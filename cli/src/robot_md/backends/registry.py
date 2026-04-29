@@ -79,7 +79,7 @@ def discover_backends() -> list[CapabilityBackend]:
         try:
             cls = ep.load()
             instance = cls()
-        except Exception as e:  # noqa: BLE001 — adapter import failures are non-fatal
+        except Exception as e:
             _log.warning("backend %r failed to load: %s", ep.name, e)
             continue
         try:

@@ -1,6 +1,7 @@
 # cli/tests/backends/test_enumerate_capabilities.py
 from __future__ import annotations
 
+from robot_md.backends import Capability, enumerate_capabilities
 from robot_md.backends.base import CapabilityBackend
 from robot_md.backends.registry import BackendRegistry
 
@@ -29,9 +30,6 @@ def test_iter_classes_yields_name_class_pairs() -> None:
     name, cls = pairs[0]
     assert name == "stub"
     assert cls is _StubBackend
-
-
-from robot_md.backends import enumerate_capabilities, Capability
 
 
 class _SecondStubBackend(CapabilityBackend):
