@@ -21,8 +21,13 @@ class LerobotBackend(CapabilityBackend):
         self._robot = None
 
     def open(self, spec: RobotSpec) -> None:
-        # Implemented in Task 18.
-        raise NotImplementedError
+        from lerobot.common.robot_devices.robots.factory import make_robot
+
+        from robot_md.backends.lerobot.config import build_lerobot_config
+
+        cfg = build_lerobot_config(spec)
+        self._robot = make_robot(cfg)
+        self._robot.connect()
 
     def close(self) -> None:
         if self._robot is not None:
