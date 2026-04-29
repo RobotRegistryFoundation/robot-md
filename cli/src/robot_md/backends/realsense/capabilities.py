@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from robot_md.backends.base import ExecutionResult
-from robot_md.backends.realsense.perception import perceive_depth, perceive_rgb
+from robot_md.backends.realsense.perception import (
+    perceive_depth,
+    perceive_rgb,
+    realsense_aligned_depth,
+)
 
 HANDLERS = {
     "perceive.rgb": perceive_rgb,
     "perceive.depth": perceive_depth,
+    "realsense.aligned_depth": realsense_aligned_depth,
 }
 
 

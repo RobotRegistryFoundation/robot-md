@@ -39,3 +39,37 @@ def perceive_depth(backend, args: dict, *, dry_run: bool, estop) -> ExecutionRes
         events=[ExecutionEvent(kind="frame", data={"frame_bytes": data, "format": "z16"})],
         error=None,
     )
+
+
+def realsense_aligned_depth(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResult:
+    if dry_run:
+        return ExecutionResult(
+            status="ok",
+            trajectory=None,
+            events=[ExecutionEvent(kind="dry_run", data={"capability": "realsense.aligned_depth"})],
+            error=None,
+        )
+    align = _ensure_align(backend)
+    frames = backend._pipeline.wait_for_frames(timeout_ms=1000)
+    aligned_frames = align.process(frames)
+    aligned = aligned_frames.get_depth_frame()
+    data = bytes(aligned.get_data()) if aligned is not None else b""
+    return ExecutionResult(
+        status="ok",
+        trajectory=None,
+        events=[
+            ExecutionEvent(
+                kind="frame",
+                data={"frame_bytes": data, "format": "z16", "aligned_to": "color"},
+            )
+        ],
+        error=None,
+    )
+
+
+def _ensure_align(backend):
+    if getattr(backend, "_align_processor", None) is None:
+        import pyrealsense2 as rs
+
+        backend._align_processor = rs.align(rs.stream.color)
+    return backend._align_processor
