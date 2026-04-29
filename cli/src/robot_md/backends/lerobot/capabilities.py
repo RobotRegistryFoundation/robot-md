@@ -10,6 +10,7 @@ from robot_md.backends.lerobot.motion import (
     gripper_close,
     gripper_open,
 )
+from robot_md.backends.lerobot.perception import perceive_depth, perceive_rgb
 
 HANDLERS = {
     "arm.pick": arm_pick,
@@ -17,6 +18,8 @@ HANDLERS = {
     "arm.home": arm_home,
     "gripper.open": gripper_open,
     "gripper.close": gripper_close,
+    "perceive.rgb": perceive_rgb,
+    "perceive.depth": perceive_depth,
 }
 
 
