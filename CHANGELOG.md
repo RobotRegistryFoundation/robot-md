@@ -5,6 +5,39 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.3.0] — 2026-04-29
+
+**SP3: capability metadata foundation + RealSense + LeRobot adapter backends.** Three SP3 phases shipped on top of v1.2.5:
+
+- **Phase A — Capability metadata API.** New `Capability` dataclass (`name`, `namespace: Literal["core","vendor"]`, `arg_schema`, `description`) plus a backward-compatible `describe_capabilities() -> list[Capability]` default on `CapabilityBackend`. Backends still implement `capabilities() -> frozenset[str]`; the default walker reads each capability's metadata from `cli/src/robot_md/schemas/capabilities.json`. Vendor capabilities use `<backend>.<verb>` namespacing, validated at backend registration via a single regex (`^[a-z][a-z0-9_]*\.[a-z]([a-z0-9_.]*[a-z0-9_])?$`). New `robot-md describe-capabilities [--json]` CLI subcommand enumerates declared backends.
+- **Phase B — RealSense camera backend.** `RealsenseBackend` (`name="realsense"`, `read_only_capabilities={perceive.rgb, perceive.depth}`) declares `perceive.rgb`, `perceive.depth`, and the vendor `realsense.aligned_depth`. Lazy-imports `pyrealsense2`; `open()` starts a pipeline with color BGR8 + depth Z16 @640x480/30fps; `scene_describe()` snapshots latest frames. Camera-only adapter — no motion handlers.
+- **Phase C — LeRobot motion + camera backend.** `LerobotBackend` (`name="lerobot"`, `protocols={feetech, dynamixel}`, `read_only_capabilities={perceive.rgb, perceive.depth}`) declares all 7 core caps (arm.pick/place/home, gripper.open/close, perceive.rgb/depth) plus the vendor `lerobot.teleop`. Wraps `lerobot.common.robot_devices.robots.factory.make_robot`; merges `DriverEntry` (port, baud_rate, model) with `physics.kinematics` (per-joint servo_id) into the per-motor config dict.
+
+**Note on runtime discovery.** Both backends are importable but not yet entry-point registered — `discover_backends()` won't find them until SP3 Phase D wires the `robot_md.backends` group in `pyproject.toml`. Direct import works today: `from robot_md.backends.realsense import RealsenseBackend` and `from robot_md.backends.lerobot import LerobotBackend`.
+
+Also includes the v1.2.5 fix that never reached PyPI (eu-register URL routing — see [1.2.5] below).
+
+### Added
+- `robot_md.backends.capability.Capability` dataclass + `derive_namespace(name)` helper.
+- `CapabilityBackend.describe_capabilities()` ABC default; `_capability_default.describe_default()` schema-driven walker.
+- `cli/src/robot_md/schemas/capabilities.json` — JSON-Schema for the 7 core capabilities + nav.go_to + safety.estop, all with `additionalProperties: false`.
+- `_validate_capability_namespace(name, caps)` at backend registration; rejects malformed names (trailing dot, missing verb, non-lowercase) with `BackendRegistrationError`.
+- `robot_md.backends.enumerate_capabilities(registry)` walker re-exported from `robot_md.backends`.
+- `RealsenseBackend` (`backends/realsense/{__init__, perception, capabilities}.py`).
+- `LerobotBackend` (`backends/lerobot/{__init__, config, motion, perception, capabilities}.py`).
+- 87 backends tests across Phases A+B+C.
+
+### CI
+- Phase A merge sequence (`9f9ae29`/`70e797e`/`3244460`/`0b33874`/`b1c5564` + PR #22 squash).
+- Phase B (PR #25, `cb1e61a`).
+- Phase C (PR #26, `535a6a0`).
+- `SKIP_FLAKY_DISCOVER=1` flag added to `.github/workflows/ci.yml` Test step (PR #23, `5747939`); deeper root cause for `test_discover_emits_per_step_progress` tracked in issue #24.
+
+### Notes
+- This release bundles the v1.2.5 eu-register URL routing fix (RRF #72) — that tag was created and a GitHub release published, but `workflow_dispatch publish_pypi=true` was never run. PyPI users upgrading from 1.2.4 receive both the v1.2.5 fix and the SP3 backend infrastructure in a single hop.
+
+---
+
 ## [1.2.5] — 2026-04-28
 
 **`emit-eu-register --submit` now POSTs to the correct RRF endpoint.** The §26 / Art. 49 submission lives at `/v2/models/<rmn>/eu-register` (per-AI-system, not per-robot); robot-md was POSTing to `/v2/robots/<rrn>/eu-register` and getting a 405 from Cloudflare's default-no-handler response. Builder also now enforces `metadata.rmn` per rcan-spec §26 MUST. Closes RRF #72.
