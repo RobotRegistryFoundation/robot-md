@@ -177,3 +177,32 @@ def gripper_close(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResu
         events=[ExecutionEvent(kind="motion_complete", data={"capability": "gripper.close"})],
         error=None,
     )
+
+
+def lerobot_teleop(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResult:
+    max_steps = int(args.get("max_steps", 100))
+    if dry_run:
+        return ExecutionResult(
+            status="ok",
+            trajectory=None,
+            events=[
+                ExecutionEvent(
+                    kind="dry_run",
+                    data={"capability": "lerobot.teleop", "max_steps": max_steps},
+                )
+            ],
+            error=None,
+        )
+    streamed = 0
+    for _ in range(max_steps):
+        state = backend._robot.read_leader_state()
+        if state is None:
+            break
+        backend._robot.send_action(state)
+        streamed += 1
+    return ExecutionResult(
+        status="ok",
+        trajectory=None,
+        events=[ExecutionEvent(kind="teleop_complete", data={"steps": streamed})],
+        error=None,
+    )
