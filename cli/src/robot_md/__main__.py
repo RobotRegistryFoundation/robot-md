@@ -103,6 +103,65 @@ def context(path: Path = typer.Argument(..., help="Path to a ROBOT.md file.")) -
     sys.stdout.write(emit_context(parsed))
 
 
+@app.command("describe-capabilities")
+def describe_capabilities(
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit JSON instead of human-readable text."
+    ),
+) -> None:
+    """List capabilities exposed by every installed backend.
+
+    Walks the entry-point group `robot_md.backends`, builds a BackendRegistry,
+    and dumps Capability metadata grouped by backend + namespace.
+    """
+    import json as _json
+
+    from robot_md.backends import BackendRegistry, enumerate_capabilities
+
+    reg = BackendRegistry.from_entry_points()
+    pairs = enumerate_capabilities(reg)
+
+    by_backend: dict[str, list] = {}
+    for backend_name, cap in pairs:
+        by_backend.setdefault(backend_name, []).append(cap)
+
+    if json_output:
+        payload = [
+            {
+                "backend": backend_name,
+                "capabilities": [
+                    {
+                        "name": c.name,
+                        "namespace": c.namespace,
+                        "arg_schema": c.arg_schema,
+                        "description": c.description,
+                    }
+                    for c in caps
+                ],
+            }
+            for backend_name, caps in sorted(by_backend.items())
+        ]
+        typer.echo(_json.dumps(payload, indent=2, sort_keys=True))
+        return
+
+    for backend_name in sorted(by_backend):
+        typer.echo(f"\n{backend_name}")
+        typer.echo("=" * len(backend_name))
+        caps = by_backend[backend_name]
+        core = [c for c in caps if c.namespace == "core"]
+        vendor = [c for c in caps if c.namespace == "vendor"]
+        if core:
+            typer.echo("  core:")
+            for c in sorted(core, key=lambda x: x.name):
+                desc = f" — {c.description}" if c.description else ""
+                typer.echo(f"    {c.name}{desc}")
+        if vendor:
+            typer.echo("  vendor:")
+            for c in sorted(vendor, key=lambda x: x.name):
+                desc = f" — {c.description}" if c.description else ""
+                typer.echo(f"    {c.name}{desc}")
+
+
 @app.command()
 def autodetect(
     write: Path | None = typer.Option(

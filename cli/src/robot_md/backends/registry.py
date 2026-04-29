@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
+from importlib.metadata import entry_points
 
 from robot_md.backends.base import CapabilityBackend
 from robot_md.robot_spec import RobotSpec
+
+_log = logging.getLogger(__name__)
 
 CORE_CAPABILITY_PREFIXES = frozenset({"arm.", "nav.", "perceive.", "gripper.", "safety."})
 _VENDOR_CAPABILITY_PATTERN = re.compile(r"^[a-z][a-z0-9_]*\.[a-z]([a-z0-9_.]*[a-z0-9_])?$")
@@ -59,11 +63,11 @@ def _validate_capability_namespace(backend_name: str, caps: frozenset[str]) -> N
 
 
 def discover_backends() -> list[CapabilityBackend]:
-    """Load backends registered under the `robot_md.backends` entry-point group."""
-    try:
-        from importlib.metadata import entry_points
-    except Exception:
-        return []
+    """Load backends registered under the `robot_md.backends` entry-point group.
+
+    Backends with malformed capability names are logged and skipped — the rest
+    of the registry continues to load.
+    """
     try:
         eps = entry_points(group="robot_md.backends")
     except TypeError:
@@ -74,9 +78,16 @@ def discover_backends() -> list[CapabilityBackend]:
     for ep in sorted(eps, key=lambda e: e.name):
         try:
             cls = ep.load()
-            out.append(cls())
-        except Exception:
+            instance = cls()
+        except Exception as e:
+            _log.warning("backend %r failed to load: %s", ep.name, e)
             continue
+        try:
+            _validate_capability_namespace(ep.name, instance.capabilities())
+        except BackendRegistrationError as e:
+            _log.warning("%s — skipping backend.", e)
+            continue
+        out.append(instance)
     return out
 
 
@@ -106,3 +117,13 @@ class BackendRegistry:
             match = next((b for b in ordered if drv.protocol in b.protocols), None)
             out[drv.id] = match
         return out
+
+    def iter_classes(self) -> list[tuple[str, type[CapabilityBackend]]]:
+        """Return [(backend.name, type(backend)), ...] for every loaded backend.
+
+        Used by enumerate_capabilities() in backends/__init__.py to walk the
+        catalog without re-instantiating. The registry already holds live
+        instances; iter_classes() exposes (name, class) for callers that
+        specifically need the class object.
+        """
+        return [(b.name, type(b)) for b in self.backends]
