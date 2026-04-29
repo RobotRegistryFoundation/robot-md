@@ -141,3 +141,39 @@ def arm_home(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResult:
         events=[ExecutionEvent(kind="motion_complete", data={"capability": "arm.home"})],
         error=None,
     )
+
+
+def gripper_open(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResult:
+    cmd = {"phase": "gripper.open", "gripper": "open"}
+    if dry_run:
+        return ExecutionResult(
+            status="ok",
+            trajectory=[cmd],
+            events=[ExecutionEvent(kind="dry_run", data={"capability": "gripper.open"})],
+            error=None,
+        )
+    backend._robot.send_action(cmd)
+    return ExecutionResult(
+        status="ok",
+        trajectory=[cmd],
+        events=[ExecutionEvent(kind="motion_complete", data={"capability": "gripper.open"})],
+        error=None,
+    )
+
+
+def gripper_close(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResult:
+    cmd = {"phase": "gripper.close", "gripper": "close"}
+    if dry_run:
+        return ExecutionResult(
+            status="ok",
+            trajectory=[cmd],
+            events=[ExecutionEvent(kind="dry_run", data={"capability": "gripper.close"})],
+            error=None,
+        )
+    backend._robot.send_action(cmd)
+    return ExecutionResult(
+        status="ok",
+        trajectory=[cmd],
+        events=[ExecutionEvent(kind="motion_complete", data={"capability": "gripper.close"})],
+        error=None,
+    )
