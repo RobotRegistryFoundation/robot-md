@@ -60,5 +60,20 @@ class CapabilityBackend(ABC):
         estop: Any,
     ) -> ExecutionResult: ...
 
+    def describe_capabilities(self) -> "list[Capability]":
+        """Return rich metadata for each capability this backend declares.
+
+        Default: walk self.capabilities(), look each up in
+        cli/src/robot_md/schemas/capabilities.json for arg_schema +
+        description; vendor capabilities not in the schema get
+        arg_schema=None, description="".
+
+        Adapters MAY override to provide richer vendor metadata
+        (e.g., lerobot.teleop description, dynamixel.indirect_address
+        arg shapes).
+        """
+        from robot_md.backends._capability_default import describe_default
+        return describe_default(self.name, self.capabilities())
+
     def scene_describe(self) -> SceneSnapshot:
         return SceneSnapshot.empty()
