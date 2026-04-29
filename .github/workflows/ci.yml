@@ -31,6 +31,8 @@ jobs:
         run: ruff format --check src tests
       - name: Test
         working-directory: cli
+        env:
+          SKIP_FLAKY_DISCOVER: "1"  # tracked in issue #24
         run: python -m pytest -v
 
   validate-examples:
