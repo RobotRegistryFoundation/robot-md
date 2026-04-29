@@ -117,3 +117,13 @@ class BackendRegistry:
             match = next((b for b in ordered if drv.protocol in b.protocols), None)
             out[drv.id] = match
         return out
+
+    def iter_classes(self) -> list[tuple[str, type[CapabilityBackend]]]:
+        """Return [(backend.name, type(backend)), ...] for every loaded backend.
+
+        Used by enumerate_capabilities() in backends/__init__.py to walk the
+        catalog without re-instantiating. The registry already holds live
+        instances; iter_classes() exposes (name, class) for callers that
+        specifically need the class object.
+        """
+        return [(b.name, type(b)) for b in self.backends]
