@@ -8,10 +8,16 @@ def test_capabilities_method_returns_frozenset() -> None:
     b = FeetechDepthaiBackend()
     caps = b.capabilities()
     assert isinstance(caps, frozenset)
-    expected = frozenset({
-        "arm.pick", "arm.place", "arm.reach", "arm.home",
-        "vision.describe", "status.report",
-    })
+    expected = frozenset(
+        {
+            "arm.pick",
+            "arm.place",
+            "arm.reach",
+            "arm.home",
+            "vision.describe",
+            "status.report",
+        }
+    )
     assert caps == expected
 
 

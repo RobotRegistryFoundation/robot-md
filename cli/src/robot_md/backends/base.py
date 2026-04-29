@@ -76,6 +76,7 @@ class CapabilityBackend(ABC):
         arg shapes).
         """
         from robot_md.backends._capability_default import describe_default
+
         return describe_default(self.name, self.capabilities())
 
     def scene_describe(self) -> SceneSnapshot:
