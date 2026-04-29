@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from robot_md.backends.base import ExecutionResult
-from robot_md.backends.lerobot.motion import arm_pick
+from robot_md.backends.lerobot.motion import arm_home, arm_pick, arm_place
 
 HANDLERS = {
     "arm.pick": arm_pick,
+    "arm.place": arm_place,
+    "arm.home": arm_home,
 }
 
 

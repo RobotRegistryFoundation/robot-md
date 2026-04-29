@@ -68,3 +68,76 @@ def arm_pick(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResult:
         ],
         error=None,
     )
+
+
+def arm_place(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResult:
+    if "destination" not in args:
+        return ExecutionResult(
+            status="error",
+            trajectory=None,
+            events=[],
+            error={"reason": "missing_args", "detail": "arm.place requires 'destination'"},
+        )
+    if not isinstance(args["destination"], str):
+        return ExecutionResult(
+            status="error",
+            trajectory=None,
+            events=[],
+            error={"reason": "schema_violation", "detail": "'destination' must be string"},
+        )
+    destination = args["destination"]
+    plan = [
+        {
+            "phase": "transport",
+            "joints": [0.5, -0.3, 0.6, 0.0, 0.0, 0.6],
+            "destination": destination,
+        },
+        {"phase": "release", "joints": [0.5, -0.5, 0.4, 0.0, 0.0, 0.0]},
+        {"phase": "retract", "joints": [0.0, -0.3, 0.6, 0.0, 0.0, 0.0]},
+    ]
+    if dry_run:
+        return ExecutionResult(
+            status="ok",
+            trajectory=plan,
+            events=[
+                ExecutionEvent(
+                    kind="dry_run",
+                    data={"capability": "arm.place", "destination": destination},
+                )
+            ],
+            error=None,
+        )
+    for step in plan:
+        backend._robot.send_action(step)
+    return ExecutionResult(
+        status="ok",
+        trajectory=plan,
+        events=[
+            ExecutionEvent(
+                kind="motion_complete",
+                data={"capability": "arm.place", "destination": destination},
+            )
+        ],
+        error=None,
+    )
+
+
+_HOME_JOINTS = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+
+def arm_home(backend, args: dict, *, dry_run: bool, estop) -> ExecutionResult:
+    plan = [{"phase": "home", "joints": list(_HOME_JOINTS)}]
+    if dry_run:
+        return ExecutionResult(
+            status="ok",
+            trajectory=plan,
+            events=[ExecutionEvent(kind="dry_run", data={"capability": "arm.home"})],
+            error=None,
+        )
+    backend._robot.send_action(plan[0])
+    return ExecutionResult(
+        status="ok",
+        trajectory=plan,
+        events=[ExecutionEvent(kind="motion_complete", data={"capability": "arm.home"})],
+        error=None,
+    )
