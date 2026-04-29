@@ -54,5 +54,11 @@ class RealsenseBackend(CapabilityBackend):
         return dispatch(self, capability=capability, args=dict(args), dry_run=dry_run, estop=estop)
 
     def scene_describe(self) -> SceneSnapshot:
-        # Implemented in Task 13.
-        return SceneSnapshot.empty()
+        import time
+
+        if self._pipeline is None:
+            return SceneSnapshot.empty()
+        frames = self._pipeline.wait_for_frames(timeout_ms=1000)
+        color = frames.get_color_frame()
+        data = bytes(color.get_data()) if color is not None else None
+        return SceneSnapshot(frame=data, detections=(), joint_state={}, ts=time.time())
