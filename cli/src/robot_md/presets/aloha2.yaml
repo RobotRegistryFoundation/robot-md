@@ -158,12 +158,14 @@ physics:
 drivers:
   - id: left_arm
     protocol: dynamixel
+    preferred_backend: lerobot       # SP3 Rev 6: preset-internal hint, NOT copied to manifest
     port: /dev/ttyUSB0
     baud_rate: 1000000
     model: XM540/XM430               # ViperX-300s mixed chain
     count: 8                         # 6 joints + 2 (shoulder + elbow dual servos)
   - id: right_arm
     protocol: dynamixel
+    preferred_backend: lerobot
     port: /dev/ttyUSB1
     baud_rate: 1000000
     model: XM540/XM430

@@ -84,6 +84,7 @@ physics:
 drivers:
   - id: arm_servos
     protocol: dynamixel
+    preferred_backend: lerobot       # SP3 Rev 6: preset-internal hint, NOT copied to manifest
     port: /dev/ttyUSB0               # U2D2 default — operator overrides
     baud_rate: 1000000
     model: XL-330-M077-T
