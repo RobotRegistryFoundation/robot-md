@@ -122,6 +122,7 @@ physics:
 drivers:
   - id: arm_servos
     protocol: feetech
+    preferred_backend: lerobot   # SP3 Rev 6: preset-internal hint, NOT copied to manifest
     port: /dev/ttyACM0           # autodetect overrides if different
     baud_rate: 1000000
     model: STS3215
