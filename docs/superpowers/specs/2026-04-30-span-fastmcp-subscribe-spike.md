@@ -76,3 +76,28 @@ Pragmatic, single-session stdio-mode focused (the bob baseline):
   properly with lowlevel handlers + a subscription registry.
 - Cross-session fanout — solved by lifting the active-session tracker to
   a `set[ServerSession]` if/when v2 multi-session support lands.
+
+## Implementation note (2026-04-30, post-v1.4.0)
+
+v2 multi-session support shipped without the full FastMCP→lowlevel
+migration this spike originally recommended. The smaller seam:
+
+1. FastMCP exposes the underlying lowlevel server as `_mcp_server`.
+2. `subscribe_resource` / `unsubscribe_resource` decorators can be
+   attached to that inner server *after* FastMCP is constructed —
+   they register handlers on `request_handlers` like any other.
+3. `mcp.server.lowlevel.server.request_ctx.get().session` returns the
+   per-session identity inside a subscribe handler.
+4. The lowlevel `get_capabilities` method hard-codes
+   `resources.subscribe = False`; we override it on the instance to
+   flip the bit.
+
+A `SessionRegistry` (`cli/src/robot_md/mcp/resource_subscribers.py`)
+maintains per-(URI, session) entries; the SP-HP queue subscribers
+fan-out via `registry.emit(uri)`. The `_resource_hotplug_pending`
+handler no longer captures the active session — sessions opt in via
+the standard `resources/subscribe` wire.
+
+Shipped in commit d38f60c (PR after v1.4.0). The full lowlevel migration
+remains available if a future requirement (e.g., per-session
+`@server.prompt` differentiation) needs the lowlevel API surface.

@@ -1,23 +1,22 @@
 # Hot-plug roadmap (v2 and beyond)
 
-SP-AN v1 ships Claude chat + voice-mode audio. The following items are
-explicitly deferred and tracked here so v2 work has a starting point.
+SP-AN v1 shipped Claude chat + voice-mode audio with a single-session
+ServerSession capture. v2 (PR after v1.4.0) closed the multi-session
+gap; the items below remain explicitly deferred and are tracked here.
 
-## v1 single-session limitation
+## v2 done — multi-session subscribe (closed)
 
-The v1 implementation captures the active `ServerSession` opportunistically
-inside the `robot-md://hotplug/pending` resource handler. In stdio mode
-this is reliable: a server process serves one Claude session, and Claude
-reads the resource at session start. In HTTP-streamable / multi-session
-modes, only the most-recent session that read the resource will receive
-`notifications/resources/updated` for hot-plug events.
-
-The v2 fix is to drop down to the lowlevel `mcp.server.lowlevel.Server`
-API (which exposes `subscribe_resource` / `unsubscribe_resource` decorators
-unavailable on FastMCP) and maintain a per-session subscription registry.
+The v1 single-active-session limitation is gone. We attach lowlevel
+`subscribe_resource` / `unsubscribe_resource` handlers to FastMCP's
+underlying `_mcp_server` and route per-session subscriptions through a
+`SessionRegistry`. Each daemon nudge fans out to every currently-
+subscribed session on the URI. The server now also advertises
+`resources.subscribe = True` in its capabilities so MCP-spec-strict
+clients honor `notifications/resources/updated`.
 
 See `docs/superpowers/specs/2026-04-30-span-fastmcp-subscribe-spike.md`
-for the spike that established this trade-off.
+for the original FastMCP-vs-lowlevel trade-off; the spike's "v2 fix"
+recommendation was implemented without the full lowlevel migration.
 
 ## v2 — pendant screen surface
 
@@ -41,15 +40,6 @@ for the spike that established this trade-off.
   removes it from `drivers[]` after safety checks (no kinematics
   referencing, no in-flight execution).
 - Driver-dependency + safety semantics designed during the v2 plan.
-
-## v2 — capability advertisement (`resources_subscribed=True`)
-
-- FastMCP defaults `NotificationOptions.resources_changed.subscribe`
-  to `False`; clients per the MCP spec MAY ignore
-  `notifications/resources/updated` if the server doesn't declare the
-  `subscribe` capability. v1 ships without this declaration; v2 wires
-  it once we own the lowlevel `Server` and the per-session subscribe
-  handlers.
 
 ## v3+ — web UI surface
 

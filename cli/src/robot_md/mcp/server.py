@@ -40,10 +40,13 @@ def build_server(ctx: McpContext):
 
     from mcp.server.fastmcp import FastMCP
 
-    # SP-AN: opportunistic active-session capture + lifespan-managed
-    # subscribers. v1 single-session limitation documented in
-    # cli/docs/hotplug-roadmap.md and the 2026-04-30 spike findings.
-    _an_state: dict = {"active_session": None}
+    # SP-AN v2: per-session SessionRegistry replaces v1 active-session capture.
+    # MCP subscribe/unsubscribe handlers (registered below on the underlying
+    # lowlevel server) maintain entries; the SP-HP queue subscribers fan-out
+    # via registry.emit() so every subscribed session gets its notification.
+    from robot_md.mcp.resource_subscribers import SessionRegistry
+
+    _an_registry = SessionRegistry()
 
     @asynccontextmanager
     async def _lifespan(_server):
@@ -51,11 +54,11 @@ def build_server(ctx: McpContext):
         from robot_md.mcp.resource_subscribers import (
             FilePollFallback,
             HotplugResourceSubscriber,
-            make_an_emit,
+            make_registry_emit,
         )
         from robot_md.mcp.resources.hotplug_pending import URI as _U
 
-        emit = make_an_emit(_an_state, _U)
+        emit = make_registry_emit(_an_registry, _U)
         sub = HotplugResourceSubscriber(on_change=emit)
         fallback = FilePollFallback(
             queue_path=_HOTPLUG_QUEUE_PATH,
@@ -71,6 +74,52 @@ def build_server(ctx: McpContext):
             await fallback.stop()
 
     server = FastMCP("robot-md", lifespan=_lifespan)
+
+    # SP-AN v2: attach lowlevel subscribe/unsubscribe handlers to the
+    # underlying mcp.server.lowlevel.Server. FastMCP doesn't expose these
+    # decorators directly; we reach the inner server via _mcp_server.
+    from mcp.server.lowlevel.server import request_ctx as _request_ctx
+
+    _inner = server._mcp_server
+
+    @_inner.subscribe_resource()
+    async def _on_subscribe(uri):
+        try:
+            session = _request_ctx.get().session
+        except LookupError:
+            return
+        _an_registry.add(str(uri), session)
+
+    @_inner.unsubscribe_resource()
+    async def _on_unsubscribe(uri):
+        try:
+            session = _request_ctx.get().session
+        except LookupError:
+            return
+        _an_registry.remove(str(uri), session)
+
+    # SP-AN v2: lowlevel.Server hard-codes resources.subscribe=False in its
+    # capability builder regardless of whether subscribe handlers are attached.
+    # Override the public get_capabilities to flip the bit so MCP-spec-strict
+    # clients honor notifications/resources/updated.
+    import mcp.types as _mcp_types
+
+    _orig_get_caps = _inner.get_capabilities
+
+    def _get_caps_with_subscribe(notif_opts, exp_caps):
+        caps = _orig_get_caps(notif_opts, exp_caps)
+        if caps.resources is not None:
+            caps.resources = _mcp_types.ResourcesCapability(
+                subscribe=True,
+                listChanged=caps.resources.listChanged,
+            )
+        return caps
+
+    _inner.get_capabilities = _get_caps_with_subscribe  # type: ignore[method-assign]
+
+    # Test seam: tests reach the registry via server._span_registry to
+    # drive emit() without spinning up the daemon side.
+    server._span_registry = _an_registry  # type: ignore[attr-defined]
 
     @server.tool()
     def render() -> str:
@@ -350,10 +399,9 @@ def build_server(ctx: McpContext):
 
         return json.dumps(_re(ctx), indent=2)
 
-    # SP-AN: hot-plug pending events. Each read captures the active
-    # session so the lifespan-managed subscriber can target it for
-    # notifications/resources/updated. v1 single-session limitation; see
-    # docs/superpowers/specs/2026-04-30-span-fastmcp-subscribe-spike.md.
+    # SP-AN v2: hot-plug pending events. Sessions opt in via MCP
+    # resources/subscribe; the SessionRegistry routes queue-change emits
+    # to every currently-subscribed session.
     from robot_md.mcp.resources.hotplug_pending import URI as _HOTPLUG_PENDING_URI
 
     @server.resource(_HOTPLUG_PENDING_URI, mime_type="application/json")
@@ -361,13 +409,6 @@ def build_server(ctx: McpContext):
         import json
 
         from robot_md.mcp.resources.hotplug_pending import build_pending_payload
-
-        try:
-            ctx_ = server.get_context()
-            if ctx_ is not None:
-                _an_state["active_session"] = ctx_.session
-        except (LookupError, RuntimeError, AttributeError):
-            pass
 
         return json.dumps(build_pending_payload(), indent=2)
 
