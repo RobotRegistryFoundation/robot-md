@@ -240,9 +240,12 @@ If the section is absent, the robot is ineligible for the eval — no breakage. 
     "execute":         0.60
   },
   "rcan_signature": "<base64>",
+  "rrf_signature":  null,
   "evidence_root":  "sha256:..."
 }
 ```
+
+`rrf_signature` is `null` for self-attested scores and populated by RRF after counter-signature (Phase 1 / 1.5). Both signatures cover the same canonical bytes (with both fields cleared during canonicalization), so a registry-attested score still self-verifies under the robot's keypair.
 
 Per-unit scores are first-class. The aggregate is convenience. Cherry-picking by hiding flunked units is impossible — `units` is declared in ROBOT.md and any missing unit appears as `not_run`.
 
