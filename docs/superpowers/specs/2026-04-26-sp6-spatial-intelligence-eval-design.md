@@ -373,7 +373,67 @@ GET  /v1/spatial-eval/leaderboard?spec_version=…  → ranked attested scores
 
 Held-out probes are never served — RRF runs them server-side as part of the audit. Execute audits spot-check ~20% of trials by replaying judge video; full re-audit available on challenge. RRF counter-signs the Score JSON; counter-signed scores are the only ones on the leaderboard.
 
-The `robot_md.spatial_eval.rrf` module reuses the existing RRF client used by `compliance_status.py` and `eu_register.py`. No new auth surface, no new client library.
+The `robot_md.spatial_eval.rrf` module is a parallel urllib helper alongside `submit.py`. It does not extend `submit.py::KIND_REGISTRY` — the §27 path scheme is run-id keyed (`/v1/spatial-eval/runs`, `/v1/spatial-eval/runs/{run_id}`), not robot-keyed (`/v2/robots/{rrn}/...`), so the existing client's path template generalizes poorly. Audit logging via `robot_md.audit.record_event(rrn, event="submission", ...)` is preserved, identically to `submit.py`.
+
+#### §27 wire format (Phase 1.5 robot-md contract)
+
+This locks the request/response body shapes the robot-md client assumes. The RRF backend implementation must mirror exactly. Both endpoints require `Authorization: Bearer <apikey>` for the submitting robot's RRN.
+
+**POST /v1/spatial-eval/runs** — submit a self-attested Score JSON for counter-signature.
+
+Request body (`Content-Type: application/json`):
+
+```json
+{
+  "score": { /* full ScoreJSON.to_dict() — rcan_signature populated, rrf_signature null, evidence_root populated */ }
+}
+```
+
+Response — `202 Accepted` (async path, RRF queues the audit):
+
+```json
+{
+  "submission_id": "sub_<opaque>",
+  "status": "pending"
+}
+```
+
+Response — `200 OK` (sync path, RRF counter-signed inline):
+
+```json
+{
+  "submission_id": "sub_<opaque>",
+  "status": "counter_signed",
+  "score": { /* ScoreJSON with rrf_signature populated by RRF */ }
+}
+```
+
+Error responses:
+- `400 Bad Request` — missing fields, malformed score, invalid `spec_version`, mismatched RRN between Bearer apikey and `score.rrn`.
+- `401 Unauthorized` — apikey invalid or revoked.
+- `409 Conflict` — `(rrn, run_id)` already submitted.
+- `422 Unprocessable Entity` — robot's `rcan_signature` failed RRF-side verification against the keystore for `score.rrn`.
+
+**GET /v1/spatial-eval/runs/{submission_id}** — poll for counter-signature completion.
+
+Response — `200 OK`:
+
+```json
+{
+  "submission_id": "sub_<opaque>",
+  "status": "pending" | "counter_signed" | "rejected",
+  "score": { /* present iff status == "counter_signed" */ },
+  "rejection_reason": "<string>"  /* present iff status == "rejected" */
+}
+```
+
+Error responses:
+- `404 Not Found` — unknown submission_id.
+- `403 Forbidden` — apikey RRN doesn't match the submission's owner RRN.
+
+**Counter-signature canonicalization.** RRF's `rrf_signature` is computed against `payload_bytes(score)` — the exact same canonical form the robot signed (both `rcan_signature` and `rrf_signature` cleared before serialization). RRF endorses the bytes the robot endorsed. This means a registry-attested score still self-verifies under the robot's keypair without modification.
+
+**RRF pubkey distribution.** Verifiers obtain RRF's ML-DSA public key from `GET /v1/spatial-eval/spec/{version}` (already in the §27 path table); the response includes a `rrf_pubkey` field alongside the canonical spec JSON. Pinned per spec version so a key rotation requires a minor version bump and is auditable in the leaderboard timeline.
 
 ### Data flow (Phase 0)
 

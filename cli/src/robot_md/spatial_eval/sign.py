@@ -16,11 +16,16 @@ from robot_md.spatial_eval.score import ScoreJSON
 def payload_bytes(score: ScoreJSON) -> bytes:
     """Canonical bytes for ML-DSA signing/verification.
 
-    Score JSON with `rcan_signature` cleared so the signature isn't over
-    itself. Same canonicalization on the verify side.
+    Both `rcan_signature` and `rrf_signature` are cleared. The robot's
+    self-attestation is computed first (rrf_signature is None at that
+    time), and RRF's counter-signature is computed against the same
+    canonical bytes (so RRF endorses exactly what the robot signed). At
+    verify time both are cleared so a registry-attested score still
+    self-verifies.
     """
     d = score.to_dict()
     d["rcan_signature"] = None
+    d["rrf_signature"] = None
     return json.dumps(d, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 

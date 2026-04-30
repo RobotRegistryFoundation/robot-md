@@ -61,6 +61,7 @@ class ScoreJSON:
     tracks_execute: ExecuteTrack
     aggregate: Aggregate
     rcan_signature: str | None = None
+    rrf_signature: str | None = None
     evidence_root: str | None = None
 
     def to_dict(self) -> dict:
@@ -82,6 +83,7 @@ class ScoreJSON:
             },
             "aggregate": asdict(self.aggregate),
             "rcan_signature": self.rcan_signature,
+            "rrf_signature": self.rrf_signature,
             "evidence_root": self.evidence_root,
         }
 
@@ -111,5 +113,6 @@ class ScoreJSON:
             tracks_execute=_load_exec(d["tracks"]["execute"]),
             aggregate=Aggregate(**d["aggregate"]),
             rcan_signature=d.get("rcan_signature"),
+            rrf_signature=d.get("rrf_signature"),
             evidence_root=d.get("evidence_root"),
         )
