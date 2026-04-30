@@ -247,6 +247,13 @@ def build_server(ctx: McpContext):
 
         return submit_to_rrf_tool(ctx, run_dir=run_dir)
 
+    @server.tool()
+    def hotplug_review() -> dict:
+        """Return all currently-pending (unresolved) hot-plug events for operator review."""
+        from robot_md.mcp.tools.hotplug_review import hotplug_review_tool
+
+        return hotplug_review_tool()
+
     from robot_md.mcp.resources import _sanitize_robot_name
 
     robot_name = _sanitize_robot_name(ctx.spec.metadata.robot_name if ctx.spec else None)
