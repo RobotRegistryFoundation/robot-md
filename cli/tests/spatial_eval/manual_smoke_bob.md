@@ -38,11 +38,11 @@ Run BEFORE declaring SP6 Phase 0 done. Estimated time: ~40 min.
    - Expect Score JSON with `tracks.execute.O1.passed == n_passed_in_step_4`.
    - The replay's `evidence_sha256` must match step 4's `evidence_root` byte-for-byte (deterministic root hash).
 
-6. **Verify (gated on signed Score.json).** If bob's apikey is wired and step 4's Score.json carries an `rcan_signature`:
+6. **Verify (Phase 1 wiring landed 2026-04-30).** Step 4's Score.json carries an `rcan_signature` whenever `~/.robot-md/keys/<rrn>.signing.json` exists for the served manifest's RRN.
    - Run `spatial_eval_verify(score_json=<contents of Score.json>)`.
    - Expect `{"ok": true, "attestation": "self-attested"}`.
    - Tamper one byte in the signature, re-run, expect `{"ok": false, "error": "invalid signature"}`.
-   - If apikey is not yet wired, this step returns `{"ok": false, "error": "production verifier not wired"}` — that is the documented Phase-0 state, not a failure.
+   - If `~/.robot-md/keys/<rrn>.signing.json` is missing, the score is unsigned (`rcan_signature: null`) and verify returns `{"ok": false, "error": "no rcan_signature on Score JSON"}` — that signals an absent keystore entry, not a wiring gap.
 
 7. **Submit-to-RRF stub.** Run `spatial_eval_submit_to_rrf(run_dir=<path>)`. Expect `{"ok": true, "status": "pending_phase_1", "message": "...RRF §27..."}`. This is the documented Phase-0 stub.
 
