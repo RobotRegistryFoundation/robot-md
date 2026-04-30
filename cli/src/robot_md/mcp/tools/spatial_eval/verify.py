@@ -15,20 +15,10 @@ from __future__ import annotations
 
 import base64
 import binascii
-import json
 from collections.abc import Callable
 
 from robot_md.spatial_eval.score import ScoreJSON
-
-
-def _payload_for_signing(score: ScoreJSON) -> bytes:
-    """Canonical bytes that the signature is computed over: the Score JSON
-    with `rcan_signature` set to None (cleared) so the signature isn't
-    over itself.
-    """
-    d = score.to_dict()
-    d["rcan_signature"] = None
-    return json.dumps(d, sort_keys=True, separators=(",", ":")).encode("utf-8")
+from robot_md.spatial_eval.sign import payload_bytes
 
 
 def _make_apikey_verifier(rrn: str) -> Callable[[bytes, str], bool] | None:
@@ -70,7 +60,7 @@ def verify_tool(
     if score.rcan_signature is None:
         return {"ok": False, "error": "no rcan_signature on Score JSON"}
 
-    payload = _payload_for_signing(score)
+    payload = payload_bytes(score)
 
     if _verify_signature is None:
         _verify_signature = _make_apikey_verifier(score.rrn)

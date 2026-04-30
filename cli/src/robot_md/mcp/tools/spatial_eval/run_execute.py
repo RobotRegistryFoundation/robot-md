@@ -22,6 +22,7 @@ from robot_md.spatial_eval.score import (
     ProbeTrack,
     ScoreJSON,
 )
+from robot_md.spatial_eval.sign import try_apikey_sign
 
 
 def run_execute_tool(
@@ -93,5 +94,15 @@ def run_execute_tool(
     }
     score.tracks_execute = per_unit_with_root
     score.evidence_root = f"sha256:{root}"
+
+    # Self-attest: sign the Score JSON with the keystore keypair for this
+    # RRN if one exists. Verifier in spatial_eval_verify uses the same
+    # canonicalization. Robots without a keypair on disk produce unsigned
+    # scores — verify_tool returns the standard "no rcan_signature" error
+    # in that case rather than crashing.
+    sig = try_apikey_sign(score)
+    if sig is not None:
+        score.rcan_signature = sig
+
     (rd / "Score.json").write_text(score.to_json())
     return {"ok": True, "score": score.to_dict(), "run_dir": str(rd)}
