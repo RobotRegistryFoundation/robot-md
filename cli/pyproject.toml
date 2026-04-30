@@ -108,6 +108,8 @@ Spec = "https://robotmd.dev/spec/v1"
 
 [project.entry-points."robot_md.backends"]
 feetech_depthai = "robot_md.backends.feetech_depthai:FeetechDepthaiBackend"
+lerobot         = "robot_md.backends.lerobot:LerobotBackend"
+realsense       = "robot_md.backends.realsense:RealsenseBackend"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/robot_md"]
