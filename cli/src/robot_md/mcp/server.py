@@ -309,6 +309,17 @@ def build_server(ctx: McpContext):
 
         return json.dumps(_re(ctx), indent=2)
 
+    # SP-AN: hot-plug pending events. Notifications wired in Tasks 3-4.
+    from robot_md.mcp.resources.hotplug_pending import URI as _HOTPLUG_PENDING_URI
+
+    @server.resource(_HOTPLUG_PENDING_URI, mime_type="application/json")
+    def _resource_hotplug_pending() -> str:
+        import json
+
+        from robot_md.mcp.resources.hotplug_pending import build_pending_payload
+
+        return json.dumps(build_pending_payload(), indent=2)
+
     # ── Prompts (slash commands in Claude Desktop/Code) ──────────────────────
     # Raw robot name for human-readable prompt text (trimmed, not URI-sanitized).
     _raw_robot_name = (ctx.spec.metadata.robot_name if ctx.spec else None) or robot_name
