@@ -26,10 +26,63 @@ from robot_md.spatial_eval.score import ScoreJSON
 DEFAULT_RRF_ENDPOINT = "https://robotregistryfoundation.org"
 RUNS_PATH = "/v1/spatial-eval/runs"
 RUN_DETAIL_PATH = "/v1/spatial-eval/runs/{submission_id}"
+SPEC_PATH = "/v1/spatial-eval/spec/{version}"
 
 
 class RrfSubmitError(RuntimeError):
     """Raised on missing apikey, network failure, or non-2xx HTTP response."""
+
+
+class RrfFetchError(RuntimeError):
+    """Raised when the spec endpoint can't serve the requested data
+    (network down, 404, malformed response). Verifiers should treat this
+    as a soft failure — fall back to self-attested rather than raising.
+    """
+
+
+def fetch_rrf_pubkey(
+    spec_version: str,
+    *,
+    endpoint: str = DEFAULT_RRF_ENDPOINT,
+    timeout: float = 5.0,
+) -> bytes:
+    """GET /v1/spatial-eval/spec/{version} and return the raw RRF ML-DSA
+    public key bytes (base64-decoded). Raises RrfFetchError on any
+    non-success path.
+
+    No audit logging here — pubkey fetches are read-only and frequent;
+    spamming the audit chain with every verify call would be noise.
+    """
+    import base64
+    import binascii
+
+    url = endpoint.rstrip("/") + SPEC_PATH.format(version=spec_version)
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={
+            "Accept": "application/json",
+            "User-Agent": f"robot-md/{__version__}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body_bytes = resp.read()
+    except (urllib.error.HTTPError, urllib.error.URLError, OSError) as e:
+        raise RrfFetchError(f"could not fetch RRF spec from {url}: {e}") from e
+
+    try:
+        body = json.loads(body_bytes)
+    except json.JSONDecodeError as e:
+        raise RrfFetchError(f"RRF spec returned non-JSON: {e}") from e
+
+    pubkey_b64 = body.get("rrf_pubkey")
+    if not isinstance(pubkey_b64, str) or not pubkey_b64:
+        raise RrfFetchError(f"RRF spec response missing rrf_pubkey: {body!r}")
+    try:
+        return base64.b64decode(pubkey_b64)
+    except (ValueError, binascii.Error) as e:
+        raise RrfFetchError(f"RRF spec rrf_pubkey is not valid base64: {e}") from e
 
 
 def submit_score(

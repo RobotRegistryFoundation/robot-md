@@ -58,19 +58,28 @@ def test_verify_rejects_invalid_rrf_signature():
 
 
 def test_verify_score_with_rrf_sig_but_no_rrf_verifier_falls_back_to_self_attested_with_warning():
-    """Phase 1.5 production path: rrf_signature is present on the score but
-    RRF's public key isn't fetchable yet (spec endpoint not built). Don't
-    claim registry-attested without verifying — return self-attested with
-    a clear warning so callers see the situation."""
-    out = verify_tool(
-        MagicMock(),
-        score_json=_score_with("rcan-sig", "rrf-sig"),
-        _verify_signature=lambda payload, sig: True,
-        # _verify_rrf_signature=None  -- omitted on purpose
-    )
+    """When rrf_signature is present but the production fetcher can't
+    reach the spec endpoint (offline / unbuilt), don't claim
+    registry-attested without verifying — return self-attested with a
+    clear warning so callers see the situation. Mocks urllib to simulate
+    network failure, since the default path would otherwise hit the
+    real internet."""
+    import urllib.error
+    from unittest.mock import patch
+
+    def _no_network(req, timeout=None):
+        raise urllib.error.URLError("network disabled in test")
+
+    with patch("urllib.request.urlopen", side_effect=_no_network):
+        out = verify_tool(
+            MagicMock(),
+            score_json=_score_with("rcan-sig", "rrf-sig"),
+            _verify_signature=lambda payload, sig: True,
+            # _verify_rrf_signature=None  -- omitted on purpose
+        )
     assert out["ok"] is True
     assert out["attestation"] == "self-attested"
-    assert "rrf_signature present" in out["warning"]
+    assert "RRF public key could not be fetched" in out["warning"]
 
 
 def test_verify_score_without_rrf_sig_still_returns_self_attested():
