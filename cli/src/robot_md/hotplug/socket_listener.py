@@ -22,6 +22,7 @@ import asyncio
 import contextlib
 import os
 import socket as _socket
+import sys
 from pathlib import Path
 
 _DEFAULT_PATH = (
@@ -61,12 +62,14 @@ class SocketListener:
         sock.listen()
         sock.setblocking(False)
         self._sock = sock
-        # cleanup_socket=False because we own the file lifecycle in stop().
-        self._server = await asyncio.start_unix_server(
-            handler,
-            sock=sock,
-            cleanup_socket=False,
-        )
+        # cleanup_socket was added in Python 3.13. On 3.13+ asyncio would
+        # otherwise unlink our socket path on shutdown; on 3.11/3.12 the
+        # kwarg raises TypeError and the pre-bound sock already has the
+        # behavior we want. We own the file lifecycle in stop() either way.
+        kwargs: dict = {"sock": sock}
+        if sys.version_info >= (3, 13):
+            kwargs["cleanup_socket"] = False
+        self._server = await asyncio.start_unix_server(handler, **kwargs)
 
     async def broadcast(self, byte: bytes = b"\x01") -> int:
         """Push `byte` to every connected subscriber. Drops dead writers
