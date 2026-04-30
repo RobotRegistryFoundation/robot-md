@@ -69,9 +69,11 @@ def test_submit_score_rrf_down_raises_and_records_audit(home_with_apikey):
 
     from robot_md.spatial_eval.rrf import RrfSubmitError, submit_score
 
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        with pytest.raises(RrfSubmitError, match="could not reach"):
-            submit_score(_signed_score())
+    with (
+        patch("urllib.request.urlopen", side_effect=fake_urlopen),
+        pytest.raises(RrfSubmitError, match="could not reach"),
+    ):
+        submit_score(_signed_score())
 
     audit_log = home_with_apikey / ".robot-md" / "audit" / "RRN-000000000002.jsonl"
     entries = [json.loads(line) for line in audit_log.read_text().splitlines() if line]
@@ -94,9 +96,11 @@ def test_submit_score_4xx_raises_and_records_audit(home_with_apikey):
 
     from robot_md.spatial_eval.rrf import RrfSubmitError, submit_score
 
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        with pytest.raises(RrfSubmitError, match="returned 422"):
-            submit_score(_signed_score())
+    with (
+        patch("urllib.request.urlopen", side_effect=fake_urlopen),
+        pytest.raises(RrfSubmitError, match="returned 422"),
+    ):
+        submit_score(_signed_score())
 
     audit_log = home_with_apikey / ".robot-md" / "audit" / "RRN-000000000002.jsonl"
     entries = [json.loads(line) for line in audit_log.read_text().splitlines() if line]
@@ -125,9 +129,11 @@ def test_poll_status_404_raises_and_records_audit(home_with_apikey):
 
     from robot_md.spatial_eval.rrf import RrfSubmitError, poll_status
 
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        with pytest.raises(RrfSubmitError, match="returned 404"):
-            poll_status("sub_x", rrn="RRN-000000000002")
+    with (
+        patch("urllib.request.urlopen", side_effect=fake_urlopen),
+        pytest.raises(RrfSubmitError, match="returned 404"),
+    ):
+        poll_status("sub_x", rrn="RRN-000000000002")
 
     audit_log = home_with_apikey / ".robot-md" / "audit" / "RRN-000000000002.jsonl"
     entries = [json.loads(line) for line in audit_log.read_text().splitlines() if line]
@@ -143,9 +149,11 @@ def test_poll_status_rrf_down_raises_and_records_audit(home_with_apikey):
 
     from robot_md.spatial_eval.rrf import RrfSubmitError, poll_status
 
-    with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-        with pytest.raises(RrfSubmitError, match="could not reach"):
-            poll_status("sub_x", rrn="RRN-000000000002")
+    with (
+        patch("urllib.request.urlopen", side_effect=fake_urlopen),
+        pytest.raises(RrfSubmitError, match="could not reach"),
+    ):
+        poll_status("sub_x", rrn="RRN-000000000002")
 
     audit_log = home_with_apikey / ".robot-md" / "audit" / "RRN-000000000002.jsonl"
     entries = [json.loads(line) for line in audit_log.read_text().splitlines() if line]
