@@ -44,7 +44,17 @@ Run BEFORE declaring SP6 Phase 0 done. Estimated time: ~40 min.
    - Tamper one byte in the signature, re-run, expect `{"ok": false, "error": "invalid signature"}`.
    - If `~/.robot-md/keys/<rrn>.signing.json` is missing, the score is unsigned (`rcan_signature: null`) and verify returns `{"ok": false, "error": "no rcan_signature on Score JSON"}` — that signals an absent keystore entry, not a wiring gap.
 
-7. **Submit-to-RRF stub.** Run `spatial_eval_submit_to_rrf(run_dir=<path>)`. Expect `{"ok": true, "status": "pending_phase_1", "message": "...RRF §27..."}`. This is the documented Phase-0 stub.
+7. **Submit-to-RRF (Phase 1.5 wiring landed 2026-04-30).** The §27 client is real; the §27 backend is not yet built. Two ways to exercise:
+
+   a. **MCP path against the real (unbuilt) RRF endpoint.** Run `spatial_eval_submit_to_rrf(run_dir=<path>)`. Expect `{"ok": false, "error": "could not reach https://robotregistryfoundation.org/v1/spatial-eval/runs: ..."}`. The audit log at `~/.robot-md/audit/<rrn>.jsonl` MUST contain a fresh `submission` event with `outcome: network_error` and `kind: spatial-eval-run` — that is the load-bearing assertion.
+
+   b. **CLI path against a local mock RRF.** In one shell, run a 3-line stub server returning `{"submission_id":"sub_x","status":"pending"}` on `POST /v1/spatial-eval/runs`. In bob's shell:
+      ```
+      robot-md spatial-eval submit-to-rrf <path>/Score.json --endpoint http://localhost:8765
+      ```
+      Expect stdout to print the JSON `{"submission_id": "sub_x", "status": "pending"}` and exit 0. Audit entry should be `outcome: ok`.
+
+   c. **Pre-Phase-1.5 unsigned Score guard.** Edit Score.json to clear `rcan_signature` to `null` and re-run; expect `{"ok": false, "error": "...has no rcan_signature — sign the run first..."}` (or CLI exit 2 with the same message).
 
 8. **Full sweep.** Run `spatial_eval_run_full(units=["O1","O2","O3","A1","A2"], trials_per_unit=10)` for a complete pass.
    - Expect <40 min total wall-clock (5 units × 30 probes × 2 stacks ≈ 25 min for probe phase + 5 units × 10 trials × ~30 s each ≈ 25 min for execute, with overlap).
@@ -64,9 +74,10 @@ All seven success criteria from the spec hold:
 
 If any criterion fails: capture the failure (logs, Score JSON, video frames) and open an issue tagged `sp6-bob-smoke`. Do not declare Phase 0 done until all 7 pass.
 
-## Known gaps (Phase 0 → Phase 1)
+## Known gaps (Phase 0 → Phase 1.5 → Phase 2)
 
 - **No video bundling yet:** `videos/` in the evidence packet is empty in Phase 0. Phase 1 will populate it from the judge camera capture (T19's `_score_unit` reads frames but does not currently retain them).
 - **No reset_scorer_registry consumer:** the test fixture exists but no Phase-0 test uses it; T15+ scorer dispatcher tests in v1.1 may.
-- **Production signer not wired:** `spatial_eval_verify` accepts an injected verifier in tests but has no production counterpart yet. Apikey integration is the Phase-1 item.
+- **RRF §27 backend not built yet:** Phase 1.5 shipped the robot-md client (`submit_score`, `poll_status`, MCP tool, CLI). Real submission against `robotregistryfoundation.org` returns network_error until the §27 endpoints land. Wire-format contract is locked in `docs/superpowers/specs/2026-04-26-sp6-spatial-intelligence-eval-design.md` "§27 wire format" subsection.
+- **Production rrf-signature verifier not wired:** `verify_tool` accepts a `_verify_rrf_signature` injectable. When `rrf_signature` is present but no verifier is wired, the tool returns self-attested with a warning rather than claiming registry-attested. Production wiring lands when `GET /v1/spatial-eval/spec/{version}` serves the RRF pubkey.
 - **`grid_mat.pdf` is a placeholder path:** the file does not exist on disk in v1.0.0; the BOM doc has manual print instructions instead.
