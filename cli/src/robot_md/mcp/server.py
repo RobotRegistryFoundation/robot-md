@@ -36,9 +36,39 @@ def find_manifest_via_cwd_walk(start: Path) -> Path | None:
 
 def build_server(ctx: McpContext):
     """Build a FastMCP server with the render/validate/estop tools bound to ctx."""
+    from contextlib import asynccontextmanager
+
     from mcp.server.fastmcp import FastMCP
 
-    server = FastMCP("robot-md")
+    # SP-AN: opportunistic active-session capture + lifespan-managed
+    # subscribers. v1 single-session limitation documented in
+    # cli/docs/hotplug-roadmap.md and the 2026-04-30 spike findings.
+    _an_state: dict = {"active_session": None}
+
+    @asynccontextmanager
+    async def _lifespan(_server):
+        from robot_md.hotplug.queue import _DEFAULT_PATH as _HOTPLUG_QUEUE_PATH
+        from robot_md.mcp.resource_subscribers import (
+            FilePollFallback,
+            HotplugResourceSubscriber,
+            make_an_emit,
+        )
+        from robot_md.mcp.resources.hotplug_pending import URI as _U
+
+        emit = make_an_emit(_an_state, _U)
+        sub = HotplugResourceSubscriber(on_change=emit)
+        fallback = FilePollFallback(
+            queue_path=_HOTPLUG_QUEUE_PATH, on_change=emit, interval=2.0,
+        )
+        await sub.start()
+        await fallback.start()
+        try:
+            yield {}
+        finally:
+            await sub.stop()
+            await fallback.stop()
+
+    server = FastMCP("robot-md", lifespan=_lifespan)
 
     @server.tool()
     def render() -> str:
@@ -309,7 +339,10 @@ def build_server(ctx: McpContext):
 
         return json.dumps(_re(ctx), indent=2)
 
-    # SP-AN: hot-plug pending events. Notifications wired in Tasks 3-4.
+    # SP-AN: hot-plug pending events. Each read captures the active
+    # session so the lifespan-managed subscriber can target it for
+    # notifications/resources/updated. v1 single-session limitation; see
+    # docs/superpowers/specs/2026-04-30-span-fastmcp-subscribe-spike.md.
     from robot_md.mcp.resources.hotplug_pending import URI as _HOTPLUG_PENDING_URI
 
     @server.resource(_HOTPLUG_PENDING_URI, mime_type="application/json")
@@ -317,6 +350,13 @@ def build_server(ctx: McpContext):
         import json
 
         from robot_md.mcp.resources.hotplug_pending import build_pending_payload
+
+        try:
+            ctx_ = server.get_context()
+            if ctx_ is not None:
+                _an_state["active_session"] = ctx_.session
+        except (LookupError, RuntimeError, AttributeError):
+            pass
 
         return json.dumps(build_pending_payload(), indent=2)
 
