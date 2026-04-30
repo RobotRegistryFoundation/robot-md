@@ -254,6 +254,17 @@ def build_server(ctx: McpContext):
 
         return hotplug_review_tool()
 
+    @server.tool()
+    def hotplug_confirm(
+        event_id: str, decision: str, choice_index: int | None = None,
+    ) -> dict:
+        """Bind or reject a pending hot-plug event. decision is 'bind' or 'reject'."""
+        from robot_md.mcp.tools.hotplug_confirm import hotplug_confirm_tool
+
+        return hotplug_confirm_tool(
+            event_id=event_id, decision=decision, choice_index=choice_index,
+        )
+
     from robot_md.mcp.resources import _sanitize_robot_name
 
     robot_name = _sanitize_robot_name(ctx.spec.metadata.robot_name if ctx.spec else None)
