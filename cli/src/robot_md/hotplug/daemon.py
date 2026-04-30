@@ -20,6 +20,7 @@ from typing import Callable
 from robot_md.hotplug import matcher
 from robot_md.hotplug.audit import AuditLog
 from robot_md.hotplug.event import DeviceEvent
+from robot_md.hotplug.manifest import merge as manifest_merge
 from robot_md.hotplug.matcher import classify
 from robot_md.hotplug.queue import EventQueue, last_reject_ts_for_event
 from robot_md.hotplug.socket_listener import SocketListener
@@ -71,7 +72,7 @@ async def run_daemon(
                 continue
             seen[key] = now
             decision = classify(evt)
-            queue.append_pending(evt, decision)
+            record = queue.append_pending(evt, decision)
             audit.append("hotplug_event", {
                 "event": {
                     "vid": evt.vid, "pid": evt.pid, "serial": evt.serial,
@@ -80,6 +81,27 @@ async def run_daemon(
                 },
                 "tier": decision.tier,
             })
+            if (
+                decision.tier == "HIGH"
+                and decision.unambiguous
+                and decision.bind_proposal is not None
+            ):
+                outcome = manifest_merge(
+                    decision.bind_proposal,
+                    manifest_path=Path.cwd() / "ROBOT.md",
+                )
+                if outcome.success:
+                    queue.append_resolution(
+                        ref_id=record.id, resolution="bind", by="daemon",
+                        outcome={"driver_id": outcome.driver_id, "rrn": outcome.rrn},
+                    )
+                    audit.append("hotplug_bind", {"driver_id": outcome.driver_id})
+                else:
+                    queue.append_resolution(
+                        ref_id=record.id, resolution="bind", by="daemon",
+                        outcome={"merge_failed": outcome.reason},
+                    )
+                    audit.append("merge_failed", {"reason": outcome.reason})
 
     task = asyncio.create_task(event_loop())
     try:
