@@ -55,11 +55,16 @@ async def run_daemon(
     audit_root: Path,
     watcher_factory: Callable[[], object],
     rrn: str = "RRN-current",
+    listener: SocketListener | None = None,
 ) -> int:
     queue = EventQueue(path=queue_path)
     audit = AuditLog(rrn=rrn, root=audit_root)
     seen: dict[tuple, datetime] = {}
     restore_provider = _install_recent_reject_provider(queue)
+
+    async def _nudge() -> None:
+        if listener is not None:
+            await listener.broadcast()
 
     async def event_loop():
         async for evt in watcher_factory():
@@ -81,6 +86,7 @@ async def run_daemon(
                 },
                 "tier": decision.tier,
             })
+            await _nudge()
             if (
                 decision.tier == "HIGH"
                 and decision.unambiguous
@@ -102,6 +108,7 @@ async def run_daemon(
                         outcome={"merge_failed": outcome.reason},
                     )
                     audit.append("merge_failed", {"reason": outcome.reason})
+                await _nudge()
 
     task = asyncio.create_task(event_loop())
     try:
@@ -130,7 +137,7 @@ async def run_daemon_with_socket(
     """
     listener = SocketListener(path=socket_path)
     try:
-        await listener.start(on_nudge=lambda: None)
+        await listener.start()
     except OSError as e:
         if e.errno == errno.EADDRINUSE or "already in use" in str(e).lower():
             return 2
@@ -143,6 +150,7 @@ async def run_daemon_with_socket(
             audit_root=audit_root,
             watcher_factory=watcher_factory,
             rrn=rrn,
+            listener=listener,
         )
     finally:
         await listener.stop()

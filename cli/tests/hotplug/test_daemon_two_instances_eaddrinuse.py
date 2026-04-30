@@ -25,7 +25,7 @@ def test_second_daemon_exits_with_eaddrinuse(tmp_path: Path) -> None:
 
     async def main():
         # Pre-bind the socket to simulate a running daemon.
-        await listener.start(on_nudge=lambda: None)
+        await listener.start()
         try:
             rc = await run_daemon_with_socket(
                 stop_event=stop2,
