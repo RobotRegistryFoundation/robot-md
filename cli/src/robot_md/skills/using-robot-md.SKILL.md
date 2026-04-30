@@ -177,15 +177,12 @@ When you receive that notification:
      for v1 — call this out and offer to help edit ROBOT.md by hand.)
 3. For MEDIUM/LOW-tier pending events:
    - Surface the event with its alternatives.
-   - Ask the operator: "Want me to bind this as {top_candidate}, pick
-     a different option, or reject?"
+   - Ask the operator: "Want me to bind this as {top_candidate}, pick a different option, or reject?"
    - Call `hotplug_confirm` with their answer.
 
 ## Modality hierarchy
 
-If the operator is in voice mode, **announce by voice first**, then mirror
-the same text to the chat. If the operator is in text mode, write to the
-chat only.
+If the operator is in voice mode, **announce by voice first**, then mirror the same text to the chat. If the operator is in text mode, write to the chat only.
 
 ## Resolved-elsewhere handling
 
