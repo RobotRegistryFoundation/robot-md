@@ -71,9 +71,7 @@ def test_poll_status_sends_bearer_auth(home):
     with patch("urllib.request.urlopen", side_effect=fake_urlopen):
         poll_status("sub_x", rrn="RRN-000000000002")
 
-    auth = next(
-        (v for k, v in captured["headers"].items() if k.lower() == "authorization"), None
-    )
+    auth = next((v for k, v in captured["headers"].items() if k.lower() == "authorization"), None)
     assert auth == "Bearer bob-apikey"
 
 

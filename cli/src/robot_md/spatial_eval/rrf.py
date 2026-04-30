@@ -52,8 +52,7 @@ def submit_score(
         api_key = load_apikey(rrn)
     if not api_key:
         raise RrfSubmitError(
-            f"no apikey for {rrn} in ~/.robot-md/keys/. "
-            f"Run `robot-md register` to mint one."
+            f"no apikey for {rrn} in ~/.robot-md/keys/. Run `robot-md register` to mint one."
         )
 
     url = endpoint.rstrip("/") + RUNS_PATH
@@ -140,8 +139,7 @@ def poll_status(
         api_key = load_apikey(rrn)
     if not api_key:
         raise RrfSubmitError(
-            f"no apikey for {rrn} in ~/.robot-md/keys/. "
-            f"Run `robot-md register` to mint one."
+            f"no apikey for {rrn} in ~/.robot-md/keys/. Run `robot-md register` to mint one."
         )
 
     url = endpoint.rstrip("/") + RUN_DETAIL_PATH.format(submission_id=submission_id)

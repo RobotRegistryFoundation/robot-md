@@ -128,9 +128,7 @@ def test_submit_score_sends_bearer_auth_for_score_rrn(with_apikey):
     with patch("urllib.request.urlopen", side_effect=fake_urlopen):
         submit_score(_signed_score())
 
-    auth = next(
-        (v for k, v in captured["headers"].items() if k.lower() == "authorization"), None
-    )
+    auth = next((v for k, v in captured["headers"].items() if k.lower() == "authorization"), None)
     assert auth == "Bearer bob-apikey-xyz"
 
 

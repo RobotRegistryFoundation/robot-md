@@ -85,9 +85,7 @@ def test_submit_to_rrf_unsigned_score_returns_error(tmp_path):
         rrn="RRN-000000000002",
         run_id="run-1",
         timestamp="2026-04-30T18:00:00Z",
-        tracks_probe=ProbeTrack(
-            baseline_claude={}, robot_declared={}, delta_per_unit={}
-        ),
+        tracks_probe=ProbeTrack(baseline_claude={}, robot_declared={}, delta_per_unit={}),
         tracks_execute={},
         aggregate=Aggregate(probe_baseline=0.0, probe_declared=0.0, execute=0.0),
         rcan_signature=None,
