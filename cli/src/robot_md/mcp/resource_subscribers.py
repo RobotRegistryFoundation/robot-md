@@ -40,26 +40,58 @@ async def _maybe_await(result: Any) -> None:
         await result
 
 
-def make_an_emit(state: dict, uri: str) -> Callable[[], Awaitable[None]]:
-    """Build the SP-AN emit-closure used by HotplugResourceSubscriber +
-    FilePollFallback. The closure looks at state["active_session"] (set
-    by the resource handler in build_server) and calls
-    send_resource_updated(uri) on it. If the session is gone or the call
-    raises, the closure clears state["active_session"] so the next
-    resource read recaptures.
+class SessionRegistry:
+    """Per-(URI, session) subscription registry for SP-AN v2 multi-session.
+
+    The MCP server's lowlevel `subscribe_resource` / `unsubscribe_resource`
+    handlers maintain entries here. The SP-HP queue subscribers
+    (HotplugResourceSubscriber + FilePollFallback) call `emit(uri)` on
+    every queue change; emit fans out to every session currently
+    subscribed to that URI. Sessions that raise from `send_resource_updated`
+    are evicted so subsequent emits skip them.
     """
-    from pydantic import AnyUrl
 
-    emit_uri = AnyUrl(uri)
+    def __init__(self) -> None:
+        self._subs: dict[str, list[Any]] = {}
 
-    async def emit() -> None:
-        sess = state.get("active_session")
-        if sess is None:
+    def add(self, uri: str, session: Any) -> None:
+        bucket = self._subs.setdefault(uri, [])
+        if session not in bucket:
+            bucket.append(session)
+
+    def remove(self, uri: str, session: Any) -> None:
+        bucket = self._subs.get(uri)
+        if not bucket:
             return
         try:
-            await sess.send_resource_updated(emit_uri)
-        except Exception:
-            state["active_session"] = None
+            bucket.remove(session)
+        except ValueError:
+            pass
+
+    async def emit(self, uri: str) -> None:
+        from pydantic import AnyUrl
+
+        emit_uri = AnyUrl(uri)
+        bucket = self._subs.get(uri, [])
+        if not bucket:
+            return
+        dead: list[Any] = []
+        for sess in list(bucket):
+            try:
+                await sess.send_resource_updated(emit_uri)
+            except Exception:
+                dead.append(sess)
+        for sess in dead:
+            self.remove(uri, sess)
+
+
+def make_registry_emit(registry: SessionRegistry, uri: str) -> Callable[[], Awaitable[None]]:
+    """Build the on_change closure expected by HotplugResourceSubscriber +
+    FilePollFallback. Each fire calls registry.emit(uri).
+    """
+
+    async def emit() -> None:
+        await registry.emit(uri)
 
     return emit
 
