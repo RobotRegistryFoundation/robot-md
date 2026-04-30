@@ -55,6 +55,7 @@ def verify_tool(
     *,
     score_json: str,
     _verify_signature: Callable[[bytes, str], bool] | None = None,
+    _verify_rrf_signature: Callable[[bytes, str], bool] | None = None,
 ) -> dict:
     score = ScoreJSON.from_json(score_json)
     if score.rcan_signature is None:
@@ -76,4 +77,20 @@ def verify_tool(
     if not _verify_signature(payload, score.rcan_signature):
         return {"ok": False, "error": "invalid signature"}
 
-    return {"ok": True, "attestation": "self-attested"}
+    if score.rrf_signature is None:
+        return {"ok": True, "attestation": "self-attested"}
+
+    if _verify_rrf_signature is None:
+        return {
+            "ok": True,
+            "attestation": "self-attested",
+            "warning": (
+                "rrf_signature present but RRF public key is not yet available "
+                "locally; counter-signature was not verified"
+            ),
+        }
+
+    if not _verify_rrf_signature(payload, score.rrf_signature):
+        return {"ok": False, "error": "invalid rrf_signature"}
+
+    return {"ok": True, "attestation": "registry-attested"}
