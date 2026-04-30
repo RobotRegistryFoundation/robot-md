@@ -158,6 +158,42 @@ If the operator hasn't invoked a prompt, you can still proceed via the matching 
 - **Problem:** You add a new capability or tweak a driver port, then move on. The manifest now fails schema validation silently.
 - **Fix:** After any edit to `ROBOT.md`, call the `validate` MCP tool or run `robot-md validate ROBOT.md`.
 
+## Reacting to hot-plug events
+
+The MCP server emits `notifications/resources/updated` for
+`robot-md://hotplug/pending` whenever new hardware is detected.
+
+When you receive that notification:
+
+1. Call `hotplug_review`.
+2. For HIGH-tier events that already resolved (`bind`):
+   - **Announce to the operator** — say or write:
+     "Found a {preset_name} on {port}. I bound it as the {driver_id} driver
+      using the {backend_name} backend. Say 'undo' to reject."
+   - If the operator says undo / reject within 30 s of the announce,
+     call `hotplug_confirm({event_id}, "reject")`. The daemon will append
+     a rejection record; the manifest stays bound but the audit trail
+     captures the operator's intent. (Manifest unbinding is out of scope
+     for v1 — call this out and offer to help edit ROBOT.md by hand.)
+3. For MEDIUM/LOW-tier pending events:
+   - Surface the event with its alternatives.
+   - Ask the operator: "Want me to bind this as {top_candidate}, pick
+     a different option, or reject?"
+   - Call `hotplug_confirm` with their answer.
+
+## Modality hierarchy
+
+If the operator is in voice mode, **announce by voice first**, then mirror
+the same text to the chat. If the operator is in text mode, write to the
+chat only.
+
+## Resolved-elsewhere handling
+
+If you call `hotplug_confirm` and get back `already_resolved`, the
+operator confirmed it via another path (e.g., `robot-md hotplug confirm`
+from a terminal, or — in the future — a pendant). Tell them you saw it
+("Got it — I see {decision} happened from the terminal.") and move on.
+
 ## Red Flags
 
 **Never:**
