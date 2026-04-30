@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 from robot_md.backends import BackendRegistry
 from robot_md.backends.capability import Capability
 from robot_md.hotplug.event import DeviceEvent
 from robot_md.hotplug import presets_index
+
+_RECENT_REJECT_WINDOW = timedelta(hours=1)
+
+
+def _recent_reject_for(evt: DeviceEvent) -> str | None:
+    """Return the ISO timestamp of the most-recent reject for this device, or None.
+
+    Default implementation returns None until Task 9 wires the queue file in.
+    Tests patch this to inject fixtures.
+    """
+    return None
 
 
 @dataclass(frozen=True)
@@ -77,6 +89,19 @@ def classify(evt: DeviceEvent) -> Decision:
             ))
 
     if len(proposals) == 1 and preset_matches[0].confidence == "exact_match":
+        recent = _recent_reject_for(evt)
+        if recent is not None:
+            recent_dt = datetime.fromisoformat(recent.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) - recent_dt < _RECENT_REJECT_WINDOW:
+                return Decision(
+                    tier="MEDIUM", unambiguous=False,
+                    bind_proposal=proposals[0],
+                    alternatives=[],
+                    reasons=[
+                        f"exact preset match {preset_matches[0].preset_name}",
+                        f"recently rejected at {recent}; not auto-binding",
+                    ],
+                )
         return Decision(
             tier="HIGH", unambiguous=True, bind_proposal=proposals[0],
             alternatives=[],
