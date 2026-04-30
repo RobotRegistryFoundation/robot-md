@@ -63,10 +63,8 @@ class SessionRegistry:
         bucket = self._subs.get(uri)
         if not bucket:
             return
-        try:
+        with contextlib.suppress(ValueError):
             bucket.remove(session)
-        except ValueError:
-            pass
 
     async def emit(self, uri: str) -> None:
         from pydantic import AnyUrl
