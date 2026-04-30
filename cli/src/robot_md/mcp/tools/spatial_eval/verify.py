@@ -50,12 +50,52 @@ def _make_apikey_verifier(rrn: str) -> Callable[[bytes, str], bool] | None:
     return verify
 
 
+def _make_rrf_verifier(
+    spec_version: str,
+    *,
+    endpoint: str | None = None,
+) -> Callable[[bytes, str], bool] | None:
+    """Build a (payload, sig_b64) -> bool verifier bound to RRF's ML-DSA
+    public key for `spec_version`. Fetches the key from
+    GET /v1/spatial-eval/spec/{version}. Returns None if the fetch
+    fails (network down, 404, malformed response) — callers should treat
+    None as "RRF pubkey unavailable, fall back to self-attested with
+    warning".
+    """
+    from rcan.crypto import verify_ml_dsa
+
+    from robot_md.spatial_eval.rrf import (
+        DEFAULT_RRF_ENDPOINT,
+        RrfFetchError,
+        fetch_rrf_pubkey,
+    )
+
+    try:
+        rrf_pub = fetch_rrf_pubkey(spec_version, endpoint=endpoint or DEFAULT_RRF_ENDPOINT)
+    except RrfFetchError:
+        return None
+
+    def verify(payload: bytes, sig_b64: str) -> bool:
+        try:
+            sig_bytes = base64.b64decode(sig_b64)
+        except (ValueError, binascii.Error):
+            return False
+        try:
+            verify_ml_dsa(rrf_pub, payload, sig_bytes)
+        except Exception:
+            return False
+        return True
+
+    return verify
+
+
 def verify_tool(
     ctx,
     *,
     score_json: str,
     _verify_signature: Callable[[bytes, str], bool] | None = None,
     _verify_rrf_signature: Callable[[bytes, str], bool] | None = None,
+    rrf_endpoint: str | None = None,
 ) -> dict:
     score = ScoreJSON.from_json(score_json)
     if score.rcan_signature is None:
@@ -81,14 +121,17 @@ def verify_tool(
         return {"ok": True, "attestation": "self-attested"}
 
     if _verify_rrf_signature is None:
-        return {
-            "ok": True,
-            "attestation": "self-attested",
-            "warning": (
-                "rrf_signature present but RRF public key is not yet available "
-                "locally; counter-signature was not verified"
-            ),
-        }
+        _verify_rrf_signature = _make_rrf_verifier(score.spec_version, endpoint=rrf_endpoint)
+        if _verify_rrf_signature is None:
+            return {
+                "ok": True,
+                "attestation": "self-attested",
+                "warning": (
+                    "rrf_signature present but RRF public key could not be "
+                    "fetched (network down, spec endpoint missing, or "
+                    "malformed response); counter-signature was not verified"
+                ),
+            }
 
     if not _verify_rrf_signature(payload, score.rrf_signature):
         return {"ok": False, "error": "invalid rrf_signature"}

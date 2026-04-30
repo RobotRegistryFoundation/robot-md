@@ -431,8 +431,11 @@ Response — `200 OK`:
 ```
 
 Error responses:
+- `400 Bad Request` — malformed submission_id.
+- `401 Unauthorized` — missing Bearer header.
 - `404 Not Found` — unknown submission_id.
-- `403 Forbidden` — apikey RRN doesn't match the submission's owner RRN.
+
+**Bearer is opaque on GET** (matches §22-26): any holder of a valid Bearer token can fetch by submission_id. Submission ids are unguessable (uuid4-class) so they're effectively the auth token. Tightening to per-RRN authorization waits on a stable apikey→RRN reverse-lookup store.
 
 **Counter-signature canonicalization.** RRF's `rrf_signature` is computed against `payload_bytes(score)` — the exact same canonical form the robot signed (both `rcan_signature` and `rrf_signature` cleared before serialization). RRF endorses the bytes the robot endorsed. This means a registry-attested score still self-verifies under the robot's keypair without modification.
 
