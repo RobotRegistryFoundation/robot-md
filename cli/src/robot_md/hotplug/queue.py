@@ -103,8 +103,6 @@ class EventQueue:
         _, dropped = _safe_iter_records(self.path)
         if dropped == 0:
             return
-        # Make sure the alert lands on its own line even if the trailing
-        # corrupt fragment lacks a newline terminator.
         with self.path.open("ab") as f:
             fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             try:
@@ -164,7 +162,6 @@ class EventQueue:
         by: str,
         outcome: dict | None,
     ) -> QueueRecord:
-        # First-writer-wins: refuse a second resolution for the same pending id.
         records, _ = _safe_iter_records(self.path)
         for rec in records:
             if rec.get("kind") == "resolved" and rec.get("ref") == ref_id:
@@ -222,3 +219,30 @@ class EventQueue:
                 self.append_resolution(ref_id=rid, resolution="expired", by="daemon", outcome=None)
                 expired_ids.append(rid)
         return expired_ids
+
+
+def last_reject_ts_for_event(queue: EventQueue, evt: DeviceEvent) -> str | None:
+    """Return the ISO ts of the most recent 'reject' resolution whose original
+    pending event had the same (vid, pid, serial, path) as `evt`, or None if
+    no such reject exists. The daemon wires matcher._recent_reject_for to a
+    closure over this so the recent-reject demotion (Task 8) becomes live.
+    """
+    records, _ = _safe_iter_records(queue.path)
+    pending_event_by_id = {
+        r["id"]: r.get("event")
+        for r in records if r.get("kind") == "pending"
+    }
+    target_key = (evt.vid, evt.pid, evt.serial, evt.path)
+    candidates: list[str] = []
+    for r in records:
+        if r.get("kind") != "resolved" or r.get("resolution") != "reject":
+            continue
+        ev = pending_event_by_id.get(r.get("ref"))
+        if not ev:
+            continue
+        ev_key = (ev.get("vid"), ev.get("pid"), ev.get("serial"), ev.get("path"))
+        if ev_key == target_key:
+            ts = r.get("ts")
+            if ts:
+                candidates.append(ts)
+    return max(candidates) if candidates else None
