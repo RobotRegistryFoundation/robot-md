@@ -260,11 +260,16 @@ def build_server(ctx: McpContext):
 
     @server.tool()
     def spatial_eval_verify(score_json: str) -> dict:
-        """Verify a Score JSON's RCAN signature.
+        """Verify a Score JSON's RCAN ML-DSA signature.
 
-        Phase 0: returns `production verifier not wired` when no injected
-        verifier is available. Phase 1 wires this to the apikey-based verifier
-        once that integration ships in a separate plan.
+        Loads the signing keypair from ~/.robot-md/keys/<rrn>.signing.json
+        for the score's `rrn` and verifies `rcan_signature` against the
+        canonical bytes of the score with `rcan_signature` cleared. Returns
+        `attestation: self-attested` on success. Returns a clean
+        keystore-miss error if the keypair isn't on disk (the robot was
+        registered elsewhere or the keystore was cleaned up). The signer
+        side (run_execute_tool emitting an `rcan_signature` on Score.json)
+        is a separate follow-up.
         """
         from robot_md.mcp.tools.spatial_eval.verify import verify_tool
 

@@ -1,10 +1,63 @@
-"""MCP tool: spatial_eval_verify — verify a self-attested Score JSON signature."""
+"""MCP tool: spatial_eval_verify — verify a self-attested Score JSON signature.
+
+Phase 1: production verifier wired. By default, verify_tool loads the
+ML-DSA signing keypair from ~/.robot-md/keys/<rrn>.signing.json (the
+same keystore that holds the apikey-signed RRF artifacts) and verifies
+the Score JSON's `rcan_signature` against the canonical bytes of the
+score with `rcan_signature` cleared (you can't sign over your own
+signature).
+
+Tests inject `_verify_signature` to skip the keystore lookup; production
+callers leave it None.
+"""
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 from collections.abc import Callable
 
 from robot_md.spatial_eval.score import ScoreJSON
+
+
+def _payload_for_signing(score: ScoreJSON) -> bytes:
+    """Canonical bytes that the signature is computed over: the Score JSON
+    with `rcan_signature` set to None (cleared) so the signature isn't
+    over itself.
+    """
+    d = score.to_dict()
+    d["rcan_signature"] = None
+    return json.dumps(d, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _make_apikey_verifier(rrn: str) -> Callable[[bytes, str], bool] | None:
+    """Build a (payload, sig_b64) -> bool verifier bound to the keystore
+    keypair for `rrn`. Returns None if the keystore has no entry — callers
+    should surface that as a clean error.
+    """
+    from rcan.crypto import verify_ml_dsa
+
+    from robot_md.signing import load_keypair
+
+    kp = load_keypair(rrn)
+    if kp is None:
+        return None
+
+    pq_pub = kp.ml_dsa.public_key_bytes
+
+    def verify(payload: bytes, sig_b64: str) -> bool:
+        try:
+            sig_bytes = base64.b64decode(sig_b64)
+        except (ValueError, binascii.Error):
+            return False
+        try:
+            verify_ml_dsa(pq_pub, payload, sig_bytes)
+        except Exception:
+            return False
+        return True
+
+    return verify
 
 
 def verify_tool(
@@ -16,12 +69,21 @@ def verify_tool(
     score = ScoreJSON.from_json(score_json)
     if score.rcan_signature is None:
         return {"ok": False, "error": "no rcan_signature on Score JSON"}
-    payload = score.to_json().encode("utf-8")
+
+    payload = _payload_for_signing(score)
+
     if _verify_signature is None:
-        # Per reviewer T28/T29 note: signers are dependency-injected. The
-        # production wiring lands in a later task; until then, callers must
-        # inject a verifier explicitly.
-        return {"ok": False, "error": "production verifier not wired"}
+        _verify_signature = _make_apikey_verifier(score.rrn)
+        if _verify_signature is None:
+            return {
+                "ok": False,
+                "error": (
+                    f"no signing keypair for {score.rrn} in keystore — "
+                    f"register the robot or restore ~/.robot-md/keys/{score.rrn}.signing.json"
+                ),
+            }
+
     if not _verify_signature(payload, score.rcan_signature):
         return {"ok": False, "error": "invalid signature"}
+
     return {"ok": True, "attestation": "self-attested"}
