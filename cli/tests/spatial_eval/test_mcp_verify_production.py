@@ -13,7 +13,6 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 from rcan.crypto import sign_ml_dsa
 
 from robot_md.mcp.tools.spatial_eval.verify import verify_tool
@@ -65,7 +64,8 @@ def test_production_verifier_accepts_well_signed_score(monkeypatch, tmp_path: Pa
 
 
 def test_production_verifier_rejects_tampered_signature(
-    monkeypatch, tmp_path: Path,
+    monkeypatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     kp = generate_keypair()
@@ -85,7 +85,8 @@ def test_production_verifier_rejects_tampered_signature(
 
 
 def test_production_verifier_rejects_tampered_payload(
-    monkeypatch, tmp_path: Path,
+    monkeypatch,
+    tmp_path: Path,
 ) -> None:
     """Sign one score; then mutate a non-signature field and ask the verifier
     to check it. The signature was over the pre-mutation canonical bytes,
@@ -107,7 +108,8 @@ def test_production_verifier_rejects_tampered_payload(
 
 
 def test_production_verifier_keystore_miss_returns_clean_error(
-    monkeypatch, tmp_path: Path,
+    monkeypatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     score = _score_with_rrn("RRN-no-key-here")
@@ -119,7 +121,8 @@ def test_production_verifier_keystore_miss_returns_clean_error(
 
 
 def test_production_verifier_returns_no_signature_error_when_unsigned(
-    monkeypatch, tmp_path: Path,
+    monkeypatch,
+    tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("HOME", str(tmp_path))
     score = _score_with_rrn("RRN-unsigned")
