@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.4.0] — 2026-04-30
+
+**SP-HP hot-plug daemon + SP-AN announce/confirm + SP6 Phase 1 self-attestation.** Three independent feature tracks land together; together they change what registering a new piece of hardware feels like — OS-level event, conversational confirm in Claude, cryptographically self-attested eval scores.
+
+### Added
+- **SP-HP — `robot-md hotplug-daemon`** per-user daemon watching `pyudev` (Linux), `ioreg + pyserial` (macOS), or polling (Windows). Hash-chained append-only event log at `~/.robot-md/hotplug-events.jsonl`. Three tiers (HIGH / MEDIUM / LOW) based on VID:PID-to-preset uniqueness and matching backend availability. HIGH-tier auto-binds via `fcntl`-locked `ROBOT.md` merge; MEDIUM and LOW queue for operator confirmation. Operator CLI: `robot-md hotplug review|confirm`. MCP tools: `hotplug_review`, `hotplug_confirm`. Service installer: `robot-md hotplug install-service` (systemd / launchd; Windows stub). 50 unit tests + 1 e2e.
+- **SP-AN — MCP resource `robot-md://hotplug/pending`** plus `notifications/resources/updated` plumbing. Linux uses an AF_UNIX socket fanout from the daemon; macOS / Windows fall back to a 2-second mtime poll. Both paths share an opportunistic active-session capture inside the FastMCP `lifespan`. Three new sections in `using-robot-md.SKILL.md` describe the announce-by-voice-then-mirror-to-chat UX, the 30-second undo window, the resolved-elsewhere acknowledgement path, and the MEDIUM-tier alternative-options surface. 24 unit tests (incl. canonical/mirror skill-text harness with char-exact substring contracts).
+- **SP6 Phase 1 — self-attested spatial scores.** `spatial_eval_verify` is now a real verifier: loads the keystore keypair at `~/.robot-md/keys/<rrn>.signing.json` and checks the signature via `rcan.crypto.verify_ml_dsa`. `spatial_eval_run_execute` and `spatial_eval_run_full` produce signed Score.json on disk. Robots without a keypair produce unsigned scores cleanly. New module `robot_md.spatial_eval.sign` is the single source of truth for canonical signing bytes; `payload_bytes` clears `rcan_signature` before serialization (closing the sign-over-own-signature bug Phase 0 stub had embedded). 87 spatial_eval tests.
+- `watchdog>=3.0` added to core dependencies (`hotplug.manifest_watcher` uses `FileSystemEventHandler`).
+
+### Fixed
+- `socket_listener.py`: `cleanup_socket` kwarg to `asyncio.start_unix_server` is Python 3.13+ only — pass it conditionally so SP-HP socket tests pass on the 3.10/3.11/3.12 CI legs.
+- `spatial_eval.run_full_tool`: re-sign merged Score.json after merging probe + execute tracks. The execute-track signature was stamped before the merge and would otherwise show as `invalid signature` — looks like tampering, isn't.
+
+### Changed
+- 59 ruff lint findings across SP-HP / SP-AN files cleaned up (B017/B904/E402/E501/E702/F401/I001/RUF059/SIM105 + `ruff format` on 46 files).
+
+### Notes
+- 163 cross-area tests green on Python 3.13. Manual smoke on bob is the next gate (SP-AN: `cli/tests/manual/span_smoke.md`; SP6: `cli/tests/spatial_eval/manual_smoke_bob.md`).
+- SP-AN runs single-session-per-process via opportunistic active-session capture. Multi-session generalization needs the lowlevel `mcp.server.lowlevel.Server` API and is a v2 deliverable; trade-off is documented in `cli/docs/hotplug-roadmap.md` and the public spike memo at `docs/superpowers/specs/2026-04-30-span-fastmcp-subscribe-spike.md`.
+- SP6 Phase 1 lands the self-attested half. The registry-attested half (RRF §27 endpoints, RRF independently re-running the held-out probe split, RRF counter-signing for leaderboard eligibility) is RRF-side work in a separate plan.
+
+---
+
 ## [1.3.0] — 2026-04-29
 
 **SP3: capability metadata foundation + RealSense + LeRobot adapter backends.** Three SP3 phases shipped on top of v1.2.5:
