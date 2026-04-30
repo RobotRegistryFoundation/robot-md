@@ -9,7 +9,6 @@ import pytest
 
 from robot_md.hotplug.event import DeviceEvent
 
-
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="linux-only")
 
 
@@ -40,7 +39,14 @@ def _install_fake_pyudev(monkeypatch, fake_events):
     monkeypatch.setitem(sys.modules, "pyudev", fake)
 
 
-def _make_fake_udev_device(*, vid="1a86", pid="7523", serial="AB12", subsystem="tty", path="/dev/ttyACM0"):
+def _make_fake_udev_device(
+    *,
+    vid="1a86",
+    pid="7523",
+    serial="AB12",
+    subsystem="tty",
+    path="/dev/ttyACM0",
+):
     dev = MagicMock()
     dev.subsystem = subsystem
     dev.device_node = path

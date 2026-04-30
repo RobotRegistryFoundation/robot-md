@@ -9,9 +9,14 @@ from robot_md.hotplug.queue import EventQueue
 
 def _evt() -> DeviceEvent:
     return DeviceEvent(
-        kind="tty_added", vid="1a86", pid="7523", serial=None,
-        path="/dev/ttyACM0", transport="feetech",
-        raw_metadata={}, detected_at="2026-04-27T19:30:11Z",
+        kind="tty_added",
+        vid="1a86",
+        pid="7523",
+        serial=None,
+        path="/dev/ttyACM0",
+        transport="feetech",
+        raw_metadata={},
+        detected_at="2026-04-27T19:30:11Z",
     )
 
 

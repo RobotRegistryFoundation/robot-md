@@ -15,10 +15,7 @@ from pathlib import Path
 
 import pytest
 
-
-_SKILL_PATH = (
-    Path(__file__).parents[2] / "src" / "robot_md" / "skills" / "using-robot-md.SKILL.md"
-)
+_SKILL_PATH = Path(__file__).parents[2] / "src" / "robot_md" / "skills" / "using-robot-md.SKILL.md"
 
 
 @dataclass

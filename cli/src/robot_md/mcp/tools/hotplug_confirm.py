@@ -58,7 +58,10 @@ def hotplug_confirm_tool(
     if choice_index is None:
         choice_index = 0
     if choice_index < 0 or choice_index >= len(proposals):
-        return {"ok": False, "error": f"choice_index {choice_index} out of range (0..{len(proposals)-1})"}
+        return {
+            "ok": False,
+            "error": f"choice_index {choice_index} out of range (0..{len(proposals) - 1})",
+        }
     chosen = proposals[choice_index]
     proposal_obj = BindProposal(
         rrn=chosen.get("rrn"),
@@ -75,7 +78,9 @@ def hotplug_confirm_tool(
 
     try:
         q.append_resolution(
-            ref_id=event_id, resolution="bind", by=_by,
+            ref_id=event_id,
+            resolution="bind",
+            by=_by,
             outcome={"driver_id": outcome.driver_id, "rrn": outcome.rrn},
         )
     except AlreadyResolvedError as e:

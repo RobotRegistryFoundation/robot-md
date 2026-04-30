@@ -34,10 +34,7 @@ def test_initial_start_does_not_fire(tmp_path: Path) -> None:
     """Subscriber connects to a queue that already has records; first
     poll must NOT count that as a change."""
     queue_path = tmp_path / "q.jsonl"
-    queue_path.write_text(
-        '{"id":"evt_old","kind":"pending"}\n'
-        '{"id":"evt_old2","kind":"pending"}\n'
-    )
+    queue_path.write_text('{"id":"evt_old","kind":"pending"}\n{"id":"evt_old2","kind":"pending"}\n')
     received: list[int] = []
 
     poller = FilePollFallback(

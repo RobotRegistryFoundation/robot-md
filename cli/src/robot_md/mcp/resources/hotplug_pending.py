@@ -11,7 +11,6 @@ import json
 
 from robot_md.hotplug.queue import EventQueue
 
-
 URI = "robot-md://hotplug/pending"
 
 
@@ -30,10 +29,7 @@ def build_pending_payload(*, _queue: EventQueue | None = None) -> dict:
         except Exception:
             continue
 
-    resolved_refs = {
-        r["ref"] for r in records
-        if r.get("kind") == "resolved" and r.get("ref")
-    }
+    resolved_refs = {r["ref"] for r in records if r.get("kind") == "resolved" and r.get("ref")}
 
     pending: list[dict] = []
     for r in records:
@@ -41,10 +37,12 @@ def build_pending_payload(*, _queue: EventQueue | None = None) -> dict:
             continue
         if r["id"] in resolved_refs:
             continue
-        pending.append({
-            "event_id": r["id"],
-            "tier": r["decision"]["tier"],
-            "device": r["event"],
-            "decision": r["decision"],
-        })
+        pending.append(
+            {
+                "event_id": r["id"],
+                "tier": r["decision"]["tier"],
+                "device": r["event"],
+                "decision": r["decision"],
+            }
+        )
     return {"pending": pending}

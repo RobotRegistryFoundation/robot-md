@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from robot_md.hotplug.event import DeviceEvent, classify_transport
@@ -16,7 +18,7 @@ def test_device_event_is_frozen() -> None:
         raw_metadata={},
         detected_at="2026-04-27T19:30:11Z",
     )
-    with pytest.raises(Exception):
+    with pytest.raises((AttributeError, dataclasses.FrozenInstanceError)):
         e.path = "/dev/ttyACM1"
 
 

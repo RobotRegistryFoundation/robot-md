@@ -19,13 +19,13 @@ def test_status_when_no_daemon_running() -> None:
     pidfile = Path.home() / ".robot-md" / "hotplug-daemon.pid"
     if pidfile.exists():
         import pytest
+
         pytest.skip(f"a daemon is running (or stale pidfile at {pidfile})")
     proc = subprocess.run(
         [sys.executable, "-m", "robot_md", "hotplug-daemon", "status"],
-        capture_output=True, text=True, env=env,
+        capture_output=True,
+        text=True,
+        env=env,
     )
     assert proc.returncode == 0, proc.stderr
-    assert (
-        "not running" in proc.stdout.lower()
-        or "stopped" in proc.stdout.lower()
-    )
+    assert "not running" in proc.stdout.lower() or "stopped" in proc.stdout.lower()

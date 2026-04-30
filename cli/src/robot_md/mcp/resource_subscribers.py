@@ -20,19 +20,19 @@ cli/docs/hotplug-roadmap.md.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import os
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Union
-
+from typing import Any
 
 _DEFAULT_SOCKET_PATH: Path | None = (
-    Path(f"/run/user/{os.getuid()}/robot-md-hotplug.sock")
-    if hasattr(os, "getuid") else None
+    Path(f"/run/user/{os.getuid()}/robot-md-hotplug.sock") if hasattr(os, "getuid") else None
 )
 
 
-_OnChange = Callable[[], Union[None, Awaitable[None]]]
+_OnChange = Callable[[], None | Awaitable[None]]
 
 
 async def _maybe_await(result: Any) -> None:
@@ -90,10 +90,8 @@ class HotplugResourceSubscriber:
         self._stopping = True
         if self._task is not None:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     async def _run(self) -> None:
@@ -111,10 +109,8 @@ class HotplugResourceSubscriber:
                 await _maybe_await(self._on_change())
         finally:
             writer.close()
-            try:
+            with contextlib.suppress(Exception):
                 await writer.wait_closed()
-            except Exception:
-                pass
 
 
 class FilePollFallback:
@@ -146,10 +142,8 @@ class FilePollFallback:
         self._stop.set()
         if self._task is not None:
             self._task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._task
-            except asyncio.CancelledError:
-                pass
             self._task = None
 
     async def _run(self) -> None:

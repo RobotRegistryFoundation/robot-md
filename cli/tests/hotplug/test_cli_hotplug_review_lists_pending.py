@@ -19,10 +19,9 @@ def test_review_lists_pending_table() -> None:
     }
     proc = subprocess.run(
         [sys.executable, "-m", "robot_md", "hotplug", "review"],
-        capture_output=True, text=True, env=env,
+        capture_output=True,
+        text=True,
+        env=env,
     )
     assert proc.returncode == 0, proc.stderr
-    assert (
-        "event_id" in proc.stdout.lower()
-        or "no pending" in proc.stdout.lower()
-    )
+    assert "event_id" in proc.stdout.lower() or "no pending" in proc.stdout.lower()

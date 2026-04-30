@@ -10,16 +10,23 @@ from robot_md.mcp.tools.hotplug_review import hotplug_review_tool
 
 def _evt():
     return DeviceEvent(
-        kind="tty_added", vid="1a86", pid="7523", serial="AB12",
-        path="/dev/ttyACM0", transport="feetech",
-        raw_metadata={}, detected_at="2026-04-27T19:30:11Z",
+        kind="tty_added",
+        vid="1a86",
+        pid="7523",
+        serial="AB12",
+        path="/dev/ttyACM0",
+        transport="feetech",
+        raw_metadata={},
+        detected_at="2026-04-27T19:30:11Z",
     )
 
 
 def test_review_returns_pending_only(tmp_path: Path) -> None:
     q = EventQueue(path=tmp_path / "q.jsonl")
-    pending1 = q.append_pending(_evt(), Decision(tier="MEDIUM", unambiguous=False, bind_proposal=None))
-    pending2 = q.append_pending(_evt(), Decision(tier="LOW", unambiguous=False, bind_proposal=None))
+    medium = Decision(tier="MEDIUM", unambiguous=False, bind_proposal=None)
+    low = Decision(tier="LOW", unambiguous=False, bind_proposal=None)
+    pending1 = q.append_pending(_evt(), medium)
+    pending2 = q.append_pending(_evt(), low)
     q.append_resolution(ref_id=pending1.id, resolution="bind", by="claude", outcome={})
 
     result = hotplug_review_tool(_queue=q)

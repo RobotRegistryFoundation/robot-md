@@ -8,8 +8,8 @@ from typing import Literal
 
 from robot_md.backends import BackendRegistry
 from robot_md.backends.capability import Capability
-from robot_md.hotplug.event import DeviceEvent
 from robot_md.hotplug import presets_index
+from robot_md.hotplug.event import DeviceEvent
 
 _RECENT_REJECT_WINDOW = timedelta(hours=1)
 
@@ -60,7 +60,9 @@ def classify(evt: DeviceEvent) -> Decision:
     preset_matches = presets_index.lookup_by_vid_pid(vid=evt.vid, pid=evt.pid)
     if not preset_matches:
         return Decision(
-            tier="LOW", unambiguous=False, bind_proposal=None,
+            tier="LOW",
+            unambiguous=False,
+            bind_proposal=None,
             alternatives=[],
             reasons=[f"no preset match for VID:PID {evt.vid}:{evt.pid}"],
         )
@@ -68,7 +70,9 @@ def classify(evt: DeviceEvent) -> Decision:
     backends = _installed_backends_for_transport(evt.transport)
     if not backends:
         return Decision(
-            tier="LOW", unambiguous=False, bind_proposal=None,
+            tier="LOW",
+            unambiguous=False,
+            bind_proposal=None,
             alternatives=[],
             reasons=[
                 f"no backend installed for transport {evt.transport!r}",
@@ -79,14 +83,20 @@ def classify(evt: DeviceEvent) -> Decision:
     proposals: list[BindProposal] = []
     for pm in preset_matches:
         for backend_name in backends:
-            proposals.append(BindProposal(
-                rrn=None,
-                driver_id_suggestion="arm_servos",
-                backend_name=backend_name,
-                preset_name=pm.preset_name,
-                capability_preview=[],
-                inferred_fields={"port": evt.path, "transport": evt.transport, "serial": evt.serial},
-            ))
+            proposals.append(
+                BindProposal(
+                    rrn=None,
+                    driver_id_suggestion="arm_servos",
+                    backend_name=backend_name,
+                    preset_name=pm.preset_name,
+                    capability_preview=[],
+                    inferred_fields={
+                        "port": evt.path,
+                        "transport": evt.transport,
+                        "serial": evt.serial,
+                    },
+                )
+            )
 
     if len(proposals) == 1 and preset_matches[0].confidence == "exact_match":
         recent = _recent_reject_for(evt)
@@ -94,7 +104,8 @@ def classify(evt: DeviceEvent) -> Decision:
             recent_dt = datetime.fromisoformat(recent.replace("Z", "+00:00"))
             if datetime.now(timezone.utc) - recent_dt < _RECENT_REJECT_WINDOW:
                 return Decision(
-                    tier="MEDIUM", unambiguous=False,
+                    tier="MEDIUM",
+                    unambiguous=False,
                     bind_proposal=proposals[0],
                     alternatives=[],
                     reasons=[
@@ -103,7 +114,9 @@ def classify(evt: DeviceEvent) -> Decision:
                     ],
                 )
         return Decision(
-            tier="HIGH", unambiguous=True, bind_proposal=proposals[0],
+            tier="HIGH",
+            unambiguous=True,
+            bind_proposal=proposals[0],
             alternatives=[],
             reasons=[
                 f"exact preset match {preset_matches[0].preset_name}",
@@ -112,7 +125,8 @@ def classify(evt: DeviceEvent) -> Decision:
         )
 
     return Decision(
-        tier="MEDIUM", unambiguous=False,
+        tier="MEDIUM",
+        unambiguous=False,
         bind_proposal=proposals[0],
         alternatives=proposals[1:],
         reasons=[

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from robot_md.hotplug.matcher import BindProposal, Decision
@@ -14,7 +16,7 @@ def test_bind_proposal_is_frozen() -> None:
         capability_preview=[],
         inferred_fields={"port": "/dev/ttyACM0"},
     )
-    with pytest.raises(Exception):
+    with pytest.raises((AttributeError, dataclasses.FrozenInstanceError)):
         bp.backend_name = "feetech_depthai"
 
 

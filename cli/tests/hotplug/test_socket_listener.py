@@ -8,7 +8,6 @@ import pytest
 
 from robot_md.hotplug.socket_listener import SocketListener
 
-
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Unix socket — Linux primary")
 
 
@@ -75,7 +74,7 @@ def test_broadcast_drops_dead_subscribers(tmp_path: Path) -> None:
     async def main():
         await listener.start()
         try:
-            reader, writer = await asyncio.open_unix_connection(str(sock_path))
+            _reader, writer = await asyncio.open_unix_connection(str(sock_path))
             await asyncio.sleep(0.05)
             assert listener.subscriber_count == 1
 

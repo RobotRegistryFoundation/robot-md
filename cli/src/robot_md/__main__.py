@@ -2044,8 +2044,8 @@ def dashboard_serve(
     uvicorn.run(app_, host=host, port=port, log_level="info")
 
 
-from robot_md.hotplug.cli import app as hotplug_daemon_app
-from robot_md.hotplug.cli import operator_app as hotplug_operator_app
+from robot_md.hotplug.cli import app as hotplug_daemon_app  # noqa: E402
+from robot_md.hotplug.cli import operator_app as hotplug_operator_app  # noqa: E402
 
 app.add_typer(hotplug_daemon_app, name="hotplug-daemon")
 app.add_typer(hotplug_operator_app, name="hotplug")

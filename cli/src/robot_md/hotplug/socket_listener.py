@@ -19,13 +19,13 @@ daemon fails-loud — see daemon.run_daemon_with_socket's rc=2 protection.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import socket as _socket
 from pathlib import Path
 
 _DEFAULT_PATH = (
-    Path(f"/run/user/{os.getuid()}/robot-md-hotplug.sock")
-    if hasattr(os, "getuid") else None
+    Path(f"/run/user/{os.getuid()}/robot-md-hotplug.sock") if hasattr(os, "getuid") else None
 )
 
 
@@ -48,10 +48,8 @@ class SocketListener:
             finally:
                 self._writers.discard(writer)
                 writer.close()
-                try:
+                with contextlib.suppress(Exception):
                     await writer.wait_closed()
-                except Exception:
-                    pass
 
         self.path.parent.mkdir(parents=True, exist_ok=True)
         sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
@@ -65,7 +63,9 @@ class SocketListener:
         self._sock = sock
         # cleanup_socket=False because we own the file lifecycle in stop().
         self._server = await asyncio.start_unix_server(
-            handler, sock=sock, cleanup_socket=False,
+            handler,
+            sock=sock,
+            cleanup_socket=False,
         )
 
     async def broadcast(self, byte: bytes = b"\x01") -> int:
@@ -83,10 +83,8 @@ class SocketListener:
                 dead.append(w)
         for w in dead:
             self._writers.discard(w)
-            try:
+            with contextlib.suppress(Exception):
                 w.close()
-            except Exception:
-                pass
         return delivered
 
     @property
@@ -99,10 +97,8 @@ class SocketListener:
             await self._server.wait_closed()
             self._server = None
         for w in list(self._writers):
-            try:
+            with contextlib.suppress(Exception):
                 w.close()
-            except Exception:
-                pass
         self._writers.clear()
         self._sock = None
         try:

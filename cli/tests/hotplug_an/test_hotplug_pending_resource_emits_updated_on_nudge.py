@@ -13,7 +13,6 @@ import pytest
 from robot_md.hotplug.socket_listener import SocketListener
 from robot_md.mcp.resource_subscribers import HotplugResourceSubscriber
 
-
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="Unix socket — Linux primary")
 
 
@@ -60,6 +59,7 @@ def test_subscriber_supports_async_on_change(tmp_path: Path) -> None:
         listener = SocketListener(path=sock_path)
         await listener.start()
         try:
+
             async def on_change() -> None:
                 received.append("async")
 

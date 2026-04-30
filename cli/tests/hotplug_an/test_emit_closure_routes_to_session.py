@@ -6,8 +6,6 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from robot_md.mcp.resource_subscribers import make_an_emit
 from robot_md.mcp.resources.hotplug_pending import URI
 

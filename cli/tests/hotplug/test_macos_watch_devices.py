@@ -7,7 +7,6 @@ import pytest
 
 from robot_md.hotplug.event import DeviceEvent
 
-
 pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="macOS-only")
 
 
@@ -21,6 +20,7 @@ def _fake_enumerate_second_call() -> set:
 
 def test_watch_devices_emits_new_devices_on_diff(monkeypatch) -> None:
     from robot_md.hotplug import macos as mod
+
     calls = iter([_fake_enumerate_first_call(), _fake_enumerate_second_call()])
 
     def fake_enum():

@@ -7,7 +7,6 @@ import pytest
 
 from robot_md.hotplug.service_installers.linux_systemd import write_unit_file
 
-
 pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="systemd-only test")
 
 

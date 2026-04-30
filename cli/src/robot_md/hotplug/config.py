@@ -19,7 +19,7 @@ class HotplugConfig:
     pending_ttl_days: float = 7.0
 
     @classmethod
-    def load(cls, *, path: Path = _DEFAULT_PATH) -> "HotplugConfig":
+    def load(cls, *, path: Path = _DEFAULT_PATH) -> HotplugConfig:
         if not path.exists():
             return cls()
         data = tomllib.loads(path.read_text())

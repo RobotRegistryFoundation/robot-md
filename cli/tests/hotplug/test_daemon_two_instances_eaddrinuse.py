@@ -9,8 +9,10 @@ import pytest
 from robot_md.hotplug.daemon import run_daemon_with_socket
 from robot_md.hotplug.socket_listener import SocketListener
 
-
-pytestmark = pytest.mark.skipif(sys.platform != "linux", reason="socket-bind contention is Linux-only")
+pytestmark = pytest.mark.skipif(
+    sys.platform != "linux",
+    reason="socket-bind contention is Linux-only",
+)
 
 
 async def _empty_watcher():

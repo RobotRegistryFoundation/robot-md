@@ -10,7 +10,9 @@ from robot_md.hotplug.presets_index import PresetMatch
 def _evt() -> DeviceEvent:
     return DeviceEvent(
         kind="tty_added",
-        vid="1a86", pid="7523", serial="UNIQUE_SERIAL_AB12",
+        vid="1a86",
+        pid="7523",
+        serial="UNIQUE_SERIAL_AB12",
         path="/dev/ttyACM0",
         transport="feetech",
         raw_metadata={},
@@ -25,8 +27,9 @@ def test_high_tier_when_serial_uniquely_identifies_preset_and_one_backend(monkey
         lambda *, vid, pid: [PresetMatch("so_arm101", "feetech", "exact_match")],
     )
     # Only lerobot backend installed.
-    with patch("robot_md.hotplug.matcher._installed_backends_for_transport",
-               return_value=["lerobot"]):
+    with patch(
+        "robot_md.hotplug.matcher._installed_backends_for_transport", return_value=["lerobot"]
+    ):
         decision = classify(_evt())
     assert decision.tier == "HIGH"
     assert decision.unambiguous is True

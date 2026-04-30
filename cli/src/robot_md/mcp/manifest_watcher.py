@@ -9,8 +9,8 @@ kqueue on macOS / BSD, ReadDirectoryChangesW on Windows).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
@@ -29,7 +29,9 @@ class ManifestWatcher:
 
     def start(self) -> None:
         self._observer.schedule(
-            self._handler, str(self.manifest_path.parent), recursive=False,
+            self._handler,
+            str(self.manifest_path.parent),
+            recursive=False,
         )
         self._observer.start()
 

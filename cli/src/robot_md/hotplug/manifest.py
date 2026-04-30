@@ -11,7 +11,6 @@ import yaml
 
 from robot_md.hotplug.matcher import BindProposal
 
-
 _DRIVER_ID_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n", re.DOTALL)
 
@@ -27,13 +26,17 @@ class MergeOutcome:
 def merge(proposal: BindProposal, *, manifest_path: Path) -> MergeOutcome:
     if not manifest_path.exists():
         return MergeOutcome(
-            success=False, rrn=proposal.rrn, driver_id=None,
+            success=False,
+            rrn=proposal.rrn,
+            driver_id=None,
             reason="no_manifest_in_cwd",
         )
 
     if not _DRIVER_ID_RE.match(proposal.driver_id_suggestion):
         return MergeOutcome(
-            success=False, rrn=proposal.rrn, driver_id=None,
+            success=False,
+            rrn=proposal.rrn,
+            driver_id=None,
             reason="validation_failed: driver_id must match [a-z][a-z0-9_]*",
         )
 
@@ -45,7 +48,9 @@ def merge(proposal: BindProposal, *, manifest_path: Path) -> MergeOutcome:
             m = _FRONTMATTER_RE.match(text)
             if m is None:
                 return MergeOutcome(
-                    success=False, rrn=proposal.rrn, driver_id=None,
+                    success=False,
+                    rrn=proposal.rrn,
+                    driver_id=None,
                     reason="validation_failed: no frontmatter",
                 )
             data = yaml.safe_load(m.group(1)) or {}
@@ -62,7 +67,7 @@ def merge(proposal: BindProposal, *, manifest_path: Path) -> MergeOutcome:
             drivers.append(new_driver)
 
             new_frontmatter = yaml.safe_dump(data, sort_keys=False).rstrip()
-            new_text = f"---\n{new_frontmatter}\n---\n" + text[m.end():]
+            new_text = f"---\n{new_frontmatter}\n---\n" + text[m.end() :]
 
             f.seek(0)
             f.truncate()
@@ -72,6 +77,8 @@ def merge(proposal: BindProposal, *, manifest_path: Path) -> MergeOutcome:
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
 
     return MergeOutcome(
-        success=True, rrn=proposal.rrn, driver_id=proposal.driver_id_suggestion,
+        success=True,
+        rrn=proposal.rrn,
+        driver_id=proposal.driver_id_suggestion,
         reason="ok",
     )

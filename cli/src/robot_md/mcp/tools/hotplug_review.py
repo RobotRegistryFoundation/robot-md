@@ -19,19 +19,18 @@ def hotplug_review_tool(_queue: EventQueue | None = None) -> dict:
         except Exception:
             continue
     pending_ids = {r["id"] for r in records if r.get("kind") == "pending"}
-    resolved_refs = {
-        r["ref"] for r in records
-        if r.get("kind") == "resolved" and r.get("ref")
-    }
+    resolved_refs = {r["ref"] for r in records if r.get("kind") == "resolved" and r.get("ref")}
     pending_unresolved = pending_ids - resolved_refs
 
     out = []
     for r in records:
         if r.get("kind") == "pending" and r["id"] in pending_unresolved:
-            out.append({
-                "event_id": r["id"],
-                "tier": r["decision"]["tier"],
-                "device": r["event"],
-                "decision": r["decision"],
-            })
+            out.append(
+                {
+                    "event_id": r["id"],
+                    "tier": r["decision"]["tier"],
+                    "device": r["event"],
+                    "decision": r["decision"],
+                }
+            )
     return {"pending": out}

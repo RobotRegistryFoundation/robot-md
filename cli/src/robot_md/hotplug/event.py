@@ -3,14 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-
 # VID:PID lookup table for known transports. Community-curated; expand via PR.
 _TRANSPORT_TABLE: dict[tuple[str, str], str] = {
-    ("1a86", "7523"): "feetech",   # CH340 — SO-ARM101, generic feetech bus
-    ("0403", "6014"): "feetech",   # FTDI FT232H — alt feetech bus
-    ("8086", "0b07"): "realsense", # Intel RealSense D435
-    ("8086", "0b3a"): "realsense", # Intel RealSense D455
-    ("03e7", "2485"): "uvc",       # Luxonis OAK-D
+    ("1a86", "7523"): "feetech",  # CH340 — SO-ARM101, generic feetech bus
+    ("0403", "6014"): "feetech",  # FTDI FT232H — alt feetech bus
+    ("8086", "0b07"): "realsense",  # Intel RealSense D435
+    ("8086", "0b3a"): "realsense",  # Intel RealSense D455
+    ("03e7", "2485"): "uvc",  # Luxonis OAK-D
 }
 
 

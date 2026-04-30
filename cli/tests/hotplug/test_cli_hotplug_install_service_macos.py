@@ -8,7 +8,6 @@ import pytest
 
 from robot_md.hotplug.service_installers.macos_launchd import write_plist
 
-
 pytestmark = pytest.mark.skipif(sys.platform != "darwin", reason="launchd-only test")
 
 

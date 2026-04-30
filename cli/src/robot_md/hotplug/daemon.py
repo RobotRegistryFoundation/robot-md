@@ -12,10 +12,11 @@ adds EADDRINUSE protection via the SocketListener).
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import errno
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable
 
 from robot_md.hotplug import matcher
 from robot_md.hotplug.audit import AuditLog
@@ -24,7 +25,6 @@ from robot_md.hotplug.manifest import merge as manifest_merge
 from robot_md.hotplug.matcher import classify
 from robot_md.hotplug.queue import EventQueue, last_reject_ts_for_event
 from robot_md.hotplug.socket_listener import SocketListener
-
 
 _DEDUP_WINDOW = timedelta(hours=1)
 
@@ -78,14 +78,20 @@ async def run_daemon(
             seen[key] = now
             decision = classify(evt)
             record = queue.append_pending(evt, decision)
-            audit.append("hotplug_event", {
-                "event": {
-                    "vid": evt.vid, "pid": evt.pid, "serial": evt.serial,
-                    "path": evt.path, "transport": evt.transport,
-                    "detected_at": evt.detected_at,
+            audit.append(
+                "hotplug_event",
+                {
+                    "event": {
+                        "vid": evt.vid,
+                        "pid": evt.pid,
+                        "serial": evt.serial,
+                        "path": evt.path,
+                        "transport": evt.transport,
+                        "detected_at": evt.detected_at,
+                    },
+                    "tier": decision.tier,
                 },
-                "tier": decision.tier,
-            })
+            )
             await _nudge()
             if (
                 decision.tier == "HIGH"
@@ -98,13 +104,17 @@ async def run_daemon(
                 )
                 if outcome.success:
                     queue.append_resolution(
-                        ref_id=record.id, resolution="bind", by="daemon",
+                        ref_id=record.id,
+                        resolution="bind",
+                        by="daemon",
                         outcome={"driver_id": outcome.driver_id, "rrn": outcome.rrn},
                     )
                     audit.append("hotplug_bind", {"driver_id": outcome.driver_id})
                 else:
                     queue.append_resolution(
-                        ref_id=record.id, resolution="bind", by="daemon",
+                        ref_id=record.id,
+                        resolution="bind",
+                        by="daemon",
                         outcome={"merge_failed": outcome.reason},
                     )
                     audit.append("merge_failed", {"reason": outcome.reason})
@@ -115,10 +125,8 @@ async def run_daemon(
         await stop_event.wait()
     finally:
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
         restore_provider()
     return 0
 

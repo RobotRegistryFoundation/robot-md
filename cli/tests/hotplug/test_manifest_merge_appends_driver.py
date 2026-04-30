@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from robot_md.hotplug.manifest import merge, MergeOutcome
+from robot_md.hotplug.manifest import MergeOutcome, merge
 from robot_md.hotplug.matcher import BindProposal
 
 
@@ -31,6 +31,6 @@ drivers:
     assert isinstance(outcome, MergeOutcome)
     assert outcome.success is True
     text = manifest.read_text()
-    assert "id: existing" in text          # preserved
-    assert "id: arm_servos" in text         # appended
+    assert "id: existing" in text  # preserved
+    assert "id: arm_servos" in text  # appended
     assert "backend: lerobot" in text

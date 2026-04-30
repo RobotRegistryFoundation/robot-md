@@ -74,13 +74,15 @@ def start() -> None:
     _PIDFILE.parent.mkdir(parents=True, exist_ok=True)
     _PIDFILE.write_text(str(os.getpid()))
     try:
-        rc = asyncio.run(run_daemon_with_socket(
-            stop_event=stop_event,
-            queue_path=_QUEUE_PATH,
-            audit_root=_AUDIT_ROOT,
-            watcher_factory=_platform_watcher_factory(),
-            socket_path=SOCK,
-        ))
+        rc = asyncio.run(
+            run_daemon_with_socket(
+                stop_event=stop_event,
+                queue_path=_QUEUE_PATH,
+                audit_root=_AUDIT_ROOT,
+                watcher_factory=_platform_watcher_factory(),
+                socket_path=SOCK,
+            )
+        )
         raise typer.Exit(rc)
     finally:
         _PIDFILE.unlink(missing_ok=True)
@@ -96,7 +98,7 @@ def stop() -> None:
     except ValueError:
         _PIDFILE.unlink(missing_ok=True)
         typer.echo("daemon not running (corrupt pidfile cleared)")
-        raise typer.Exit(0)
+        raise typer.Exit(0) from None
     try:
         os.kill(pid, signal.SIGTERM)
         typer.echo(f"sent SIGTERM to pid {pid}")
@@ -115,21 +117,19 @@ def status() -> None:
     except ValueError:
         _PIDFILE.unlink(missing_ok=True)
         typer.echo("daemon: not running (corrupt pidfile cleared)")
-        raise typer.Exit(0)
+        raise typer.Exit(0) from None
     if not _pid_alive(pid):
         _PIDFILE.unlink(missing_ok=True)
         typer.echo("daemon: not running (stale pidfile cleared)")
         raise typer.Exit(0)
-    depth = (
-        sum(1 for _ in _QUEUE_PATH.read_text().splitlines())
-        if _QUEUE_PATH.exists() else 0
-    )
+    depth = sum(1 for _ in _QUEUE_PATH.read_text().splitlines()) if _QUEUE_PATH.exists() else 0
     typer.echo(f"daemon: running (pid={pid}); queue records: {depth}")
 
 
 @operator_app.command("review")
 def review() -> None:
     from robot_md.mcp.tools.hotplug_review import hotplug_review_tool
+
     out = hotplug_review_tool()
     pending = out["pending"]
     if not pending:
@@ -152,6 +152,7 @@ def confirm(
         typer.echo("specify exactly one of --bind / --reject", err=True)
         raise typer.Exit(2)
     from robot_md.mcp.tools.hotplug_confirm import hotplug_confirm_tool
+
     out = hotplug_confirm_tool(
         event_id=event_id,
         decision="bind" if bind else "reject",
@@ -168,18 +169,22 @@ def confirm(
 def install_service() -> None:
     if sys.platform == "linux":
         from robot_md.hotplug.service_installers.linux_systemd import write_unit_file
+
         target = Path.home() / ".config" / "systemd" / "user" / "robot-md-hotplug.service"
         write_unit_file(target=target)
         typer.echo(f"wrote {target}")
         typer.echo("enable: systemctl --user enable --now robot-md-hotplug")
     elif sys.platform == "darwin":
         from robot_md.hotplug.service_installers.macos_launchd import write_plist
+
         target = Path.home() / "Library" / "LaunchAgents" / "dev.robotmd.hotplug.plist"
         write_plist(target=target)
         typer.echo(f"wrote {target}")
         typer.echo(f"load: launchctl load -w {target}")
     elif sys.platform == "win32":
-        typer.echo("Windows installer is a follow-up; run `robot-md hotplug-daemon start` manually for now")
+        typer.echo(
+            "Windows installer is a follow-up; run `robot-md hotplug-daemon start` manually for now"
+        )
     else:
         typer.echo(f"unsupported platform: {sys.platform}", err=True)
         raise typer.Exit(2)

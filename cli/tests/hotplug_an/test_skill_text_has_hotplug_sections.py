@@ -11,10 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
-_MIRROR = (
-    Path(__file__).parents[2] / "src" / "robot_md" / "skills" / "using-robot-md.SKILL.md"
-)
+_MIRROR = Path(__file__).parents[2] / "src" / "robot_md" / "skills" / "using-robot-md.SKILL.md"
 
 
 def test_mirror_contains_three_new_sections() -> None:

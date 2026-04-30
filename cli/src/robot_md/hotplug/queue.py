@@ -20,7 +20,6 @@ from pathlib import Path
 from robot_md.hotplug.event import DeviceEvent
 from robot_md.hotplug.matcher import Decision
 
-
 _DEFAULT_PATH = Path.home() / ".robot-md" / "hotplug-events.jsonl"
 _ZERO_HASH = "sha256:" + "0" * 64
 
@@ -29,7 +28,7 @@ _ZERO_HASH = "sha256:" + "0" * 64
 class QueueRecord:
     id: str
     ts: str
-    kind: str   # "pending" | "resolved" | "daemon_alert"
+    kind: str  # "pending" | "resolved" | "daemon_alert"
     event: dict | None
     decision: dict | None
     ref: str | None
@@ -228,10 +227,7 @@ def last_reject_ts_for_event(queue: EventQueue, evt: DeviceEvent) -> str | None:
     closure over this so the recent-reject demotion (Task 8) becomes live.
     """
     records, _ = _safe_iter_records(queue.path)
-    pending_event_by_id = {
-        r["id"]: r.get("event")
-        for r in records if r.get("kind") == "pending"
-    }
+    pending_event_by_id = {r["id"]: r.get("event") for r in records if r.get("kind") == "pending"}
     target_key = (evt.vid, evt.pid, evt.serial, evt.path)
     candidates: list[str] = []
     for r in records:
