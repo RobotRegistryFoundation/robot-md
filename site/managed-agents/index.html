@@ -793,23 +793,23 @@
           No spam. No sales cadence. One email when the beta opens.
         </p>
 
-        <!--
-          WAITLIST MECHANIC — DECISION PENDING
-          =====================================
-          The brief (docs/superpowers/specs/2026-04-30-robotmd-site-redesign-brief.md,
-          "Managed Agents framing" section) lists two options:
-            A. Cloudflare Workers + KV — simple, no third-party, requires a Worker
-               that accepts POST /waitlist, stores email in KV, returns 200.
-               CSP form-action would need to allow the Workers endpoint.
-            B. Tally / Fillout embed — no-code, replace this <form> with an
-               iframe or widget script. Requires updating the _headers CSP to
-               allow the embed origin.
-          Until a decision is made, this form POSTs nowhere (action="#").
-          See open question #4 in docs/superpowers/notes/2026-05-01-site-ia-review.md.
-        -->
+        <!-- Waitlist backend: site/functions/api/managed-agents/waitlist.js (Cloudflare Pages Function + KV) -->
+
+        <!-- Count badge — hidden until count > 0; populated by /js/waitlist.js -->
+        <p id="waitlist-count-badge"
+           style="display:none;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--ok);margin:0 0 16px;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"
+               xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7" cy="7" r="6.5" stroke="currentColor"/>
+            <path d="M4 7l2 2 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span id="waitlist-count-num">0</span> on the waitlist
+        </p>
+
         <form class="waitlist-form"
-              action="#"
-              method="post"
+              id="waitlist-form"
+              action="/api/managed-agents/waitlist"
+              method="POST"
               aria-label="Compliance-bot waitlist sign-up">
           <div class="field-group">
             <label for="waitlist-email">Work email</label>
@@ -823,6 +823,16 @@
           </div>
           <button type="submit">Join waitlist</button>
         </form>
+
+        <!-- Error message (shown on validation failure) -->
+        <p id="waitlist-error"
+           role="alert"
+           style="display:none;color:var(--accent);font-size:13px;margin-top:10px;"></p>
+
+        <!-- Success message (shown after submit; form is hidden) -->
+        <p id="waitlist-msg"
+           role="status"
+           style="display:none;font-size:15px;color:var(--ok);font-family:var(--sans);margin-top:16px;font-weight:500;"></p>
 
         <p class="waitlist-note" id="waitlist-privacy-note">
           Your email is only used to contact you about Compliance-bot.
@@ -847,6 +857,8 @@
       <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
     </div>
   </footer>
+
+  <script src="/js/waitlist.js" defer></script>
 
 </body>
 
