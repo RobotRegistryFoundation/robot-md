@@ -21,3 +21,16 @@
 name = "robotmd-dev"
 compatibility_date = "2024-10-01"
 pages_build_output_dir = "site"
+
+# KV namespace for the Compliance-bot waitlist (Pages Function).
+# To provision:
+#   1. npx wrangler kv:namespace create "WAITLIST_KV"
+#      → copy the returned id into the `id` field below
+#   2. npx wrangler kv:namespace create "WAITLIST_KV" --preview
+#      → copy the returned id into the `preview_id` field below
+#   3. Commit the updated wrangler.toml and redeploy.
+# Docs: https://developers.cloudflare.com/kv/get-started/
+[[kv_namespaces]]
+binding    = "WAITLIST_KV"
+id         = "REPLACE_WITH_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_PREVIEW_NAMESPACE_ID"
