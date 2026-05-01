@@ -70,12 +70,7 @@ def test_parse_text_has_no_source_path(fixtures_dir):
 def test_parse_directory_resolves_to_robot_md(tmp_path):
     """A directory containing ROBOT.md is accepted; parses the manifest inside."""
     (tmp_path / "ROBOT.md").write_text(
-        "---\n"
-        "rcan_version: '3.0'\n"
-        "metadata:\n"
-        "  robot_name: dirtest\n"
-        "---\n"
-        "# dirtest\n"
+        "---\nrcan_version: '3.0'\nmetadata:\n  robot_name: dirtest\n---\n# dirtest\n"
     )
     result = parse_file(tmp_path)
     assert result.frontmatter["metadata"]["robot_name"] == "dirtest"
@@ -85,12 +80,7 @@ def test_parse_directory_resolves_to_robot_md(tmp_path):
 def test_parse_dot_directory_resolves(tmp_path, monkeypatch):
     """`robot-md compliance status .` — the original failure mode in #32."""
     (tmp_path / "ROBOT.md").write_text(
-        "---\n"
-        "rcan_version: '3.0'\n"
-        "metadata:\n"
-        "  robot_name: dottest\n"
-        "---\n"
-        "# dottest\n"
+        "---\nrcan_version: '3.0'\nmetadata:\n  robot_name: dottest\n---\n# dottest\n"
     )
     monkeypatch.chdir(tmp_path)
     result = parse_file(Path("."))
@@ -107,12 +97,7 @@ def test_parse_explicit_file_in_directory_still_works(tmp_path):
     """Passing the explicit path inside a directory keeps working unchanged."""
     manifest = tmp_path / "ROBOT.md"
     manifest.write_text(
-        "---\n"
-        "rcan_version: '3.0'\n"
-        "metadata:\n"
-        "  robot_name: explicit\n"
-        "---\n"
-        "# explicit\n"
+        "---\nrcan_version: '3.0'\nmetadata:\n  robot_name: explicit\n---\n# explicit\n"
     )
     result = parse_file(manifest)
     assert result.frontmatter["metadata"]["robot_name"] == "explicit"
