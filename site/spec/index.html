@@ -271,48 +271,6 @@
       border-radius: 2px;
     }
     .spec-body tr:last-child td { border-bottom: none }
-
-    .spec-body .req-icon { color: var(--ok); font-size: 13px }
-
-    .exit-codes {
-      display: grid;
-      grid-template-columns: 60px 1fr;
-      gap: 0;
-      border: 1px solid var(--rule);
-      overflow: hidden;
-      margin: 12px 0 20px;
-    }
-    .exit-codes .ec-row {
-      display: contents;
-    }
-    .exit-codes .ec-code {
-      font-family: var(--mono);
-      font-size: 14px;
-      font-weight: 600;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--rule);
-      border-right: 1px solid var(--rule);
-      background: var(--paper-2);
-      color: var(--accent-ink);
-    }
-    .exit-codes .ec-desc {
-      font-size: 13.5px;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--rule);
-      color: var(--ink-2);
-    }
-    .exit-codes .ec-code:last-of-type,
-    .exit-codes .ec-desc:last-of-type { border-bottom: none }
-
-    .spec-note {
-      background: var(--accent-wash);
-      border-left: 3px solid var(--accent);
-      padding: 12px 16px;
-      font-size: 13.5px;
-      color: var(--ink-2);
-      margin: 12px 0 20px;
-      line-height: 1.55;
-    }
   </style>
 </head>
 
@@ -326,7 +284,7 @@
       </a>
       <nav aria-label="Site navigation">
         <a href="/spec/" class="current" aria-current="page">Spec</a>
-        <a href="/agents/claude-code/">Agents</a>
+        <a href="/agents/">Agents</a>
         <a href="/mcp/">MCP</a>
         <a href="/registry/">Registry</a>
         <a href="/compliance/">Compliance</a>
@@ -381,17 +339,17 @@
           <ul>
             <li><a href="#overview">1. Overview</a></li>
             <li><a href="#file-structure">2. File structure</a></li>
-            <li><a href="#required-fields">3. Required fields</a></li>
-            <li class="toc-sub"><a href="#rcan-version">3.1 rcan_version</a></li>
-            <li class="toc-sub"><a href="#metadata">3.2 metadata</a></li>
-            <li class="toc-sub"><a href="#physics">3.3 physics</a></li>
-            <li class="toc-sub"><a href="#drivers">3.4 drivers</a></li>
-            <li class="toc-sub"><a href="#safety">3.5 safety</a></li>
-            <li><a href="#conditional-fields">4. Conditional fields</a></li>
-            <li class="toc-sub"><a href="#capabilities">4.1 capabilities</a></li>
-            <li class="toc-sub"><a href="#network">4.2 network</a></li>
-            <li class="toc-sub"><a href="#brain">4.3 brain</a></li>
-            <li class="toc-sub"><a href="#compliance">4.4 compliance</a></li>
+            <li><a href="#required-fields">3. Frontmatter — required fields</a></li>
+            <li class="toc-sub"><a href="#rcan-version">3.1 rcan_version (string, required)</a></li>
+            <li class="toc-sub"><a href="#metadata">3.2 metadata (map, required)</a></li>
+            <li class="toc-sub"><a href="#physics">3.3 physics (map, required)</a></li>
+            <li class="toc-sub"><a href="#drivers">3.4 drivers (array, required)</a></li>
+            <li class="toc-sub"><a href="#safety">3.5 safety (map, required)</a></li>
+            <li><a href="#conditional-fields">4. Frontmatter — conditionally required</a></li>
+            <li class="toc-sub"><a href="#capabilities">4.1 capabilities (array of strings, required if physics.dof &gt; 0)</a></li>
+            <li class="toc-sub"><a href="#network">4.2 network (map, required for network-addressable robots)</a></li>
+            <li class="toc-sub"><a href="#brain">4.3 brain (map, required if the robot uses an LLM planner)</a></li>
+            <li class="toc-sub"><a href="#compliance">4.4 compliance (map, required for EU-deployed robots)</a></li>
             <li><a href="#body-required">5. Body — required sections</a></li>
             <li><a href="#body-planner">6. Body — planner usage</a></li>
             <li><a href="#extensions">7. Extensions</a></li>
@@ -414,91 +372,136 @@
 
       <!-- ---- SPEC BODY ---- -->
       <article class="spec-body" aria-label="ROBOT.md Format Specification v1">
-
-        <h2 id="overview">1. Overview</h2>
-        <p>
-          <code>ROBOT.md</code> is a single file that declares what a robot <strong>is</strong>
-          and what it <strong>can do</strong>, in a form that both machines
-          (JSON Schema + RCAN validators) and LLM planners
-          (Claude Opus 4.7, Sonnet, etc.) can consume directly.
-        </p>
-        <p>The file is markdown with a leading YAML frontmatter block:</p>
-        <ul>
-          <li>The <strong>frontmatter</strong> is the machine-readable declaration: identity, physics,
-              drivers, safety, capabilities, compliance. Validated against
-              <a href="/schema/v1/robot.schema.json"><code>schema/v1/robot.schema.json</code></a>.</li>
-          <li>The <strong>body</strong> is human/LLM prose: identity narrative, capabilities explained,
-              safety gates described, task-routing guidance. Read by the planner at session start.</li>
-        </ul>
-        <p>
-          This parallels <code>CLAUDE.md</code>'s role for codebases: a single file, read at session
-          start, that orients the planner.
-        </p>
-
-        <h2 id="file-structure">2. File structure</h2>
-        <pre><code>---
+<p><strong>Status:</strong> Draft (v0.1)
+<strong>Date:</strong> 2026-04-17
+<strong>Authors:</strong> craigm26 et al.
+<strong>License:</strong> Apache-2.0 (same as repo)</p>
+<h2 id="overview">1. Overview</h2>
+<p><code>ROBOT.md</code> is a single file that declares what a robot <strong>is</strong> and what it <strong>can do</strong>, in a form that both machines (JSON Schema + RCAN validators) and LLM planners (Claude Opus 4.7, Sonnet, etc.) can consume directly.</p>
+<p>The file is markdown with a leading YAML frontmatter block:</p>
+<ul>
+<li>The <strong>frontmatter</strong> is the machine-readable declaration: identity, physics, drivers, safety, capabilities, compliance. Validated against <code>schema/v1/robot.schema.json</code>.</li>
+<li>The <strong>body</strong> is human/LLM prose: identity narrative, capabilities explained, safety gates described, task-routing guidance. Read by the planner at session start.</li>
+</ul>
+<p>This parallels <code>CLAUDE.md</code>'s role for codebases: a single file, read at session start, that orients the planner.</p>
+<h2 id="file-structure">2. File structure</h2>
+<pre><code>---
 &lt;YAML frontmatter&gt;
 ---
 
-&lt;Markdown body&gt;</code></pre>
-        <p>
-          The frontmatter delimiters MUST be exactly three hyphens (<code>---</code>) on their own lines.
-          The frontmatter MUST be valid YAML 1.1 (compatible with PyYAML <code>safe_load</code>).
-          The body MAY be empty but MUST be present (at minimum a single <code># &lt;robot_name&gt;</code> H1).
-        </p>
-
-        <h2 id="required-fields">3. Frontmatter — required fields</h2>
-
-        <h3 id="rcan-version">3.1 <code>rcan_version</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(string, required)</small></h3>
-        <p>The RCAN protocol version this ROBOT.md conforms to. MUST be one of:</p>
-        <ul>
-          <li><code>"3.0"</code> — current (recommended)</li>
-          <li><code>"2.2"</code>, <code>"2.1"</code> — accepted via OpenCastor compatibility mode but operators should migrate</li>
-          <li>Future <code>3.x</code> versions (forward-compatible per <code>castor.compliance.is_accepted_version</code>)</li>
-        </ul>
-        <p>Rejected: <code>"1.x"</code> (EU AI Act compliance gap; ROBOT.md requires v2.1+).</p>
-
-        <h3 id="metadata">3.2 <code>metadata</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(map, required)</small></h3>
-        <table>
-          <thead>
-            <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>robot_name</code></td><td>string</td><td><span class="req-icon">✅</span></td><td>Short display name (e.g., <code>bob</code>)</td></tr>
-            <tr><td><code>rrn</code></td><td>string</td><td>recommended</td><td>RRF-assigned RRN, or empty string until registered</td></tr>
-            <tr><td><code>rrn_uri</code></td><td>string</td><td>recommended</td><td>Canonical URI form of the RRN</td></tr>
-            <tr><td><code>ruri</code></td><td>string</td><td>recommended</td><td>Gateway URL (e.g., <code>rcan://robot.local:8001/bob</code>)</td></tr>
-            <tr><td><code>manufacturer</code></td><td>string</td><td>optional</td><td>Vendor or operator</td></tr>
-            <tr><td><code>model</code></td><td>string</td><td>optional</td><td>Model identifier</td></tr>
-            <tr><td><code>version</code></td><td>string</td><td>optional</td><td>Firmware/deployment version</td></tr>
-            <tr><td><code>license</code></td><td>string</td><td>optional</td><td>SPDX license identifier</td></tr>
-          </tbody>
-        </table>
-
-        <h3 id="physics">3.3 <code>physics</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(map, required)</small></h3>
-        <table>
-          <thead>
-            <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>type</code></td><td>string</td><td><span class="req-icon">✅</span></td><td><code>arm</code> | <code>wheeled</code> | <code>tracked</code> | <code>legged</code> | <code>arm+camera</code> | <code>humanoid</code> | <code>other</code></td></tr>
-            <tr><td><code>dof</code></td><td>int</td><td><span class="req-icon">✅</span></td><td>Degrees of freedom (0 for purely sensory robots)</td></tr>
-            <tr><td><code>kinematics</code></td><td>array</td><td>optional</td><td>Per-joint entries (required if <code>type</code> is arm-based and <code>dof &gt; 0</code>)</td></tr>
-          </tbody>
-        </table>
-        <p>Each kinematics entry:</p>
-        <pre><code>- id: shoulder_pan
+&lt;Markdown body&gt;
+</code></pre>
+<p>The frontmatter delimiters MUST be exactly three hyphens (<code>---</code>) on their own lines. The frontmatter MUST be valid YAML 1.1 (compatible with PyYAML <code>safe_load</code>). The body MAY be empty but MUST be present (at minimum a single <code># &lt;robot_name&gt;</code> H1).</p>
+<h2 id="required-fields">3. Frontmatter — required fields</h2>
+<h3 id="rcan-version">3.1 <code>rcan_version</code> (string, required)</h3>
+<p>The RCAN protocol version this ROBOT.md conforms to. MUST be one of:</p>
+<ul>
+<li><code>"3.0"</code> — current (recommended)</li>
+<li><code>"2.2"</code>, <code>"2.1"</code> — accepted via OpenCastor compatibility mode but operators should migrate</li>
+<li>Future <code>3.x</code> versions (forward-compatible per <code>castor.compliance.is_accepted_version</code>)</li>
+</ul>
+<p>Rejected: <code>"1.x"</code> (EU AI Act compliance gap; ROBOT.md requires v2.1+).</p>
+<h3 id="metadata">3.2 <code>metadata</code> (map, required)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>robot_name</code></td>
+<td>string</td>
+<td>✅</td>
+<td>Short display name (e.g., <code>bob</code>)</td>
+</tr>
+<tr>
+<td><code>rrn</code></td>
+<td>string</td>
+<td>recommended</td>
+<td>RRF-assigned RRN, or empty string until registered</td>
+</tr>
+<tr>
+<td><code>rrn_uri</code></td>
+<td>string</td>
+<td>recommended</td>
+<td>Canonical URI form of the RRN</td>
+</tr>
+<tr>
+<td><code>ruri</code></td>
+<td>string</td>
+<td>recommended</td>
+<td>Gateway URL (e.g., <code>rcan://robot.local:8001/bob</code>)</td>
+</tr>
+<tr>
+<td><code>manufacturer</code></td>
+<td>string</td>
+<td>optional</td>
+<td>Vendor or operator</td>
+</tr>
+<tr>
+<td><code>model</code></td>
+<td>string</td>
+<td>optional</td>
+<td>Model identifier</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>string</td>
+<td>optional</td>
+<td>Firmware/deployment version</td>
+</tr>
+<tr>
+<td><code>license</code></td>
+<td>string</td>
+<td>optional</td>
+<td>SPDX license identifier</td>
+</tr>
+</tbody>
+</table>
+<h3 id="physics">3.3 <code>physics</code> (map, required)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>string</td>
+<td>✅</td>
+<td><code>arm</code> | <code>wheeled</code> | <code>tracked</code> | <code>legged</code> | <code>arm+camera</code> | <code>humanoid</code> | <code>other</code></td>
+</tr>
+<tr>
+<td><code>dof</code></td>
+<td>int</td>
+<td>✅</td>
+<td>Degrees of freedom (0 for purely sensory robots)</td>
+</tr>
+<tr>
+<td><code>kinematics</code></td>
+<td>array</td>
+<td>optional</td>
+<td>Per-joint entries (required if <code>type</code> is arm-based and <code>dof &gt; 0</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Each kinematics entry:</p>
+<pre><code class="language-yaml">- id: shoulder_pan
   axis: x | y | z
   limits_deg: [min, max]   # or limits_mm for prismatic joints
-  length_mm: 60            # link length downstream of this joint</code></pre>
-
-        <h3 id="drivers">3.4 <code>drivers</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(array, required)</small></h3>
-        <p>
-          A list of hardware drivers the robot uses. At least one entry is required.
-          Each driver declares <code>id</code> and <code>protocol</code>;
-          additional fields are protocol-specific.
-        </p>
-        <pre><code>drivers:
+  length_mm: 60            # link length downstream of this joint
+</code></pre>
+<h3 id="drivers">3.4 <code>drivers</code> (array, required)</h3>
+<p>A list of hardware drivers the robot uses. At least one entry is required. Each driver declares <code>id</code> and <code>protocol</code>; additional fields are protocol-specific.</p>
+<pre><code class="language-yaml">drivers:
   - id: arm_servos
     protocol: feetech       # feetech | dynamixel | pca9685 | gpio | ros2 | ...
     port: /dev/ttyUSB0
@@ -507,72 +510,143 @@
     count: 6
   - id: camera
     protocol: depthai
-    model: OAK-D</code></pre>
-        <p>Recognized protocols match <code>castor.drivers.&lt;name&gt;</code> in OpenCastor.</p>
-
-        <h3 id="safety">3.5 <code>safety</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(map, required)</small></h3>
-        <table>
-          <thead>
-            <tr><th>Field</th><th>Type</th><th>Required</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>p66_enabled</code></td><td>bool</td><td>recommended</td><td>P66 safety manifest active</td></tr>
-            <tr><td><code>loa_enforcement</code></td><td>bool</td><td>recommended</td><td>RCAN Level-of-Assurance enforcement</td></tr>
-            <tr><td><code>max_joint_velocity_dps</code></td><td>number</td><td>if applicable</td><td>Max degrees/sec across all joints</td></tr>
-            <tr><td><code>max_linear_velocity_ms</code></td><td>number</td><td>if applicable</td><td>Max m/s (wheeled/tracked)</td></tr>
-            <tr><td><code>payload_kg</code></td><td>number</td><td>if applicable</td><td>Max payload</td></tr>
-            <tr><td><code>estop</code></td><td>map</td><td><span class="req-icon">✅</span></td><td>E-stop configuration</td></tr>
-            <tr><td><code>hitl_gates</code></td><td>array</td><td>recommended</td><td>Human-in-the-loop gate scopes</td></tr>
-          </tbody>
-        </table>
-        <p>The <code>estop</code> map:</p>
-        <pre><code>estop:
+    model: OAK-D
+</code></pre>
+<p>Recognized protocols match <code>castor.drivers.&lt;name&gt;</code> in OpenCastor (full list: <code>spec/rationale.md</code>).</p>
+<h3 id="safety">3.5 <code>safety</code> (map, required)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>p66_enabled</code></td>
+<td>bool</td>
+<td>recommended</td>
+<td>P66 safety manifest active</td>
+</tr>
+<tr>
+<td><code>loa_enforcement</code></td>
+<td>bool</td>
+<td>recommended</td>
+<td>RCAN Level-of-Assurance enforcement</td>
+</tr>
+<tr>
+<td><code>max_joint_velocity_dps</code></td>
+<td>number</td>
+<td>if applicable</td>
+<td>Max degrees/sec across all joints</td>
+</tr>
+<tr>
+<td><code>max_linear_velocity_ms</code></td>
+<td>number</td>
+<td>if applicable</td>
+<td>Max m/s (wheeled/tracked)</td>
+</tr>
+<tr>
+<td><code>payload_kg</code></td>
+<td>number</td>
+<td>if applicable</td>
+<td>Max payload</td>
+</tr>
+<tr>
+<td><code>estop</code></td>
+<td>map</td>
+<td>✅</td>
+<td>E-stop configuration — see below</td>
+</tr>
+<tr>
+<td><code>hitl_gates</code></td>
+<td>array</td>
+<td>recommended</td>
+<td>Human-in-the-loop gate scopes</td>
+</tr>
+</tbody>
+</table>
+<p>The <code>estop</code> map:</p>
+<pre><code class="language-yaml">estop:
   hardware: false           # dedicated physical button?
   software: true            # software interrupt supported
-  response_ms: 100          # time from trigger to motion-halt</code></pre>
-        <p>At minimum, <code>software: true</code> with <code>response_ms</code> is required.</p>
-
-        <h2 id="conditional-fields">4. Frontmatter — conditionally required</h2>
-
-        <h3 id="capabilities">4.1 <code>capabilities</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(array of strings, required if physics.dof &gt; 0)</small></h3>
-        <p>
-          Named skills the robot exposes. Each name SHOULD map to a skill registered in the
-          deploying runtime's <code>SkillRegistry</code>. Standard namespaces:
-        </p>
-        <ul>
-          <li><code>nav.*</code> — navigation (move, stop, go_to)</li>
-          <li><code>arm.*</code> — manipulation (pick, place, reach, grip)</li>
-          <li><code>vision.*</code> — perception (describe, detect, track)</li>
-          <li><code>status.*</code> — introspection (report, health)</li>
-          <li><code>system.*</code> — lifecycle (shutdown, reboot, calibrate)</li>
-        </ul>
-        <p>Vendor-specific skills MAY use their own namespace (e.g., <code>bosdyn.crouch</code>).</p>
-
-        <h3 id="network">4.2 <code>network</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(map, required for network-addressable robots)</small></h3>
-        <table>
-          <thead>
-            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>rrf_endpoint</code></td><td>URL</td><td><code>https://robotregistryfoundation.org</code> or self-hosted RRF</td></tr>
-            <tr><td><code>port</code></td><td>int</td><td>Gateway port</td></tr>
-            <tr><td><code>signing_alg</code></td><td>string</td><td><code>pqc-hybrid-v1</code> (required at RCAN 3.0 L2+); <code>ml-dsa-65</code>; or <code>ed25519</code> (L1 only, sunset in 3.x)</td></tr>
-            <tr><td><code>transports</code></td><td>array</td><td><code>[http, mqtt, ws]</code> etc.</td></tr>
-          </tbody>
-        </table>
-
-        <h3 id="brain">4.3 <code>brain</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(map, required if robot uses LLM planner)</small></h3>
-        <table>
-          <thead>
-            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>planning</code></td><td>map</td><td>LLM provider + model + confidence gate</td></tr>
-            <tr><td><code>reactive</code></td><td>map</td><td>Optional low-latency layer (e.g., VLA model)</td></tr>
-            <tr><td><code>task_routing</code></td><td>map</td><td>RCAN task-category routing overrides</td></tr>
-          </tbody>
-        </table>
-        <pre><code>brain:
+  response_ms: 100          # time from trigger to motion-halt
+</code></pre>
+<p>At minimum, <code>software: true</code> with <code>response_ms</code> is required.</p>
+<h2 id="conditional-fields">4. Frontmatter — conditionally required</h2>
+<h3 id="capabilities">4.1 <code>capabilities</code> (array of strings, required if <code>physics.dof &gt; 0</code>)</h3>
+<p>Named skills the robot exposes. Each name SHOULD map to a skill registered in the deploying runtime's <code>SkillRegistry</code>. Standard namespaces:</p>
+<ul>
+<li><code>nav.*</code> — navigation (move, stop, go_to)</li>
+<li><code>arm.*</code> — manipulation (pick, place, reach, grip)</li>
+<li><code>vision.*</code> — perception (describe, detect, track)</li>
+<li><code>status.*</code> — introspection (report, health)</li>
+<li><code>system.*</code> — lifecycle (shutdown, reboot, calibrate)</li>
+</ul>
+<p>Vendor-specific skills MAY use their own namespace (e.g., <code>bosdyn.crouch</code>).</p>
+<h3 id="network">4.2 <code>network</code> (map, required for network-addressable robots)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rrf_endpoint</code></td>
+<td>URL</td>
+<td><code>https://robotregistryfoundation.org</code> or self-hosted RRF</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>int</td>
+<td>Gateway port</td>
+</tr>
+<tr>
+<td><code>signing_alg</code></td>
+<td>string</td>
+<td><code>pqc-hybrid-v1</code> (required at RCAN 3.0 L2+); <code>ml-dsa-65</code>; or <code>ed25519</code> (L1 only, sunset in 3.x)</td>
+</tr>
+<tr>
+<td><code>transports</code></td>
+<td>array</td>
+<td><code>[http, mqtt, ws]</code> etc.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="brain">4.3 <code>brain</code> (map, required if the robot uses an LLM planner)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>planning</code></td>
+<td>map</td>
+<td>LLM provider + model + confidence gate</td>
+</tr>
+<tr>
+<td><code>reactive</code></td>
+<td>map</td>
+<td>Optional low-latency layer (e.g., VLA model)</td>
+</tr>
+<tr>
+<td><code>task_routing</code></td>
+<td>map</td>
+<td>RCAN task-category routing overrides</td>
+</tr>
+</tbody>
+</table>
+<p>Example:</p>
+<pre><code class="language-yaml">brain:
   planning:
     provider: anthropic
     model: claude-opus-4-7
@@ -584,94 +658,98 @@
     sensor_poll: fast_only
     safety: planner_always
     navigation: periodic
-    reasoning: planner</code></pre>
-
-        <h3 id="compliance">4.4 <code>compliance</code> <small style="font-size:11px;color:var(--ink-4);font-family:var(--mono)">(map, required for EU-deployed robots)</small></h3>
-        <table>
-          <thead>
-            <tr><th>Field</th><th>Type</th><th>Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>fria_ref</code></td><td>URL or null</td><td>Signed FRIA document URI (RCAN §27). <code>null</code> = pending <code>castor fria generate</code>.</td></tr>
-            <tr><td><code>iso_42001</code></td><td>map</td><td><code>{ self_assessed: bool, level: 1-5 }</code></td></tr>
-            <tr><td><code>eu_ai_act</code></td><td>map</td><td><code>{ audit_retention_days: int }</code> (≥ 365 for Annex III systems)</td></tr>
-          </tbody>
-        </table>
-
-        <h2 id="body-required">5. Body — required sections</h2>
-        <p>The markdown body MUST contain:</p>
-        <ol>
-          <li><code># &lt;metadata.robot_name&gt;</code> — H1 matching <code>metadata.robot_name</code> (case-insensitive)</li>
-          <li><code>## Identity</code> — 1-2 paragraphs describing the robot</li>
-          <li><code>## What &lt;robot_name&gt; Can Do</code> — prose capability narrative</li>
-          <li><code>## Safety Gates</code> — which actions gated, how E-stop works</li>
-        </ol>
-        <p>Optional sections:</p>
-        <ul>
-          <li><code>## Task Routing</code> — expands on <code>brain.task_routing</code></li>
-          <li><code>## Extension Points</code> — how to add skills/drivers</li>
-          <li><code>## References</code> — links to spec, runtime, RRF entry</li>
-        </ul>
-
-        <h2 id="body-planner">6. Body — planner usage</h2>
-        <p>A Claude session with this ROBOT.md in context at startup is expected to:</p>
-        <ol>
-          <li>Cite the robot by name in its first response</li>
-          <li>Respect <code>safety.hitl_gates</code> without prompting</li>
-          <li>Route tasks according to <code>brain.task_routing</code></li>
-          <li>Refuse capabilities NOT listed in <code>capabilities[]</code></li>
-          <li>Honor <code>compliance</code> flags (e.g., extra caution for <code>eu_ai_act.audit_retention_days &gt; 0</code>)</li>
-        </ol>
-
-        <h2 id="extensions">7. Extensions</h2>
-        <p>
-          Vendor-specific extensions MUST use the <code>extensions:</code> block with namespaced keys:
-        </p>
-        <pre><code>extensions:
+    reasoning: planner
+</code></pre>
+<h3 id="compliance">4.4 <code>compliance</code> (map, required for EU-deployed robots)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fria_ref</code></td>
+<td>URL or null</td>
+<td>Signed Fundamental Rights Impact Assessment document URI (RCAN §27). <code>null</code> = placeholder pending <code>castor fria generate</code>.</td>
+</tr>
+<tr>
+<td><code>iso_42001</code></td>
+<td>map</td>
+<td><code>{ self_assessed: bool, level: 1-5 }</code></td>
+</tr>
+<tr>
+<td><code>eu_ai_act</code></td>
+<td>map</td>
+<td><code>{ audit_retention_days: int }</code> (≥ 365 for Annex III systems)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="body-required">5. Body — required sections</h2>
+<p>The markdown body MUST contain:</p>
+<ol>
+<li><code># &lt;metadata.robot_name&gt;</code> — H1 matching <code>metadata.robot_name</code> (case-insensitive)</li>
+<li><code>## Identity</code> — 1-2 paragraphs describing the robot</li>
+<li><code>## What &lt;robot_name&gt; Can Do</code> — prose capability narrative</li>
+<li><code>## Safety Gates</code> — which actions gated, how E-stop works</li>
+</ol>
+<p>Optional sections:</p>
+<ul>
+<li><code>## Task Routing</code> — expands on <code>brain.task_routing</code></li>
+<li><code>## Extension Points</code> — how to add skills/drivers</li>
+<li><code>## References</code> — links to spec, runtime, RRF entry</li>
+</ul>
+<h2 id="body-planner">6. Body — planner usage</h2>
+<p>A Claude session with this ROBOT.md in context at startup is expected to:</p>
+<ol>
+<li>Cite the robot by name in its first response</li>
+<li>Respect <code>safety.hitl_gates</code> without prompting</li>
+<li>Route tasks according to <code>brain.task_routing</code></li>
+<li>Refuse capabilities NOT listed in <code>capabilities[]</code></li>
+<li>Honor <code>compliance</code> flags (e.g., extra caution for <code>eu_ai_act.audit_retention_days &gt; 0</code>)</li>
+</ol>
+<h2 id="extensions">7. Extensions</h2>
+<p>Vendor-specific extensions MUST use the <code>extensions:</code> block with namespaced keys:</p>
+<pre><code class="language-yaml">extensions:
   x-opencastor:
     harness_ref: /etc/opencastor/harness.yaml
   x-boston-dynamics:
-    spot_config_version: "3.2"</code></pre>
-        <p>Unknown <code>extensions.x-*</code> keys MUST NOT cause validation failure.</p>
-
-        <h2 id="validation">8. Validation</h2>
-        <p>A ROBOT.md is <strong>valid</strong> if and only if:</p>
-        <ol>
-          <li>Frontmatter parses as YAML without error</li>
-          <li>Frontmatter validates against <a href="/schema/v1/robot.schema.json"><code>schema/v1/robot.schema.json</code></a></li>
-          <li><code>rcan_version</code> passes <code>castor.compliance.is_accepted_version</code></li>
-          <li>Required body sections are present</li>
-          <li><code>capabilities</code> values match <code>nav.*</code>, <code>arm.*</code>, <code>vision.*</code>, <code>status.*</code>, <code>system.*</code>, or vendor <code>&lt;prefix&gt;.*</code> patterns</li>
-        </ol>
-        <p>The <code>robot-md validate</code> CLI returns exit codes:</p>
-        <div class="exit-codes" role="table" aria-label="robot-md validate exit codes">
-          <div class="ec-code" role="cell">0</div><div class="ec-desc" role="cell">Valid</div>
-          <div class="ec-code" role="cell">1</div><div class="ec-desc" role="cell">File not found or parse error</div>
-          <div class="ec-code" role="cell">2</div><div class="ec-desc" role="cell">Schema violation</div>
-          <div class="ec-code" role="cell">3</div><div class="ec-desc" role="cell">RCAN conformance violation</div>
-          <div class="ec-code" role="cell">4</div><div class="ec-desc" role="cell">Missing required body section</div>
-        </div>
-
-        <h2 id="versioning">9. Versioning</h2>
-        <p>The spec version is <strong>v1</strong>. Future versions:</p>
-        <ul>
-          <li><code>v1.x</code> — backward-compatible additions (new optional fields, new optional sections)</li>
-          <li><code>v2</code> — breaking changes (field renames, required→optional changes that affect validation)</li>
-        </ul>
-        <p>
-          Breaking changes live at a new schema URL (<code>schema/v2/robot.schema.json</code>)
-          and the spec file is renamed. Both served indefinitely.
-        </p>
-
-        <h2 id="references">10. References</h2>
-        <ul>
-          <li>RCAN protocol: <a href="https://rcan.dev/spec/">rcan.dev/spec/</a></li>
-          <li>Robot Registry Foundation: <a href="https://robotregistryfoundation.org/">robotregistryfoundation.org</a></li>
-          <li>OpenCastor runtime: <a href="https://github.com/craigm26/OpenCastor">github.com/craigm26/OpenCastor</a></li>
-          <li>JSON Schema spec: <a href="https://json-schema.org/draft/2020-12/">json-schema.org/draft/2020-12/</a></li>
-          <li>JSON Schema (this spec): <a href="/schema/v1/robot.schema.json">/schema/v1/robot.schema.json</a></li>
-        </ul>
-
+    spot_config_version: &quot;3.2&quot;
+</code></pre>
+<p>Unknown <code>extensions.x-*</code> keys MUST NOT cause validation failure.</p>
+<h2 id="validation">8. Validation</h2>
+<p>A ROBOT.md is <strong>valid</strong> if and only if:</p>
+<ol>
+<li>Frontmatter parses as YAML without error</li>
+<li>Frontmatter validates against <code>schema/v1/robot.schema.json</code></li>
+<li><code>rcan_version</code> passes <code>castor.compliance.is_accepted_version</code> (or equivalent — see rationale)</li>
+<li>Required body sections are present</li>
+<li><code>capabilities</code> values match <code>nav.*</code>, <code>arm.*</code>, <code>vision.*</code>, <code>status.*</code>, <code>system.*</code>, or vendor <code>&lt;prefix&gt;.*</code> patterns</li>
+</ol>
+<p>The <code>robot-md validate</code> CLI returns exit codes:</p>
+<ul>
+<li><code>0</code> — valid</li>
+<li><code>1</code> — file not found or parse error</li>
+<li><code>2</code> — schema violation</li>
+<li><code>3</code> — RCAN conformance violation</li>
+<li><code>4</code> — missing required body section</li>
+</ul>
+<h2 id="versioning">9. Versioning</h2>
+<p>The spec version is <code>v1</code>. Future versions:</p>
+<ul>
+<li><code>v1.x</code> — backward-compatible additions (new optional fields, new optional sections)</li>
+<li><code>v2</code> — breaking changes (field renames, required→optional changes that affect validation)</li>
+</ul>
+<p>Breaking changes live at a new schema URL (<code>schema/v2/robot.schema.json</code>) and the spec file is renamed accordingly. Both served indefinitely.</p>
+<h2 id="references">10. References</h2>
+<ul>
+<li>RCAN protocol: <a href="https://rcan.dev/spec/">https://rcan.dev/spec/</a></li>
+<li>Robot Registry Foundation: <a href="https://robotregistryfoundation.org/">https://robotregistryfoundation.org/</a></li>
+<li>OpenCastor runtime: <a href="https://github.com/craigm26/OpenCastor">https://github.com/craigm26/OpenCastor</a></li>
+<li>JSON Schema spec: <a href="https://json-schema.org/draft/2020-12/">https://json-schema.org/draft/2020-12/</a></li>
+</ul>
       </article>
 
     </div>

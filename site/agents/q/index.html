@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Amazon Q — ROBOT.md Agents</title>
+  <meta name="description"
+    content="ROBOT.md + Amazon Q: MCP integration is pending aarch64 support in Q CLI. Use the robot-md-http OpenAPI bridge as a fallback today.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Amazon Q — ROBOT.md Agents">
+  <meta property="og:url" content="https://robotmd.dev/agents/q/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/agents/q/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    .agent-nav {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--rule);
+      background: var(--paper-2);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      overflow: hidden;
+      margin-top: 28px;
+    }
+    .agent-nav a {
+      padding: 8px 18px;
+      border-right: 1px solid var(--rule);
+      color: var(--ink-3);
+      border-bottom: none;
+      transition: background .12s;
+      white-space: nowrap;
+    }
+    .agent-nav a:last-child { border-right: none }
+    .agent-nav a:hover { background: var(--paper-3); color: var(--ink) }
+    .agent-nav a.current { background: var(--ink); color: var(--paper) }
+    @media (max-width: 720px) {
+      .agent-nav { flex-wrap: wrap }
+      .agent-nav a { flex: 1 1 auto; text-align: center }
+    }
+
+    .code-example {
+      background: var(--ink);
+      color: #E8E3D3;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 18px 20px;
+      margin: 12px 0 20px;
+      overflow-x: auto;
+      border-radius: 2px;
+      border: 1px solid var(--rule);
+    }
+    .code-example .cm { color: #6a9966 }
+    .code-example .kw { color: #ffb88c }
+    .code-example .st { color: #b8d9a1 }
+
+    .info-block {
+      background: var(--paper-2);
+      border-left: 3px solid var(--ink-3);
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+      color: var(--ink-2);
+      line-height: 1.55;
+    }
+    .info-block strong { color: var(--ink) }
+
+    .warn-block {
+      background: var(--accent-wash);
+      border-left: 3px solid var(--accent);
+      padding: 14px 18px;
+      margin: 16px 0;
+      font-size: 14px;
+      color: var(--ink-2);
+      line-height: 1.55;
+    }
+    .warn-block strong { color: var(--accent-ink) }
+
+    .future-block {
+      background: var(--paper-2);
+      border: 1px dashed var(--rule);
+      padding: 18px 20px;
+      margin: 12px 0 20px;
+    }
+    .future-block .future-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      color: var(--ink-4);
+      margin-bottom: 8px;
+    }
+    .future-block pre {
+      background: var(--ink);
+      color: #E8E3D3;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 14px 18px;
+      margin: 0;
+      overflow-x: auto;
+      border-radius: 2px;
+      opacity: .65;
+    }
+
+    .caps-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 13.5px;
+    }
+    .caps-table th {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--paper-2);
+      border-bottom: 2px solid var(--rule);
+      color: var(--ink-3);
+    }
+    .caps-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--rule);
+      color: var(--ink-2);
+      vertical-align: middle;
+    }
+    .caps-table tr:last-child td { border-bottom: none }
+    .caps-table td:first-child { font-family: var(--mono); font-size: 12.5px; color: var(--ink) }
+    .cap-native  { color: var(--ok);         font-family: var(--mono); font-size: 11px }
+    .cap-bridge  { color: var(--accent-ink); font-family: var(--mono); font-size: 11px }
+    .cap-blocked { color: var(--danger);     font-family: var(--mono); font-size: 11px }
+    .cap-na      { color: var(--ink-4);      font-family: var(--mono); font-size: 11px }
+
+    .cta-strip {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 32px;
+      padding-top: 28px;
+      border-top: 1px solid var(--rule);
+    }
+    .cta-strip a {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 9px 20px;
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      border-bottom: 1px solid var(--rule);
+      transition: background .12s, color .12s;
+    }
+    .cta-strip a:hover { background: var(--ink); color: var(--paper) }
+    .cta-strip a.primary { background: var(--ink); color: var(--paper); border-color: var(--ink) }
+    .cta-strip a.primary:hover { background: var(--accent); border-color: var(--accent) }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== SITE NAV ===== -->
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="/spec/">Spec</a>
+        <a href="/agents/" class="current" aria-current="page">Agents</a>
+        <a href="/mcp/">MCP</a>
+        <a href="/registry/">Registry</a>
+        <a href="/compliance/">Compliance</a>
+        <a href="/managed-agents/">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+      <div class="page-eyebrow">
+        <span>Agents · Amazon Q</span>
+        <span class="rule-line" aria-hidden="true"></span>
+        <span class="badge badge-wip">Pre-release · aarch64 blocked</span>
+      </div>
+      <h1 class="page-heading">
+        ROBOT<span style="color:var(--accent)">.</span><span style="font-family:var(--serif);font-weight:400;font-style:italic;color:var(--ink-3)">md</span>
+        + <b>Amazon Q</b>
+      </h1>
+      <p class="page-lede">
+        When Q's MCP CLI support catches up to aarch64, robot-md-mcp wires in with one config line.
+        Until then, the <code style="font-family:var(--mono);font-size:15px;background:var(--paper-2);padding:2px 7px;border-radius:2px;">robot-md-http</code>
+        OpenAPI bridge is the fallback path.
+      </p>
+      <nav class="agent-nav" aria-label="Agent surfaces">
+        <a href="/agents/claude-code/">Claude Code</a>
+        <a href="/agents/gemini/">Gemini CLI</a>
+        <a href="/agents/codex/">Codex CLI</a>
+        <a href="/agents/chatgpt/">ChatGPT</a>
+        <a href="/agents/q/" class="current" aria-current="page">Amazon Q</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== WHAT'S BLOCKED ===== -->
+  <section class="sec" id="blocked">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 01 — Status</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">What's blocked today.</h2>
+
+      <div class="warn-block">
+        <strong>aarch64 not supported:</strong> Amazon Q CLI's MCP integration currently requires an
+        x86 host. The reference robot (<em>bob</em>) runs on a Raspberry Pi 5 (aarch64), so the native
+        MCP path is blocked until AWS ships aarch64 support. Tracking:
+        <a href="https://github.com/aws/amazon-q-developer-cli/issues"
+           style="font-family:var(--mono);font-size:12px;">aws/amazon-q-developer-cli issues →</a>
+      </div>
+
+      <p style="font-size:15px;color:var(--ink-2);line-height:1.65;max-width:640px;margin-top:12px;">
+        The blocker is architectural — Q CLI's MCP stdio transport is compiled for x86 only as of
+        2026-04-29. There is no workaround on aarch64 hardware short of cross-architecture emulation
+        (not recommended for production robotics). When AWS ships a universal binary or aarch64 build,
+        the integration is a one-line config change identical to the Codex and Gemini setups.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== WHAT WORKS TODAY ===== -->
+  <section class="sec" id="today">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 02 — What works today</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">OpenAPI bridge fallback.</h2>
+
+      <p style="font-size:15px;color:var(--ink-2);line-height:1.65;max-width:640px;margin-bottom:16px;">
+        The same <code style="font-family:var(--mono);font-size:13px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md-http</code>
+        bridge used by ChatGPT Custom GPT Actions works with Q's web and chat surfaces.
+        It exposes your robot manifest as an OpenAPI endpoint that any HTTP-capable agent can call.
+      </p>
+
+      <div class="info-block">
+        <strong>Fallback path:</strong> Start <code style="font-family:var(--mono);font-size:12.5px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:2px;">robot-md-http</code>
+        as a local server, then point Q's custom tool configuration at
+        <code style="font-family:var(--mono);font-size:12.5px;background:rgba(0,0,0,.06);padding:1px 5px;border-radius:2px;">http://localhost:4000/openapi.json</code>.
+        Capability reads and safety queries work; tool-call execution requires the full MCP path.
+      </div>
+
+      <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 8px;">
+        Start the HTTP bridge
+      </p>
+      <pre class="code-example" aria-label="robot-md-http bridge command"><span class="cm"># Install and start the OpenAPI bridge:</span>
+$ npx -y robot-md-http ./ROBOT.md
+
+<span class="cm"># Bridge starts at http://localhost:4000</span>
+<span class="cm"># OpenAPI schema: http://localhost:4000/openapi.json</span>
+<span class="cm"># Point Amazon Q's plugin/tool config at this endpoint.</span></pre>
+
+      <p style="font-size:15px;color:var(--ink-2);line-height:1.65;max-width:640px;margin-bottom:0;">
+        Full walkthrough for the HTTP bridge (including custom GPT Action wiring) is on the
+        <a href="/agents/chatgpt/">ChatGPT page</a> — the setup is identical.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== FUTURE MCP INSTALL ===== -->
+  <section class="sec" id="future">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 03 — Future MCP install</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">When aarch64 support ships.</h2>
+
+      <p style="font-size:15px;color:var(--ink-2);line-height:1.65;max-width:640px;margin-bottom:16px;">
+        Once Q CLI ships aarch64 support, the install is one command — identical in shape
+        to the Gemini and Codex setups. The block below shows the expected form.
+        Do not run it today; the command will fail on aarch64 hosts.
+      </p>
+
+      <div class="future-block">
+        <div class="future-label">Future — not yet functional on aarch64</div>
+        <!-- No copy button intentionally: this command does not work today -->
+        <pre aria-label="Future Amazon Q MCP install (not yet functional)"># When Q CLI supports aarch64:
+q mcp add robot-md \
+  -- npx --yes robot-md-mcp ./ROBOT.md
+
+# Then start Q and ask:
+q chat
+&gt; what can this robot do?</pre>
+      </div>
+
+      <p style="font-size:13.5px;color:var(--ink-3);line-height:1.55;max-width:540px;margin-top:8px;">
+        This page will be updated and the copy button enabled once the integration is verified
+        on aarch64 hardware. Watch
+        <a href="https://github.com/RobotRegistryFoundation/robot-md/issues"
+           style="font-family:var(--mono);font-size:12px;">robot-md issues</a>
+        or
+        <a href="https://github.com/aws/amazon-q-developer-cli/issues"
+           style="font-family:var(--mono);font-size:12px;">aws/amazon-q-developer-cli issues</a>
+        for status.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== CAPABILITIES ===== -->
+  <section class="sec" id="capabilities">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 04 — Capabilities</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">What works via Amazon Q.</h2>
+
+      <table class="caps-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Q CLI (MCP)</th>
+            <th>Q via HTTP bridge</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Read capabilities / safety / frontmatter</td>
+            <td><span class="cap-blocked">✗ aarch64 blocked</span></td>
+            <td><span class="cap-bridge">→ Bridge</span></td>
+            <td>HTTP bridge reads MCP resources via REST</td>
+          </tr>
+          <tr>
+            <td>Validate ROBOT.md</td>
+            <td><span class="cap-blocked">✗ aarch64 blocked</span></td>
+            <td><span class="cap-bridge">→ Bridge</span></td>
+            <td>OpenAPI <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">POST /validate</code></td>
+          </tr>
+          <tr>
+            <td>Render canonical YAML</td>
+            <td><span class="cap-blocked">✗ aarch64 blocked</span></td>
+            <td><span class="cap-bridge">→ Bridge</span></td>
+            <td>Via HTTP bridge</td>
+          </tr>
+          <tr>
+            <td>Compliance filing commands</td>
+            <td><span class="cap-na">— Not via Q</span></td>
+            <td><span class="cap-na">— CLI only</span></td>
+            <td>Run <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">robot-md emit-fria</code> directly from shell</td>
+          </tr>
+          <tr>
+            <td>Native MCP (all features)</td>
+            <td><span class="cap-blocked">✗ Future (aarch64)</span></td>
+            <td><span class="cap-na">— N/A</span></td>
+            <td>Will match Codex/Gemini feature set once unblocked</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== CTA ===== -->
+  <section class="sec" id="next" style="border-bottom:none;">
+    <div class="wrap">
+      <div class="cta-strip">
+        <a class="primary" href="/mcp/">MCP server docs →</a>
+        <a href="/agents/">All surfaces →</a>
+        <a href="/agents/chatgpt/">ChatGPT (HTTP bridge) →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="wrap foot">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/compliance/">Compliance</a> ·
+      <a href="/robots">Robots</a> ·
+      <a href="/status">Status</a> ·
+      <a href="/report.html">Report issue</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+
+</body>
+
+</html>
