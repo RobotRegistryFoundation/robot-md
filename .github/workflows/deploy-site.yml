@@ -31,6 +31,11 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Render spec from markdown
+        run: |
+          pip install --user markdown
+          python3 site/scripts/render-spec.py
+
       - name: Inject build-time stats
         run: node site/scripts/inject-stats.js
         env:
