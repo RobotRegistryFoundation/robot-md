@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Robot Registry Foundation — ROBOT.md Registry</title>
+  <meta name="description"
+    content="RRN and RMN identities, RRF endpoints, signed-POST registration flow, PQC signing keys, and M2M_TRUSTED revocation polling via RCAN 3.0.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Robot Registry Foundation — ROBOT.md Registry">
+  <meta property="og:description"
+    content="Permanent RRN/RMN identities for robots. 5 live RCAN §22-26 endpoints. Signed-POST with pqc-hybrid-v1 keys.">
+  <meta property="og:url" content="https://robotmd.dev/registry/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/registry/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    .rrn-example {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--rule);
+      overflow: hidden;
+      margin-top: 24px;
+    }
+    @media (max-width: 720px) { .rrn-example { grid-template-columns: 1fr } }
+    .rrn-card {
+      padding: 20px 24px;
+      border-right: 1px solid var(--rule);
+    }
+    .rrn-card:last-child { border-right: none }
+    @media (max-width: 720px) {
+      .rrn-card { border-right: none; border-bottom: 1px solid var(--rule) }
+      .rrn-card:last-child { border-bottom: none }
+    }
+    .rrn-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+    .rrn-value {
+      font-family: var(--mono);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 8px;
+      word-break: break-all;
+    }
+    .rrn-desc {
+      font-size: 13.5px;
+      color: var(--ink-3);
+      line-height: 1.5;
+    }
+
+    .endpoints-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 13.5px;
+    }
+    .endpoints-table th {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--paper-2);
+      border-bottom: 2px solid var(--rule);
+      color: var(--ink-3);
+    }
+    .endpoints-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--rule);
+      color: var(--ink-2);
+      vertical-align: top;
+      line-height: 1.5;
+    }
+    .endpoints-table tr:last-child td { border-bottom: none }
+    .endpoints-table td:first-child {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--accent-ink);
+      white-space: nowrap;
+    }
+    .endpoints-table td:nth-child(2) { font-family: var(--mono); font-size: 12px; color: var(--ink) }
+    .ep-live { color: var(--ok); font-family: var(--mono); font-size: 11px }
+    .ep-wip  { color: var(--ink-4); font-family: var(--mono); font-size: 11px }
+
+    .code-example {
+      background: var(--ink);
+      color: #E8E3D3;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 18px 20px;
+      margin: 12px 0 20px;
+      overflow-x: auto;
+      border-radius: 2px;
+      border: 1px solid var(--rule);
+    }
+    .code-example .cm { color: #6a9966 }
+    .code-example .kw { color: #ffb88c }
+    .code-example .st { color: #b8d9a1 }
+    .code-example .ok { color: #7fb27a }
+
+    .signing-block {
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      padding: 24px 28px;
+      margin-top: 20px;
+    }
+    .signing-block .sb-row {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+    .signing-block .sb-row:last-child { border-bottom: none }
+    .signing-block .sb-key {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .04em;
+      color: var(--ink-3);
+      min-width: 160px;
+      flex-shrink: 0;
+    }
+    .signing-block .sb-val {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink);
+    }
+    .signing-block .sb-note {
+      font-size: 13px;
+      color: var(--ink-3);
+    }
+
+    .cta-strip {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 32px;
+      padding-top: 28px;
+      border-top: 1px solid var(--rule);
+    }
+    .cta-strip a {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 9px 20px;
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      border-bottom: 1px solid var(--rule);
+      transition: background .12s, color .12s;
+    }
+    .cta-strip a:hover { background: var(--ink); color: var(--paper) }
+    .cta-strip a.primary { background: var(--ink); color: var(--paper); border-color: var(--ink) }
+    .cta-strip a.primary:hover { background: var(--accent); border-color: var(--accent) }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== SITE NAV ===== -->
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="/spec/">Spec</a>
+        <a href="/agents/claude-code/">Agents</a>
+        <a href="/mcp/">MCP</a>
+        <a href="/registry/" class="current" aria-current="page">Registry</a>
+        <a href="/compliance/">Compliance</a>
+        <a href="/managed-agents/">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+      <div class="page-eyebrow">
+        <span>Robot Registry Foundation</span>
+        <span class="rule-line" aria-hidden="true"></span>
+        <span>RCAN 3.0 · 5 §22-26 endpoints live</span>
+      </div>
+      <h1 class="page-heading">
+        Permanent <em>identity</em> for every robot.
+      </h1>
+      <p class="page-lede">
+        The Robot Registry Foundation issues RRNs — permanent numeric robot identities —
+        and hosts the five RCAN §22-26 compliance endpoints.
+        <code style="font-family:var(--mono);font-size:0.8em">robot-md register</code> handles the signed-POST flow.
+      </p>
+    </div>
+  </header>
+
+  <!-- ===== RRN + RMN ===== -->
+  <section class="sec" id="identifiers">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 01 — Identifiers</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">RRN and RMN — two identifier types.</h2>
+      <p class="sec-lede">
+        An RRN identifies a robot instance. An RMN identifies a robot model.
+        Both are permanent once issued.
+      </p>
+
+      <div class="rrn-example" aria-label="RRN and RMN examples">
+        <div class="rrn-card">
+          <div class="rrn-label">RRN — Robot Registration Number</div>
+          <div class="rrn-value">RRN-000000000003</div>
+          <div class="rrn-desc">
+            Identifies a specific robot instance. Numeric, zero-padded to 12 digits.
+            URI form: <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">rrn:000000000003</code>.
+            Resolves at <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">robotregistryfoundation.org/r/RRN-000000000003</code>.
+          </div>
+        </div>
+        <div class="rrn-card">
+          <div class="rrn-label">RMN — Robot Model Number</div>
+          <div class="rrn-value">RMN-000000000004</div>
+          <div class="rrn-desc">
+            Identifies a robot model (e.g., SO-ARM101 v2). Required field in ROBOT.md
+            for EU AI Act compliance (the model number is the anchor for §26 EU Register filings).
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== REGISTER ===== -->
+  <section class="sec" id="register">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 02 — Registration</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">robot-md register — mint an RRN.</h2>
+      <p class="sec-lede">
+        One command mints an RRN and writes it back into your ROBOT.md.
+        Requires a valid ROBOT.md with <code style="font-size:0.85em">rcan_version: "3.0"</code>.
+      </p>
+
+      <div class="install-block" style="margin-top:24px;">
+        <pre aria-label="robot-md register command"><span class="prompt">$</span> <span class="cmd">robot-md register ROBOT.md \
+    --manufacturer "Acme Robotics" \
+    --contact-email ops@example.com</span></pre>
+        <button class="install-copy-btn"
+                aria-label="Copy register command"
+                data-copy="robot-md register ROBOT.md --manufacturer &quot;Acme Robotics&quot; --contact-email ops@example.com">Copy</button>
+      </div>
+
+      <p style="font-size:14px;color:var(--ink-2);margin-top:16px;line-height:1.6;">
+        The command signs the registration payload with your robot's key (generated at init time)
+        and POSTs to <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">https://robotregistryfoundation.org/api/register</code>.
+        On success, <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">metadata.rrn</code>
+        and <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">metadata.rrn_uri</code>
+        are written back to your ROBOT.md.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== RRF ENDPOINTS ===== -->
+  <section class="sec" id="endpoints">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 03 — RRF endpoints</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">5 §22-26 endpoints, all live.</h2>
+      <p class="sec-lede">
+        All five RCAN compliance endpoints are live at
+        <a href="https://robotregistryfoundation.org">robotregistryfoundation.org</a>
+        as of 2026-04-24.
+      </p>
+
+      <table class="endpoints-table">
+        <thead>
+          <tr>
+            <th>RCAN §</th>
+            <th>Endpoint</th>
+            <th>Packet name</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>§22</td>
+            <td>/api/compliance/fria</td>
+            <td>FRIA — Fundamental Rights Impact Assessment</td>
+            <td><span class="ep-live">● Live</span></td>
+          </tr>
+          <tr>
+            <td>§23</td>
+            <td>/api/compliance/safety-benchmark</td>
+            <td>Safety benchmark (ISO 42001 self-assessment)</td>
+            <td><span class="ep-live">● Live</span></td>
+          </tr>
+          <tr>
+            <td>§24</td>
+            <td>/api/compliance/ifu</td>
+            <td>IFU Art. 13(3) — Instructions for Use</td>
+            <td><span class="ep-live">● Live</span></td>
+          </tr>
+          <tr>
+            <td>§25</td>
+            <td>/api/compliance/incident-report</td>
+            <td>Incident report Art. 72</td>
+            <td><span class="ep-live">● Live</span></td>
+          </tr>
+          <tr>
+            <td>§26</td>
+            <td>/api/compliance/eu-register</td>
+            <td>EU Register Art. 49 filing</td>
+            <td><span class="ep-live">● Live</span></td>
+          </tr>
+          <tr>
+            <td>§27</td>
+            <td>/api/compliance/fria-signed</td>
+            <td>FRIA with post-quantum signature (in flight)</td>
+            <td><span class="ep-wip">◌ In flight</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p style="font-size:14px;color:var(--ink-3);margin-top:12px;line-height:1.6;">
+        Live endpoint status: <a href="https://robotregistryfoundation.org">robotregistryfoundation.org →</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== SIGNING KEYS ===== -->
+  <section class="sec" id="signing">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 04 — Identity &amp; signing</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">Post-quantum hybrid keys.</h2>
+      <p class="sec-lede">
+        Every compliance packet is signed before posting. Keys are stored locally.
+      </p>
+
+      <div class="signing-block" aria-label="Signing configuration reference">
+        <div class="sb-row">
+          <span class="sb-key">Key algorithm</span>
+          <span class="sb-val">pqc-hybrid-v1</span>
+          <span class="sb-note">&nbsp;— ML-DSA-65 + Ed25519 hybrid (RCAN 3.0 L2+)</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-key">Keystore path</span>
+          <span class="sb-val">~/.robot-md/keys/</span>
+          <span class="sb-note">&nbsp;— one key pair per robot instance</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-key">Rotate key</span>
+          <span class="sb-val">robot-md rotate-key ROBOT.md</span>
+          <span class="sb-note">&nbsp;— generates new key pair, re-binds at RRF</span>
+        </div>
+        <div class="sb-row">
+          <span class="sb-key">Revoke key</span>
+          <span class="sb-val">robot-md revoke-key ROBOT.md</span>
+          <span class="sb-note">&nbsp;— marks key as revoked at RRF; triggers downstream M2M_TRUSTED re-auth</span>
+        </div>
+      </div>
+
+      <p style="font-size:14px;color:var(--ink-2);margin-top:16px;line-height:1.6;">
+        Keys are generated at <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md register</code> time and bound to the RRN.
+        The <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">ed25519</code> algorithm is accepted at RCAN 3.0 L1 only;
+        L2+ requires <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">pqc-hybrid-v1</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== REVOCATION POLLING ===== -->
+  <section class="sec" id="revocation">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 05 — Revocation</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">M2M_TRUSTED §2.9 revocation polling.</h2>
+      <p class="sec-lede">
+        Any system that trusts a robot's key via the <code style="font-size:0.85em">M2M_TRUSTED</code>
+        tier MUST poll for revocation. robot-md handles this automatically.
+      </p>
+      <p style="font-size:14.5px;color:var(--ink-2);line-height:1.65;margin-top:16px;max-width:700px;">
+        When a key is revoked (via <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md revoke-key</code>
+        or directly at RRF), the RRF broadcasts a revocation event to all registered
+        <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">M2M_TRUSTED</code>
+        listeners. Peer runtimes (OpenCastor, robot-md-dispatcher) poll
+        <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">https://robotregistryfoundation.org/api/revocation/&lt;rrn&gt;</code>
+        on a configurable interval (default: 60 seconds). Any request signed with a revoked key is
+        rejected with <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">403 KEY_REVOKED</code>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== CTA ===== -->
+  <section class="sec" id="next" style="border-bottom:none;">
+    <div class="wrap">
+      <div class="cta-strip">
+        <a class="primary" href="https://robotregistryfoundation.org">RRF live site →</a>
+        <a href="/compliance/">File compliance packets →</a>
+        <a href="/spec/">ROBOT.md spec →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="wrap foot">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/compliance/">Compliance</a> ·
+      <a href="/robots">Robots</a> ·
+      <a href="/status">Status</a> ·
+      <a href="/report.html">Report issue</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+
+  <script src="/js/copy-button.js" defer></script>
+
+</body>
+
+</html>

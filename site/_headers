@@ -31,6 +31,30 @@
   Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600
 
+/spec/index.html
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+
+/agents/*
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+
+/mcp/*
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+
+/registry/*
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+
+/compliance/*
+  Content-Type: text/html; charset=utf-8
+  Cache-Control: public, max-age=300, must-revalidate
+
+/css/*
+  Content-Type: text/css; charset=utf-8
+  Cache-Control: public, max-age=3600, must-revalidate
+
 /hook
   Content-Type: text/x-shellscript; charset=utf-8
   Content-Disposition: attachment; filename="robot-md.sh"

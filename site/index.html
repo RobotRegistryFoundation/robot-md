@@ -24,7 +24,11 @@
     href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
     rel="stylesheet">
 
+  <link rel="stylesheet" href="/css/design.css">
+
   <style>
+    /* Page-specific styles (hero, marquee, demo, surfaces, compliance pipeline, rcan-block, builton, CTAs) */
+    /* Shared design tokens are in /css/design.css */
     /* ============================================================
        DESIGN TOKENS — paper/ink/terracotta palette, unchanged
        ============================================================ */
@@ -1103,11 +1107,11 @@ claude</pre>
         </div>
 
         <div class="surface-card">
-          <div class="surf-status live">● Live</div>
+          <div class="surf-status wip">○ Pre-release</div>
           <div class="surf-name">ChatGPT</div>
-          <pre class="surf-cmd">robot-md register ROBOT.md
-# paste RRF URL in Custom GPT
-# Instructions field</pre>
+          <pre class="surf-cmd">npx -y robot-md-http
+# OpenAPI bridge for
+# Custom GPT Actions</pre>
           <a class="surf-link" href="/agents/chatgpt/">Full install guide →</a>
         </div>
 
