@@ -1,0 +1,337 @@
+/*
+ * ROBOT.md design system — shared stylesheet
+ * Paper / ink / terracotta palette · Inter Tight + Fraunces + JetBrains Mono
+ * Sourced from site/index.html (canonical) + site/managed-agents/index.html
+ *
+ * Include BEFORE page-specific <style> blocks.
+ * Google Fonts <link> must still be in each page's <head>.
+ */
+
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+:root {
+  --paper:      #F4EFE6;
+  --paper-2:    #ECE5D6;
+  --paper-3:    #DFD5BF;
+  --ink:        #111110;
+  --ink-2:      #2A2825;
+  --ink-3:      #5A574F;
+  --ink-4:      #8A8578;
+  --rule:       #1d1c1a;
+  --accent:     #B34A2A;   /* terracotta — do NOT use for body text */
+  --accent-ink: #5A1F0E;   /* dark terracotta — AA safe for body text */
+  --accent-wash:#EBD9C9;
+  --ok:         #2F6B3E;
+  --danger:     #9B2D20;
+
+  --sans:  'Inter Tight', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  --mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --serif: 'Fraunces', Georgia, serif;
+
+  --maxw: 1240px;
+}
+
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box }
+html, body { margin: 0; padding: 0 }
+
+html {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
+  font-feature-settings: "ss01", "cv11";
+  min-height: 100vh;
+}
+
+/* subtle paper grain */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(rgba(0,0,0,.035) 1px, transparent 1px),
+    radial-gradient(rgba(0,0,0,.025) 1px, transparent 1px);
+  background-size: 3px 3px, 7px 7px;
+  background-position: 0 0, 1px 2px;
+  mix-blend-mode: multiply;
+  opacity: .55;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+}
+a:hover { color: var(--accent); border-color: var(--accent) }
+
+/* ============================================================
+   LAYOUT HELPERS
+   ============================================================ */
+.wrap {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 0 32px;
+  position: relative;
+  z-index: 1;
+}
+@media (max-width: 720px) { .wrap { padding: 0 16px } }
+
+/* ============================================================
+   SITE NAV
+   ============================================================ */
+.site-nav {
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  position: sticky;
+  top: 0;
+  background: var(--paper);
+  z-index: 100;
+}
+
+.site-nav-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.site-nav .wordmark {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -.03em;
+  border: none;
+}
+.site-nav .wordmark .dot { color: var(--accent) }
+.site-nav .wordmark .md  { font-family: var(--serif); font-weight: 400; font-style: italic; color: var(--ink-3) }
+
+.site-nav nav {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.site-nav nav a { border: none; opacity: .75 }
+.site-nav nav a:hover { opacity: 1 }
+.site-nav nav a.current { opacity: 1; color: var(--accent); border-bottom: 1px solid var(--accent) }
+
+.site-nav .nav-cta {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 5px 12px;
+  border-radius: 2px;
+  border: none;
+  letter-spacing: .08em;
+}
+.site-nav .nav-cta:hover { background: var(--accent); color: var(--paper) }
+
+@media (max-width: 900px) {
+  .site-nav nav { gap: 14px }
+  .site-nav .nav-cta { display: none }
+}
+@media (max-width: 600px) {
+  .site-nav-inner { flex-direction: column; align-items: flex-start; gap: 8px }
+  .site-nav nav { gap: 10px }
+}
+
+/* ============================================================
+   PAGE HEADER (secondary pages)
+   ============================================================ */
+.page-header {
+  padding: 56px 0 48px;
+  border-bottom: 3px double var(--rule);
+}
+
+.page-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.page-eyebrow .rule-line {
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+  opacity: .5;
+}
+
+.page-heading {
+  font-family: var(--sans);
+  font-weight: 300;
+  font-size: clamp(36px, 5vw, 66px);
+  line-height: 1.06;
+  letter-spacing: -0.026em;
+  text-wrap: balance;
+  margin: 0 0 20px;
+  color: var(--ink);
+}
+.page-heading b { font-weight: 700 }
+.page-heading em {
+  font-style: italic;
+  font-family: var(--serif);
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.page-lede {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 20px;
+  color: var(--ink-2);
+  max-width: 680px;
+  margin: 0;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+.sec {
+  padding: 64px 0;
+  border-bottom: 1px solid var(--rule);
+  position: relative;
+}
+
+.sec-eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sec-eyebrow .rule-line {
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+  opacity: .5;
+}
+
+.sec-title {
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: clamp(24px, 3.2vw, 40px);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0 0 12px;
+  text-wrap: balance;
+}
+
+.sec-lede {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 19px;
+  color: var(--ink-2);
+  max-width: 680px;
+  margin: 0;
+  text-wrap: pretty;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   INSTALL BLOCK (shared across agent pages + MCP page)
+   ============================================================ */
+.install-block {
+  display: flex;
+  align-items: stretch;
+  max-width: 640px;
+  margin-bottom: 24px;
+  border: 1px solid var(--rule);
+  background: var(--ink);
+  border-radius: 3px;
+  overflow: hidden;
+  box-shadow: 5px 5px 0 var(--rule);
+}
+
+.install-block pre {
+  margin: 0;
+  padding: 14px 20px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: #E8E3D3;
+  flex: 1;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.install-block pre .prompt { color: var(--accent) }
+.install-block pre .cmd   { color: #fff; font-weight: 500 }
+
+.install-copy-btn {
+  background: none;
+  border: none;
+  border-left: 1px solid #2a2825;
+  color: #8a857a;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 0 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color .15s, background .15s;
+}
+.install-copy-btn:hover { color: var(--paper); background: #2a2825 }
+.install-copy-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px }
+
+/* ============================================================
+   STATUS BADGES (shared)
+   ============================================================ */
+.badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 2px;
+}
+.badge-live    { background: var(--ok); color: var(--paper) }
+.badge-wip     { background: var(--paper-3); color: var(--ink-2); border: 1px solid var(--rule) }
+.badge-prerel  { background: var(--accent-wash); color: var(--accent-ink); border: 1px solid var(--accent) }
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer.foot {
+  padding: 28px 0 44px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--rule);
+}
+footer.foot a { color: var(--ink-3) }
+footer.foot a:hover { color: var(--accent) }
