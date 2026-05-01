@@ -99,7 +99,7 @@ def test_parse_dot_directory_resolves(tmp_path, monkeypatch):
 
 def test_parse_directory_without_robot_md_raises(tmp_path):
     """A directory with no ROBOT.md inside surfaces a clear error message."""
-    with pytest.raises(ParseError, match="ROBOT.md"):
+    with pytest.raises(ParseError, match=r"ROBOT\.md"):
         parse_file(tmp_path)
 
 
