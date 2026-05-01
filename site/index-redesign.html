@@ -1318,46 +1318,8 @@ claude</pre>
     </div>
   </footer>
 
-  <!-- ===== VANILLA JS: copy button only ===== -->
-  <script>
-    (function () {
-      var btn = document.querySelector('[data-copy]');
-      if (!btn) return;
-      btn.addEventListener('click', function () {
-        var text = btn.getAttribute('data-copy');
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(function () {
-            var original = btn.textContent;
-            btn.textContent = 'Copied!';
-            btn.setAttribute('aria-label', 'Copied to clipboard');
-            setTimeout(function () {
-              btn.textContent = original;
-              btn.setAttribute('aria-label', 'Copy install command');
-            }, 1800);
-          }).catch(function () {
-            btn.textContent = 'Failed';
-            setTimeout(function () { btn.textContent = 'Copy'; }, 1800);
-          });
-        } else {
-          /* fallback for browsers without clipboard API */
-          var ta = document.createElement('textarea');
-          ta.value = text;
-          ta.style.position = 'fixed';
-          ta.style.opacity = '0';
-          document.body.appendChild(ta);
-          ta.select();
-          try {
-            document.execCommand('copy');
-            btn.textContent = 'Copied!';
-            setTimeout(function () { btn.textContent = 'Copy'; }, 1800);
-          } catch (e) {
-            btn.textContent = 'Copy';
-          }
-          document.body.removeChild(ta);
-        }
-      });
-    }());
-  </script>
+  <!-- Copy install command (kept external so script-src 'self' stays strict) -->
+  <script src="/js/copy-button.js" defer></script>
 
   <!-- Proof-bar stats: populated from /_stats.json written by site/scripts/inject-stats.js -->
   <script src="/js/stats.js" defer></script>
