@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Claude Code — ROBOT.md Agents</title>
+  <meta name="description"
+    content="ROBOT.md + Claude Code: your robot's AI cockpit. Install via claude mcp add, wire the MCP server, and talk to your robot in plain language.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Claude Code — ROBOT.md Agents">
+  <meta property="og:url" content="https://robotmd.dev/agents/claude-code/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/agents/claude-code/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    /* Agent page shared layout */
+    .agent-nav {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--rule);
+      background: var(--paper-2);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      overflow: hidden;
+      margin-top: 28px;
+    }
+    .agent-nav a {
+      padding: 8px 18px;
+      border-right: 1px solid var(--rule);
+      color: var(--ink-3);
+      border-bottom: none;
+      transition: background .12s;
+      white-space: nowrap;
+    }
+    .agent-nav a:last-child { border-right: none }
+    .agent-nav a:hover { background: var(--paper-3); color: var(--ink) }
+    .agent-nav a.current { background: var(--ink); color: var(--paper) }
+    @media (max-width: 720px) {
+      .agent-nav { flex-wrap: wrap }
+      .agent-nav a { flex: 1 1 auto; text-align: center }
+    }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 0 20px;
+      margin-top: 20px;
+    }
+    .step-num {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent);
+      padding-top: 2px;
+      grid-row: span 2;
+      line-height: 1;
+    }
+    .step-title {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--ink);
+      margin: 0 0 6px;
+    }
+    .step-body {
+      font-size: 14px;
+      color: var(--ink-2);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .caps-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 13.5px;
+    }
+    .caps-table th {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--paper-2);
+      border-bottom: 2px solid var(--rule);
+      color: var(--ink-3);
+    }
+    .caps-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--rule);
+      color: var(--ink-2);
+      vertical-align: middle;
+    }
+    .caps-table tr:last-child td { border-bottom: none }
+    .caps-table td:first-child { font-family: var(--mono); font-size: 12.5px; color: var(--ink) }
+    .cap-native { color: var(--ok); font-family: var(--mono); font-size: 11px }
+    .cap-bridge { color: var(--accent-ink); font-family: var(--mono); font-size: 11px }
+    .cap-na     { color: var(--ink-4); font-family: var(--mono); font-size: 11px }
+
+    .code-example {
+      background: var(--ink);
+      color: #E8E3D3;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 18px 20px;
+      margin: 12px 0 20px;
+      overflow-x: auto;
+      border-radius: 2px;
+      border: 1px solid var(--rule);
+    }
+    .code-example .cm { color: #6a9966 }  /* comment */
+    .code-example .kw { color: #ffb88c }  /* keyword */
+    .code-example .st { color: #b8d9a1 }  /* string */
+    .code-example .acc { color: var(--accent) }
+
+    .cta-strip {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 32px;
+      padding-top: 28px;
+      border-top: 1px solid var(--rule);
+    }
+    .cta-strip a {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 9px 20px;
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      border-bottom: 1px solid var(--rule);
+      transition: background .12s, color .12s;
+    }
+    .cta-strip a:hover { background: var(--ink); color: var(--paper) }
+    .cta-strip a.primary { background: var(--ink); color: var(--paper); border-color: var(--ink) }
+    .cta-strip a.primary:hover { background: var(--accent); border-color: var(--accent) }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== SITE NAV ===== -->
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="/spec/">Spec</a>
+        <a href="/agents/claude-code/" class="current" aria-current="page">Agents</a>
+        <a href="/mcp/">MCP</a>
+        <a href="/registry/">Registry</a>
+        <a href="/compliance/">Compliance</a>
+        <a href="/managed-agents/">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+      <div class="page-eyebrow">
+        <span>Agents · Claude Code</span>
+        <span class="rule-line" aria-hidden="true"></span>
+        <span class="badge badge-live">Primary surface</span>
+      </div>
+      <h1 class="page-heading">
+        ROBOT<span style="color:var(--accent)">.</span><span style="font-family:var(--serif);font-weight:400;font-style:italic;color:var(--ink-3)">md</span>
+        + <b>Claude Code</b>
+      </h1>
+      <p class="page-lede">
+        Your robot's AI cockpit. One MCP server wires the manifest into every
+        Claude Code session — no config files, no axis conventions to learn.
+      </p>
+      <!-- Surface sibling nav -->
+      <nav class="agent-nav" aria-label="Agent surfaces">
+        <a href="/agents/claude-code/" class="current" aria-current="page">Claude Code</a>
+        <a href="/agents/gemini/">Gemini CLI</a>
+        <a href="/agents/codex/">Codex CLI</a>
+        <a href="/agents/chatgpt/">ChatGPT</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== INSTALL ===== -->
+  <section class="sec" id="install">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 01 — Install</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">One command. No config files.</h2>
+      <p class="sec-lede">
+        Wire the MCP server into Claude Code from your robot project root.
+      </p>
+
+      <div style="margin-top:28px;">
+        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">Step 1 — Install the CLI</p>
+        <div class="install-block">
+          <pre aria-label="Install robot-md CLI"><span class="prompt">$</span> <span class="cmd">pip install robot-md</span></pre>
+          <button class="install-copy-btn"
+                  aria-label="Copy install command"
+                  data-copy="pip install robot-md">Copy</button>
+        </div>
+
+        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 8px;">Step 2 — Create your ROBOT.md</p>
+        <div class="install-block">
+          <pre aria-label="Init robot-md"><span class="prompt">$</span> <span class="cmd">robot-md init my-robot --preset so-arm101</span></pre>
+          <button class="install-copy-btn"
+                  aria-label="Copy init command">Copy</button>
+        </div>
+
+        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 8px;">Step 3 — Wire the MCP server</p>
+        <div class="install-block">
+          <pre aria-label="Wire MCP to Claude Code"><span class="prompt">$</span> <span class="cmd">claude mcp add robot-md -- npx -y robot-md-mcp ./ROBOT.md</span></pre>
+          <button class="install-copy-btn"
+                  aria-label="Copy MCP add command">Copy</button>
+        </div>
+      </div>
+
+      <p style="font-size:14px;color:var(--ink-2);margin-top:16px;line-height:1.6;">
+        Open Claude Code. Run <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">/mcp</code>
+        to confirm <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md</code>
+        is connected. Ask <em>"what can this robot do?"</em> — the <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">using-robot-md</code>
+        skill reads capabilities from the MCP server and answers from your manifest, not training data.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== EXAMPLE ===== -->
+  <section class="sec" id="example">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 02 — Example</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">Pin the MCP server in <code style="font-size:0.8em">.claude/settings.json</code>.</h2>
+      <p class="sec-lede">
+        Commit this file so every teammate who clones the repo gets the robot context automatically.
+      </p>
+
+      <pre class="code-example" aria-label=".claude/settings.json example"><span class="cm">// .claude/settings.json</span>
+{
+  <span class="kw">"mcpServers"</span>: {
+    <span class="kw">"robot-md"</span>: {
+      <span class="kw">"command"</span>: <span class="st">"npx"</span>,
+      <span class="kw">"args"</span>: [<span class="st">"-y"</span>, <span class="st">"robot-md-mcp"</span>, <span class="st">"./ROBOT.md"</span>]
+    }
+  }
+}</pre>
+
+      <p style="font-size:14px;color:var(--ink-2);line-height:1.6;">
+        The MCP server walks up from the directory you launch Claude Code in, finds the first
+        <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">ROBOT.md</code>,
+        and serves it as four resources: <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">frontmatter</code>,
+        <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">capabilities</code>,
+        <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">safety</code>,
+        <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">body</code>.
+        No absolute paths, no environment variables.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===== CLI SUBCOMMANDS ===== -->
+  <section class="sec" id="cli">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 03 — CLI</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">robot-md CLI subcommands.</h2>
+
+      <table class="caps-table">
+        <thead>
+          <tr>
+            <th>Command</th>
+            <th>What it does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>robot-md init</td>
+            <td>Scaffold a ROBOT.md in the current directory. Accepts <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">--preset so-arm101</code> and similar presets.</td>
+          </tr>
+          <tr>
+            <td>robot-md validate ROBOT.md</td>
+            <td>Validate against JSON Schema + RCAN conformance rules. Exit codes 0-4.</td>
+          </tr>
+          <tr>
+            <td>robot-md register ROBOT.md</td>
+            <td>Mint an RRN at Robot Registry Foundation. Requires <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">--manufacturer</code> and <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">--contact-email</code>.</td>
+          </tr>
+          <tr>
+            <td>robot-md install-skill</td>
+            <td>Install the <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">using-robot-md</code> Claude Code skill into your project.</td>
+          </tr>
+          <tr>
+            <td>robot-md install-desktop</td>
+            <td>Write the MCP server snippet to <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">claude_desktop_config.json</code>.</td>
+          </tr>
+          <tr>
+            <td>robot-md claude-md</td>
+            <td>Generate a <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">CLAUDE.md</code> stub that instructs Claude to read the ROBOT.md first.</td>
+          </tr>
+          <tr>
+            <td>robot-md emit-fria</td>
+            <td>Emit a FRIA attestation packet (RCAN §22). See <a href="/compliance/">Compliance →</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== CAPABILITIES TABLE ===== -->
+  <section class="sec" id="capabilities">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 04 — Capabilities</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">What works natively vs. via bridge.</h2>
+
+      <table class="caps-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Claude Code (MCP)</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Read capabilities / safety / frontmatter</td>
+            <td><span class="cap-native">✓ Native</span></td>
+            <td>MCP resources served by robot-md-mcp</td>
+          </tr>
+          <tr>
+            <td>Validate ROBOT.md</td>
+            <td><span class="cap-native">✓ Native</span></td>
+            <td><code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">validate</code> MCP tool</td>
+          </tr>
+          <tr>
+            <td>Render canonical YAML</td>
+            <td><span class="cap-native">✓ Native</span></td>
+            <td><code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">render</code> MCP tool</td>
+          </tr>
+          <tr>
+            <td>Compliance filing (emit-fria etc.)</td>
+            <td><span class="cap-native">✓ Native</span></td>
+            <td>Via robot-md CLI inside Claude Code session</td>
+          </tr>
+          <tr>
+            <td>RRN registration</td>
+            <td><span class="cap-native">✓ Native</span></td>
+            <td>Via robot-md CLI</td>
+          </tr>
+          <tr>
+            <td>ChatGPT Custom GPT Actions</td>
+            <td><span class="cap-bridge">→ HTTP bridge</span></td>
+            <td>Requires <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">robot-md-http</code>; see <a href="/agents/chatgpt/">ChatGPT page →</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== CTA ===== -->
+  <section class="sec" id="next" style="border-bottom:none;">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 05 — Next steps</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">Where to go from here.</h2>
+      <div class="cta-strip">
+        <a class="primary" href="/mcp/">Read the MCP docs →</a>
+        <a href="/spec/">ROBOT.md spec →</a>
+        <a href="/registry/">Register your robot →</a>
+        <a href="/compliance/">Compliance filing →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="wrap foot">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/compliance/">Compliance</a> ·
+      <a href="/robots">Robots</a> ·
+      <a href="/status">Status</a> ·
+      <a href="/report.html">Report issue</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+
+  <script src="/js/copy-button.js" defer></script>
+
+</body>
+
+</html>

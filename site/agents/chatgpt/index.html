@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ChatGPT — ROBOT.md Agents</title>
+  <meta name="description"
+    content="Use ROBOT.md with ChatGPT Custom GPT Actions via the robot-md-http OpenAPI bridge. Status: pre-release. Join the waitlist.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="ChatGPT — ROBOT.md Agents">
+  <meta property="og:url" content="https://robotmd.dev/agents/chatgpt/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/agents/chatgpt/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    .agent-nav {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--rule);
+      background: var(--paper-2);
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      overflow: hidden;
+      margin-top: 28px;
+    }
+    .agent-nav a {
+      padding: 8px 18px;
+      border-right: 1px solid var(--rule);
+      color: var(--ink-3);
+      border-bottom: none;
+      transition: background .12s;
+      white-space: nowrap;
+    }
+    .agent-nav a:last-child { border-right: none }
+    .agent-nav a:hover { background: var(--paper-3); color: var(--ink) }
+    .agent-nav a.current { background: var(--ink); color: var(--paper) }
+    @media (max-width: 720px) {
+      .agent-nav { flex-wrap: wrap }
+      .agent-nav a { flex: 1 1 auto; text-align: center }
+    }
+
+    .prerel-banner {
+      background: var(--accent-wash);
+      border: 1px solid var(--accent);
+      padding: 16px 20px;
+      margin-top: 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .prerel-banner .prerel-badge {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      background: var(--accent);
+      color: var(--paper);
+      padding: 4px 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+    .prerel-banner .prerel-text {
+      font-size: 14px;
+      color: var(--ink-2);
+      line-height: 1.5;
+    }
+
+    .code-example {
+      background: var(--ink);
+      color: #E8E3D3;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: 18px 20px;
+      margin: 12px 0 20px;
+      overflow-x: auto;
+      border-radius: 2px;
+      border: 1px solid var(--rule);
+    }
+    .code-example .cm { color: #6a9966 }
+    .code-example .kw { color: #ffb88c }
+    .code-example .st { color: #b8d9a1 }
+
+    .caps-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 13.5px;
+    }
+    .caps-table th {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--paper-2);
+      border-bottom: 2px solid var(--rule);
+      color: var(--ink-3);
+    }
+    .caps-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--rule);
+      color: var(--ink-2);
+      vertical-align: middle;
+    }
+    .caps-table tr:last-child td { border-bottom: none }
+    .caps-table td:first-child { font-family: var(--mono); font-size: 12.5px; color: var(--ink) }
+    .cap-native { color: var(--ok); font-family: var(--mono); font-size: 11px }
+    .cap-bridge { color: var(--accent-ink); font-family: var(--mono); font-size: 11px }
+    .cap-na     { color: var(--ink-4); font-family: var(--mono); font-size: 11px }
+
+    .endpoints-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0;
+      border: 1px solid var(--rule);
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    @media (max-width: 720px) { .endpoints-grid { grid-template-columns: 1fr } }
+    .ep-card {
+      padding: 16px 20px;
+      border-right: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+    }
+    .ep-card:nth-child(2n) { border-right: none }
+    .ep-card:nth-last-child(-n+2) { border-bottom: none }
+    @media (max-width: 720px) {
+      .ep-card { border-right: none }
+      .ep-card:last-child { border-bottom: none }
+    }
+    .ep-method {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .ep-path {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .ep-desc {
+      font-size: 13px;
+      color: var(--ink-3);
+      line-height: 1.45;
+    }
+
+    .cta-strip {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 32px;
+      padding-top: 28px;
+      border-top: 1px solid var(--rule);
+    }
+    .cta-strip a {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 9px 20px;
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      border-bottom: 1px solid var(--rule);
+      transition: background .12s, color .12s;
+    }
+    .cta-strip a:hover { background: var(--ink); color: var(--paper) }
+    .cta-strip a.primary { background: var(--ink); color: var(--paper); border-color: var(--ink) }
+    .cta-strip a.primary:hover { background: var(--accent); border-color: var(--accent) }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== SITE NAV ===== -->
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="/spec/">Spec</a>
+        <a href="/agents/claude-code/" class="current" aria-current="page">Agents</a>
+        <a href="/mcp/">MCP</a>
+        <a href="/registry/">Registry</a>
+        <a href="/compliance/">Compliance</a>
+        <a href="/managed-agents/">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+      <div class="page-eyebrow">
+        <span>Agents · ChatGPT</span>
+        <span class="rule-line" aria-hidden="true"></span>
+        <span class="badge badge-prerel">Pre-release</span>
+      </div>
+      <h1 class="page-heading">
+        ROBOT<span style="color:var(--accent)">.</span><span style="font-family:var(--serif);font-weight:400;font-style:italic;color:var(--ink-3)">md</span>
+        + <b>ChatGPT</b>
+      </h1>
+      <p class="page-lede">
+        ChatGPT Custom GPT Actions via the <code style="font-family:var(--mono);font-size:0.8em">robot-md-http</code>
+        OpenAPI bridge. The HTTP bridge is scaffolded (v0.1); a hosted multi-tenant version is in development.
+      </p>
+      <nav class="agent-nav" aria-label="Agent surfaces">
+        <a href="/agents/claude-code/">Claude Code</a>
+        <a href="/agents/gemini/">Gemini CLI</a>
+        <a href="/agents/codex/">Codex CLI</a>
+        <a href="/agents/chatgpt/" class="current" aria-current="page">ChatGPT</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== STATUS BANNER ===== -->
+  <div class="wrap">
+    <div class="prerel-banner" role="note">
+      <span class="prerel-badge">Status: Pre-release</span>
+      <p class="prerel-text">
+        <strong>robot-md-http v0.1</strong> is scaffolding — local-only, no auth, localhost-only.
+        The full hosted version (v0.2) with RCAN 3.0 envelopes and a GPT Store entry is tracked in
+        <a href="https://github.com/RobotRegistryFoundation/robot-md/issues/3">issue #3</a>.
+        This page is informational; the install flow below requires manual steps.
+      </p>
+    </div>
+  </div>
+
+  <!-- ===== HOW IT WORKS ===== -->
+  <section class="sec" id="how-it-works">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 01 — How it works</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">ChatGPT doesn't speak MCP — it speaks OpenAPI.</h2>
+      <p class="sec-lede">
+        <code style="font-size:0.85em">robot-md-http</code> launches a local Hono-based HTTP server
+        that mirrors the MCP surface as REST endpoints. ChatGPT Custom GPT Actions import the
+        OpenAPI 3.1 schema directly.
+      </p>
+
+      <div style="margin-top:28px;">
+        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">Launch the HTTP bridge</p>
+        <div class="install-block">
+          <pre aria-label="Launch robot-md-http"><span class="prompt">$</span> <span class="cmd">npx -y robot-md-http /path/to/ROBOT.md</span></pre>
+          <button class="install-copy-btn"
+                  aria-label="Copy launch command"
+                  data-copy="npx -y robot-md-http /path/to/ROBOT.md">Copy</button>
+        </div>
+        <p style="font-size:14px;color:var(--ink-2);margin-top:8px;line-height:1.6;">
+          Server starts on <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">http://localhost:8787</code>.
+          OpenAPI schema at <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">/openapi.json</code>.
+          Then: in your Custom GPT editor → Actions → Add action → import the schema URL.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== ENDPOINTS ===== -->
+  <section class="sec" id="endpoints">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 02 — HTTP endpoints</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">Available endpoints (v0.1).</h2>
+
+      <div class="endpoints-grid" aria-label="HTTP bridge endpoints">
+        <div class="ep-card">
+          <div class="ep-method">GET</div>
+          <div class="ep-path">/frontmatter</div>
+          <div class="ep-desc">Full YAML frontmatter as JSON</div>
+        </div>
+        <div class="ep-card">
+          <div class="ep-method">GET</div>
+          <div class="ep-path">/capabilities</div>
+          <div class="ep-desc">Capabilities array from frontmatter</div>
+        </div>
+        <div class="ep-card">
+          <div class="ep-method">GET</div>
+          <div class="ep-path">/safety</div>
+          <div class="ep-desc">Safety block (estop, hitl_gates, etc.)</div>
+        </div>
+        <div class="ep-card">
+          <div class="ep-method">GET</div>
+          <div class="ep-path">/body</div>
+          <div class="ep-desc">Markdown prose body as text/markdown</div>
+        </div>
+        <div class="ep-card">
+          <div class="ep-method">GET</div>
+          <div class="ep-path">/identity</div>
+          <div class="ep-desc">RRN + robot_name + metadata fields</div>
+        </div>
+        <div class="ep-card">
+          <div class="ep-method">GET</div>
+          <div class="ep-path">/context</div>
+          <div class="ep-desc">Combined context object (all fields)</div>
+        </div>
+        <div class="ep-card">
+          <div class="ep-method">POST</div>
+          <div class="ep-path">/validate</div>
+          <div class="ep-desc">Validate the loaded ROBOT.md. Returns <code style="font-family:var(--mono);font-size:12px">{ ok, summary, errors }</code></div>
+        </div>
+        <div class="ep-card">
+          <div class="ep-method">POST</div>
+          <div class="ep-path">/render</div>
+          <div class="ep-desc">Canonical YAML of frontmatter</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CAPABILITIES TABLE ===== -->
+  <section class="sec" id="capabilities">
+    <div class="wrap">
+      <div class="sec-eyebrow">
+        <span>§ 03 — Capabilities</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h2 class="sec-title">What works via ChatGPT.</h2>
+
+      <table class="caps-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>ChatGPT (OpenAPI)</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Read capabilities / safety / frontmatter</td>
+            <td><span class="cap-bridge">→ HTTP bridge</span></td>
+            <td>Requires local <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">robot-md-http</code> running</td>
+          </tr>
+          <tr>
+            <td>Validate ROBOT.md</td>
+            <td><span class="cap-bridge">→ HTTP bridge</span></td>
+            <td>POST /validate via Custom GPT Action</td>
+          </tr>
+          <tr>
+            <td>Compliance filing</td>
+            <td><span class="cap-na">— Not yet</span></td>
+            <td>Planned for robot-md-http v0.2</td>
+          </tr>
+          <tr>
+            <td>Hosted mode (no local server)</td>
+            <td><span class="cap-na">— Pre-release</span></td>
+            <td>v0.2 roadmap — tracked in <a href="https://github.com/RobotRegistryFoundation/robot-md/issues/3">issue #3</a></td>
+          </tr>
+          <tr>
+            <td>GPT Store entry</td>
+            <td><span class="cap-na">— Pre-release</span></td>
+            <td>Deferred to v0.2</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== CTA ===== -->
+  <section class="sec" id="next" style="border-bottom:none;">
+    <div class="wrap">
+      <p style="font-size:14px;color:var(--ink-3);line-height:1.6;margin-bottom:20px;">
+        Track progress: <a href="https://github.com/RobotRegistryFoundation/robot-md/issues/3">robot-md issue #3</a> —
+        robot-md-http v0.1 scaffold + v0.2 roadmap.
+      </p>
+      <div class="cta-strip">
+        <a class="primary" href="/agents/claude-code/">Use Claude Code instead →</a>
+        <a href="/mcp/">MCP server docs →</a>
+        <a href="/spec/">ROBOT.md spec →</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="wrap foot">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/compliance/">Compliance</a> ·
+      <a href="/robots">Robots</a> ·
+      <a href="/status">Status</a> ·
+      <a href="/report.html">Report issue</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+
+  <script src="/js/copy-button.js" defer></script>
+
+</body>
+
+</html>
