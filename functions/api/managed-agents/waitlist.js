@@ -99,27 +99,14 @@ async function handleGetCount(env) {
 }
 
 // ---------------------------------------------------------------------------
-// Router
+// Pages Function exports — filesystem routing matches /api/managed-agents/waitlist
+// (count lives in ./waitlist/count.js as a sibling subpath route)
 // ---------------------------------------------------------------------------
-export async function onRequest(context) {
-  const { request, env } = context;
-  const url = new URL(request.url);
-  const method = request.method.toUpperCase();
 
-  // Preflight
-  if (method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
-  }
+export async function onRequestOptions() {
+  return new Response(null, { status: 204, headers: CORS_HEADERS });
+}
 
-  // GET /api/managed-agents/waitlist/count
-  if (method === "GET" && url.pathname.endsWith("/count")) {
-    return handleGetCount(env);
-  }
-
-  // POST /api/managed-agents/waitlist
-  if (method === "POST") {
-    return handlePost(request, env);
-  }
-
-  return json({ ok: false, error: "method not allowed" }, 405);
+export async function onRequestPost({ request, env }) {
+  return handlePost(request, env);
 }
