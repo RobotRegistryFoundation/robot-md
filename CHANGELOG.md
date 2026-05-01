@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [Unreleased]
+
+### Fixed
+- **`parse_file` now accepts directories** — `robot-md compliance status .`, `robot-md validate ./bob`, and every other CLI command that takes a manifest path now resolve a directory argument to `<dir>/ROBOT.md`. Previously raised `ParseError: Is a directory`. ([#32](https://github.com/RobotRegistryFoundation/robot-md/issues/32))
+
+---
+
 ## [1.4.0] — 2026-04-30
 
 **SP-HP hot-plug daemon + SP-AN announce/confirm + SP6 Phase 1 self-attestation.** Three independent feature tracks land together; together they change what registering a new piece of hardware feels like — OS-level event, conversational confirm in Claude, cryptographically self-attested eval scores.

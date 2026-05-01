@@ -22,9 +22,23 @@ class ParsedRobotMd:
 
 
 def parse_file(path: Path | str) -> ParsedRobotMd:
-    """Parse a ROBOT.md file from disk."""
+    """Parse a ROBOT.md file from disk.
+
+    If `path` is a directory, resolves to ``<path>/ROBOT.md`` — so callers
+    can pass either an explicit manifest file or its containing directory.
+    This makes `robot-md compliance status .`, `robot-md validate ./bob`,
+    and similar invocations work as users naturally expect (issue #32).
+    """
     p = Path(path)
-    if not p.exists():
+    if p.is_dir():
+        candidate = p / "ROBOT.md"
+        if not candidate.exists():
+            raise ParseError(
+                f"no ROBOT.md found in directory {p} — pass the manifest path "
+                f"explicitly or `cd` into a directory containing one."
+            )
+        p = candidate
+    elif not p.exists():
         raise ParseError(f"file not found: {p}")
     try:
         text = p.read_text()
