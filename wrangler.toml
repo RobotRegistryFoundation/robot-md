@@ -32,5 +32,5 @@ pages_build_output_dir = "site"
 # Docs: https://developers.cloudflare.com/kv/get-started/
 [[kv_namespaces]]
 binding    = "WAITLIST_KV"
-id         = "REPLACE_WITH_KV_NAMESPACE_ID"
-preview_id = "REPLACE_WITH_PREVIEW_NAMESPACE_ID"
+id         = "9a78bec840d049eb930a5c49f19d393a"
+preview_id = "7c39ec739893442ab5b4951480010dcb"
