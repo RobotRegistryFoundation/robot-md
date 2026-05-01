@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Managed Agents — ROBOT.md</title>
+  <meta name="description"
+    content="Compliance-bot: give your robot repo, get back a signed FRIA + IFU + safety-benchmark + EU-register filing in one day. Powered by Anthropic Managed Agents. Join the waitlist.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Managed Agents — ROBOT.md">
+  <meta property="og:description"
+    content="Compliance-bot replaces a multi-week regulatory checklist with a 1-day automated filing flow. Waitlist open.">
+  <meta property="og:url" content="https://robotmd.dev/managed-agents/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/managed-agents/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       DESIGN TOKENS — same paper/ink/terracotta system as main site
+       ============================================================ */
+    :root {
+      --paper:      #F4EFE6;
+      --paper-2:    #ECE5D6;
+      --paper-3:    #DFD5BF;
+      --ink:        #111110;
+      --ink-2:      #2A2825;
+      --ink-3:      #5A574F;
+      --ink-4:      #8A8578;
+      --rule:       #1d1c1a;
+      --accent:     #B34A2A;
+      --accent-ink: #5A1F0E;
+      --accent-wash:#EBD9C9;
+      --ok:         #2F6B3E;
+
+      --sans:  'Inter Tight', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+      --mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+      --serif: 'Fraunces', Georgia, serif;
+
+      --maxw: 1240px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box }
+    html, body { margin: 0; padding: 0 }
+
+    html {
+      background: var(--paper);
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.5;
+      font-feature-settings: "ss01", "cv11";
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+        radial-gradient(rgba(0,0,0,.035) 1px, transparent 1px),
+        radial-gradient(rgba(0,0,0,.025) 1px, transparent 1px);
+      background-size: 3px 3px, 7px 7px;
+      background-position: 0 0, 1px 2px;
+      mix-blend-mode: multiply;
+      opacity: .55;
+    }
+
+    a { color: inherit; text-decoration: none; border-bottom: 1px solid currentColor }
+    a:hover { color: var(--accent); border-color: var(--accent) }
+
+    .wrap {
+      max-width: var(--maxw);
+      margin: 0 auto;
+      padding: 0 32px;
+      position: relative;
+      z-index: 1;
+    }
+    @media (max-width: 720px) { .wrap { padding: 0 16px } }
+
+    /* ============================================================
+       SITE NAV
+       ============================================================ */
+    .site-nav {
+      border-bottom: 1px solid var(--rule);
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      position: sticky;
+      top: 0;
+      background: var(--paper);
+      z-index: 100;
+    }
+    .site-nav-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .site-nav .wordmark {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: -.03em;
+      border: none;
+    }
+    .site-nav .wordmark .dot { color: var(--accent) }
+    .site-nav .wordmark .md  { font-family: var(--serif); font-weight: 400; font-style: italic; color: var(--ink-3) }
+    .site-nav nav { display: flex; gap: 22px; flex-wrap: wrap }
+    .site-nav nav a { border: none; opacity: .75 }
+    .site-nav nav a:hover { opacity: 1 }
+    .site-nav .current { opacity: 1; color: var(--accent); border-bottom: 1px solid var(--accent) }
+    @media (max-width: 600px) {
+      .site-nav-inner { flex-direction: column; align-items: flex-start; gap: 8px }
+      .site-nav nav { gap: 10px }
+    }
+
+    /* ============================================================
+       PAGE HEADER
+       ============================================================ */
+    .page-header {
+      padding: 56px 0 48px;
+      border-bottom: 3px double var(--rule);
+    }
+
+    .page-eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .page-eyebrow .rule-line {
+      flex: 1;
+      height: 1px;
+      background: var(--rule);
+      opacity: .5;
+    }
+
+    .page-heading {
+      font-family: var(--sans);
+      font-weight: 300;
+      font-size: clamp(36px, 5vw, 66px);
+      line-height: 1.06;
+      letter-spacing: -0.026em;
+      text-wrap: balance;
+      margin: 0 0 20px;
+      color: var(--ink);
+    }
+    .page-heading b { font-weight: 700 }
+    .page-heading em {
+      font-style: italic;
+      font-family: var(--serif);
+      font-weight: 400;
+      color: var(--accent);
+    }
+
+    .page-lede {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 20px;
+      color: var(--ink-2);
+      max-width: 680px;
+      margin: 0;
+      line-height: 1.5;
+      text-wrap: pretty;
+    }
+
+    /* ============================================================
+       SECTIONS
+       ============================================================ */
+    .sec {
+      padding: 64px 0;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .sec-eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .sec-eyebrow .rule-line { flex: 1; height: 1px; background: var(--rule); opacity: .5 }
+
+    .sec-title {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(24px, 3.2vw, 40px);
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin: 0 0 12px;
+      text-wrap: balance;
+    }
+
+    .sec-lede {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 19px;
+      color: var(--ink-2);
+      max-width: 680px;
+      margin: 0;
+      text-wrap: pretty;
+      line-height: 1.5;
+    }
+
+    /* ============================================================
+       OPEN-CORE SPLIT DIAGRAM
+       ============================================================ */
+    .split-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--rule);
+      margin-top: 28px;
+      overflow: hidden;
+    }
+    @media (max-width: 720px) {
+      .split-grid { grid-template-columns: 1fr }
+    }
+
+    .split-card {
+      padding: 28px 28px 24px;
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--paper);
+    }
+    .split-card:last-child { border-right: none }
+    @media (max-width: 720px) {
+      .split-card { border-right: none; border-bottom: 1px solid var(--rule) }
+      .split-card:last-child { border-bottom: none }
+    }
+
+    .split-card .tier-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 2px;
+      width: fit-content;
+    }
+    .tier-oss     { background: var(--paper-3); color: var(--ink-2); border: 1px solid var(--rule) }
+    .tier-managed { background: var(--accent); color: var(--paper) }
+
+    .split-card .product-name {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+
+    .split-card .product-lede {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 17px;
+      color: var(--ink-2);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .split-card ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .split-card ul li {
+      font-size: 14px;
+      color: var(--ink-2);
+      padding-left: 18px;
+      position: relative;
+      line-height: 1.5;
+    }
+    .split-card ul li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 11px;
+      top: 2px;
+    }
+    .split-card ul li code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--paper-2);
+      padding: 1px 5px;
+      border-radius: 2px;
+    }
+
+    .split-card .pkg-link {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      color: var(--accent);
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px dashed var(--rule);
+    }
+
+    /* ============================================================
+       COMPLIANCE-BOT FLOW
+       ============================================================ */
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border: 1px solid var(--rule);
+      overflow: hidden;
+      margin-top: 28px;
+    }
+    @media (max-width: 900px) {
+      .flow-steps { grid-template-columns: repeat(2, 1fr) }
+      .flow-step:nth-child(2) { border-right: none }
+      .flow-step:nth-child(-n+2) { border-bottom: 1px solid var(--rule) }
+    }
+    @media (max-width: 600px) {
+      .flow-steps { grid-template-columns: 1fr }
+    }
+
+    .flow-step {
+      padding: 24px 22px;
+      border-right: 1px solid var(--rule);
+      background: var(--paper);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .flow-step:last-child { border-right: none }
+    @media (max-width: 600px) {
+      .flow-step { border-right: none; border-bottom: 1px solid var(--rule) }
+      .flow-step:last-child { border-bottom: none }
+    }
+
+    .flow-step .step-n {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .flow-step .step-name {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--ink);
+    }
+    .flow-step .step-detail {
+      font-size: 13.5px;
+      color: var(--ink-2);
+      line-height: 1.5;
+    }
+
+    /* ============================================================
+       ANTHROPIC MANAGED AGENTS CONTEXT BLOCK
+       ============================================================ */
+    .anthropic-block {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 40px 48px;
+      margin-top: 32px;
+    }
+    @media (max-width: 720px) { .anthropic-block { padding: 28px 20px } }
+
+    .anthropic-block .eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+
+    .anthropic-block .headline {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(18px, 2.4vw, 28px);
+      letter-spacing: -0.015em;
+      margin: 0 0 14px;
+      color: var(--paper);
+    }
+
+    .anthropic-block .body-text {
+      font-size: 14.5px;
+      color: #c8c3b8;
+      max-width: 680px;
+      line-height: 1.6;
+      margin: 0 0 20px;
+    }
+
+    .anthropic-block .ref-link {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .08em;
+      color: var(--accent);
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+
+    /* ============================================================
+       WAITLIST FORM
+       ============================================================ */
+    .waitlist-section {
+      padding: 64px 0;
+      border-bottom: none;
+    }
+
+    .waitlist-card {
+      border: 1px solid var(--rule);
+      background: var(--paper-2);
+      padding: 40px;
+      max-width: 600px;
+    }
+    @media (max-width: 720px) { .waitlist-card { padding: 24px 20px } }
+
+    .waitlist-card .wl-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .waitlist-card h2 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 26px;
+      letter-spacing: -0.015em;
+      margin: 0 0 10px;
+      color: var(--ink);
+    }
+
+    .waitlist-card .wl-desc {
+      font-size: 15px;
+      color: var(--ink-2);
+      line-height: 1.6;
+      margin: 0 0 24px;
+    }
+
+    .waitlist-form {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .waitlist-form label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 6px;
+    }
+
+    .waitlist-form .field-group {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .waitlist-form input[type="email"] {
+      font-family: var(--mono);
+      font-size: 14px;
+      padding: 10px 14px;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      border-radius: 2px;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    .waitlist-form input[type="email"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-wash);
+    }
+
+    .waitlist-form button[type="submit"] {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 10px 22px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      align-self: flex-end;
+      transition: background .15s;
+      flex-shrink: 0;
+    }
+    .waitlist-form button[type="submit"]:hover { background: var(--accent) }
+    .waitlist-form button[type="submit"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .waitlist-note {
+      font-size: 12.5px;
+      color: var(--ink-4);
+      line-height: 1.5;
+      margin-top: 14px;
+    }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    footer.foot {
+      padding: 28px 0 44px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--rule);
+    }
+    footer.foot a { color: var(--ink-3) }
+    footer.foot a:hover { color: var(--accent) }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== SITE NAV ===== -->
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="/spec/">Spec</a>
+        <a href="/agents/claude-code/">Agents</a>
+        <a href="/mcp/">MCP</a>
+        <a href="/registry/">Registry</a>
+        <a href="/compliance/">Compliance</a>
+        <a href="/managed-agents/" class="current" aria-current="page">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+
+      <div class="page-eyebrow">
+        <span>New · Managed Agents</span>
+        <span class="rule-line" aria-hidden="true"></span>
+        <span>Powered by Anthropic</span>
+      </div>
+
+      <h1 class="page-heading">
+        Compliance in one day.<br>
+        Not one <em>month.</em>
+      </h1>
+
+      <p class="page-lede">
+        Give Compliance-bot your robot repo. Get back a signed FRIA, IFU,
+        safety-benchmark, and EU-register filing — all five RCAN §22–26
+        packets — without reading a single EU AI Act article yourself.
+      </p>
+
+    </div>
+  </header>
+
+  <!-- ===== COMPLIANCE-BOT — WHAT IT DOES ===== -->
+  <section class="sec" id="what-it-does">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ 01 — Compliance-bot</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">Automated compliance filing for regulated robots.</h2>
+      <p class="sec-lede">
+        The RCAN §22–26 compliance stack is already live.
+        Compliance-bot is the hosted agent that automates it.
+      </p>
+
+      <div class="flow-steps" aria-label="Compliance-bot 4-step flow" role="list">
+
+        <div class="flow-step" role="listitem">
+          <div class="step-n">Input</div>
+          <div class="step-name">Your robot repo</div>
+          <div class="step-detail">
+            Point Compliance-bot at a GitHub repo containing a valid
+            <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">ROBOT.md</code>
+            with an issued RRN. Nothing else required.
+          </div>
+        </div>
+
+        <div class="flow-step" role="listitem">
+          <div class="step-n">Analysis</div>
+          <div class="step-name">Manifest audit</div>
+          <div class="step-detail">
+            The agent reads the manifest, cross-checks capabilities against
+            RCAN §22 FRIA criteria, and drafts the attestation text. Flags gaps
+            for human review before filing.
+          </div>
+        </div>
+
+        <div class="flow-step" role="listitem">
+          <div class="step-n">Filing</div>
+          <div class="step-name">5 packets signed + sent</div>
+          <div class="step-detail">
+            FRIA · safety-benchmark · IFU Art. 13(3) · incident-report Art. 72
+            · EU-register Art. 49 — all signed with your robot's key and
+            routed to RRF's live endpoints.
+          </div>
+        </div>
+
+        <div class="flow-step" role="listitem">
+          <div class="step-n">Output</div>
+          <div class="step-name">Signed receipts</div>
+          <div class="step-detail">
+            You get a compliance bundle: signed envelopes, RRF confirmation
+            hashes, and a human-readable summary ready for your legal team
+            or regulator.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== OPEN-CORE SPLIT ===== -->
+  <section class="sec" id="open-core">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ 02 — Open-core model</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">OSS agent SDK. Hosted convenience layer.</h2>
+      <p class="sec-lede">
+        The compliance tooling is open-source. The hosted agent is the
+        convenience layer — no infrastructure to run, no SDK to integrate.
+      </p>
+
+      <div class="split-grid">
+
+        <!-- OSS tier -->
+        <div class="split-card">
+          <div class="tier-label tier-oss">Open source · Apache-2.0</div>
+          <div class="product-name">robot-md-dispatcher</div>
+          <p class="product-lede">
+            The Agent SDK reference implementation. BYOK Claude Agent SDK
+            wrapper around robot-md-mcp. Self-host on your robot or your
+            own cloud.
+          </p>
+          <ul>
+            <li>Full <code>robot-md-mcp</code> surface — all 6 resources + 3 tools</li>
+            <li>Default-deny tier gate; hardened systemd unit</li>
+            <li>Audit log; RCAN-signed envelopes for all dispatch events</li>
+            <li>All §22–26 filing commands available as CLI primitives</li>
+            <li>Provision with <code>/enable-dispatch</code> from Claude Code</li>
+          </ul>
+          <a class="pkg-link"
+             href="https://github.com/RobotRegistryFoundation/robot-md-dispatcher">
+            github.com/RobotRegistryFoundation/robot-md-dispatcher →
+          </a>
+        </div>
+
+        <!-- Managed Agent tier -->
+        <div class="split-card" style="background: var(--accent-wash);">
+          <div class="tier-label tier-managed">Managed Agent · hosted</div>
+          <div class="product-name">Compliance-bot</div>
+          <p class="product-lede">
+            The hosted Managed Agent. Give it a repo, get back a full
+            compliance bundle — no infrastructure, no CLI, no reading
+            of RCAN section numbers.
+          </p>
+          <ul>
+            <li>Accepts a GitHub repo URL or a <code>ROBOT.md</code> file upload</li>
+            <li>Runs a pre-flight audit and flags gaps before filing</li>
+            <li>Files all 5 §22–26 packets in one session</li>
+            <li>Returns signed receipts + human-readable compliance bundle</li>
+            <li>Powered by Anthropic Managed Agents (see §03 below)</li>
+          </ul>
+          <a class="pkg-link" href="#waitlist" style="color: var(--accent-ink); border-top-color: var(--accent-ink);">
+            Join the waitlist ↓
+          </a>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== ANTHROPIC MANAGED AGENTS CONTEXT ===== -->
+  <section class="sec" id="anthropic-surface" style="padding-bottom: 32px;">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ 03 — Anthropic surface alignment</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">Built on Anthropic Managed Agents.</h2>
+      <p class="sec-lede">
+        Compliance-bot is the first robot-md product built on Anthropic's
+        just-announced Managed Agents platform — composable cloud-hosted
+        agents with a public API.
+      </p>
+
+      <div class="anthropic-block">
+        <div class="eyebrow">Anthropic · Managed Agents (beta)</div>
+        <h3 class="headline">
+          Composable APIs for cloud-hosted agents.
+          robot-md's commercial wedge runs here.
+        </h3>
+        <p class="body-text">
+          Anthropic's Managed Agents platform provides the infrastructure for
+          cloud-hosted, composable agent workflows. Compliance-bot is the
+          robot-md flagship built on this surface: it receives a robot repo,
+          orchestrates a multi-step compliance filing workflow, and returns
+          signed attestation packets — all without the operator running any
+          local infrastructure.
+        </p>
+        <p class="body-text" style="margin-bottom: 16px;">
+          The open-source
+          <code style="font-family:var(--mono);font-size:13px;color:#E8E3D3;background:#2a2825;padding:1px 5px;border-radius:2px;">robot-md-dispatcher</code>
+          is the reference Agent SDK integration — self-hosted for developers
+          who want full control. Compliance-bot is the managed convenience
+          layer for operators who want the outcome without the infrastructure.
+        </p>
+        <a class="ref-link"
+           href="https://claude.com/blog/product-development-in-the-agentic-era"
+           target="_blank"
+           rel="noopener">
+          Anthropic: Product development in the agentic era →
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== WAITLIST FORM ===== -->
+  <section class="waitlist-section" id="waitlist">
+    <div class="wrap">
+
+      <div class="waitlist-card">
+        <div class="wl-label">Waitlist · Compliance-bot</div>
+        <h2>Get early access.</h2>
+        <p class="wl-desc">
+          Compliance-bot is in private preview. Leave your email and we'll
+          contact you when it's ready — or when we need a test case.
+          No spam. No sales cadence. One email when the beta opens.
+        </p>
+
+        <!--
+          WAITLIST MECHANIC — DECISION PENDING
+          =====================================
+          The brief (docs/superpowers/specs/2026-04-30-robotmd-site-redesign-brief.md,
+          "Managed Agents framing" section) lists two options:
+            A. Cloudflare Workers + KV — simple, no third-party, requires a Worker
+               that accepts POST /waitlist, stores email in KV, returns 200.
+               CSP form-action would need to allow the Workers endpoint.
+            B. Tally / Fillout embed — no-code, replace this <form> with an
+               iframe or widget script. Requires updating the _headers CSP to
+               allow the embed origin.
+          Until a decision is made, this form POSTs nowhere (action="#").
+          See open question #4 in docs/superpowers/notes/2026-05-01-site-ia-review.md.
+        -->
+        <form class="waitlist-form"
+              action="#"
+              method="post"
+              aria-label="Compliance-bot waitlist sign-up">
+          <div class="field-group">
+            <label for="waitlist-email">Work email</label>
+            <input type="email"
+                   id="waitlist-email"
+                   name="email"
+                   placeholder="you@company.com"
+                   required
+                   autocomplete="email"
+                   aria-describedby="waitlist-privacy-note">
+          </div>
+          <button type="submit">Join waitlist</button>
+        </form>
+
+        <p class="waitlist-note" id="waitlist-privacy-note">
+          Your email is only used to contact you about Compliance-bot.
+          No third-party sharing. Unsubscribe in one reply.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="wrap foot">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/compliance/">Compliance</a> ·
+      <a href="/robots">Robots</a> ·
+      <a href="/status">Status</a> ·
+      <a href="/report.html">Report issue</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+
+</body>
+
+</html>
