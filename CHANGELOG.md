@@ -7,8 +7,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.5.0] — 2026-05-01
+
+**SP-AN v2 + SP6 Phase 1.5 (RRF counter-sign) + SP3 Phase D + a complete robotmd.dev redesign.** Versioned MINOR not PATCH because four feature tracks landed on top of v1.4.0 — only the parser fix was originally framed as v1.4.1. Strict-semver upgrade is safe; no breaking changes.
+
+### Added
+- **SP-AN v2 — multi-session subscribe + capability advertisement.** Drops down to `mcp.server.lowlevel.Server` for proper per-session `subscribe_resource` / `unsubscribe_resource` handlers, removing v1's single-session-per-process limitation. Capability advertisement so subscribed clients can announce voice-mode, terminal-mode, etc. ([#28](https://github.com/RobotRegistryFoundation/robot-md/pull/28))
+- **SP6 Phase 1.5 — RRF §27 counter-sign client.** New `spatial_eval_submit_to_rrf` MCP tool packages a self-attested Score.json and posts to `/v2/robots/<rrn>/spatial-eval`. RRF independently re-runs the held-out probe split and returns a counter-signed score; `spatial_eval_verify` returns `{"ok": true, "attestation": "registry-attested"}` against it. First successful end-to-end submission: `sub_8c686d6e-6e87-49ef-8bb5-0b51e5982de7`. ([#29](https://github.com/RobotRegistryFoundation/robot-md/pull/29), [#30](https://github.com/RobotRegistryFoundation/robot-md/pull/30), [#31](https://github.com/RobotRegistryFoundation/robot-md/pull/31))
+- **SP3 Phase D — backend extras + entry-points + preset preference.** Wires `[project.entry-points."robot_md.backends"]` so installed backends are runtime-discoverable; preset preference logic for tie-breaking among multiple matching backends. ([#27](https://github.com/RobotRegistryFoundation/robot-md/pull/27))
+- **robotmd.dev complete redesign.** Four-PR information-architecture rebuild of the site under `site/`, ~+8,750 net new lines.
+  - IA review + landing page + managed-agents stub + Cloudflare Workers KV-backed waitlist endpoint. ([#33](https://github.com/RobotRegistryFoundation/robot-md/pull/33))
+  - Eight MVP secondary pages: `/spec/`, `/mcp/`, `/registry/`, `/compliance/`, `/agents/{claude-code,gemini,codex,chatgpt}/`. ([#34](https://github.com/RobotRegistryFoundation/robot-md/pull/34))
+  - `render-spec.py` (RCAN spec Markdown → HTML), `/agents/` hub, `/agents/q/` (Amazon Q aarch64-block surface). ([#35](https://github.com/RobotRegistryFoundation/robot-md/pull/35))
+  - 14 routes total, build-time stats injection (npm-weekly downloads, RRF endpoint count), strict CSP.
+
 ### Fixed
-- **`parse_file` now accepts directories** — `robot-md compliance status .`, `robot-md validate ./bob`, and every other CLI command that takes a manifest path now resolve a directory argument to `<dir>/ROBOT.md`. Previously raised `ParseError: Is a directory`. ([#32](https://github.com/RobotRegistryFoundation/robot-md/issues/32))
+- **`parse_file` now accepts directories** — `robot-md compliance status .`, `robot-md validate ./bob`, and every other CLI command that takes a manifest path now resolve a directory argument to `<dir>/ROBOT.md`. Previously raised `ParseError: Is a directory`. ([#32](https://github.com/RobotRegistryFoundation/robot-md/issues/32) / [#36](https://github.com/RobotRegistryFoundation/robot-md/pull/36))
+
+### Notes
+- All robotmd.dev pages above are live and CSP-validated.
+- SP6 Phase 1.5 unlocks the public spatial-eval leaderboard distinction: only registry-attested scores show up there. Self-attested scores remain valid for development, CI gating, and private benchmarking.
+- The `RRF_SPATIAL_EVAL_PQ_PRIV` secret-encoding mishap discovered along the way was fixed via RRF #75 / #76 (keypair rotation, clean encoding); no `robot-md` change needed.
 
 ---
 
