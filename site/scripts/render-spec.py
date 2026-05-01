@@ -542,6 +542,7 @@ def render(md_path: Path, html_path: Path) -> None:
                 TocExtension(permalink=False, toc_depth="2-3"),
                 "tables",
                 "fenced_code",
+                "attr_list",
             ]
         )
         body_html = md.convert(body_md)
