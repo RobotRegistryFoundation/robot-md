@@ -901,7 +901,7 @@
       <div class="hero-eyebrow">
         <span>
           <span class="status-dot" aria-hidden="true"></span>
-          <span data-stat="current-version">v1.3.0</span> · <span data-stat="rrf-endpoints">5</span> §22–26 endpoints live
+          <span data-stat="robot_md_version">v1.4.0</span> · <span data-stat="rrf_endpoints_live">5</span> §22–26 endpoints live
         </span>
         <span class="rule-line" aria-hidden="true"></span>
         <span>Getting started · one line</span>
@@ -929,22 +929,22 @@
         </button>
       </div>
 
-      <!-- Proof bar — values are build-time placeholders; see IA review §5 for fetch sources -->
+      <!-- Proof bar — populated at page-load by /js/stats.js from /_stats.json -->
       <div class="proof-bar" role="region" aria-label="Project statistics">
         <div class="proof-item">
-          <span class="val"><span data-stat="robots-registered">N</span></span>
+          <span class="val"><span data-stat="robots_registered">1</span></span>
           robots registered
         </div>
         <div class="proof-item">
-          <span class="val"><span data-stat="peer-runtimes">7</span></span>
+          <span class="val">7</span>
           peer runtimes
         </div>
         <div class="proof-item">
-          <span class="val"><span data-stat="rrf-endpoints">5</span></span>
+          <span class="val"><span data-stat="rrf_endpoints_live">5</span></span>
           §22–26 endpoints live
         </div>
         <div class="proof-item">
-          <span class="val"><span data-stat="current-version">v1.3.0</span></span>
+          <span class="val"><span data-stat="robot_md_version">v1.4.0</span></span>
           on PyPI
         </div>
       </div>
@@ -1358,6 +1358,9 @@ claude</pre>
       });
     }());
   </script>
+
+  <!-- Proof-bar stats: populated from /_stats.json written by site/scripts/inject-stats.js -->
+  <script src="/js/stats.js" defer></script>
 
 </body>
 
