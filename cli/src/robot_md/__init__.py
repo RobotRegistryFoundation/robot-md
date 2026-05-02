@@ -1,3 +1,3 @@
 """robot-md — parse, validate, and render ROBOT.md files."""
 
-__version__ = "1.5.0"
+__version__ = "1.5.1"

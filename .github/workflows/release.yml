@@ -64,14 +64,31 @@ jobs:
           files: dist/*
       - name: Set VERSION
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
-      - name: Emit version-tuple envelope
-        uses: continuonai/rcan-spec/.github/actions/emit-version-tuple@v3.2.0
+      - name: Read manifest spec version
+        run: |
+          MANIFEST_VERSION=$(cat cli/src/robot_md/schemas/v1/version.txt | tr -d '[:space:]')
+          echo "MANIFEST_VERSION=$MANIFEST_VERSION" >> "$GITHUB_ENV"
+      - name: Emit cli_version envelope
+        uses: continuonai/rcan-spec/.github/actions/emit-version-tuple@v3.2.1
         with:
           project: robot-md
           ran: ${{ secrets.ROBOT_MD_RAN }}
           field: cli_version
           value: ${{ env.VERSION }}
-          depends_on: '{"protocol_version":">=3.2.0","manifest_spec_version":"==${{ env.VERSION }}"}'
+          depends_on: '{"protocol_version":">=3.2.0","manifest_spec_version":"==${{ env.MANIFEST_VERSION }}"}'
+          pq_signing_key: ${{ secrets.ROBOT_MD_MLDSA65_PRIV }}
+          pq_kid: ${{ secrets.ROBOT_MD_PQ_KID }}
+          ed25519_signing_key: ${{ secrets.ROBOT_MD_ED25519_PRIV }}
+          ed25519_kid: ${{ secrets.ROBOT_MD_KID }}
+          release_tag: ${{ github.ref_name }}
+      - name: Emit manifest_spec_version envelope
+        uses: continuonai/rcan-spec/.github/actions/emit-version-tuple@v3.2.1
+        with:
+          project: robot-md
+          ran: ${{ secrets.ROBOT_MD_RAN }}
+          field: manifest_spec_version
+          value: ${{ env.MANIFEST_VERSION }}
+          depends_on: '{"protocol_version":">=3.2.0"}'
           pq_signing_key: ${{ secrets.ROBOT_MD_MLDSA65_PRIV }}
           pq_kid: ${{ secrets.ROBOT_MD_PQ_KID }}
           ed25519_signing_key: ${{ secrets.ROBOT_MD_ED25519_PRIV }}
