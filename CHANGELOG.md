@@ -9,6 +9,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.5.1] - 2026-05-01
+
+### Notes
+- No code changes. This release validates Plan 1 Phase 1 of the OpenCastor
+  Ecosystem Direction (2026-05-04) — the new release CI now emits a
+  hybrid-signed version-tuple envelope via the
+  `continuonai/rcan-spec/.github/actions/emit-version-tuple@v3.2.0`
+  composite action. Signing identity: `RAN-000000000002`.
+
+---
+
 ## [1.5.0] — 2026-05-01
 
 **SP-AN v2 + SP6 Phase 1.5 (RRF counter-sign) + SP3 Phase D + a complete robotmd.dev redesign.** Versioned MINOR not PATCH because four feature tracks landed on top of v1.4.0 — only the parser fix was originally framed as v1.4.1. Strict-semver upgrade is safe; no breaking changes.
