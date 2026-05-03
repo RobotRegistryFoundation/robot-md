@@ -6,12 +6,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>ROBOT.md — the manifest agents read before they touch your robot</title>
   <meta name="description"
-    content="ROBOT.md is to a robot what CLAUDE.md and AGENTS.md are to a codebase. One file — YAML + markdown — so a planning LLM can safely operate a single robot. Speaks the RCAN protocol. Built for Anthropic surfaces, flexible for any AI agent.">
+    content="ROBOT.md is the declaration layer for the OpenCastor stack — one file, YAML + markdown, so any MCP-aware agent can read a robot's identity, capabilities, and safety contract. Enforcement happens at Layer 3 (robot-md-gateway), not here.">
   <meta name="theme-color" content="#F4EFE6">
 
   <meta property="og:title" content="ROBOT.md — the manifest agents read before they touch your robot">
   <meta property="og:description"
-    content="The CLAUDE.md of physical machines. One file so Claude Code can safely drive your arm, rover, or humanoid.">
+    content="The CLAUDE.md of physical machines. One file an agent reads to know the robot's contract. Declaration only — physical safety is enforced at Layer 3 by robot-md-gateway.">
   <meta property="og:url" content="https://robotmd.dev">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
