@@ -7,8 +7,8 @@
 
 [![PyPI](https://img.shields.io/pypi/v/robot-md.svg)](https://pypi.org/project/robot-md/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Spec](https://img.shields.io/badge/spec-v1.1-green.svg)](spec/robot-md-v1.md)
-[![RCAN](https://img.shields.io/badge/RCAN-3.0-blue.svg)](https://rcan.dev/spec/)
+[![Spec](https://img.shields.io/badge/spec-live%20matrix-green.svg)](https://rcan.dev/compatibility)
+[![RCAN](https://img.shields.io/badge/RCAN-protocol-blue.svg)](https://rcan.dev/compatibility)
 
 ## Where this fits in the stack
 
@@ -18,12 +18,18 @@ This repo is the **declaration layer** — the file format + Python CLI. Everyth
 |---|---|---|
 | **Declaration** ← *this* | [ROBOT.md](https://github.com/RobotRegistryFoundation/robot-md) | The file a robot ships at its root. YAML frontmatter + markdown prose. Declares identity, capabilities, safety gates. **Spec + `robot-md` Python CLI** (`init`, `validate`, `render`, `calibrate`, `register`, `autodetect`). |
 | **Agent bridge** | [robot-md-mcp](https://github.com/RobotRegistryFoundation/robot-md-mcp) | MCP server that exposes a `ROBOT.md` to Claude Code, Claude Desktop, Cursor, Zed, Gemini CLI — any MCP-aware agent. One `claude mcp add` away. |
-| **Remote dispatch** | [robot-md-dispatcher](https://github.com/RobotRegistryFoundation/robot-md-dispatcher) | **BYOK Claude Agent SDK dispatcher** — accepts tasks over HTTP and runs them through a local Claude agent on the robot host. Use when an external system (cron, Slack bot, another agent) hands the robot a task; the MCP bridge above is for interactive human use. |
+| **Remote dispatch** | [robot-md-dispatcher](https://github.com/RobotRegistryFoundation/robot-md-dispatcher) | HTTP service that receives signed task requests and runs them through a local Claude agent on the robot host. Use when an external system (cron, Slack bot, another agent) hands the robot a task; the MCP bridge above is for interactive human use. |
 | **Wire protocol** | [RCAN](https://rcan.dev/spec/) | How robots, gateways, and planners talk. Signed envelopes, LoA enforcement, PQC crypto. Think HTTP for robots. |
 | **Python SDK** | [rcan-py](https://github.com/continuonai/rcan-py) | `pip install rcan` — `RCANMessage`, `RobotURI`, `ConfidenceGate`, `HiTLGate`, `AuditChain`. |
 | **TypeScript SDK** | [rcan-ts](https://github.com/continuonai/rcan-ts) | `npm install rcan-ts` — same API surface for Node + browser. |
 | **Registry** | [Robot Registry Foundation](https://robotregistryfoundation.org) | Permanent RRN identities. Public resolver at `/r/<rrn>`. Like ICANN for robots. |
 | **Reference runtime** | [OpenCastor](https://github.com/craigm26/OpenCastor) | Open-source robot runtime — connects LLM brains to hardware bodies. One implementation of RCAN. |
+
+<!-- BEGIN: ecosystem authority disclaimer (canonical, derived from spec §10) -->
+> **Where safety is actually enforced.**
+>
+> Physical safety is enforced at Layer 3 (`robot-md-gateway`) or Layer 4 (a runtime that embeds it, e.g., OpenCastor). Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it.
+<!-- END: ecosystem authority disclaimer -->
 
 ## The 60-second pitch
 

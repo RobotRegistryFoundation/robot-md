@@ -9,6 +9,12 @@
 
 The format spec is versioned separately from the CLI: schema URL `https://robotmd.dev/schema/v1/...` will be served indefinitely even after v2 ships, so robots pinning `rcan_version: "3.0"` in existing ROBOT.md files won't break.
 
+<!-- BEGIN: ecosystem authority disclaimer (canonical, derived from spec §10) -->
+> **Where safety is actually enforced.**
+>
+> Physical safety is enforced at Layer 3 (`robot-md-gateway`) or Layer 4 (a runtime that embeds it, e.g., OpenCastor). Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it.
+<!-- END: ecosystem authority disclaimer -->
+
 ## Reporting a Vulnerability
 
 **Do not file a public GitHub issue for security vulnerabilities.**
