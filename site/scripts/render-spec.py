@@ -231,11 +231,11 @@ NAV_HTML = """\
         ROBOT<span class="dot">.</span><span class="md">md</span>
       </a>
       <nav aria-label="Site navigation">
-        <a href="/spec/" class="current" aria-current="page">Spec</a>
+        <a href="https://docs.robotmd.dev/spec/" class="current" aria-current="page">Spec</a>
         <a href="/agents/">Agents</a>
-        <a href="/mcp/">MCP</a>
+        <a href="https://docs.robotmd.dev/mcp/">MCP</a>
         <a href="/registry/">Registry</a>
-        <a href="/compliance/">Compliance</a>
+        <a href="https://docs.robotmd.dev/compliance/">Compliance</a>
         <a href="/managed-agents/">Managed Agents</a>
         <a href="/robots">Robots</a>
         <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
@@ -248,9 +248,9 @@ FOOTER_HTML = """\
     <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
     <div>
       <a href="/">Home</a> ·
-      <a href="/spec/">Spec</a> ·
+      <a href="https://docs.robotmd.dev/spec/">Spec</a> ·
       <a href="/registry/">Registry</a> ·
-      <a href="/compliance/">Compliance</a> ·
+      <a href="https://docs.robotmd.dev/compliance/">Compliance</a> ·
       <a href="/robots">Robots</a> ·
       <a href="/status">Status</a> ·
       <a href="/report.html">Report issue</a> ·
@@ -624,8 +624,8 @@ def render(md_path: Path, html_path: Path) -> None:
             <span class="ver-badge">Current</span>
           </div>
           <ul>
-            <li><a href="/spec/v0.2-design.md">v0.2-design (historical)</a></li>
-            <li><a href="/spec/v0.1-mcp-design.md">v0.1-mcp-design (historical)</a></li>
+            <li><a href="https://docs.robotmd.dev/spec/v0.2-design/">v0.2-design (historical)</a></li>
+            <li><a href="https://docs.robotmd.dev/spec/v0.1-mcp-design/">v0.1-mcp-design (historical)</a></li>
           </ul>
         </div>
 
