@@ -6,12 +6,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>EU AI Act Compliance — ROBOT.md</title>
   <meta name="description"
-    content="Five RCAN §22-26 attestation packets for EU AI Act compliance — FRIA, safety-benchmark, IFU, incident-report, EU-register. All five endpoints live. robot-md emit-* commands.">
+    content="Five RCAN §22-26 attestation packets — FRIA, safety-benchmark, IFU, incident-report, EU-register — submitted to RRF intake as signed evidence. Evidence, not regulatory sufficiency.">
   <meta name="theme-color" content="#F4EFE6">
 
   <meta property="og:title" content="EU AI Act Compliance — ROBOT.md">
   <meta property="og:description"
-    content="FRIA + safety-benchmark + IFU + incident-report + EU-register — five RCAN §22-26 packets, all live. Filed with robot-md emit-* commands.">
+    content="FRIA + safety-benchmark + IFU + incident-report + EU-register — five RCAN §22-26 packets, signed and submitted to RRF intake. Evidence, not regulatory sufficiency.">
   <meta property="og:url" content="https://robotmd.dev/compliance/">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
@@ -242,16 +242,38 @@
         <span>5 endpoints live · 2026-04-24</span>
       </div>
       <h1 class="page-heading">
-        Filed with regulators.<br>
+        Signed evidence.<br>
         Not just <em>generated.</em>
       </h1>
       <p class="page-lede">
         Five RCAN §22-26 attestation packets — FRIA, safety-benchmark, IFU, incident-report,
-        EU-register. One <code style="font-family:var(--mono);font-size:0.8em">robot-md emit-*</code>
-        command per packet. All five endpoints live at Robot Registry Foundation.
+        EU-register. Each packet is produced by a
+        <code style="font-family:var(--mono);font-size:0.8em">robot-md emit-*</code>
+        command, signed with the operator's release key, and submitted to RRF intake at
+        <code style="font-family:var(--mono);font-size:0.8em">/v2/&lt;packet-type&gt;</code>.
+        RRF stores the evidence in its transparency log; jurisdictional filing remains the
+        operator's responsibility.
       </p>
     </div>
   </header>
+
+  <!-- ===== COMPLIANCE DISCLAIMERS ===== -->
+  <section class="sec" id="cert-disclaimer" style="padding-top:24px;padding-bottom:8px;">
+    <div class="wrap">
+      <!-- BEGIN: ecosystem certification disclaimer (canonical, derived from spec §10) -->
+      <blockquote style="border-left:3px solid var(--accent,#c2a460);margin:0 0 12px;padding:16px 20px;background:var(--paper-2,#f0ebe0);border-radius:4px;font-size:14px;line-height:1.6;color:var(--ink-2,#555);">
+        <strong>Conformance is not certification.</strong><br>
+        Conformance to RCAN tracks (L1–L4 protocol, Gateway Authority, HIL Runtime Safety) is <em>self-asserted via signed bundles</em> and <em>independently replayable from those bundles</em>. Conformance is not certification. Certification requires audit by a qualified third-party body, which is intentionally out-of-scope for the foundation in 2026.
+      </blockquote>
+      <!-- END: ecosystem certification disclaimer -->
+      <!-- BEGIN: ecosystem regulatory disclaimer (canonical, derived from spec §10) -->
+      <blockquote style="border-left:3px solid var(--accent,#c2a460);margin:0;padding:16px 20px;background:var(--paper-2,#f0ebe0);border-radius:4px;font-size:14px;line-height:1.6;color:var(--ink-2,#555);">
+        <strong>Compliance evidence is not regulatory sufficiency.</strong><br>
+        Compliance packet generation and RRF submission produce <em>evidence</em>; they do not constitute regulatory sufficiency in any jurisdiction. Per-jurisdiction conformity assessments and notified-body engagement are the user's responsibility, in consultation with qualified counsel.
+      </blockquote>
+      <!-- END: ecosystem regulatory disclaimer -->
+    </div>
+  </section>
 
   <!-- ===== COMPLIANCE PIPELINE ===== -->
   <section class="sec" id="packets">
@@ -286,7 +308,7 @@ robot-md emit-fria ROBOT.md \
           <div class="pr-status">
             <span class="status-live">Live</span>
             <a class="endpoint-link" href="https://robotregistryfoundation.org">
-              /api/compliance/fria →
+              /v2/fria →
             </a>
           </div>
         </div>
@@ -308,7 +330,7 @@ robot-md emit-fria ROBOT.md \
           <div class="pr-status">
             <span class="status-live">Live</span>
             <a class="endpoint-link" href="https://robotregistryfoundation.org">
-              /api/compliance/safety-benchmark →
+              /v2/safety-benchmark →
             </a>
           </div>
         </div>
@@ -330,7 +352,7 @@ robot-md emit-fria ROBOT.md \
           <div class="pr-status">
             <span class="status-live">Live</span>
             <a class="endpoint-link" href="https://robotregistryfoundation.org">
-              /api/compliance/ifu →
+              /v2/ifu →
             </a>
           </div>
         </div>
@@ -353,7 +375,7 @@ robot-md emit-fria ROBOT.md \
           <div class="pr-status">
             <span class="status-live">Live</span>
             <a class="endpoint-link" href="https://robotregistryfoundation.org">
-              /api/compliance/incident-report →
+              /v2/incident-report →
             </a>
           </div>
         </div>
@@ -375,7 +397,7 @@ robot-md emit-fria ROBOT.md \
           <div class="pr-status">
             <span class="status-live">Live</span>
             <a class="endpoint-link" href="https://robotregistryfoundation.org">
-              /api/compliance/eu-register →
+              /v2/eu-register →
             </a>
           </div>
         </div>
@@ -445,7 +467,7 @@ robot-md emit-fria ROBOT.md \
         <span class="rb-icon" aria-hidden="true">✓</span>
         <div class="rb-text">
           <strong>Ready for submission</strong>
-          All §22-26 endpoints live · Signed envelopes · RCAN 3.0
+          All §22-26 endpoints live · Signed envelopes · <a href="https://rcan.dev/compatibility">RCAN protocol</a>
         </div>
       </div>
 

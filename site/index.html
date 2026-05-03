@@ -6,12 +6,12 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>ROBOT.md — the manifest agents read before they touch your robot</title>
   <meta name="description"
-    content="ROBOT.md is to a robot what CLAUDE.md and AGENTS.md are to a codebase. One file — YAML + markdown — so a planning LLM can safely operate a single robot. Speaks RCAN 3.0+. Built for Anthropic surfaces, flexible for any AI agent.">
+    content="ROBOT.md is the declaration layer for the OpenCastor stack — one file, YAML + markdown, so any MCP-aware agent can read a robot's identity, capabilities, and safety contract. Enforcement happens at Layer 3 (robot-md-gateway), not here.">
   <meta name="theme-color" content="#F4EFE6">
 
   <meta property="og:title" content="ROBOT.md — the manifest agents read before they touch your robot">
   <meta property="og:description"
-    content="The CLAUDE.md of physical machines. One file so Claude Code can safely drive your arm, rover, or humanoid.">
+    content="The CLAUDE.md of physical machines. One file an agent reads to know the robot's contract. Declaration only — physical safety is enforced at Layer 3 by robot-md-gateway.">
   <meta property="og:url" content="https://robotmd.dev">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
@@ -151,6 +151,17 @@
       text-wrap: pretty;
       line-height: 1.5;
     }
+
+    .layer-list {
+      margin: 20px 0 20px 20px;
+      padding: 0;
+      list-style: disc;
+      font-size: 16px;
+      line-height: 1.7;
+      max-width: 700px;
+      color: var(--ink-2);
+    }
+    .layer-list li { margin-bottom: 4px; }
 
     /* ============================================================
        SITE NAV
@@ -919,7 +930,7 @@
       <p class="hero-lede">
         ROBOT.md is to a robot what CLAUDE.md and AGENTS.md are to a codebase.
         One file — YAML + markdown — so a planning LLM can safely operate a
-        single robot. Speaks RCAN 3.0+. Built for Anthropic surfaces,
+        single robot. Speaks the <a href="https://rcan.dev/compatibility">RCAN protocol</a>. Built for Anthropic surfaces,
         flexible for any MCP-aware agent.
       </p>
 
@@ -962,7 +973,7 @@
       <span>One file per robot</span><b>✦</b>
       <span>Frontmatter the validator trusts</span><b>✦</b>
       <span>Prose the planner reads</span><b>✦</b>
-      <span>RCAN 3.0+ conformant</span><b>✦</b>
+      <span><a href="https://rcan.dev/compatibility" style="color:inherit;text-decoration:none;">RCAN protocol</a> conformant</span><b>✦</b>
       <span>EU AI Act §22–26 live</span><b>✦</b>
       <span>Registry-resolvable via RRN</span><b>✦</b>
       <span>MCP-native · zero flags</span><b>✦</b>
@@ -970,7 +981,7 @@
       <span>One file per robot</span><b>✦</b>
       <span>Frontmatter the validator trusts</span><b>✦</b>
       <span>Prose the planner reads</span><b>✦</b>
-      <span>RCAN 3.0+ conformant</span><b>✦</b>
+      <span><a href="https://rcan.dev/compatibility" style="color:inherit;text-decoration:none;">RCAN protocol</a> conformant</span><b>✦</b>
       <span>EU AI Act §22–26 live</span><b>✦</b>
       <span>Registry-resolvable via RRN</span><b>✦</b>
       <span>MCP-native · zero flags</span><b>✦</b>
@@ -989,7 +1000,7 @@
       <h2 class="sec-title">ROBOT.md → MCP → Claude Code → robot moves.</h2>
       <p class="sec-lede">
         The full loop — manifest declaration to physical action — in one
-        conversation. No runtime to install. No axis conventions to learn.
+        conversation. No axis conventions to learn.
       </p>
 
       <div class="demo-grid" style="margin-top: 32px;">
@@ -1058,6 +1069,43 @@
           <div class="detail">Driver executes; E-stop and HiTL gates enforced per §8 AUTHORIZE before servo bus</div>
         </div>
       </div>
+
+    </div>
+  </section>
+
+  <!-- ===== BEAT 2.5: 6-LAYER ARCHITECTURE ===== -->
+  <section class="sec layered-explanation" id="architecture">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ 01a — Architecture</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">Where ROBOT.md fits</h2>
+      <p class="sec-lede">
+        ROBOT.md is the <strong>declaration layer</strong> — one of six in the
+        OpenCastor stack. It declares what a robot is, what it can do, and
+        what limits hold. <em>Declaration is not enforcement.</em>
+      </p>
+      <ul class="layer-list">
+        <li><strong>Layer 1 — Declaration:</strong> ROBOT.md, robot-md CLI, robot-md-mcp (Advisory).</li>
+        <li><strong>Layer 2 — Agent runtime:</strong> Claude Code, Codex, Gemini, any MCP host.</li>
+        <li><strong>Layer 3 — Gateway / Enforcement:</strong> robot-md-gateway. Mandatory exclusive path.</li>
+        <li><strong>Layer 4 — Robot-facing runtime:</strong> OpenCastor and other RCAN runtimes.</li>
+        <li><strong>Layer 5 — Protocol:</strong> RCAN spec + SDKs.</li>
+        <li><strong>Layer 6 — Registry:</strong> Robot Registry Foundation.</li>
+      </ul>
+      <p class="sec-lede">
+        Pattern 1 (Declaration-only): install <code>robot-md</code> alone for
+        manifest authoring, schema validation, and dry-run agent planning. No
+        physical robot is moved.
+      </p>
+      <p class="sec-lede">
+        Pattern 2 (Gateway Mode): add <code>robot-md-gateway</code> when you
+        actually want an agent to drive hardware.
+        <a href="https://rcan.dev/compatibility">See live version compatibility →</a>
+      </p>
 
     </div>
   </section>
@@ -1138,10 +1186,14 @@ claude</pre>
         <span class="rule-line" aria-hidden="true"></span>
       </div>
 
-      <h2 class="sec-title">Filed with regulators. Not just generated.</h2>
+      <h2 class="sec-title">Signed evidence. Submitted to RRF. Not just generated.</h2>
       <p class="sec-lede">
         Five RCAN §22–26 attestation packets, all live endpoints.
-        Run one command per packet — robot-md handles the filing.
+        Each packet is produced by a <code style="font-family:var(--mono);font-size:0.85em">robot-md emit-*</code> command,
+        signed with the operator's release key, and submitted to RRF intake at
+        <code style="font-family:var(--mono);font-size:0.85em">/v2/&lt;packet-type&gt;</code>.
+        RRF stores the evidence in its transparency log; jurisdictional filing
+        remains the operator's responsibility.
       </p>
 
       <div class="compliance-pipeline" aria-label="RCAN compliance pipeline" role="list">
@@ -1254,7 +1306,7 @@ claude</pre>
           <div class="category">Open standards</div>
           <div class="org-name">RCAN + MCP</div>
           <p class="org-desc">
-            RCAN 3.0+ (Apache-2.0, community-governed) for the wire protocol.
+            <a href="https://rcan.dev/compatibility">RCAN protocol</a> (Apache-2.0, community-governed) for the wire protocol.
             MCP for agent-surface interop. JSON Schema draft 2020-12 for
             frontmatter validation. No vendor-specific formats in the core.
           </p>
@@ -1287,7 +1339,7 @@ claude</pre>
           <h2 class="cta-heading">Understand the format.</h2>
           <p class="cta-body">
             The ROBOT.md spec defines every required and optional field,
-            the RCAN 3.0+ conformance rules, and the compliance packet
+            the <a href="https://rcan.dev/compatibility">RCAN protocol</a> conformance rules, and the compliance packet
             filing requirements. Normative text, schema, and examples.
           </p>
           <a class="cta-action" href="/spec/">Read spec →</a>
@@ -1305,6 +1357,18 @@ claude</pre>
         </div>
 
       </div>
+    </div>
+  </section>
+
+  <!-- ===== AUTHORITY DISCLAIMER ===== -->
+  <section class="sec" id="authority-disclaimer" style="padding-top:32px;padding-bottom:32px;">
+    <div class="wrap">
+      <!-- BEGIN: ecosystem authority disclaimer (canonical, derived from spec §10) -->
+      <blockquote style="border-left:3px solid var(--accent,#c2a460);margin:0;padding:16px 20px;background:var(--paper-2,#f0ebe0);border-radius:4px;font-size:14px;line-height:1.6;color:var(--ink-2,#555);">
+        <strong>Where safety is actually enforced.</strong><br>
+        Physical safety is enforced at Layer 3 (<code style="font-family:var(--mono)">robot-md-gateway</code>) or Layer 4 (a runtime that embeds it, e.g., OpenCastor). Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it.
+      </blockquote>
+      <!-- END: ecosystem authority disclaimer -->
     </div>
   </section>
 
