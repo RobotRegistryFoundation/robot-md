@@ -23,7 +23,7 @@ This repo is the **declaration layer** — the file format + Python CLI. Everyth
 | **Python SDK** | [rcan-py](https://github.com/continuonai/rcan-py) | `pip install rcan` — `RCANMessage`, `RobotURI`, `ConfidenceGate`, `HiTLGate`, `AuditChain`. |
 | **TypeScript SDK** | [rcan-ts](https://github.com/continuonai/rcan-ts) | `npm install rcan-ts` — same API surface for Node + browser. |
 | **Registry** | [Robot Registry Foundation](https://robotregistryfoundation.org) | Permanent RRN identities. Public resolver at `/r/<rrn>`. Like ICANN for robots. |
-| **Reference runtime** | [OpenCastor](https://github.com/craigm26/OpenCastor) | Open-source robot runtime — connects LLM brains to hardware bodies. One implementation of RCAN. |
+| **Productized runtime (Layer 4)** | [OpenCastor](https://github.com/craigm26/OpenCastor) | Open-source productized RCAN runtime. Gateway-as-kernel + drivers + fleet + cloud bridge + UI. Most fully-documented RCAN runtime; not "the" reference (RCAN is implementation-independent). |
 
 <!-- BEGIN: ecosystem authority disclaimer (canonical, derived from spec §10) -->
 > **Where safety is actually enforced.**
