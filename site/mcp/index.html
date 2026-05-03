@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>robot-md-mcp — MCP Server for ROBOT.md</title>
   <meta name="description"
-    content="robot-md-mcp: the MCP server that exposes every ROBOT.md command to any MCP-aware agent. Install with npx or claude mcp add.">
+    content="robot-md-mcp: the MCP server that exposes manifest resources, validate, and render tools to any MCP-aware agent. Advisory Mode only — actuator authority is handled by robot-md-gateway, not by this npm package.">
   <meta name="theme-color" content="#F4EFE6">
 
   <meta property="og:title" content="robot-md-mcp — MCP Server">
@@ -201,9 +201,21 @@
       <h1 class="page-heading">
         The MCP server for <em>ROBOT.md</em>.
       </h1>
+      <aside class="prerel-banner" role="note" style="margin-top:16px;">
+        <strong>Advisory Mode only.</strong> This npm package exposes the
+        manifest as MCP resources plus <code style="font-family:var(--mono);font-size:0.85em">validate</code> and
+        <code style="font-family:var(--mono);font-size:0.85em">render</code> tools. It does not expose actuator commands. To
+        let an agent move hardware, install
+        <a href="https://github.com/RobotRegistryFoundation/robot-md-gateway"><code style="font-family:var(--mono);font-size:0.85em">robot-md-gateway</code></a>
+        — the mandatory exclusive path between agent intent and any motor.
+      </aside>
       <p class="page-lede">
-        Exposes every ROBOT.md command to any MCP-aware agent — Claude Code,
-        Claude Desktop, Gemini CLI, Codex CLI, Cursor, Zed, Continue.dev.
+        This MCP server exposes a robot's <code style="font-family:var(--mono);font-size:0.8em">ROBOT.md</code> as MCP
+        resources, plus two tools: <code style="font-family:var(--mono);font-size:0.8em">validate</code> (check a manifest
+        against the schema) and <code style="font-family:var(--mono);font-size:0.8em">render</code> (produce a human- or
+        agent-readable view). Read-only. <strong>By design, it has no actuator tools.</strong>
+        Anything that physically moves a robot goes through
+        <code style="font-family:var(--mono);font-size:0.8em">robot-md-gateway</code> at Layer 3.
         One <code style="font-family:var(--mono);font-size:0.8em">npx</code> command. Zero config files.
       </p>
     </div>
@@ -373,6 +385,18 @@ arm.reach, vision.describe, status.report...</pre>
         <a href="https://www.npmjs.com/package/robot-md-mcp">npm: robot-md-mcp →</a>
         <a href="https://github.com/RobotRegistryFoundation/robot-md-mcp">GitHub →</a>
       </div>
+    </div>
+  </section>
+
+  <!-- ===== AUTHORITY DISCLAIMER ===== -->
+  <section class="sec" id="authority-disclaimer" style="padding-top:32px;padding-bottom:32px;">
+    <div class="wrap">
+      <!-- BEGIN: ecosystem authority disclaimer (canonical, derived from spec §10) -->
+      <blockquote style="border-left:3px solid var(--accent,#c2a460);margin:0;padding:16px 20px;background:var(--paper-2,#f0ebe0);border-radius:4px;font-size:14px;line-height:1.6;color:var(--ink-2,#555);">
+        <strong>Where safety is actually enforced.</strong><br>
+        Physical safety is enforced at Layer 3 (<code style="font-family:var(--mono)">robot-md-gateway</code>) or Layer 4 (a runtime that embeds it, e.g., OpenCastor). Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it.
+      </blockquote>
+      <!-- END: ecosystem authority disclaimer -->
     </div>
   </section>
 
