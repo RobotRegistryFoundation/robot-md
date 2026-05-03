@@ -54,9 +54,9 @@ digraph when_to_use {
 | "Register this robot" / "get an RRN" | `robot-md register ROBOT.md` (defaults read from the manifest). See **Registration** below for the confirm-first flow. |
 | "Unregister" / "take it down" | `robot-md unregister <rrn>` — confirm with operator first (destructive). |
 
-## Registration (RRF + RCAN 3.0)
+## Registration (RRF + RCAN protocol)
 
-Every shared or production robot should have a public identity — an **RRN** (Robot Registry Name) minted at the [Robot Registry Foundation](https://robotregistryfoundation.org). The RRN is the permanent, cryptographically-bound id that lets this robot participate in the **RCAN 3.0+** network and be addressed by other agents. Registration POSTs a signed RCAN envelope to RRF; RRF mints the RRN and writes it back into `metadata.rrn` in the manifest.
+Every shared or production robot should have a public identity — an **RRN** (Robot Registry Name) minted at the [Robot Registry Foundation](https://robotregistryfoundation.org). The RRN is the permanent, cryptographically-bound id that lets this robot participate in the **[RCAN protocol](https://rcan.dev/compatibility)** network and be addressed by other agents. Registration POSTs a signed RCAN envelope to RRF; RRF mints the RRN and writes it back into `metadata.rrn` in the manifest.
 
 ### Detect unregistered state and surface it
 
@@ -75,7 +75,7 @@ Once the operator approves, the simplest path is a single command. All flags are
 robot-md register ROBOT.md
 ```
 
-This signs the body with the local key under `~/.robot-md/keys/` (RCAN 3.0 envelope), POSTs to the RRF mint endpoint, writes the returned RRN back into `metadata.rrn`, and prints the public URL.
+This signs the body with the local key under `~/.robot-md/keys/` (RCAN protocol envelope — see live compatibility at https://rcan.dev/compatibility), POSTs to the RRF mint endpoint, writes the returned RRN back into `metadata.rrn`, and prints the public URL.
 
 **Flow when the operator says "register it":**
 

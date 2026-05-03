@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Robot Registry Foundation — ROBOT.md Registry</title>
   <meta name="description"
-    content="RRN and RMN identities, RRF endpoints, signed-POST registration flow, PQC signing keys, and M2M_TRUSTED revocation polling via RCAN 3.0.">
+    content="RRN and RMN identities, RRF endpoints, signed-POST registration flow, PQC signing keys, and M2M_TRUSTED revocation polling via the RCAN protocol.">
   <meta name="theme-color" content="#F4EFE6">
 
   <meta property="og:title" content="Robot Registry Foundation — ROBOT.md Registry">
@@ -204,7 +204,7 @@
       <div class="page-eyebrow">
         <span>Robot Registry Foundation</span>
         <span class="rule-line" aria-hidden="true"></span>
-        <span>RCAN 3.0 · 5 §22-26 endpoints live</span>
+        <span><a href="https://rcan.dev/compatibility">RCAN protocol</a> · 5 §22-26 endpoints live</span>
       </div>
       <h1 class="page-heading">
         Permanent <em>identity</em> for every robot.
@@ -369,7 +369,7 @@
         <div class="sb-row">
           <span class="sb-key">Key algorithm</span>
           <span class="sb-val">pqc-hybrid-v1</span>
-          <span class="sb-note">&nbsp;— ML-DSA-65 + Ed25519 hybrid (RCAN 3.0 L2+)</span>
+          <span class="sb-note">&nbsp;— ML-DSA-65 + Ed25519 hybrid (<a href="https://rcan.dev/compatibility">RCAN protocol</a> L2+)</span>
         </div>
         <div class="sb-row">
           <span class="sb-key">Keystore path</span>
@@ -390,7 +390,7 @@
 
       <p style="font-size:14px;color:var(--ink-2);margin-top:16px;line-height:1.6;">
         Keys are generated at <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md register</code> time and bound to the RRN.
-        The <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">ed25519</code> algorithm is accepted at RCAN 3.0 L1 only;
+        The <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">ed25519</code> algorithm is accepted at <a href="https://rcan.dev/compatibility">RCAN protocol</a> L1 only;
         L2+ requires <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">pqc-hybrid-v1</code>.
       </p>
     </div>
