@@ -152,6 +152,17 @@
       line-height: 1.5;
     }
 
+    .layer-list {
+      margin: 20px 0 20px 20px;
+      padding: 0;
+      list-style: disc;
+      font-size: 16px;
+      line-height: 1.7;
+      max-width: 700px;
+      color: var(--ink-2);
+    }
+    .layer-list li { margin-bottom: 4px; }
+
     /* ============================================================
        SITE NAV
        ============================================================ */
@@ -989,11 +1000,7 @@
       <h2 class="sec-title">ROBOT.md → MCP → Claude Code → robot moves.</h2>
       <p class="sec-lede">
         The full loop — manifest declaration to physical action — in one
-        conversation. Pattern 1 (Declaration-only): drop a ROBOT.md, connect
-        robot-md-mcp to your agent, and start. No extra runtime required for
-        this pattern. Patterns 2–4 add gateway enforcement, a full runtime, or
-        cloud dispatch — see <a href="https://rcan.dev/compatibility">rcan.dev/compatibility</a> for the full
-        deployment-pattern matrix. No axis conventions to learn.
+        conversation. No axis conventions to learn.
       </p>
 
       <div class="demo-grid" style="margin-top: 32px;">
@@ -1062,6 +1069,43 @@
           <div class="detail">Driver executes; E-stop and HiTL gates enforced per §8 AUTHORIZE before servo bus</div>
         </div>
       </div>
+
+    </div>
+  </section>
+
+  <!-- ===== BEAT 2.5: 6-LAYER ARCHITECTURE ===== -->
+  <section class="sec layered-explanation" id="architecture">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ 01a — Architecture</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">Where ROBOT.md fits</h2>
+      <p class="sec-lede">
+        ROBOT.md is the <strong>declaration layer</strong> — one of six in the
+        OpenCastor stack. It declares what a robot is, what it can do, and
+        what limits hold. <em>Declaration is not enforcement.</em>
+      </p>
+      <ul class="layer-list">
+        <li><strong>Layer 1 — Declaration:</strong> ROBOT.md, robot-md CLI, robot-md-mcp (Advisory).</li>
+        <li><strong>Layer 2 — Agent runtime:</strong> Claude Code, Codex, Gemini, any MCP host.</li>
+        <li><strong>Layer 3 — Gateway / Enforcement:</strong> robot-md-gateway. Mandatory exclusive path.</li>
+        <li><strong>Layer 4 — Robot-facing runtime:</strong> OpenCastor and other RCAN runtimes.</li>
+        <li><strong>Layer 5 — Protocol:</strong> RCAN spec + SDKs.</li>
+        <li><strong>Layer 6 — Registry:</strong> Robot Registry Foundation.</li>
+      </ul>
+      <p>
+        Pattern 1 (Declaration-only): install <code>robot-md</code> alone for
+        manifest authoring, schema validation, and dry-run agent planning. No
+        physical robot is moved.
+      </p>
+      <p>
+        Pattern 2 (Gateway Mode): add <code>robot-md-gateway</code> when you
+        actually want an agent to drive hardware.
+        <a href="https://rcan.dev/compatibility">See live version compatibility →</a>
+      </p>
 
     </div>
   </section>
