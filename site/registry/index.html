@@ -262,7 +262,7 @@
       <h2 class="sec-title">robot-md register — mint an RRN.</h2>
       <p class="sec-lede">
         One command mints an RRN and writes it back into your ROBOT.md.
-        Requires a valid ROBOT.md with <code style="font-size:0.85em">rcan_version: "3.0"</code>.
+        Requires a valid ROBOT.md declaring an <code style="font-size:0.85em">rcan_version</code> from the <a href="https://rcan.dev/compatibility">live compatibility matrix</a>.
       </p>
 
       <div class="install-block" style="margin-top:24px;">
@@ -412,7 +412,7 @@
         When a key is revoked (via <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md revoke-key</code>
         or directly at RRF), the RRF broadcasts a revocation event to all registered
         <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">M2M_TRUSTED</code>
-        listeners. Peer runtimes (OpenCastor, robot-md-dispatcher) poll
+        listeners. Peer runtimes (OpenCastor, robot-md-gateway) poll
         <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">https://robotregistryfoundation.org/api/revocation/&lt;rrn&gt;</code>
         on a configurable interval (default: 60 seconds). Any request signed with a revoked key is
         rejected with <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">403 KEY_REVOKED</code>.
