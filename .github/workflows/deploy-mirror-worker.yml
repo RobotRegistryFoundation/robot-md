@@ -28,7 +28,9 @@ jobs:
       - name: Deploy via wrangler
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # Separate token from the Pages-only CLOUDFLARE_API_TOKEN — Workers + KV writes
+          # need their own scopes (Workers Scripts: Edit + Workers KV Storage: Edit).
+          apiToken: ${{ secrets.CLOUDFLARE_WORKERS_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: mirror-worker
           command: deploy
