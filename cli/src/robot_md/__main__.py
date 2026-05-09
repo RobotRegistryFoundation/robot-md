@@ -1919,7 +1919,7 @@ def invoke(
 
 # ---------------------------------------------------------------- actuator
 actuator_app = typer.Typer(
-    help="Manage robot-md-gateway actuators (init in v1.6.0; search + publish coming in v1.7.0)."
+    help="Manage robot-md-gateway actuators (init / search / publish)."
 )
 app.add_typer(actuator_app, name="actuator")
 
