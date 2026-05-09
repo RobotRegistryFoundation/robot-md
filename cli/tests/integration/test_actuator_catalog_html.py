@@ -1,6 +1,7 @@
 """Smoke test for the actuator catalog page. Parses the static HTML and
 verifies it embeds the JSON-loading JS, an empty-state, and a results
 container. Marked slow because it does real file I/O outside cli/."""
+
 from __future__ import annotations
 
 from pathlib import Path

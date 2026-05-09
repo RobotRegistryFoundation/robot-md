@@ -1,14 +1,11 @@
 """Tests that the bundled SKILL.md ships the expected guidance sections."""
+
 from __future__ import annotations
 
 from pathlib import Path
 
 SKILL = (
-    Path(__file__).resolve().parents[1]
-    / "src"
-    / "robot_md"
-    / "skills"
-    / "using-robot-md.SKILL.md"
+    Path(__file__).resolve().parents[1] / "src" / "robot_md" / "skills" / "using-robot-md.SKILL.md"
 )
 
 
