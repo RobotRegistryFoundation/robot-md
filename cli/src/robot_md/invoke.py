@@ -11,10 +11,16 @@ No mocks. No demo flags. The signing path uses the operator's
 
 from __future__ import annotations
 
+import base64
 import secrets
 import time
 import uuid
 from typing import Any
+
+from cryptography.hazmat.primitives.asymmetric import ed25519
+from rcan.audit_bundle import canonical_json
+
+from robot_md.signing import SigningKeypair
 
 
 def build_envelope(
@@ -41,3 +47,31 @@ def build_envelope(
         "nonce": secrets.token_hex(16),
         "timestamp_ms": int(time.time() * 1000),
     }
+
+
+def sign_envelope(
+    envelope: dict[str, Any],
+    keypair: SigningKeypair,
+    *,
+    kid: str,
+) -> dict[str, Any]:
+    """Sign an envelope with Ed25519 and return a copy with envelope_signature attached.
+
+    Signature is over `canonical_json(signed_envelope, exclude="envelope_signature")`
+    matching the gateway's `verify_envelope` pre-image (cert/envelope.py:57).
+
+    Args:
+        envelope: dict from build_envelope (or compatible)
+        keypair: operator's signing keypair (from ~/.robot-md/keys/<rrn>.signing.json)
+        kid: key id to advertise in the envelope; gateway resolves to a
+             registered Ed25519 public key via RRFResolver.
+
+    Returns: a new dict (input is not mutated) with `envelope_signature` set.
+    """
+    out = dict(envelope)
+    out["envelope_signature"] = {"kid": kid, "sig": ""}  # placeholder for canon
+    pre = canonical_json(out, exclude="envelope_signature")
+    sec = ed25519.Ed25519PrivateKey.from_private_bytes(keypair.ed25519_sec)
+    sig = sec.sign(pre)
+    out["envelope_signature"] = {"kid": kid, "sig": base64.b64encode(sig).decode()}
+    return out
