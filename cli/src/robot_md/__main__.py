@@ -1680,6 +1680,11 @@ def install_desktop_cmd(
 
 @app.command("install-skill")
 def install_skill_cmd(
+    package: str | None = typer.Argument(
+        None,
+        help="Optional package name. When supplied, installs every skill "
+        "in <package>/skills/*.SKILL.md. Defaults to bundled using-robot-md.",
+    ),
     dest: Path | None = typer.Option(
         None,
         "--dest",
@@ -1689,52 +1694,304 @@ def install_skill_cmd(
         False,
         "--force",
         "-f",
-        help="Overwrite an existing using-robot-md/SKILL.md.",
+        help="Overwrite an existing using-robot-md/SKILL.md (no-arg flow only).",
     ),
     stdout: bool = typer.Option(
         False,
         "--stdout",
-        help="Print the skill to stdout instead of installing it.",
+        help="Print the bundled skill to stdout (no-arg flow only).",
+    ),
+    list_skills: bool = typer.Option(
+        False,
+        "--list",
+        help="List all installed skills across packages and exit.",
     ),
 ) -> None:
-    """Install the `using-robot-md` skill into your Claude Code skills dir.
+    """Install Claude Code skills from a pip-installed package, or list available skills.
 
-    The skill teaches skill-aware harnesses (superpowers, etc.) to
-    auto-invoke robot-md tooling when the operator's message mentions the
-    robot, its capabilities, safety, or any `robot-md` verb. Writes to
-    `~/.claude/skills/using-robot-md/SKILL.md` by default.
+    \b
+      robot-md install-skill                       # bundled using-robot-md
+      robot-md install-skill log-only-actuator     # third-party package skills
+      robot-md install-skill --list                # enumerate all installed skills
+      robot-md install-skill --dest ./skills       # project-local skills dir
+      robot-md install-skill --force               # overwrite existing (no-arg flow)
+      robot-md install-skill --stdout | less       # preview bundled skill
+
+    OQ-A resolution: REPLACE-on-conflict for `<package>` flow (single file
+    per skill name).
+    """
+    from robot_md.skill import (
+        default_skills_dir,
+        install,
+        install_package_skills,
+        iter_all_installed_skills,
+        skill_content,
+    )
+
+    if list_skills:
+        for pkg, path in iter_all_installed_skills():
+            out_console.print(f"{pkg}\t{path.name}")
+        return
+
+    dest_root = dest or default_skills_dir()
+
+    if package is None:
+        # Backward-compatible bundled-skill flow.
+        try:
+            content = skill_content()
+        except FileNotFoundError as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=FILE_ERROR) from None
+        if stdout:
+            sys.stdout.write(content)
+            return
+        try:
+            written = install(dest_root, force=force)
+        except FileExistsError as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=FILE_ERROR) from None
+        out_console.print(f"[green]✓[/green] installed {written}")
+        out_console.print(
+            "  Claude Code (with superpowers or any skill-aware harness) will "
+            "auto-invoke this skill when the operator mentions the robot."
+        )
+        return
+
+    # Package-name flow.
+    try:
+        written = install_package_skills(package, dest_root)
+    except ModuleNotFoundError:
+        err_console.print(
+            f"[red]✗[/red] package {package!r} not installed — `pip install {package}` first"
+        )
+        raise typer.Exit(code=FILE_ERROR) from None
+    if not written:
+        err_console.print(
+            f"[yellow]![/yellow] package {package!r} ships no skills "
+            f"(no <package>/skills/*.SKILL.md found)"
+        )
+        return
+    for p in written:
+        out_console.print(f"[green]✓[/green] installed {p}")
+
+
+@app.command()
+def invoke(
+    manifest: Path = typer.Argument(..., help="Path to ROBOT.md being actuated against."),
+    tool: str = typer.Option(..., "--tool", help="Tool name to invoke (e.g. 'home_pose')."),
+    args: str = typer.Option(
+        "{}",
+        "--args",
+        help="Tool args as JSON object string (default: '{}').",
+    ),
+    gateway: str = typer.Option(
+        "http://127.0.0.1:8080",
+        "--gateway",
+        help="Gateway base URL (e.g. 'http://127.0.0.1:8080').",
+    ),
+    bearer: str | None = typer.Option(
+        None,
+        "--bearer",
+        help="Bearer token directly (mutually exclusive with --bearer-from-bearers).",
+    ),
+    bearer_from_bearers: Path | None = typer.Option(
+        None,
+        "--bearer-from-bearers",
+        help="Read bearer for tier 'actuate' from a bearers.yaml file.",
+    ),
+    scope: str = typer.Option("actuate", "--scope", help="Envelope scope (default 'actuate')."),
+    sign: bool = typer.Option(
+        True,
+        "--sign/--no-sign",
+        help="Sign the envelope with ~/.robot-md/keys/<rrn>.signing.json (default: sign).",
+    ),
+    kid: str | None = typer.Option(
+        None,
+        "--kid",
+        help="Override envelope signing kid (defaults to keypair's pq_kid).",
+    ),
+    print_bundle_entry: bool = typer.Option(
+        False,
+        "--print-bundle-entry",
+        help="After a successful invoke, GET /v1/audit/last and print the entry.",
+    ),
+) -> None:
+    """Send a real signed RCAN INVOKE envelope to a robot-md-gateway.
+
+    Operators use this for production dispatches; cookbook readers use it as
+    the actuation step. Loads the operator's signing keypair from
+    ~/.robot-md/keys/<rrn>.signing.json (see `robot-md register`).
 
     Examples:
 
     \b
-      robot-md install-skill                       # writes to ~/.claude/skills/
-      robot-md install-skill --dest ./skills       # project-local skills dir
-      robot-md install-skill --force               # overwrite existing
-      robot-md install-skill --stdout | less       # preview the skill
+      robot-md invoke ROBOT.md --tool home_pose
+      robot-md invoke ROBOT.md --tool grasp --args '{"target":"red_brick"}'
+      robot-md invoke ROBOT.md --tool home_pose \\
+          --gateway http://127.0.0.1:8080 \\
+          --bearer-from-bearers ./bearers.yaml \\
+          --print-bundle-entry
     """
-    from robot_md.skill import install, skill_content
+    import json as _json
+
+    from robot_md.invoke import (
+        build_envelope,
+        fetch_last_audit_entry,
+        invoke_envelope,
+        load_bearer_for_tier,
+        sign_envelope,
+    )
+    from robot_md.parser import parse_file
+    from robot_md.signing import load_keypair
+
+    if bearer is None and bearer_from_bearers is None:
+        err_console.print(
+            "[red]✗[/red] must pass either --bearer <token> or --bearer-from-bearers <yaml>"
+        )
+        raise typer.Exit(code=FILE_ERROR)
+    if bearer is not None and bearer_from_bearers is not None:
+        err_console.print("[red]✗[/red] --bearer and --bearer-from-bearers are mutually exclusive")
+        raise typer.Exit(code=FILE_ERROR)
+
+    parsed = parse_file(manifest)
+    metadata = parsed.frontmatter.get("metadata") or {}
+    rrn = metadata.get("rrn")
+    ruri = metadata.get("ruri")
+    if not rrn or not ruri:
+        err_console.print(
+            f"[red]✗[/red] {manifest} must declare metadata.rrn and metadata.ruri "
+            "(run `robot-md register` first)"
+        )
+        raise typer.Exit(code=FILE_ERROR)
 
     try:
-        content = skill_content()
-    except FileNotFoundError as e:
-        err_console.print(f"[red]✗[/red] {e}")
+        tool_args = _json.loads(args)
+    except _json.JSONDecodeError as e:
+        err_console.print(f"[red]✗[/red] --args must be valid JSON: {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+    if not isinstance(tool_args, dict):
+        err_console.print(
+            f"[red]✗[/red] --args must be a JSON object, got {type(tool_args).__name__}"
+        )
+        raise typer.Exit(code=FILE_ERROR)
+
+    envelope = build_envelope(
+        ruri=ruri,
+        tool_name=tool,
+        tool_args=tool_args,
+        manifest_path=str(manifest.resolve()),
+        scope=scope,
+    )
+
+    if sign:
+        kp = load_keypair(rrn)
+        if kp is None:
+            err_console.print(
+                f"[red]✗[/red] no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — "
+                "run `robot-md register` first, or pass --no-sign"
+            )
+            raise typer.Exit(code=FILE_ERROR)
+        envelope = sign_envelope(envelope, kp, kid=kid or kp.pq_kid)
+
+    if bearer_from_bearers is not None:
+        try:
+            bearer = load_bearer_for_tier(bearer_from_bearers, "actuate")
+        except (FileNotFoundError, LookupError, ValueError) as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=FILE_ERROR) from None
+
+    try:
+        result = invoke_envelope(envelope=envelope, gateway_url=gateway, bearer=bearer)
+    except RuntimeError as e:
+        err_console.print(f"[red]✗[/red] invoke failed: {e}")
         raise typer.Exit(code=FILE_ERROR) from None
 
-    if stdout:
-        sys.stdout.write(content)
-        return
+    out_console.print(_json.dumps(result, indent=2))
+
+    if print_bundle_entry:
+        try:
+            entry = fetch_last_audit_entry(gateway_url=gateway, bearer=bearer)
+            out_console.print("[dim]--- /v1/audit/last ---[/dim]")
+            out_console.print(_json.dumps(entry, indent=2))
+        except RuntimeError as e:
+            err_console.print(f"[yellow]![/yellow] could not fetch audit entry: {e}")
+
+
+# ---------------------------------------------------------------- actuator
+actuator_app = typer.Typer(
+    help="Manage robot-md-gateway actuators (init in v1.6.0; search + publish coming in v1.7.0)."
+)
+app.add_typer(actuator_app, name="actuator")
+
+
+@actuator_app.command("init")
+def actuator_init_cmd(
+    name: str = typer.Argument(
+        ...,
+        help="Package name in kebab-case (e.g. 'my-camera-stack').",
+    ),
+    parent: Path | None = typer.Option(
+        None,
+        "--parent",
+        help="Directory to create the package under (default: cwd).",
+    ),
+    author: str = typer.Option(
+        "anonymous@robot-md.local",
+        "--author",
+        help="Author identifier for plugin.json metadata.",
+    ),
+    description: str = typer.Option(
+        "Production actuator for robot-md-gateway.",
+        "--description",
+        help="One-line description (used in pyproject + plugin.json).",
+    ),
+) -> None:
+    """Scaffold a production actuator package.
+
+    Produces a Python-package + Claude-plugin sibling layout:
+
+    \b
+      <name>/
+      ├── pyproject.toml         # entry-point declared
+      ├── src/<name>/actuator.py # Protocol skeleton (NotImplementedError)
+      ├── claude-plugin/         # Anthropic plugin layout
+      ├── skills/                # bundled SKILL.md
+      └── tests/test_actuator.py # Protocol-conformance scaffold
+
+    After scaffolding:
+
+    \b
+      cd <name>
+      pip install -e '.[dev]'
+      pytest                       # confirms Protocol conformance
+      robot-md-gateway list-actuators   # confirms entry-point auto-discovery
+      # Then open Claude Code and ask it to fill in execute() against your ROBOT.md.
+    """
+    from robot_md.actuator import scaffold_actuator_package
+
+    if parent is None:
+        parent = Path.cwd()
 
     try:
-        written = install(dest, force=force)
+        out = scaffold_actuator_package(
+            name,
+            parent,
+            author=author,
+            description=description,
+        )
     except FileExistsError as e:
         err_console.print(f"[red]✗[/red] {e}")
         raise typer.Exit(code=FILE_ERROR) from None
+    except ValueError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
 
-    out_console.print(f"[green]✓[/green] installed {written}")
-    out_console.print(
-        "  Claude Code (with superpowers or any skill-aware harness) will "
-        "auto-invoke this skill when the operator mentions the robot."
-    )
+    out_console.print(f"[green]✓[/green] scaffolded {out}")
+    out_console.print("\n  Next:")
+    out_console.print(f"    cd {out.name}")
+    out_console.print("    pip install -e '.[dev]'")
+    out_console.print("    pytest")
+    out_console.print("    robot-md-gateway list-actuators")
 
 
 @app.command("publish-discovery")

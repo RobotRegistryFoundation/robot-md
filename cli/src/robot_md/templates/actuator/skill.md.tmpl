@@ -1,0 +1,24 @@
+---
+name: using-{{ name }}
+description: When operating <hardware-class> via robot-md-gateway, this skill teaches Claude how to use the {{ name }} actuator. Triggers on actuating <hardware-class>.
+hardware_tags: ["{{ hardware_tag_1 }}", "{{ hardware_tag_2 }}"]
+manifest_signals: ["{{ signal_1 }}"]
+---
+
+# {{ name }}
+
+## Purpose
+{{ description }}
+
+## Capabilities exposed
+{% for capability in capabilities %}
+- `{{ capability.tool_name }}` — {{ capability.description }}
+{% endfor %}
+
+## Safety boundaries
+{{ safety_notes }}
+
+## Prompts that should call this actuator
+{% for prompt in prompts %}
+- "{{ prompt }}"
+{% endfor %}

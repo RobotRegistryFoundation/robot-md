@@ -15,6 +15,8 @@ so `robot-md install-skill` can install it without network access.
 
 from __future__ import annotations
 
+import importlib
+from collections.abc import Iterator
 from pathlib import Path
 
 SKILL_NAME = "using-robot-md"
@@ -57,3 +59,82 @@ def install(
     target_dir.mkdir(parents=True, exist_ok=True)
     target_file.write_text(skill_content())
     return target_file
+
+
+def iter_skills_for_package(package_name: str) -> Iterator[Path]:
+    """Yield each `<package>/skills/*.SKILL.md` file in an installed package.
+
+    Resolves `package_name` via importlib (must be importable; raises
+    ModuleNotFoundError otherwise). Empty iterator if the package has no
+    `skills/` subdir.
+    """
+    mod = importlib.import_module(package_name)
+    if not mod.__file__:
+        return
+    pkg_dir = Path(mod.__file__).parent
+    skills_dir = pkg_dir / "skills"
+    if not skills_dir.is_dir():
+        return
+    yield from sorted(skills_dir.glob("*.SKILL.md"))
+
+
+def install_package_skills(package_name: str, dest_root: Path) -> list[Path]:
+    """Install all skills from `<package>/skills/` into `<dest_root>/<package>/`.
+
+    REPLACE-on-conflict (OQ-A): existing files at the target are overwritten.
+    Returns the list of written paths.
+    """
+    pkg_dest = dest_root / package_name
+    pkg_dest.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    for skill_path in iter_skills_for_package(package_name):
+        target = pkg_dest / skill_path.name
+        target.write_text(skill_path.read_text())
+        written.append(target)
+    return written
+
+
+def iter_all_installed_skills() -> Iterator[tuple[str, Path]]:
+    """Yield (package_name, skill_path) for every Python package on
+    sys.path that ships a `skills/*.SKILL.md`.
+
+    Walks installed-distribution metadata via `importlib.metadata` rather
+    than glob-walking sys.path, so wheels are visible. For editable installs
+    (which may not have a complete RECORD), attempts direct import and
+    enumeration as a fallback. The bundled `robot_md` is always present
+    since it ships `robot_md/skills/using-robot-md.SKILL.md`.
+    """
+    from importlib.metadata import distributions
+
+    seen: set[str] = set()
+    for dist in distributions():
+        # `dist.files` is None for distributions without RECORD; editable
+        # installs often lack a complete RECORD, so fallback to direct import.
+        files = dist.files or []
+        # Each `dist.files` entry is a relative path under site-packages.
+        # The top-level package name is the first path segment.
+        candidates = {
+            f.parts[0]
+            for f in files
+            if len(f.parts) >= 3 and f.parts[1] == "skills" and f.parts[-1].endswith(".SKILL.md")
+        }
+        # For editable installs with empty files, try the top-level package name.
+        if not candidates and dist.name:
+            # Normalize distribution name to package name (e.g., 'robot-md' -> 'robot_md').
+            pkg_candidate = dist.name.replace("-", "_")
+            candidates = {pkg_candidate}
+
+        for pkg in candidates:
+            if pkg in seen:
+                continue
+            seen.add(pkg)
+            try:
+                for skill_path in iter_skills_for_package(pkg):
+                    yield pkg, skill_path
+            except Exception:
+                # Importing arbitrary third-party packages can raise anything
+                # (ModuleNotFoundError for stale RECORD entries; AssertionError
+                # from setuptools' distutils-hack on Py3.10/3.11; ImportError
+                # from packages with optional native deps). Skip rather than
+                # let one bad package crash the whole enumeration.
+                continue
