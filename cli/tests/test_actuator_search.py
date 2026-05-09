@@ -7,7 +7,7 @@ import json
 from typer.testing import CliRunner
 
 from robot_md.__main__ import app
-from robot_md.actuator import actuator_search
+from robot_md.actuator import RPN_PATTERN, actuator_search, actuator_search_by_rpn
 
 runner = CliRunner()
 
@@ -115,11 +115,6 @@ def test_search_offline_uses_cache(tmp_path, monkeypatch):
     assert "cached-act" in res.stdout
 
 
-import re
-
-from robot_md.actuator import RPN_PATTERN, actuator_search_by_rpn
-
-
 def test_rpn_pattern_matches_well_formed():
     assert RPN_PATTERN.match("RPN-000000000001")
     assert not RPN_PATTERN.match("RPN-1")
@@ -131,9 +126,14 @@ def test_actuator_search_by_rpn_calls_fetch_one(monkeypatch):
 
     def _fake(rpn, **kw):
         captured["rpn"] = rpn
-        return {"rpn": rpn, "name": "found", "version": "1.0",
-                "description": "x", "hardware_tags": [],
-                "install": {"package_manager": "pip", "package": "found"}}
+        return {
+            "rpn": rpn,
+            "name": "found",
+            "version": "1.0",
+            "description": "x",
+            "hardware_tags": [],
+            "install": {"package_manager": "pip", "package": "found"},
+        }
 
     monkeypatch.setattr("robot_md.actuator.fetch_one", _fake)
     out = actuator_search_by_rpn("RPN-000000000001")
@@ -144,9 +144,14 @@ def test_actuator_search_by_rpn_calls_fetch_one(monkeypatch):
 
 def test_search_command_dispatches_to_rpn_lookup(monkeypatch):
     def _fake(rpn, **kw):
-        return {"rpn": rpn, "name": "looked-up", "version": "1.0",
-                "description": "via direct lookup", "hardware_tags": [],
-                "install": {"package_manager": "pip", "package": "x"}}
+        return {
+            "rpn": rpn,
+            "name": "looked-up",
+            "version": "1.0",
+            "description": "via direct lookup",
+            "hardware_tags": [],
+            "install": {"package_manager": "pip", "package": "x"},
+        }
 
     monkeypatch.setattr("robot_md.actuator.fetch_one", _fake)
     res = runner.invoke(

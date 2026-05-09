@@ -1,15 +1,15 @@
 """End-to-end: scaffold an actuator → publish (first time) → publish (version
 update) → verify cache state. Mocks RRF as an in-process HTTP server.
 """
+
 from __future__ import annotations
 
 import http.server
 import json
 import socketserver
 import threading
-import time
 from contextlib import contextmanager
-from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from typer.testing import CliRunner
@@ -20,8 +20,8 @@ runner = CliRunner()
 
 
 class _MockRRF(http.server.BaseHTTPRequestHandler):
-    seq = 0
-    records: dict = {}
+    seq: ClassVar[int] = 0
+    records: ClassVar[dict] = {}
 
     def do_POST(self):
         ln = int(self.headers.get("Content-Length") or 0)
@@ -29,7 +29,11 @@ class _MockRRF(http.server.BaseHTTPRequestHandler):
         if self.path == "/v2/packages/register":
             self.__class__.seq += 1
             rpn = f"RPN-{self.__class__.seq:012d}"
-            self.__class__.records[rpn] = {**body, "rpn": rpn, "versions": [{"version": body["version"]}]}
+            self.__class__.records[rpn] = {
+                **body,
+                "rpn": rpn,
+                "versions": [{"version": body["version"]}],
+            }
             self._json(201, {"rpn": rpn, "registered_at": "x", "record_url": f"http://x/{rpn}"})
             return
         if self.path.startswith("/v2/packages/") and self.path.endswith("/versions"):
@@ -79,8 +83,17 @@ def test_rpn_roundtrip_first_publish_then_update(tmp_path, monkeypatch):
         # 1. Scaffold an actuator.
         scaffold = runner.invoke(
             app,
-            ["actuator", "init", "smoke-act", "--parent", str(tmp_path),
-             "--author", "smoke@local", "--description", "smoke"],
+            [
+                "actuator",
+                "init",
+                "smoke-act",
+                "--parent",
+                str(tmp_path),
+                "--author",
+                "smoke@local",
+                "--description",
+                "smoke",
+            ],
             env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
         )
         assert scaffold.exit_code == 0, scaffold.output

@@ -30,8 +30,6 @@ from robot_md.rrf_packages import (
     append_version,
     fetch_one,
     register_package,
-    revoke_package,
-    transfer_package,
 )
 
 _KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")

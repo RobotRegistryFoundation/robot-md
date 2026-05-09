@@ -2151,7 +2151,9 @@ def _resolve_github_user_or_fail() -> str:
     try:
         out = subprocess.run(
             ["gh", "api", "user", "--jq", ".login"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.strip()
         if out:
             return out
@@ -2159,7 +2161,8 @@ def _resolve_github_user_or_fail() -> str:
         pass
     typer.secho(
         "Could not auto-detect GitHub user. Pass --github-user.",
-        fg=typer.colors.RED, err=True,
+        fg=typer.colors.RED,
+        err=True,
     )
     raise typer.Exit(FILE_ERROR)
 
@@ -2168,13 +2171,14 @@ def _resolve_github_user_or_fail() -> str:
 def actuator_revoke_cmd(
     rpn: str = typer.Argument(..., help="The RPN to revoke (e.g. RPN-000000000007)."),
     reason: str = typer.Option(..., "--reason", help="Revocation reason (free text)."),
-    github_user: str = typer.Option("", "--github-user",
-        help="GitHub user namespace; defaults to `gh api user`."),
+    github_user: str = typer.Option(
+        "", "--github-user", help="GitHub user namespace; defaults to `gh api user`."
+    ),
 ) -> None:
     """Revoke a published package. Owner-only."""
-    from robot_md.actuator import RPN_PATTERN, _build_revoke_body, revoke_package
+    from robot_md.actuator import RPN_PATTERN, _build_revoke_body
     from robot_md.publisher_key import load_or_mint_publisher_key
-    from robot_md.rrf_packages import PackageNotFoundError
+    from robot_md.rrf_packages import PackageNotFoundError, revoke_package
 
     if not RPN_PATTERN.match(rpn):
         typer.secho(f"Malformed RPN: {rpn}", fg=typer.colors.RED, err=True)
@@ -2190,20 +2194,27 @@ def actuator_revoke_cmd(
         typer.echo(f"Revoked {rpn}: {reason}")
     except PackageNotFoundError:
         typer.secho(f"No package with RPN {rpn}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(FILE_ERROR)
+        raise typer.Exit(FILE_ERROR) from None
 
 
 @actuator_app.command("transfer")
 def actuator_transfer_cmd(
     rpn: str = typer.Argument(..., help="The RPN to transfer."),
-    to_key: Path = typer.Option(..., "--to-key",
-        help="Path to a PEM file (with .metadata.json sidecar) holding the new owner's public keys."),
+    to_key: Path = typer.Option(
+        ...,
+        "--to-key",
+        help="Path to a PEM file (+ .metadata.json sidecar) holding the new owner's public keys.",
+    ),
     github_user: str = typer.Option("", "--github-user"),
 ) -> None:
     """Transfer a package's publisher key. Owner-only — current owner signs."""
-    from robot_md.actuator import RPN_PATTERN, _build_transfer_body, _read_pub_keys_from_pem, transfer_package
+    from robot_md.actuator import (
+        RPN_PATTERN,
+        _build_transfer_body,
+        _read_pub_keys_from_pem,
+    )
     from robot_md.publisher_key import load_or_mint_publisher_key
-    from robot_md.rrf_packages import PackageNotFoundError
+    from robot_md.rrf_packages import PackageNotFoundError, transfer_package
 
     if not RPN_PATTERN.match(rpn):
         typer.secho(f"Malformed RPN: {rpn}", fg=typer.colors.RED, err=True)
@@ -2220,7 +2231,7 @@ def actuator_transfer_cmd(
         typer.echo(f"Transferred {rpn} to publisher {new_pq_kid}")
     except PackageNotFoundError:
         typer.secho(f"No package with RPN {rpn}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(FILE_ERROR)
+        raise typer.Exit(FILE_ERROR) from None
 
 
 @app.command("publish-discovery")

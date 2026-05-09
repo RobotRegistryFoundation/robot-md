@@ -1,9 +1,9 @@
 """Tests for `robot-md actuator revoke` and `robot-md actuator transfer`."""
+
 from __future__ import annotations
 
 import json
 
-import pytest
 from typer.testing import CliRunner
 
 from robot_md.__main__ import app
@@ -34,16 +34,23 @@ def test_revoke_calls_rrf(monkeypatch, tmp_path):
         captured["body"] = signed_body
         return {"rpn": rpn, "status": "revoked"}
 
-    monkeypatch.setattr("robot_md.actuator.revoke_package", _fake)
-    monkeypatch.setattr("robot_md.actuator.load_or_mint_publisher_key", lambda u: _DummyKp())
+    monkeypatch.setattr("robot_md.rrf_packages.revoke_package", _fake)
+    monkeypatch.setattr("robot_md.publisher_key.load_or_mint_publisher_key", lambda u: _DummyKp())
     monkeypatch.setattr(
         "robot_md.actuator._sign",
         lambda fields, kp: {**fields, "sig": {"ml_dsa": "FAKE", "ed25519": "FAKE"}},
     )
     res = runner.invoke(
         app,
-        ["actuator", "revoke", "RPN-000000000007", "--reason", "abandoned",
-         "--github-user", "alice"],
+        [
+            "actuator",
+            "revoke",
+            "RPN-000000000007",
+            "--reason",
+            "abandoned",
+            "--github-user",
+            "alice",
+        ],
         env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
     )
     assert res.exit_code == 0, res.output
@@ -53,7 +60,7 @@ def test_revoke_calls_rrf(monkeypatch, tmp_path):
 
 
 def test_revoke_rejects_malformed_rpn(monkeypatch, tmp_path):
-    monkeypatch.setattr("robot_md.actuator.load_or_mint_publisher_key", lambda u: _DummyKp())
+    monkeypatch.setattr("robot_md.publisher_key.load_or_mint_publisher_key", lambda u: _DummyKp())
     res = runner.invoke(
         app,
         ["actuator", "revoke", "garbage", "--reason", "test", "--github-user", "alice"],
@@ -81,8 +88,8 @@ def test_transfer_calls_rrf_with_new_keys(monkeypatch, tmp_path):
         captured["body"] = signed_body
         return {"rpn": rpn}
 
-    monkeypatch.setattr("robot_md.actuator.transfer_package", _fake)
-    monkeypatch.setattr("robot_md.actuator.load_or_mint_publisher_key", lambda u: _DummyKp())
+    monkeypatch.setattr("robot_md.rrf_packages.transfer_package", _fake)
+    monkeypatch.setattr("robot_md.publisher_key.load_or_mint_publisher_key", lambda u: _DummyKp())
     monkeypatch.setattr(
         "robot_md.actuator._sign",
         lambda fields, kp: {**fields, "sig": {"ml_dsa": "FAKE", "ed25519": "FAKE"}},
@@ -93,8 +100,15 @@ def test_transfer_calls_rrf_with_new_keys(monkeypatch, tmp_path):
     )
     res = runner.invoke(
         app,
-        ["actuator", "transfer", "RPN-000000000007", "--to-key", "/tmp/new-pub.pem",
-         "--github-user", "alice"],
+        [
+            "actuator",
+            "transfer",
+            "RPN-000000000007",
+            "--to-key",
+            "/tmp/new-pub.pem",
+            "--github-user",
+            "alice",
+        ],
         env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
     )
     assert res.exit_code == 0, res.output
@@ -120,8 +134,8 @@ def test_revoke_propagates_rrf_404(monkeypatch, tmp_path):
     def _fake(*a, **kw):
         raise PackageNotFoundError("not found")
 
-    monkeypatch.setattr("robot_md.actuator.revoke_package", _fake)
-    monkeypatch.setattr("robot_md.actuator.load_or_mint_publisher_key", lambda u: _DummyKp())
+    monkeypatch.setattr("robot_md.rrf_packages.revoke_package", _fake)
+    monkeypatch.setattr("robot_md.publisher_key.load_or_mint_publisher_key", lambda u: _DummyKp())
     monkeypatch.setattr(
         "robot_md.actuator._sign",
         lambda fields, kp: {**fields, "sig": {"ml_dsa": "FAKE", "ed25519": "FAKE"}},
@@ -132,4 +146,8 @@ def test_revoke_propagates_rrf_404(monkeypatch, tmp_path):
         env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
     )
     assert res.exit_code != 0
-    assert "not found" in res.output.lower() or "404" in res.output.lower() or "no package" in res.output.lower()
+    assert (
+        "not found" in res.output.lower()
+        or "404" in res.output.lower()
+        or "no package" in res.output.lower()
+    )
