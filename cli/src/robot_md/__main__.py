@@ -1737,6 +1737,150 @@ def install_skill_cmd(
     )
 
 
+@app.command()
+def invoke(
+    manifest: Path = typer.Argument(..., help="Path to ROBOT.md being actuated against."),
+    tool: str = typer.Option(..., "--tool", help="Tool name to invoke (e.g. 'home_pose')."),
+    args: str = typer.Option(
+        "{}",
+        "--args",
+        help="Tool args as JSON object string (default: '{}').",
+    ),
+    gateway: str = typer.Option(
+        "http://127.0.0.1:8080",
+        "--gateway",
+        help="Gateway base URL (e.g. 'http://127.0.0.1:8080').",
+    ),
+    bearer: str | None = typer.Option(
+        None,
+        "--bearer",
+        help="Bearer token directly (mutually exclusive with --bearer-from-bearers).",
+    ),
+    bearer_from_bearers: Path | None = typer.Option(
+        None,
+        "--bearer-from-bearers",
+        help="Read bearer for tier 'actuate' from a bearers.yaml file.",
+    ),
+    scope: str = typer.Option("actuate", "--scope", help="Envelope scope (default 'actuate')."),
+    sign: bool = typer.Option(
+        True,
+        "--sign/--no-sign",
+        help="Sign the envelope with ~/.robot-md/keys/<rrn>.signing.json (default: sign).",
+    ),
+    kid: str | None = typer.Option(
+        None,
+        "--kid",
+        help="Override envelope signing kid (defaults to keypair's pq_kid).",
+    ),
+    print_bundle_entry: bool = typer.Option(
+        False,
+        "--print-bundle-entry",
+        help="After a successful invoke, GET /v1/audit/last and print the entry.",
+    ),
+) -> None:
+    """Send a real signed RCAN INVOKE envelope to a robot-md-gateway.
+
+    Operators use this for production dispatches; cookbook readers use it as
+    the actuation step. Loads the operator's signing keypair from
+    ~/.robot-md/keys/<rrn>.signing.json (see `robot-md register`).
+
+    Examples:
+
+    \b
+      robot-md invoke ROBOT.md --tool home_pose
+      robot-md invoke ROBOT.md --tool grasp --args '{"target":"red_brick"}'
+      robot-md invoke ROBOT.md --tool home_pose \\
+          --gateway http://127.0.0.1:8080 \\
+          --bearer-from-bearers ./bearers.yaml \\
+          --print-bundle-entry
+    """
+    import json as _json
+
+    from robot_md.invoke import (
+        build_envelope,
+        fetch_last_audit_entry,
+        invoke_envelope,
+        load_bearer_for_tier,
+        sign_envelope,
+    )
+    from robot_md.parser import parse_file
+    from robot_md.signing import load_keypair
+
+    if bearer is None and bearer_from_bearers is None:
+        err_console.print(
+            "[red]✗[/red] must pass either --bearer <token> or --bearer-from-bearers <yaml>"
+        )
+        raise typer.Exit(code=FILE_ERROR)
+    if bearer is not None and bearer_from_bearers is not None:
+        err_console.print(
+            "[red]✗[/red] --bearer and --bearer-from-bearers are mutually exclusive"
+        )
+        raise typer.Exit(code=FILE_ERROR)
+
+    parsed = parse_file(manifest)
+    metadata = parsed.frontmatter.get("metadata") or {}
+    rrn = metadata.get("rrn")
+    ruri = metadata.get("ruri")
+    if not rrn or not ruri:
+        err_console.print(
+            f"[red]✗[/red] {manifest} must declare metadata.rrn and metadata.ruri "
+            "(run `robot-md register` first)"
+        )
+        raise typer.Exit(code=FILE_ERROR)
+
+    try:
+        tool_args = _json.loads(args)
+    except _json.JSONDecodeError as e:
+        err_console.print(f"[red]✗[/red] --args must be valid JSON: {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+    if not isinstance(tool_args, dict):
+        err_console.print(
+            f"[red]✗[/red] --args must be a JSON object, got {type(tool_args).__name__}"
+        )
+        raise typer.Exit(code=FILE_ERROR)
+
+    envelope = build_envelope(
+        ruri=ruri,
+        tool_name=tool,
+        tool_args=tool_args,
+        manifest_path=str(manifest.resolve()),
+        scope=scope,
+    )
+
+    if sign:
+        kp = load_keypair(rrn)
+        if kp is None:
+            err_console.print(
+                f"[red]✗[/red] no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — "
+                "run `robot-md register` first, or pass --no-sign"
+            )
+            raise typer.Exit(code=FILE_ERROR)
+        envelope = sign_envelope(envelope, kp, kid=kid or kp.pq_kid)
+
+    if bearer_from_bearers is not None:
+        try:
+            bearer = load_bearer_for_tier(bearer_from_bearers, "actuate")
+        except (FileNotFoundError, LookupError, ValueError) as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=FILE_ERROR) from None
+
+    try:
+        result = invoke_envelope(envelope=envelope, gateway_url=gateway, bearer=bearer)
+    except RuntimeError as e:
+        err_console.print(f"[red]✗[/red] invoke failed: {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+
+    out_console.print(_json.dumps(result, indent=2))
+
+    if print_bundle_entry:
+        try:
+            entry = fetch_last_audit_entry(gateway_url=gateway, bearer=bearer)
+            out_console.print("[dim]--- /v1/audit/last ---[/dim]")
+            out_console.print(_json.dumps(entry, indent=2))
+        except RuntimeError as e:
+            err_console.print(f"[yellow]![/yellow] could not fetch audit entry: {e}")
+
+
 @app.command("publish-discovery")
 def publish_discovery(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),

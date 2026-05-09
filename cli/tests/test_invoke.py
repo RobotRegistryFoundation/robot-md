@@ -14,7 +14,9 @@ from typing import Any, ClassVar
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from rcan.audit_bundle import canonical_json
+from typer.testing import CliRunner
 
+from robot_md.__main__ import app
 from robot_md.invoke import (
     build_envelope,
     fetch_last_audit_entry,
@@ -23,6 +25,8 @@ from robot_md.invoke import (
     sign_envelope,
 )
 from robot_md.signing import generate_keypair
+
+runner = CliRunner()
 
 
 def test_build_envelope_minimal():
@@ -264,5 +268,67 @@ def test_invoke_envelope_raises_on_4xx():
                 gateway_url=f"http://127.0.0.1:{port}",
                 bearer="bad-token",
             )
+    finally:
+        httpd.shutdown()
+
+
+def test_invoke_command_help_shows_required_args():
+    res = runner.invoke(app, ["invoke", "--help"])
+    assert res.exit_code == 0
+    out = res.stdout
+    assert "--tool" in out
+    assert "--gateway" in out
+    assert "--bearer" in out or "--bearer-from-bearers" in out
+
+
+def test_invoke_command_emits_signed_envelope_against_mock(tmp_path, monkeypatch):
+    """End-to-end: write a manifest + a bearers.yaml + a signing key, run
+    `robot-md invoke`, expect 0 exit code and the mock gateway to see the
+    signed envelope.
+    """
+    # Write a minimal valid manifest.
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(
+        "---\n"
+        "metadata:\n"
+        "  rrn: RRN-000000000123\n"
+        "  ruri: rcan://RRN-000000000123/skill\n"
+        "manifest_spec_version: '1.0'\n"
+        "---\n"
+        "# robot\n"
+    )
+    # Bearers.yaml (legacy list shape — exercised by load_bearer_for_tier).
+    bearers = tmp_path / "bearers.yaml"
+    bearers.write_text(
+        "- token: tok-actuate\n"
+        "  tier: actuate\n"
+        "  caller: cli-test\n"
+    )
+    # Stash a signing keypair where signing.load_keypair finds it.
+    monkeypatch.setenv("HOME", str(tmp_path))
+    from robot_md.signing import generate_keypair, save_keypair
+    save_keypair("RRN-000000000123", generate_keypair())
+
+    # Spin up the mock gateway.
+    _MockHandler.last_envelope = None
+    httpd, _ = _start_mock_gateway()
+    try:
+        port = httpd.server_address[1]
+        res = runner.invoke(
+            app,
+            [
+                "invoke", str(manifest),
+                "--tool", "home_pose",
+                "--args", '{"speed": 0.3}',
+                "--gateway", f"http://127.0.0.1:{port}",
+                "--bearer-from-bearers", str(bearers),
+            ],
+        )
+        assert res.exit_code == 0, res.output
+        assert _MockHandler.last_envelope is not None
+        assert _MockHandler.last_envelope["tool_name"] == "home_pose"
+        assert _MockHandler.last_envelope["tool_args"] == {"speed": 0.3}
+        # Signed by default.
+        assert "envelope_signature" in _MockHandler.last_envelope
     finally:
         httpd.shutdown()
