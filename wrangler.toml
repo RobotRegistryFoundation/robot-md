@@ -34,3 +34,13 @@ pages_build_output_dir = "site"
 binding    = "WAITLIST_KV"
 id         = "9a78bec840d049eb930a5c49f19d393a"
 preview_id = "7c39ec739893442ab5b4951480010dcb"
+
+# KV namespace for the actuator catalog mirror (Pages Function /actuators/index.json).
+# Written by mirror-worker (scheduled Worker) every 10 minutes from RRF /v2/packages.
+# Provisioned 2026-05-09 via:
+#   npx wrangler@3.90.0 kv:namespace create MIRROR_KV
+#   npx wrangler@3.90.0 kv:namespace create MIRROR_KV --preview
+[[kv_namespaces]]
+binding    = "MIRROR_KV"
+id         = "1c143c6809104e4dbb5fc8878934ec89"
+preview_id = "87c92df61b22456299feeb3db4a5b958"
