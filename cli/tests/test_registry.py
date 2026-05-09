@@ -1,17 +1,17 @@
 """Tests for robot_md.registry — fetch + scoring + formatting."""
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
 from robot_md.registry import (
     DEFAULT_CATALOG_URL,
-    fetch_index,
-    score_entry,
     extract_manifest_signals,
+    fetch_index,
+    format_search_results,
+    score_entry,
 )
 
 
@@ -26,10 +26,13 @@ def test_fetch_index_writes_cache_on_success(tmp_path, monkeypatch):
     class _FakeResp:
         def __init__(self, body):
             self._body = body
+
         def read(self):
             return self._body
+
         def __enter__(self):
             return self
+
         def __exit__(self, *a):
             return False
 
@@ -93,8 +96,10 @@ def test_extract_manifest_signals_handles_missing_keys():
 
 def test_score_entry_high_when_manifest_signal_overlaps():
     entry = {
-        "name": "x", "description": "irrelevant",
-        "hardware_tags": [], "manifest_signals": ["SO-ARM101"],
+        "name": "x",
+        "description": "irrelevant",
+        "hardware_tags": [],
+        "manifest_signals": ["SO-ARM101"],
     }
     score = score_entry(entry, query="", manifest_signals=["SO-ARM101", "OAK-D-Lite"])
     assert score >= 0.55  # at least the 0.6 weight from signal overlap
@@ -102,8 +107,10 @@ def test_score_entry_high_when_manifest_signal_overlaps():
 
 def test_score_entry_zero_when_no_overlap():
     entry = {
-        "name": "x", "description": "robot arm driver",
-        "hardware_tags": ["arm"], "manifest_signals": ["unobtanium"],
+        "name": "x",
+        "description": "robot arm driver",
+        "hardware_tags": ["arm"],
+        "manifest_signals": ["unobtanium"],
     }
     score = score_entry(entry, query="aquarium pump", manifest_signals=[])
     assert score == 0.0
@@ -111,9 +118,64 @@ def test_score_entry_zero_when_no_overlap():
 
 def test_score_entry_renormalizes_when_no_manifest():
     entry = {
-        "name": "x", "description": "raspberry pi camera driver",
-        "hardware_tags": ["raspberry-pi", "camera"], "manifest_signals": [],
+        "name": "x",
+        "description": "raspberry pi camera driver",
+        "hardware_tags": ["raspberry-pi", "camera"],
+        "manifest_signals": [],
     }
     score = score_entry(entry, query="raspberry pi", manifest_signals=None)
     # 0.3 (tag) + 0.1 (desc fuzzy) = 0.4 in raw weights; renormalized = 1.0.
     assert score == pytest.approx(1.0, abs=0.01)
+
+
+def test_format_search_results_empty_says_no_match():
+    out = format_search_results([], threshold=0.3)
+    assert "No matches found" in out
+    assert "robot-md actuator publish" in out
+
+
+def test_format_search_results_lists_top_entries_with_score():
+    scored = [
+        (
+            {
+                "name": "match-a",
+                "version": "1.0",
+                "description": "desc-a",
+                "install": {"package_manager": "pip", "package": "match-a"},
+            },
+            0.95,
+        ),
+        (
+            {
+                "name": "match-b",
+                "version": "0.2",
+                "description": "desc-b",
+                "install": {"package_manager": "pip", "package": "match-b"},
+                "plugin_marketplace_entry": {"install_command": "/plugin install match-b@rrf"},
+            },
+            0.5,
+        ),
+    ]
+    out = format_search_results(scored, threshold=0.3)
+    assert "match-a" in out and "0.95" in out
+    assert "match-b" in out and "0.50" in out
+    # Plugin entry preferred over pip when both present.
+    assert "/plugin install match-b@rrf" in out
+    assert "pip install match-a" in out
+
+
+def test_format_search_results_marks_below_threshold_as_weak():
+    scored = [
+        (
+            {
+                "name": "weak",
+                "version": "0.1",
+                "description": "barely",
+                "install": {"package_manager": "pip", "package": "weak"},
+            },
+            0.15,
+        ),
+    ]
+    out = format_search_results(scored, threshold=0.3)
+    assert "weak match" in out
+    assert "weak" in out  # entry still printed, not filtered out

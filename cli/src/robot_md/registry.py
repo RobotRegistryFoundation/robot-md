@@ -3,6 +3,7 @@
 Catalog data is a single static JSON served at robotmd.dev. We keep a local
 cache so `--offline` works and so HTTP hiccups degrade gracefully.
 """
+
 from __future__ import annotations
 
 import json
@@ -92,3 +93,41 @@ def score_entry(
     if sig_score is None:
         return tag_score * 0.75 + desc_score * 0.25
     return sig_score * 0.6 + tag_score * 0.3 + desc_score * 0.1
+
+
+def format_search_results(
+    scored: list[tuple[dict, float]],
+    *,
+    threshold: float = 0.3,
+    limit: int = 5,
+) -> str:
+    """Render top-N entries with their scores. Below-threshold entries are
+    still printed but tagged as weak. Empty list prints the no-match guidance.
+    """
+    if not scored:
+        return (
+            "No matches found. Ask Claude Code to write one, then "
+            "'robot-md actuator publish' so the next person finds it.\n"
+        )
+    lines: list[str] = []
+    for entry, score in scored[:limit]:
+        name = entry.get("name", "?")
+        version = entry.get("version", "")
+        desc = entry.get("description", "")
+        weak = "  (weak match — consider writing a new actuator)" if score < threshold else ""
+        lines.append(f"{score:0.2f}  {name} {version}{weak}")
+        lines.append(f"        {desc}")
+        plugin = entry.get("plugin_marketplace_entry")
+        if plugin and plugin.get("install_command"):
+            lines.append(f"        $ {plugin['install_command']}")
+        else:
+            install = entry.get("install") or {}
+            pm = install.get("package_manager", "pip")
+            pkg = install.get("package", name)
+            post = install.get("post_install")
+            cmd = f"{pm} install {pkg}"
+            if post:
+                cmd += f" && {post}"
+            lines.append(f"        $ {cmd}")
+        lines.append("")
+    return "\n".join(lines)
