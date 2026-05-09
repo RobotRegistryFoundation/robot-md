@@ -10,6 +10,8 @@ import pytest
 from robot_md.registry import (
     DEFAULT_CATALOG_URL,
     fetch_index,
+    score_entry,
+    extract_manifest_signals,
 )
 
 
@@ -66,3 +68,52 @@ def test_fetch_index_falls_back_to_cache_on_http_error(tmp_path, monkeypatch):
     monkeypatch.setattr("robot_md.registry.urlopen", _fake_urlopen)
     out = fetch_index(cache_path=cache, offline=False)
     assert out == payload
+
+
+def test_extract_manifest_signals_pulls_driver_ids_and_camera_ids():
+    manifest = {
+        "drivers": [
+            {"id": "feetech_bus_0", "model": "SO-ARM101"},
+            {"id": "oak_d_0", "model": "OAK-D-Lite"},
+        ],
+        "physics": {"solver": {"cameras": [{"driver_id": "oak_d_0"}]}},
+    }
+    sig = extract_manifest_signals(manifest)
+    assert "feetech_bus_0" in sig
+    assert "SO-ARM101" in sig
+    assert "oak_d_0" in sig
+    assert "OAK-D-Lite" in sig
+
+
+def test_extract_manifest_signals_handles_missing_keys():
+    assert extract_manifest_signals({}) == []
+    assert extract_manifest_signals({"drivers": []}) == []
+    assert extract_manifest_signals({"physics": {}}) == []
+
+
+def test_score_entry_high_when_manifest_signal_overlaps():
+    entry = {
+        "name": "x", "description": "irrelevant",
+        "hardware_tags": [], "manifest_signals": ["SO-ARM101"],
+    }
+    score = score_entry(entry, query="", manifest_signals=["SO-ARM101", "OAK-D-Lite"])
+    assert score >= 0.55  # at least the 0.6 weight from signal overlap
+
+
+def test_score_entry_zero_when_no_overlap():
+    entry = {
+        "name": "x", "description": "robot arm driver",
+        "hardware_tags": ["arm"], "manifest_signals": ["unobtanium"],
+    }
+    score = score_entry(entry, query="aquarium pump", manifest_signals=[])
+    assert score == 0.0
+
+
+def test_score_entry_renormalizes_when_no_manifest():
+    entry = {
+        "name": "x", "description": "raspberry pi camera driver",
+        "hardware_tags": ["raspberry-pi", "camera"], "manifest_signals": [],
+    }
+    score = score_entry(entry, query="raspberry pi", manifest_signals=None)
+    # 0.3 (tag) + 0.1 (desc fuzzy) = 0.4 in raw weights; renormalized = 1.0.
+    assert score == pytest.approx(1.0, abs=0.01)
