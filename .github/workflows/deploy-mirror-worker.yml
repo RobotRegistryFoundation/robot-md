@@ -1,0 +1,34 @@
+name: Deploy mirror-worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mirror-worker/**"
+      - ".github/workflows/deploy-mirror-worker.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-mirror-worker
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install
+        working-directory: mirror-worker
+        run: npm ci
+      - name: Deploy via wrangler
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: mirror-worker
+          command: deploy --commit-message="${{ github.sha }}"
