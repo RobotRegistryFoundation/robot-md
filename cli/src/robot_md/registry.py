@@ -9,10 +9,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from urllib.error import URLError
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 DEFAULT_CATALOG_URL = "https://robotmd.dev/actuators/index.json"
 DEFAULT_CACHE_PATH = Path.home() / ".cache" / "robot-md" / "registry-index.json"
+USER_AGENT = "robot-md/cli (+https://robotmd.dev)"
 
 
 def fetch_index(
@@ -33,7 +34,8 @@ def fetch_index(
     if offline:
         return json.loads(cache_path.read_text())
     try:
-        with urlopen(url, timeout=timeout) as resp:
+        req = Request(url, headers={"User-Agent": USER_AGENT})
+        with urlopen(req, timeout=timeout) as resp:
             body = resp.read()
         payload = json.loads(body.decode())
         cache_path.parent.mkdir(parents=True, exist_ok=True)

@@ -36,8 +36,11 @@ def test_fetch_index_writes_cache_on_success(tmp_path, monkeypatch):
         def __exit__(self, *a):
             return False
 
-    def _fake_urlopen(url, timeout=10):
-        assert url == DEFAULT_CATALOG_URL
+    def _fake_urlopen(req, timeout=10):
+        actual_url = req.full_url if hasattr(req, "full_url") else req
+        assert actual_url == DEFAULT_CATALOG_URL
+        if hasattr(req, "headers"):
+            assert any(k.lower() == "user-agent" for k in req.headers)
         return _FakeResp(json.dumps(payload).encode())
 
     monkeypatch.setattr("robot_md.registry.urlopen", _fake_urlopen)
@@ -65,7 +68,7 @@ def test_fetch_index_falls_back_to_cache_on_http_error(tmp_path, monkeypatch):
     payload = {"schema_version": "1.0", "entries": [{"name": "stale"}]}
     cache.write_text(json.dumps(payload))
 
-    def _fake_urlopen(url, timeout=10):
+    def _fake_urlopen(req, timeout=10):
         raise OSError("network down")
 
     monkeypatch.setattr("robot_md.registry.urlopen", _fake_urlopen)
