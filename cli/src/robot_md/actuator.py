@@ -6,11 +6,10 @@ Plan 2 ships `actuator init`. Plans 3+ will add `actuator search` and
 
 from __future__ import annotations
 
-import os
+import base64
+import json
 import re
-import subprocess
 import sys
-import tempfile
 from importlib import resources
 from pathlib import Path
 
@@ -19,13 +18,22 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as _toml  # type: ignore[import-not-found]  # 3.10 only
 
+from rcan import sign_body
+
+from robot_md.publisher_key import KeyPair, load_or_mint_publisher_key
 from robot_md.registry import (
     extract_manifest_signals,
     format_search_results,
     score_entry,
 )
+from robot_md.rrf_packages import (
+    append_version,
+    fetch_one,
+    register_package,
+)
 
 _KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+RPN_PATTERN = re.compile(r"^RPN-\d{12}$")
 
 
 def _validate_name(name: str) -> None:
@@ -158,6 +166,13 @@ def actuator_search(
     return format_search_results(nonzero, threshold=threshold, limit=limit)
 
 
+def actuator_search_by_rpn(rpn: str) -> str:
+    """Direct GET against RRF; format the single record like a search hit."""
+    rec = fetch_one(rpn)
+    body = format_search_results([(rec, 1.0)], threshold=0.0, limit=1)
+    return f"{rpn}\n{body}"
+
+
 def detect_package_metadata(pkg_dir: Path) -> dict:
     """Scan a scaffolded actuator package and return metadata for publish.
 
@@ -247,169 +262,103 @@ def build_registry_entry(
     return entry
 
 
-REGISTRY_REPO = "RobotRegistryFoundation/robot-md"
-MARKETPLACE_REPO = "RobotRegistryFoundation/claude-code-plugins"
+def publish_record_path(package_name: str) -> Path:
+    return Path.home() / ".robot-md" / "published" / f"{package_name}.json"
 
 
-def _publish_worktree(label: str) -> Path:
-    """Pick the per-publish worktree path. Allows tests to override via env."""
-    base = os.environ.get("ROBOT_MD_PUBLISH_WORKTREE")
-    if base:
-        p = Path(base) / label
-        p.mkdir(parents=True, exist_ok=True)
-        return p
-    return Path(tempfile.mkdtemp(prefix=f"robot-md-publish-{label}-"))
+def record_published_rpn(package_name: str, rpn: str, record_url: str) -> None:
+    p = publish_record_path(package_name)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"rpn": rpn, "record_url": record_url}))
 
 
-def _gh(*args: str, capture: bool = False, check: bool = True) -> str:
-    """Run a gh CLI command. Returns stdout if capture=True."""
-    res = subprocess.run(
-        list(args),
-        capture_output=capture,
-        text=True,
-        check=check,
-    )
-    return res.stdout if capture else ""
+def load_published_rpn(package_name: str) -> tuple[str | None, str | None]:
+    p = publish_record_path(package_name)
+    if not p.is_file():
+        return (None, None)
+    data = json.loads(p.read_text())
+    return (data.get("rpn"), data.get("record_url"))
 
 
-def _git(cwd: Path, *args: str, check: bool = True) -> None:
-    subprocess.run(["git", *args], cwd=str(cwd), check=check)
-
-
-def open_registry_pr(entry: dict) -> str:
-    """Fork robot-md, append entry to site/actuators/index.json, push, open PR.
-
-    Returns the PR URL.
-    """
-    import json as _json
-
-    name = entry["name"]
-    version = entry["version"]
-    branch = f"publish/{name}-{version}"
-    wt = _publish_worktree(f"registry-{name}")
-
-    subprocess.run(
-        ["gh", "repo", "fork", REGISTRY_REPO, "--clone=false", "--remote=false"],
-        check=False,
-    )
-    user = (
-        subprocess.run(
-            ["gh", "api", "user", "--jq", ".login"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        or "unknown"
+def _sign(fields: dict, kp: KeyPair) -> dict:
+    """Wrap rcan.sign_body — returns the signed dict (fields + sig block)."""
+    return sign_body(
+        kp.ml_dsa,
+        fields,
+        ed25519_secret=kp.ed25519_sec,
+        ed25519_public=kp.ed25519_pub,
     )
 
-    fork_url = f"https://github.com/{user}/robot-md.git"
-    subprocess.run(["git", "clone", fork_url, str(wt)], check=True)
-    _git(wt, "checkout", "-b", branch)
 
-    index_path = wt / "site" / "actuators" / "index.json"
-    data = _json.loads(index_path.read_text()) if index_path.is_file() else {"entries": []}
-    data.setdefault("entries", []).append(entry)
-    data["generated_at"] = entry.get("published_at", data.get("generated_at"))
-    index_path.parent.mkdir(parents=True, exist_ok=True)
-    index_path.write_text(_json.dumps(data, indent=2) + "\n")
-
-    _git(wt, "add", str(index_path))
-    _git(wt, "commit", "-m", f"registry(actuator): publish {name} v{version}")
-    _git(wt, "push", "origin", branch)
-
-    pr_body = (
-        f"Adds `{name}` v{version} to the actuator catalog.\n\n"
-        "**Conformance checklist**:\n"
-        "- [ ] Implements `robot_md_gateway.actuators` Protocol\n"
-        "- [ ] Tests pass\n"
-        "- [ ] SKILL.md present at `<pkg>/skills/`\n"
-        "- [ ] Repository accessible at the URL in the entry\n"
-        "- [ ] `pip install <package>` works\n"
-    )
-    out = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--repo",
-            REGISTRY_REPO,
-            "--title",
-            f"registry(actuator): publish {name} v{version}",
-            "--body",
-            pr_body,
-            "--head",
-            f"{user}:{branch}",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return out.stdout.strip()
+def _build_register_body(meta: dict, kp: KeyPair) -> dict:
+    fields = {
+        "name": meta["name"],
+        "description": meta.get("description", ""),
+        "package_type": "actuator",
+        "repository_url": meta.get("repository_url", ""),
+        "hardware_tags": meta.get("hardware_tags", []),
+        "manifest_signals": meta.get("manifest_signals", []),
+        "skill_files": meta.get("skill_files", []),
+        "has_plugin_layout": meta.get("has_plugin_layout", False),
+        "version": meta["version"],
+        "pq_signing_pub": base64.b64encode(kp.pq_signing_pub).decode(),
+        "pq_kid": kp.pq_kid,
+        "ed25519_pub": base64.b64encode(kp.ed25519_pub).decode(),
+    }
+    return _sign(fields, kp)
 
 
-def open_marketplace_pr(meta: dict) -> str:
-    """Fork claude-code-plugins, append plugin block to marketplace.json, push, open PR.
+def _build_version_body(version: str, kp: KeyPair) -> dict:
+    return _sign({"version": version}, kp)
 
-    Returns the PR URL.
-    """
-    import json as _json
 
-    name = meta["name"]
-    version = meta["version"]
-    branch = f"publish/{name}-{version}"
-    wt = _publish_worktree(f"marketplace-{name}")
+def _build_revoke_body(reason: str, kp: KeyPair) -> dict:
+    return _sign({"reason": reason}, kp)
 
-    subprocess.run(
-        ["gh", "repo", "fork", MARKETPLACE_REPO, "--clone=false", "--remote=false"],
-        check=False,
-    )
-    user = (
-        subprocess.run(
-            ["gh", "api", "user", "--jq", ".login"],
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        or "unknown"
-    )
 
-    fork_url = f"https://github.com/{user}/claude-code-plugins.git"
-    subprocess.run(["git", "clone", fork_url, str(wt)], check=True)
-    _git(wt, "checkout", "-b", branch)
-
-    mp_path = wt / "marketplace.json"
-    data = _json.loads(mp_path.read_text()) if mp_path.is_file() else {"plugins": []}
-    data.setdefault("plugins", []).append(
+def _build_transfer_body(new_pq_pub: str, new_pq_kid: str, new_ed_pub: str, kp: KeyPair) -> dict:
+    return _sign(
         {
-            "name": name,
-            "version": version,
-            "description": meta.get("description", ""),
-            "repository": meta.get("repository_url", ""),
-        }
+            "new_pq_signing_pub": new_pq_pub,
+            "new_pq_kid": new_pq_kid,
+            "new_ed25519_pub": new_ed_pub,
+        },
+        kp,
     )
-    mp_path.parent.mkdir(parents=True, exist_ok=True)
-    mp_path.write_text(_json.dumps(data, indent=2) + "\n")
 
-    _git(wt, "add", str(mp_path))
-    _git(wt, "commit", "-m", f"marketplace: add {name} plugin")
-    _git(wt, "push", "origin", branch)
 
-    out = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "create",
-            "--repo",
-            MARKETPLACE_REPO,
-            "--title",
-            f"marketplace: add {name} plugin",
-            "--body",
-            f"Adds `{name}` v{version} to the Claude Code plugin marketplace.",
-            "--head",
-            f"{user}:{branch}",
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return out.stdout.strip()
+def _read_pub_keys_from_pem(pem_path: Path) -> tuple[str, str, str]:
+    """Extract (pq_signing_pub_b64, pq_kid, ed25519_pub_b64) from a PEM bundle.
+
+    Format: a PEM file with a sidecar metadata.json next to it. Pattern after how
+    publisher_key writes the private bundle.
+    """
+    metadata_path = pem_path.with_suffix(".metadata.json")
+    if not metadata_path.is_file():
+        raise FileNotFoundError(f"missing sidecar metadata: {metadata_path}")
+    meta = json.loads(metadata_path.read_text())
+    return meta["pq_signing_pub"], meta["pq_kid"], meta["ed25519_pub"]
+
+
+def actuator_publish_first_time(pkg_dir: Path, *, github_user: str) -> dict:
+    """Mint RPN at RRF, cache locally, return the RRF response."""
+    meta = detect_package_metadata(pkg_dir)
+    kp = load_or_mint_publisher_key(github_user)
+    body = _build_register_body(meta, kp)
+    out = register_package(signed_body=body)
+    record_published_rpn(meta["name"], out["rpn"], out["record_url"])
+    return out
+
+
+def actuator_publish_version_update(pkg_dir: Path, *, github_user: str) -> dict:
+    """Append new version to existing RPN at RRF."""
+    meta = detect_package_metadata(pkg_dir)
+    rpn, _ = load_published_rpn(meta["name"])
+    if not rpn:
+        raise ValueError(
+            f"No RPN cached for {meta['name']}. "
+            "Run `robot-md actuator publish` (without --version-update flag) first."
+        )
+    kp = load_or_mint_publisher_key(github_user)
+    body = _build_version_body(meta["version"], kp)
+    return append_version(rpn, signed_body=body)

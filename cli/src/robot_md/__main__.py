@@ -2017,8 +2017,17 @@ def actuator_search_cmd(
     ),
 ) -> None:
     """Search the actuator catalog at https://robotmd.dev/actuators/."""
-    from robot_md.actuator import actuator_search
+    from robot_md.actuator import RPN_PATTERN, actuator_search, actuator_search_by_rpn
     from robot_md.registry import fetch_index
+
+    stripped = (query or "").strip()
+    if RPN_PATTERN.match(stripped):
+        try:
+            typer.echo(actuator_search_by_rpn(stripped))
+            return
+        except Exception as e:
+            typer.secho(f"RPN lookup failed: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(FILE_ERROR) from e
 
     try:
         index = fetch_index(offline=offline)
@@ -2063,26 +2072,46 @@ def actuator_publish_cmd(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Print would-be PR payloads instead of opening PRs.",
+        help="Print the would-be RRF POST body instead of sending it.",
     ),
-    publisher: str = typer.Option(
+    github_user: str = typer.Option(
         "",
-        "--publisher",
-        help="Publisher identifier (default: derived from `gh api user`).",
+        "--github-user",
+        help="GitHub username (used as publisher-key namespace; defaults to `gh api user`).",
     ),
 ) -> None:
-    """Publish a scaffolded actuator to the catalog.
+    """Publish a scaffolded actuator to RRF (mints or appends an RPN)."""
+    import json as _json
+    import subprocess
 
-    Detects whether the package has a Claude-plugin layout. If yes, opens TWO
-    PRs (against RobotRegistryFoundation/claude-code-plugins for the marketplace
-    entry, and against RobotRegistryFoundation/robot-md for the catalog). If
-    no, opens ONE PR (catalog only).
+    from robot_md.actuator import (
+        _build_register_body,
+        _build_version_body,
+        actuator_publish_first_time,
+        actuator_publish_version_update,
+        detect_package_metadata,
+        load_published_rpn,
+    )
+    from robot_md.publisher_key import load_or_mint_publisher_key
+    from robot_md.rrf_packages import RRF_PACKAGES_BASE
 
-    With --dry-run, no PRs are opened — just prints the payloads it would push.
-    """
-    from datetime import datetime, timezone
-
-    from robot_md.actuator import build_registry_entry, detect_package_metadata
+    if not github_user:
+        try:
+            github_user = subprocess.run(
+                ["gh", "api", "user", "--jq", ".login"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        except Exception:
+            github_user = ""
+        if not github_user:
+            typer.secho(
+                "Could not auto-detect GitHub user. Pass --github-user.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(FILE_ERROR)
 
     try:
         meta = detect_package_metadata(package_dir.resolve())
@@ -2090,47 +2119,123 @@ def actuator_publish_cmd(
         typer.secho(f"Could not read package: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(FILE_ERROR) from e
 
-    if not publisher:
-        publisher = "github:unknown"
-    published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    entry = build_registry_entry(meta, publisher=publisher, published_at=published_at)
+    cached_rpn, _ = load_published_rpn(meta["name"])
 
     if dry_run:
-        typer.echo("=== Catalog PR (RobotRegistryFoundation/robot-md) ===")
-        typer.echo(f"  Branch: publish/{meta['name']}-{meta['version']}")
-        typer.echo("  Title: registry(actuator): publish " + meta["name"] + " v" + meta["version"])
-        typer.echo("  Modifies: site/actuators/index.json")
-        typer.echo("  Entry payload:")
-        import json as _json
-
-        typer.echo(_json.dumps(entry, indent=2))
-        if meta["has_plugin_layout"]:
-            typer.echo("\n=== Marketplace PR (RobotRegistryFoundation/claude-code-plugins) ===")
-            typer.echo(f"  Branch: publish/{meta['name']}-{meta['version']}")
-            typer.echo("  Title: marketplace: add " + meta["name"] + " plugin")
-            typer.echo("  Modifies: marketplace.json")
-            typer.echo("  Plugin block:")
-            typer.echo(
-                _json.dumps(
-                    {
-                        "name": meta["name"],
-                        "version": meta["version"],
-                        "description": meta.get("description", ""),
-                        "repository": meta.get("repository_url", ""),
-                    },
-                    indent=2,
-                )
-            )
+        kp = load_or_mint_publisher_key(github_user)
+        if cached_rpn:
+            body = _build_version_body(meta["version"], kp)
+            url = f"{RRF_PACKAGES_BASE}/{cached_rpn}/versions"
+            typer.echo("=== Version-update POST ===")
+            typer.echo(f"URL: POST {url}")
+        else:
+            body = _build_register_body(meta, kp)
+            typer.echo("=== First-publish POST ===")
+            typer.echo(f"URL: POST {RRF_PACKAGES_BASE}/register")
+        typer.echo("Body:")
+        typer.echo(_json.dumps(body, indent=2, default=str))
         return
 
-    from robot_md.actuator import open_marketplace_pr, open_registry_pr
+    if cached_rpn:
+        out = actuator_publish_version_update(package_dir.resolve(), github_user=github_user)
+        typer.echo(f"Updated {meta['name']} → version {meta['version']} on RPN {cached_rpn}")
+    else:
+        out = actuator_publish_first_time(package_dir.resolve(), github_user=github_user)
+        typer.echo(f"Published {meta['name']} v{meta['version']} as {out['rpn']}")
+        typer.echo(f"  → {out['record_url']}")
 
-    catalog_url = open_registry_pr(entry)
-    typer.echo(f"Catalog PR: {catalog_url}")
-    if meta["has_plugin_layout"]:
-        marketplace_url = open_marketplace_pr(meta)
-        typer.echo(f"Marketplace PR: {marketplace_url}")
+
+def _resolve_github_user_or_fail() -> str:
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    typer.secho(
+        "Could not auto-detect GitHub user. Pass --github-user.",
+        fg=typer.colors.RED,
+        err=True,
+    )
+    raise typer.Exit(FILE_ERROR)
+
+
+@actuator_app.command("revoke")
+def actuator_revoke_cmd(
+    rpn: str = typer.Argument(..., help="The RPN to revoke (e.g. RPN-000000000007)."),
+    reason: str = typer.Option("", "--reason", help="Revocation reason (free text)."),
+    github_user: str = typer.Option(
+        "", "--github-user", help="GitHub user namespace; defaults to `gh api user`."
+    ),
+) -> None:
+    """Revoke a published package. Owner-only."""
+    from robot_md.actuator import RPN_PATTERN, _build_revoke_body
+    from robot_md.publisher_key import load_or_mint_publisher_key
+    from robot_md.rrf_packages import PackageNotFoundError, revoke_package
+
+    if not reason:
+        typer.secho("Missing --reason: provide a revocation reason", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
+
+    if not RPN_PATTERN.match(rpn):
+        typer.secho(f"Malformed RPN: {rpn}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
+
+    if not github_user:
+        github_user = _resolve_github_user_or_fail()
+
+    kp = load_or_mint_publisher_key(github_user)
+    body = _build_revoke_body(reason, kp)
+    try:
+        revoke_package(rpn, signed_body=body)
+        typer.echo(f"Revoked {rpn}: {reason}")
+    except PackageNotFoundError:
+        typer.secho(f"No package with RPN {rpn}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR) from None
+
+
+@actuator_app.command("transfer")
+def actuator_transfer_cmd(
+    rpn: str = typer.Argument(..., help="The RPN to transfer."),
+    to_key: Path = typer.Option(
+        ...,
+        "--to-key",
+        help="Path to a PEM file (+ .metadata.json sidecar) holding the new owner's public keys.",
+    ),
+    github_user: str = typer.Option("", "--github-user"),
+) -> None:
+    """Transfer a package's publisher key. Owner-only — current owner signs."""
+    from robot_md.actuator import (
+        RPN_PATTERN,
+        _build_transfer_body,
+        _read_pub_keys_from_pem,
+    )
+    from robot_md.publisher_key import load_or_mint_publisher_key
+    from robot_md.rrf_packages import PackageNotFoundError, transfer_package
+
+    if not RPN_PATTERN.match(rpn):
+        typer.secho(f"Malformed RPN: {rpn}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
+
+    if not github_user:
+        github_user = _resolve_github_user_or_fail()
+
+    new_pq_pub, new_pq_kid, new_ed_pub = _read_pub_keys_from_pem(to_key)
+    kp = load_or_mint_publisher_key(github_user)
+    body = _build_transfer_body(new_pq_pub, new_pq_kid, new_ed_pub, kp)
+    try:
+        transfer_package(rpn, signed_body=body)
+        typer.echo(f"Transferred {rpn} to publisher {new_pq_kid}")
+    except PackageNotFoundError:
+        typer.secho(f"No package with RPN {rpn}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR) from None
 
 
 @app.command("publish-discovery")

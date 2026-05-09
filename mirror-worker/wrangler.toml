@@ -1,0 +1,13 @@
+name = "robot-md-mirror-worker"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+[triggers]
+crons = ["*/10 * * * *"]
+
+[vars]
+RRF_LIST_URL = "https://robotregistryfoundation.org/v2/packages?limit=1000"
+
+[[kv_namespaces]]
+binding = "MIRROR_KV"
+id = "1c143c6809104e4dbb5fc8878934ec89"
