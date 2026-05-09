@@ -6,10 +6,11 @@ import base64
 import copy
 import uuid
 
+import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from rcan.audit_bundle import canonical_json
 
-from robot_md.invoke import build_envelope, sign_envelope
+from robot_md.invoke import build_envelope, load_bearer_for_tier, sign_envelope
 from robot_md.signing import generate_keypair
 
 
@@ -92,3 +93,48 @@ def test_sign_envelope_does_not_mutate_input():
     snapshot = copy.deepcopy(env)
     sign_envelope(env, kp, kid="k")
     assert env == snapshot
+
+
+def test_load_bearer_for_tier_actuate_legacy_list_shape(tmp_path):
+    yaml_path = tmp_path / "bearers.yaml"
+    yaml_path.write_text(
+        "- token: tok-a\n"
+        "  tier: read\n"
+        "  caller: claude-read\n"
+        "- token: tok-b\n"
+        "  tier: actuate\n"
+        "  caller: claude-actuate\n"
+    )
+    assert load_bearer_for_tier(yaml_path, "actuate") == "tok-b"
+
+
+def test_load_bearer_for_tier_v0_5_dict_shape(tmp_path):
+    yaml_path = tmp_path / "bearers.yaml"
+    yaml_path.write_text(
+        "bearers:\n"
+        "  - token: tok-a\n"
+        "    tier: read\n"
+        "    caller: claude-read\n"
+        "  - token: tok-b\n"
+        "    tier: actuate\n"
+        "    caller: claude-actuate\n"
+        "actuator:\n"
+        "  name: noop\n"
+    )
+    assert load_bearer_for_tier(yaml_path, "actuate") == "tok-b"
+
+
+def test_load_bearer_for_tier_no_match_raises(tmp_path):
+    yaml_path = tmp_path / "bearers.yaml"
+    yaml_path.write_text(
+        "- token: tok-a\n"
+        "  tier: read\n"
+        "  caller: claude-read\n"
+    )
+    with pytest.raises(LookupError, match="no bearer entry with tier 'actuate'"):
+        load_bearer_for_tier(yaml_path, "actuate")
+
+
+def test_load_bearer_for_tier_missing_file_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load_bearer_for_tier(tmp_path / "nope.yaml", "actuate")

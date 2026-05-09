@@ -15,8 +15,10 @@ import base64
 import secrets
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 
+import yaml
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from rcan.audit_bundle import canonical_json
 
@@ -75,3 +77,26 @@ def sign_envelope(
     sig = sec.sign(pre)
     out["envelope_signature"] = {"kid": kid, "sig": base64.b64encode(sig).decode()}
     return out
+
+
+def load_bearer_for_tier(yaml_path: Path, tier: str) -> str:
+    """Load the first bearer token matching `tier` from a gateway bearers.yaml.
+
+    Accepts both legacy list-of-entries shape and v0.5.0a1+ dict shape with
+    a top-level `bearers:` key (mirrors gateway `BearerStore.from_yaml`).
+    """
+    if not yaml_path.exists():
+        raise FileNotFoundError(f"bearers file not found: {yaml_path}")
+    data = yaml.safe_load(yaml_path.read_text())
+    if isinstance(data, dict):
+        rows = data.get("bearers") or []
+    elif isinstance(data, list):
+        rows = data
+    else:
+        raise ValueError(
+            f"{yaml_path}: top-level must be a list (legacy) or dict with 'bearers' key"
+        )
+    for row in rows:
+        if row.get("tier") == tier:
+            return str(row["token"])
+    raise LookupError(f"no bearer entry with tier {tier!r} in {yaml_path}")
