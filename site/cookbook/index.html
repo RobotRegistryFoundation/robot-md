@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cookbook — wire any robot to Claude in 10 minutes — ROBOT.md</title>
+  <meta name="description"
+    content="Walkthrough: install robot-md + robot-md-gateway, author a ROBOT.md, register with RRF, run a skill via Claude Code, and produce a signed RCAN-L4 audit bundle. ≈10 minutes from clean machine, against any robot you bring.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Cookbook — wire any robot to Claude in 10 minutes">
+  <meta property="og:description" content="From pipx install to signed audit bundle in 10 minutes. Demonstrates robot-md 1.5.0 + robot-md-mcp 0.3.0 + robot-md-gateway 0.4.0a1. Hardware-agnostic.">
+  <meta property="og:url" content="https://robotmd.dev/cookbook/">
+  <meta property="og:type" content="article">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/cookbook/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    /* Cookbook page-specific styles. Tokens come from /css/design.css. */
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+    main > section { padding: 56px 0; border-top: 1px solid var(--rule); }
+    main > section:first-of-type { border-top: 0; }
+
+    /* Hero */
+    .ck-hero { padding: 96px 0 72px; }
+    .ck-hero h1 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      margin: 0 0 16px;
+    }
+    .ck-hero h1 em {
+      font-family: var(--serif);
+      font-style: italic;
+      color: var(--accent-ink);
+      font-weight: 600;
+    }
+    .ck-hero .lede {
+      font-size: 19px;
+      color: var(--ink-2);
+      max-width: 720px;
+      margin: 0 0 24px;
+    }
+    .ck-eta {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 13px;
+      background: var(--accent-wash);
+      color: var(--accent-ink);
+      padding: 4px 10px;
+      border-radius: 2px;
+    }
+
+    /* Beat headings */
+    .beat-num {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin: 0 0 8px;
+    }
+    .beat-h {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(24px, 3vw, 32px);
+      letter-spacing: -0.005em;
+      margin: 0 0 16px;
+    }
+    .beat-body { max-width: 760px; }
+    .beat-body p { margin: 0 0 14px; }
+
+    /* Code blocks */
+    pre.code {
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      padding: 14px 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-x: auto;
+      margin: 14px 0;
+    }
+    code { font-family: var(--mono); font-size: 0.92em; background: var(--paper-2); padding: 1px 5px; border-radius: 2px; }
+
+    /* Gap callout */
+    .gap-callout {
+      border-left: 3px solid var(--accent);
+      background: #FBF4DA;
+      padding: 14px 18px;
+      margin: 18px 0;
+      font-size: 14px;
+      color: var(--ink-2);
+    }
+    .gap-callout strong { color: var(--accent-ink); }
+
+    /* Outbound case-studies callout */
+    .case-callout {
+      border-left: 3px solid var(--accent-ink);
+      background: var(--paper-2);
+      padding: 18px 20px;
+      margin: 18px 0;
+      font-size: 15px;
+      color: var(--ink-2);
+    }
+    .case-callout a { color: var(--accent-ink); }
+
+    /* Authority disclaimer */
+    .authority {
+      border: 1px solid var(--rule);
+      background: var(--paper-2);
+      padding: 18px 20px;
+      margin: 32px 0 0;
+      font-size: 14px;
+      color: var(--ink-2);
+    }
+    .authority h4 {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin: 0 0 8px;
+    }
+
+    /* Verification footer */
+    .verify-line {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-3);
+      text-align: center;
+      padding: 24px 0 56px;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+
+    <!-- BEAT 1: HERO -->
+    <section class="ck-hero">
+      <div class="wrap">
+        <p class="ck-eta">≈ 10 min</p>
+        <h1>Wire <em>any robot</em> to Claude — get a signed audit bundle.</h1>
+        <p class="lede">
+          Install <code>robot-md</code>, author a <code>ROBOT.md</code>, register with RRF, run a skill via Claude Code,
+          and walk away with an RCAN-L4-conformant signed audit bundle. The runtime is Claude Code + the model;
+          the gateway is deterministic plumbing; safety is enforced at Layer 3. No new code; everything below
+          uses published tools.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 2: INSTALL -->
+    <section id="install">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 02 — Install</p>
+        <h2 class="beat-h">Two installs and you're wired.</h2>
+
+        <p>Recommended: install the Claude Code plugin, which bundles the CLI, the MCP bridge, and the gateway.</p>
+
+        <pre class="code">claude plugin add robot-md</pre>
+
+        <p>Manual fallback (or for non-Claude-Code MCP clients):</p>
+
+        <pre class="code">pipx install robot-md
+pipx install robot-md-gateway
+claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
+
+        <p>
+          <em>Why two paths?</em> The plugin install is a single command that registers all three surfaces in one move —
+          best for Claude Code users. The manual install gives you each surface independently, which is what you want
+          if you're driving a different MCP-aware agent (Cursor, Cline, etc.) or scripting CI.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 3: AUTHOR -->
+    <section id="author">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 03 — Author</p>
+        <h2 class="beat-h">One command, one manifest.</h2>
+
+        <p>Generate a starter <code>ROBOT.md</code> from bare init:</p>
+
+        <pre class="code">robot-md init my-robot --non-interactive</pre>
+
+        <p>
+          The output is a YAML-fronted Markdown file describing identity, capabilities, calibration,
+          and the safety contract. You'll commit this file alongside your robot's source — like a <code>CLAUDE.md</code>,
+          but for a physical machine.
+        </p>
+        <p>
+          Connect your cameras, sensors, and USB devices <strong>before</strong> you run <code>init</code>:
+          bare init enumerates whatever your machine actually exposes today, so plugging in your hardware
+          first means the manifest captures it. <a href="/cookbook/sample.ROBOT.md">Inspect the sample output</a>
+          — it was captured against a Raspberry Pi 5 with a camera module, so it lists Pi-specific video
+          drivers. Yours will reflect whatever you've plugged in. Edit any field that doesn't match before
+          moving on.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 4: TALK TO CLAUDE -->
+    <section id="talk-to-claude">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 04 — Talk to Claude</p>
+        <h2 class="beat-h">Open Claude Code and ask.</h2>
+
+        <p>
+          With <code>robot-md-mcp</code> installed, Claude Code reads your <code>ROBOT.md</code> as four MCP resources
+          (manifest, capabilities, safety, calibration) and exposes two tools (<code>validate</code>, <code>render</code>).
+          Try any of these:
+        </p>
+
+        <pre class="code">"What can this robot do?"
+"Is this manifest valid?"
+"What are the safety gates?"</pre>
+
+        <p>
+          Claude reads the manifest, calls <code>validate</code> if it needs to check conformance, and answers in
+          natural language — grounded in the file you just generated. <strong>The agent is read-only here.</strong>
+          Layer 2 (MCP) is advisory; it cannot move the robot.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 5: REGISTER -->
+    <section id="register">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 05 — Register</p>
+        <h2 class="beat-h">Mint an RRN.</h2>
+
+        <p>
+          Register your robot with the Robot Registry Foundation. <code>robot-md register</code> POSTs a signed
+          RCAN envelope to <code>robotregistryfoundation.org</code>, mints an <code>RRN-NNNNNNNNNNNN</code>,
+          and writes it back into your manifest's <code>metadata.rrn</code>.
+        </p>
+
+        <pre class="code">robot-md register ROBOT.md</pre>
+
+        <p>
+          You'll see your robot live at <code>https://robotregistryfoundation.org/r/&lt;RRN&gt;</code>. The RRN is
+          the public identifier the audit bundle (beat 7) cryptographically binds to.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 6: RUN A SKILL -->
+    <section id="run-skill">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 06 — Run a skill</p>
+        <h2 class="beat-h">Tell Claude what to do.</h2>
+
+        <p>
+          Now ask Claude to do something — pick any registered skill from your manifest's capabilities section.
+          For example:
+        </p>
+
+        <pre class="code">"Move to home pose."
+"Run the calibration routine."</pre>
+
+        <p>
+          Claude routes the request through <code>robot-md-gateway</code>'s <code>/dispatch</code> endpoint.
+          The gateway checks the manifest, applies the tier policy, runs safety gates, and only then calls into
+          the driver. Every dispatch appends to the audit chain.
+        </p>
+
+        <aside class="gap-callout">
+          <strong>Tool gap (queued):</strong> Today, <code>robot-md-gateway</code> 0.4.0a1 does not ship a
+          motion-OOTB path for fresh readers — its default mode validates and audits, but doesn't execute.
+          Tracking this gap so the cookbook can ship a hardware-less cast next:
+          <a href="https://github.com/RobotRegistryFoundation/robot-md-gateway/issues/17">issue #17 in
+          robot-md-gateway</a>. For runs against real hardware in the meantime, see
+          <a href="/case-studies/">case studies</a>.
+        </aside>
+      </div>
+    </section>
+
+    <!-- BEAT 7: AUDIT BUNDLE -->
+    <section id="audit-bundle">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 07 — See the audit bundle</p>
+        <h2 class="beat-h">Regulator-grade evidence.</h2>
+
+        <p>
+          Each run produces a JSON file in <code>./bundles/</code> — an RCAN-L4 envelope, Ed25519-signed,
+          bound to your RRN. Verify it:
+        </p>
+
+        <pre class="code">rcan verify ./bundles/run-001.json</pre>
+
+        <p>Inline excerpt of what's inside:</p>
+
+        <pre class="code">{
+  "rcan_version": "3.4.0",
+  "rcan_conformance": "L4",
+  "robot": { "rrn": "RRN-000000000123" },
+  "skill_id": "your-skill-id",
+  "signature": { "kid": "robot-2026-key-1" }
+}</pre>
+
+        <p>
+          That's it. Ten minutes from clean machine to a signed, RRN-bound, Layer-4-conformant audit bundle —
+          using only published tools, against any robot.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 8: CASE-STUDIES BRIDGE -->
+    <section id="case-studies-bridge">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 08 — See it in the wild</p>
+        <h2 class="beat-h">Case studies live separately.</h2>
+
+        <p>
+          Want to see this walkthrough running against real hardware, varied models, and varied harnesses?
+          That evidence lives at the case-studies surface — separate from the cookbook so the recipe stays
+          generic and the proof can grow over time.
+        </p>
+
+        <aside class="case-callout">
+          <strong>↗ <a href="/case-studies/">Case studies</a>:</strong> ongoing runs of this walkthrough on
+          real robots, across model + harness + version combinations. Each case study is a self-contained
+          report with the run's signed audit bundle attached. (If the link 404s, the surface is still in
+          flight — the cookbook ships independently of it.)
+        </aside>
+      </div>
+    </section>
+
+    <!-- AUTHORITY DISCLAIMER -->
+    <section id="authority">
+      <div class="wrap">
+        <div class="authority">
+          <h4>Where safety is actually enforced</h4>
+          <p>
+            <code>ROBOT.md</code> is a declaration. Claude Code and <code>robot-md-mcp</code> are
+            <strong>advisory</strong> — they cannot physically move a robot. Physical safety is enforced at Layer 3
+            by <code>robot-md-gateway</code>, which validates every dispatch against the manifest, applies the tier
+            policy, and signs the audit chain. The cookbook walkthrough exercises all four layers; the bundle in
+            beat 7 is the cryptographic receipt.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <p class="verify-line">
+      Last verified against robot-md 1.5.0, robot-md-mcp 0.3.0, robot-md-gateway 0.4.0a1 — <span id="verify-date">2026-05-08</span>
+    </p>
+
+  </main>
+</body>
+
+</html>
