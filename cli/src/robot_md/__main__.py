@@ -1920,6 +1920,81 @@ def invoke(
             err_console.print(f"[yellow]![/yellow] could not fetch audit entry: {e}")
 
 
+# ---------------------------------------------------------------- actuator
+actuator_app = typer.Typer(
+    help="Manage robot-md-gateway actuators (init in v1.6.0; "
+         "search + publish coming in v1.7.0)."
+)
+app.add_typer(actuator_app, name="actuator")
+
+
+@actuator_app.command("init")
+def actuator_init_cmd(
+    name: str = typer.Argument(
+        ...,
+        help="Package name in kebab-case (e.g. 'my-camera-stack').",
+    ),
+    parent: Path | None = typer.Option(
+        None,
+        "--parent",
+        help="Directory to create the package under (default: cwd).",
+    ),
+    author: str = typer.Option(
+        "anonymous@robot-md.local",
+        "--author",
+        help="Author identifier for plugin.json metadata.",
+    ),
+    description: str = typer.Option(
+        "Production actuator for robot-md-gateway.",
+        "--description",
+        help="One-line description (used in pyproject + plugin.json).",
+    ),
+) -> None:
+    """Scaffold a production actuator package.
+
+    Produces a Python-package + Claude-plugin sibling layout:
+
+    \b
+      <name>/
+      ├── pyproject.toml         # entry-point declared
+      ├── src/<name>/actuator.py # Protocol skeleton (NotImplementedError)
+      ├── claude-plugin/         # Anthropic plugin layout
+      ├── skills/                # bundled SKILL.md
+      └── tests/test_actuator.py # Protocol-conformance scaffold
+
+    After scaffolding:
+
+    \b
+      cd <name>
+      pip install -e '.[dev]'
+      pytest                       # confirms Protocol conformance
+      robot-md-gateway list-actuators   # confirms entry-point auto-discovery
+      # Then open Claude Code and ask it to fill in execute() against your ROBOT.md.
+    """
+    from robot_md.actuator import scaffold_actuator_package
+
+    if parent is None:
+        parent = Path.cwd()
+
+    try:
+        out = scaffold_actuator_package(
+            name, parent, author=author, description=description,
+        )
+    except FileExistsError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+    except ValueError as e:
+        err_console.print(f"[red]✗[/red] {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+
+    out_console.print(f"[green]✓[/green] scaffolded {out}")
+    out_console.print("\n  Next:")
+    out_console.print(f"    cd {out.name}")
+    out_console.print("    pip install -e '.[dev]'")
+    out_console.print("    pytest")
+    out_console.print("    robot-md-gateway list-actuators")
+
+
 @app.command("publish-discovery")
 def publish_discovery(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),

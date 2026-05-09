@@ -5,8 +5,12 @@ from __future__ import annotations
 import json
 
 import pytest
+from typer.testing import CliRunner
 
+from robot_md.__main__ import app
 from robot_md.actuator import scaffold_actuator_package
+
+runner = CliRunner()
 
 
 def test_scaffold_creates_expected_tree(tmp_path):
@@ -73,3 +77,29 @@ def test_scaffold_rejects_non_kebab_names(tmp_path):
         scaffold_actuator_package("My_Actuator", tmp_path, author="x@y")
     with pytest.raises(ValueError, match="kebab-case"):
         scaffold_actuator_package("my actuator", tmp_path, author="x@y")
+
+
+def test_actuator_init_command_help():
+    res = runner.invoke(app, ["actuator", "init", "--help"])
+    assert res.exit_code == 0
+    assert "package name" in res.stdout.lower() or "name" in res.stdout.lower()
+
+
+def test_actuator_init_command_creates_package(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    res = runner.invoke(
+        app,
+        ["actuator", "init", "delta", "--author", "x@y.z"],
+    )
+    assert res.exit_code == 0, res.output
+    assert (tmp_path / "delta" / "pyproject.toml").exists()
+
+
+def test_actuator_init_default_author_uses_anonymous(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    res = runner.invoke(app, ["actuator", "init", "epsilon"])
+    assert res.exit_code == 0, res.output
+    plugin = json.loads(
+        (tmp_path / "epsilon" / "claude-plugin" / ".claude-plugin" / "plugin.json").read_text()
+    )
+    assert plugin["author"]  # non-empty default
