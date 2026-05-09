@@ -1683,7 +1683,7 @@ def install_skill_cmd(
     package: str | None = typer.Argument(
         None,
         help="Optional package name. When supplied, installs every skill "
-             "in <package>/skills/*.SKILL.md. Defaults to bundled using-robot-md.",
+        "in <package>/skills/*.SKILL.md. Defaults to bundled using-robot-md.",
     ),
     dest: Path | None = typer.Option(
         None,
@@ -1762,8 +1762,7 @@ def install_skill_cmd(
         written = install_package_skills(package, dest_root)
     except ModuleNotFoundError:
         err_console.print(
-            f"[red]✗[/red] package {package!r} not installed — "
-            f"`pip install {package}` first"
+            f"[red]✗[/red] package {package!r} not installed — `pip install {package}` first"
         )
         raise typer.Exit(code=FILE_ERROR) from None
     if not written:
@@ -1851,9 +1850,7 @@ def invoke(
         )
         raise typer.Exit(code=FILE_ERROR)
     if bearer is not None and bearer_from_bearers is not None:
-        err_console.print(
-            "[red]✗[/red] --bearer and --bearer-from-bearers are mutually exclusive"
-        )
+        err_console.print("[red]✗[/red] --bearer and --bearer-from-bearers are mutually exclusive")
         raise typer.Exit(code=FILE_ERROR)
 
     parsed = parse_file(manifest)
@@ -1922,8 +1919,7 @@ def invoke(
 
 # ---------------------------------------------------------------- actuator
 actuator_app = typer.Typer(
-    help="Manage robot-md-gateway actuators (init in v1.6.0; "
-         "search + publish coming in v1.7.0)."
+    help="Manage robot-md-gateway actuators (init in v1.6.0; search + publish coming in v1.7.0)."
 )
 app.add_typer(actuator_app, name="actuator")
 
@@ -1978,7 +1974,10 @@ def actuator_init_cmd(
 
     try:
         out = scaffold_actuator_package(
-            name, parent, author=author, description=description,
+            name,
+            parent,
+            author=author,
+            description=description,
         )
     except FileExistsError as e:
         err_console.print(f"[red]✗[/red] {e}")

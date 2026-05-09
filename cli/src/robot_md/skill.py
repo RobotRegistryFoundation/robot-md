@@ -116,9 +116,7 @@ def iter_all_installed_skills() -> Iterator[tuple[str, Path]]:
         candidates = {
             f.parts[0]
             for f in files
-            if len(f.parts) >= 3
-            and f.parts[1] == "skills"
-            and f.parts[-1].endswith(".SKILL.md")
+            if len(f.parts) >= 3 and f.parts[1] == "skills" and f.parts[-1].endswith(".SKILL.md")
         }
         # For editable installs with empty files, try the top-level package name.
         if not candidates and dist.name:

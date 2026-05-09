@@ -80,8 +80,17 @@ def test_sign_envelope_attaches_envelope_signature():
     assert signed["envelope_signature"]["kid"] == "op-2026-key-1"
     assert signed["envelope_signature"]["sig"]
     # All original fields preserved
-    for k in ("msg_id", "type", "ruri", "scope", "tool_name", "tool_args",
-              "manifest_path", "nonce", "timestamp_ms"):
+    for k in (
+        "msg_id",
+        "type",
+        "ruri",
+        "scope",
+        "tool_name",
+        "tool_args",
+        "manifest_path",
+        "nonce",
+        "timestamp_ms",
+    ):
         assert signed[k] == env[k]
 
 
@@ -103,7 +112,10 @@ def test_sign_envelope_signature_verifies_with_ed25519_pub():
 def test_sign_envelope_does_not_mutate_input():
     kp = generate_keypair()
     env = build_envelope(
-        ruri="rcan://x/s", tool_name="t", tool_args={}, manifest_path="/p",
+        ruri="rcan://x/s",
+        tool_name="t",
+        tool_args={},
+        manifest_path="/p",
     )
     snapshot = copy.deepcopy(env)
     sign_envelope(env, kp, kid="k")
@@ -141,11 +153,7 @@ def test_load_bearer_for_tier_v0_5_dict_shape(tmp_path):
 
 def test_load_bearer_for_tier_no_match_raises(tmp_path):
     yaml_path = tmp_path / "bearers.yaml"
-    yaml_path.write_text(
-        "- token: tok-a\n"
-        "  tier: read\n"
-        "  caller: claude-read\n"
-    )
+    yaml_path.write_text("- token: tok-a\n  tier: read\n  caller: claude-read\n")
     with pytest.raises(LookupError, match="no bearer entry with tier 'actuate'"):
         load_bearer_for_tier(yaml_path, "actuate")
 
@@ -157,6 +165,7 @@ def test_load_bearer_for_tier_missing_file_raises(tmp_path):
 
 class _MockHandler(http.server.BaseHTTPRequestHandler):
     """Simple mock gateway. Class attributes capture state across requests."""
+
     last_envelope: ClassVar[dict[str, Any] | None] = None
     last_authorization: ClassVar[str | None] = None
     invoke_response: ClassVar[dict[str, Any]] = {
@@ -299,14 +308,11 @@ def test_invoke_command_emits_signed_envelope_against_mock(tmp_path, monkeypatch
     )
     # Bearers.yaml (legacy list shape — exercised by load_bearer_for_tier).
     bearers = tmp_path / "bearers.yaml"
-    bearers.write_text(
-        "- token: tok-actuate\n"
-        "  tier: actuate\n"
-        "  caller: cli-test\n"
-    )
+    bearers.write_text("- token: tok-actuate\n  tier: actuate\n  caller: cli-test\n")
     # Stash a signing keypair where signing.load_keypair finds it.
     monkeypatch.setenv("HOME", str(tmp_path))
     from robot_md.signing import generate_keypair, save_keypair
+
     save_keypair("RRN-000000000123", generate_keypair())
 
     # Spin up the mock gateway.
@@ -317,11 +323,16 @@ def test_invoke_command_emits_signed_envelope_against_mock(tmp_path, monkeypatch
         res = runner.invoke(
             app,
             [
-                "invoke", str(manifest),
-                "--tool", "home_pose",
-                "--args", '{"speed": 0.3}',
-                "--gateway", f"http://127.0.0.1:{port}",
-                "--bearer-from-bearers", str(bearers),
+                "invoke",
+                str(manifest),
+                "--tool",
+                "home_pose",
+                "--args",
+                '{"speed": 0.3}',
+                "--gateway",
+                f"http://127.0.0.1:{port}",
+                "--bearer-from-bearers",
+                str(bearers),
             ],
         )
         assert res.exit_code == 0, res.output

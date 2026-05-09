@@ -62,7 +62,7 @@ def test_scaffold_skill_md_substitutes_only_name(tmp_path):
     assert "name: using-beta" in skill_text
     # Other placeholders preserved.
     assert "{{ description }}" not in skill_text  # description IS substituted
-    assert "{{ hardware_tag_1 }}" in skill_text   # hardware_tag is NOT substituted
+    assert "{{ hardware_tag_1 }}" in skill_text  # hardware_tag is NOT substituted
     assert "{{ capability.tool_name }}" in skill_text
 
 

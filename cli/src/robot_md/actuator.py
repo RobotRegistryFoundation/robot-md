@@ -16,8 +16,7 @@ _KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 def _validate_name(name: str) -> None:
     if not _KEBAB_RE.match(name):
         raise ValueError(
-            f"package name {name!r} must be kebab-case "
-            "(lowercase letters, digits, single hyphens)"
+            f"package name {name!r} must be kebab-case (lowercase letters, digits, single hyphens)"
         )
 
 
@@ -31,19 +30,21 @@ def _kebab_to_pascal(name: str) -> str:
 
 def _read_template(name: str) -> str:
     """Read a packaged template file from `robot_md/templates/actuator/`."""
-    return (
-        resources.files("robot_md.templates")
-        .joinpath("actuator", name)
-        .read_text()
-    )
+    return resources.files("robot_md.templates").joinpath("actuator", name).read_text()
 
 
-def _render(template: str, *, name: str, name_underscored: str,
-            NameClass: str, description: str, author: str) -> str:
+def _render(
+    template: str,
+    *,
+    name: str,
+    name_underscored: str,
+    NameClass: str,
+    description: str,
+    author: str,
+) -> str:
     """Substitute scaffold-time placeholders. Other `{{ ... }}` left literal."""
     return (
-        template
-        .replace("{{ name }}", name)
+        template.replace("{{ name }}", name)
         .replace("{{ name_underscored }}", name_underscored)
         .replace("{{ NameClass }}", NameClass)
         .replace("{{ description }}", description)
@@ -81,23 +82,22 @@ def scaffold_actuator_package(
         d.mkdir(parents=True, exist_ok=True)
 
     common = dict(
-        name=name, name_underscored=snake, NameClass=pascal,
-        description=description, author=author,
+        name=name,
+        name_underscored=snake,
+        NameClass=pascal,
+        description=description,
+        author=author,
     )
 
     # Top-level files.
     (pkg_root / "pyproject.toml").write_text(
         _render(_read_template("pyproject.toml.tmpl"), **common)
     )
-    (pkg_root / "README.md").write_text(
-        _render(_read_template("README.md.tmpl"), **common)
-    )
+    (pkg_root / "README.md").write_text(_render(_read_template("README.md.tmpl"), **common))
 
     # Python source.
     (src_dir / "__init__.py").write_text("")
-    (src_dir / "actuator.py").write_text(
-        _render(_read_template("src_actuator.py.tmpl"), **common)
-    )
+    (src_dir / "actuator.py").write_text(_render(_read_template("src_actuator.py.tmpl"), **common))
 
     # Tests.
     (tests_dir / "__init__.py").write_text("")
@@ -106,12 +106,8 @@ def scaffold_actuator_package(
     )
 
     # Claude-plugin sibling.
-    (plugin_dir / "plugin.json").write_text(
-        _render(_read_template("plugin.json.tmpl"), **common)
-    )
-    (plugin_skills_dir / "SKILL.md").write_text(
-        _render(_read_template("skill.md.tmpl"), **common)
-    )
+    (plugin_dir / "plugin.json").write_text(_render(_read_template("plugin.json.tmpl"), **common))
+    (plugin_skills_dir / "SKILL.md").write_text(_render(_read_template("skill.md.tmpl"), **common))
     (plugin_hooks_dir / "hooks.json").write_text(
         _render(_read_template("hooks.json.tmpl"), **common)
     )

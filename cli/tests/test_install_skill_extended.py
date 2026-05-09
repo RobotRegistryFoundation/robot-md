@@ -31,7 +31,8 @@ def test_iter_skills_for_package_returns_paths(tmp_path, monkeypatch):
     from robot_md.skill import iter_skills_for_package
 
     _make_fake_package(
-        tmp_path, "fake_actuator",
+        tmp_path,
+        "fake_actuator",
         {"using-fake-actuator.SKILL.md": "---\nname: using-fake-actuator\n---\nbody"},
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -64,7 +65,8 @@ def test_install_package_skills_writes_each_skill(tmp_path, monkeypatch):
     from robot_md.skill import install_package_skills
 
     _make_fake_package(
-        tmp_path, "fake_actuator2",
+        tmp_path,
+        "fake_actuator2",
         {
             "using-fake-actuator2.SKILL.md": "---\nname: using-fake-actuator2\n---\nbody",
             "extra.SKILL.md": "---\nname: extra\n---\nbody",
@@ -90,7 +92,8 @@ def test_install_package_skills_replace_on_conflict(tmp_path, monkeypatch):
     from robot_md.skill import install_package_skills
 
     _make_fake_package(
-        tmp_path, "fake_actuator3",
+        tmp_path,
+        "fake_actuator3",
         {"using-fake-actuator3.SKILL.md": "---\nname: using-fake-actuator3\n---\nv1"},
     )
     monkeypatch.syspath_prepend(str(tmp_path))
@@ -124,7 +127,8 @@ def test_install_skill_no_args_still_installs_using_robot_md(tmp_path):
 
 def test_install_skill_with_package_arg_installs_that_packages_skills(tmp_path, monkeypatch):
     _make_fake_package(
-        tmp_path, "fake_actuator4",
+        tmp_path,
+        "fake_actuator4",
         {"using-fake-actuator4.SKILL.md": "---\nname: using-fake-actuator4\n---\nbody"},
     )
     monkeypatch.syspath_prepend(str(tmp_path))
