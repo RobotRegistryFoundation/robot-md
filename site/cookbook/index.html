@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Cookbook — wire any robot to Claude in 10 minutes — ROBOT.md</title>
   <meta name="description"
-    content="Walkthrough: install robot-md + robot-md-gateway, author a ROBOT.md, register with RRF, run a skill via Claude Code, and produce a signed RCAN-L4 audit bundle. ≈10 minutes from clean machine, against any robot you bring.">
+    content="Walkthrough: install robot-md + robot-md-gateway, author a ROBOT.md, register with RRF, discover an actuator from the public catalog, and verify its RCAN-signed registry record. ≈10 minutes from clean machine, against any robot you bring.">
   <meta name="theme-color" content="#F4EFE6">
 
   <meta property="og:title" content="Cookbook — wire any robot to Claude in 10 minutes">
-  <meta property="og:description" content="From pipx install to signed audit bundle in 10 minutes. Demonstrates robot-md 1.5.0 + robot-md-mcp 0.3.0 + robot-md-gateway 0.4.0a1. Hardware-agnostic.">
+  <meta property="og:description" content="From pipx install to verified catalog entry in 10 minutes. Demonstrates robot-md 1.8.0 + robot-md-mcp 0.3.0 + robot-md-gateway 0.4.0a1. Hardware-agnostic.">
   <meta property="og:url" content="https://robotmd.dev/cookbook/">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary_large_image">
@@ -161,8 +161,8 @@
         <p class="ck-eta">≈ 10 min</p>
         <h1>Wire <em>any robot</em> to Claude — get a signed audit bundle.</h1>
         <p class="lede">
-          Install <code>robot-md</code>, author a <code>ROBOT.md</code>, register with RRF, run a skill via Claude Code,
-          and walk away with an RCAN-L4-conformant signed audit bundle. The runtime is Claude Code + the model;
+          Install <code>robot-md</code>, author a <code>ROBOT.md</code>, register with RRF, discover an actuator from the
+          public catalog, and verify its RCAN-signed registry record. The runtime is Claude Code + the model;
           the gateway is deterministic plumbing; safety is enforced at Layer 3. No new code; everything below
           uses published tools.
         </p>
@@ -264,63 +264,86 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
       </div>
     </section>
 
-    <!-- BEAT 6: RUN A SKILL -->
-    <section id="run-skill">
+    <!-- BEAT 6: DISCOVER -->
+    <section id="discover">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 06 — Run a skill</p>
-        <h2 class="beat-h">Tell Claude what to do.</h2>
+        <p class="beat-num">Beat 06 — Discover</p>
+        <h2 class="beat-h">Find a driver from the public catalog.</h2>
 
         <p>
-          Now ask Claude to do something — pick any registered skill from your manifest's capabilities section.
-          For example:
+          <code>robot-md</code> ships an actuator catalog at <a href="/actuators/">robotmd.dev/actuators/</a>.
+          Every entry has an <strong>RPN</strong> — a permanent, RCAN-signed identifier issued by RRF — so what you
+          install is what was published. Search by hardware tag:
         </p>
 
-        <pre class="code">"Move to home pose."
-"Run the calibration routine."</pre>
+        <pre class="code">robot-md actuator search example
+robot-md actuator search "feetech bus servo"</pre>
+
+        <p>Or look up an exact RPN to retrieve a single record:</p>
+
+        <pre class="code">robot-md actuator search RPN-000000000001</pre>
 
         <p>
-          Claude routes the request through <code>robot-md-gateway</code>'s <code>/dispatch</code> endpoint.
-          The gateway checks the manifest, applies the tier policy, runs safety gates, and only then calls into
-          the driver. Every dispatch appends to the audit chain.
+          Each result lists package name, version, hardware tags, and install line. Install it as a normal
+          Python package:
+        </p>
+
+        <pre class="code">pip install robot-md-example-actuator</pre>
+
+        <p>
+          The catalog is mirrored from RRF's <code>/v2/packages</code> every 10 minutes — fresh entries
+          appear there shortly after the publisher mints. If your search returns nothing, the catalog is
+          still small as the ecosystem bootstraps; see beat 7 to verify what <em>is</em> there.
         </p>
 
         <aside class="gap-callout">
-          <strong>Tool gap (queued):</strong> Today, <code>robot-md-gateway</code> 0.4.0a1 does not ship a
-          motion-OOTB path for fresh readers — its default mode validates and audits, but doesn't execute.
-          Tracking this gap so the cookbook can ship a hardware-less cast next:
-          <a href="https://github.com/RobotRegistryFoundation/robot-md-gateway/issues/17">issue #17 in
-          robot-md-gateway</a>. For runs against real hardware in the meantime, see
-          <a href="/case-studies/">case studies</a>.
+          <strong>Authoring a driver?</strong> Mint an RPN with one command from the package directory:
+          <pre class="code" style="margin-top: 8px;">robot-md actuator publish --package-dir .</pre>
+          <code>robot-md</code> auto-mints a PQ-hybrid publisher key on first publish (cached at
+          <code>~/.robot-md/publisher-keys/</code>), POSTs the signed manifest to RRF, and prints the RPN. The
+          mirror picks it up on the next 10-minute tick.
         </aside>
       </div>
     </section>
 
-    <!-- BEAT 7: AUDIT BUNDLE -->
-    <section id="audit-bundle">
+    <!-- BEAT 7: VERIFY -->
+    <section id="verify">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 07 — See the audit bundle</p>
-        <h2 class="beat-h">Regulator-grade evidence.</h2>
+        <p class="beat-num">Beat 07 — Verify</p>
+        <h2 class="beat-h">Regulator-grade catalog evidence.</h2>
 
         <p>
-          Each run produces a JSON file in <code>./bundles/</code> — an RCAN-L4 envelope, Ed25519-signed,
-          bound to your RRN. Verify it:
+          Each registry record at RRF is an RCAN canonical-JSON body signed with the publisher's PQ-hybrid
+          keypair (ML-DSA + Ed25519). You don't have to trust the catalog UI — fetch the original signed
+          body and verify the signature yourself:
         </p>
 
-        <pre class="code">rcan verify ./bundles/run-001.json</pre>
+        <pre class="code">curl -s https://robotregistryfoundation.org/v2/packages/RPN-000000000001/proof \
+  | python3 -c "import json,sys,base64,rcan; rec=json.loads(sys.stdin.read()); sys.exit(0 if rcan.verify_body(rec, base64.b64decode(rec['pq_signing_pub'])) else 1)" \
+  &amp;&amp; echo OK</pre>
 
-        <p>Inline excerpt of what's inside:</p>
+        <p>
+          If the signature checks, you have cryptographic proof that the package metadata you're about to
+          <code>pip install</code> was published by the same key holder that minted the RPN — not swapped
+          in by a man-in-the-middle, not edited after publish.
+        </p>
+
+        <p>Inline excerpt of what the signed record looks like:</p>
 
         <pre class="code">{
-  "rcan_version": "3.4.0",
-  "rcan_conformance": "L4",
-  "robot": { "rrn": "RRN-000000000123" },
-  "skill_id": "your-skill-id",
-  "signature": { "kid": "robot-2026-key-1" }
+  "name": "robot-md-example-actuator",
+  "version": "0.1.0",
+  "package_type": "actuator",
+  "hardware_tags": ["example", "tutorial"],
+  "pq_signing_pub": "...",
+  "pq_kid": "publisher-...",
+  "ed25519_pub": "...",
+  "sig": { "ml_dsa": "...", "ed25519": "...", "ed25519_pub": "..." }
 }</pre>
 
         <p>
-          That's it. Ten minutes from clean machine to a signed, RRN-bound, Layer-4-conformant audit bundle —
-          using only published tools, against any robot.
+          That's it. Ten minutes from clean machine to a verified, RPN-anchored, RCAN-signed actuator
+          entry — using only published tools, against any robot.
         </p>
       </div>
     </section>
@@ -343,6 +366,14 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
           report with the run's signed audit bundle attached. (If the link 404s, the surface is still in
           flight — the cookbook ships independently of it.)
         </aside>
+
+        <aside class="gap-callout">
+          <strong>Tool gap (queued):</strong> Live runtime execution — running a skill that physically moves
+          the robot — needs the gateway motion path tracked in
+          <a href="https://github.com/RobotRegistryFoundation/robot-md-gateway/issues/17">robot-md-gateway
+          issue #17</a>. Until that ships, real-hardware runs and their signed run-bundles live in the case
+          studies above.
+        </aside>
       </div>
     </section>
 
@@ -355,15 +386,14 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
             <code>ROBOT.md</code> is a declaration. Claude Code and <code>robot-md-mcp</code> are
             <strong>advisory</strong> — they cannot physically move a robot. Physical safety is enforced at Layer 3
             by <code>robot-md-gateway</code>, which validates every dispatch against the manifest, applies the tier
-            policy, and signs the audit chain. The cookbook walkthrough exercises all four layers; the bundle in
-            beat 7 is the cryptographic receipt.
+            policy, and signs the audit chain. The cookbook walkthrough exercises Layers 1–2 (declaration + advisory) and Layer 5 (registry/identity); Layer 3 enforcement and the run-bundle artifact are demonstrated end-to-end in <a href="/case-studies/">case studies</a>.
           </p>
         </div>
       </div>
     </section>
 
     <p class="verify-line">
-      Last verified against robot-md 1.5.0, robot-md-mcp 0.3.0, robot-md-gateway 0.4.0a1 — <span id="verify-date">2026-05-08</span>
+      Last verified against robot-md 1.8.0, robot-md-mcp 0.3.0, robot-md-gateway 0.4.0a1 — <span id="verify-date">2026-05-09</span>
     </p>
 
   </main>
