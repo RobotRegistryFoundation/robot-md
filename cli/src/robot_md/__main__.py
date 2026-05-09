@@ -1680,6 +1680,11 @@ def install_desktop_cmd(
 
 @app.command("install-skill")
 def install_skill_cmd(
+    package: str | None = typer.Argument(
+        None,
+        help="Optional package name. When supplied, installs every skill "
+             "in <package>/skills/*.SKILL.md. Defaults to bundled using-robot-md.",
+    ),
     dest: Path | None = typer.Option(
         None,
         "--dest",
@@ -1689,52 +1694,86 @@ def install_skill_cmd(
         False,
         "--force",
         "-f",
-        help="Overwrite an existing using-robot-md/SKILL.md.",
+        help="Overwrite an existing using-robot-md/SKILL.md (no-arg flow only).",
     ),
     stdout: bool = typer.Option(
         False,
         "--stdout",
-        help="Print the skill to stdout instead of installing it.",
+        help="Print the bundled skill to stdout (no-arg flow only).",
+    ),
+    list_skills: bool = typer.Option(
+        False,
+        "--list",
+        help="List all installed skills across packages and exit.",
     ),
 ) -> None:
-    """Install the `using-robot-md` skill into your Claude Code skills dir.
-
-    The skill teaches skill-aware harnesses (superpowers, etc.) to
-    auto-invoke robot-md tooling when the operator's message mentions the
-    robot, its capabilities, safety, or any `robot-md` verb. Writes to
-    `~/.claude/skills/using-robot-md/SKILL.md` by default.
-
-    Examples:
+    """Install Claude Code skills from a pip-installed package, or list available skills.
 
     \b
-      robot-md install-skill                       # writes to ~/.claude/skills/
+      robot-md install-skill                       # bundled using-robot-md
+      robot-md install-skill log-only-actuator     # third-party package skills
+      robot-md install-skill --list                # enumerate all installed skills
       robot-md install-skill --dest ./skills       # project-local skills dir
-      robot-md install-skill --force               # overwrite existing
-      robot-md install-skill --stdout | less       # preview the skill
+      robot-md install-skill --force               # overwrite existing (no-arg flow)
+      robot-md install-skill --stdout | less       # preview bundled skill
+
+    OQ-A resolution: REPLACE-on-conflict for `<package>` flow (single file
+    per skill name).
     """
-    from robot_md.skill import install, skill_content
+    from robot_md.skill import (
+        default_skills_dir,
+        install,
+        install_package_skills,
+        iter_all_installed_skills,
+        skill_content,
+    )
 
-    try:
-        content = skill_content()
-    except FileNotFoundError as e:
-        err_console.print(f"[red]✗[/red] {e}")
-        raise typer.Exit(code=FILE_ERROR) from None
-
-    if stdout:
-        sys.stdout.write(content)
+    if list_skills:
+        for pkg, path in iter_all_installed_skills():
+            out_console.print(f"{pkg}\t{path.name}")
         return
 
-    try:
-        written = install(dest, force=force)
-    except FileExistsError as e:
-        err_console.print(f"[red]✗[/red] {e}")
-        raise typer.Exit(code=FILE_ERROR) from None
+    dest_root = dest or default_skills_dir()
 
-    out_console.print(f"[green]✓[/green] installed {written}")
-    out_console.print(
-        "  Claude Code (with superpowers or any skill-aware harness) will "
-        "auto-invoke this skill when the operator mentions the robot."
-    )
+    if package is None:
+        # Backward-compatible bundled-skill flow.
+        try:
+            content = skill_content()
+        except FileNotFoundError as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=FILE_ERROR) from None
+        if stdout:
+            sys.stdout.write(content)
+            return
+        try:
+            written = install(dest_root, force=force)
+        except FileExistsError as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=FILE_ERROR) from None
+        out_console.print(f"[green]✓[/green] installed {written}")
+        out_console.print(
+            "  Claude Code (with superpowers or any skill-aware harness) will "
+            "auto-invoke this skill when the operator mentions the robot."
+        )
+        return
+
+    # Package-name flow.
+    try:
+        written = install_package_skills(package, dest_root)
+    except ModuleNotFoundError:
+        err_console.print(
+            f"[red]✗[/red] package {package!r} not installed — "
+            f"`pip install {package}` first"
+        )
+        raise typer.Exit(code=FILE_ERROR) from None
+    if not written:
+        err_console.print(
+            f"[yellow]![/yellow] package {package!r} ships no skills "
+            f"(no <package>/skills/*.SKILL.md found)"
+        )
+        return
+    for p in written:
+        out_console.print(f"[green]✓[/green] installed {p}")
 
 
 @app.command()

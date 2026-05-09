@@ -5,6 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
+
+from robot_md.__main__ import app
+
+runner = CliRunner()
 
 
 def _make_fake_package(tmp_path: Path, package_name: str, skills: dict[str, str]) -> Path:
@@ -108,3 +113,34 @@ def test_iter_all_installed_skills_includes_robot_md_self():
     # `robot_md` itself ships using-robot-md.SKILL.md.
     pkg_names = {pkg for pkg, _path in entries}
     assert "robot_md" in pkg_names
+
+
+def test_install_skill_no_args_still_installs_using_robot_md(tmp_path):
+    """Backward-compat: calling with no args installs the bundled using-robot-md."""
+    res = runner.invoke(app, ["install-skill", "--dest", str(tmp_path)])
+    assert res.exit_code == 0, res.output
+    assert (tmp_path / "using-robot-md" / "SKILL.md").exists()
+
+
+def test_install_skill_with_package_arg_installs_that_packages_skills(tmp_path, monkeypatch):
+    _make_fake_package(
+        tmp_path, "fake_actuator4",
+        {"using-fake-actuator4.SKILL.md": "---\nname: using-fake-actuator4\n---\nbody"},
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    dest = tmp_path / "skills"
+    res = runner.invoke(
+        app,
+        ["install-skill", "fake_actuator4", "--dest", str(dest)],
+    )
+    assert res.exit_code == 0, res.output
+    assert (dest / "fake_actuator4" / "using-fake-actuator4.SKILL.md").exists()
+
+
+def test_install_skill_list_enumerates_skills(tmp_path, monkeypatch):
+    res = runner.invoke(app, ["install-skill", "--list"])
+    assert res.exit_code == 0, res.output
+    # Bundled skill always present.
+    assert "robot_md" in res.output
+    assert "using-robot-md.SKILL.md" in res.output
