@@ -117,3 +117,46 @@ def test_build_registry_entry_with_plugin_includes_marketplace_block():
         e["plugin_marketplace_entry"]["install_command"]
         == "/plugin install feetech-arm@robotregistryfoundation"
     )
+
+
+from typer.testing import CliRunner
+
+from robot_md.__main__ import app
+
+_runner = CliRunner()
+
+
+def test_publish_dry_run_no_plugin_emits_one_pr_payload(tmp_path):
+    pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=False)
+    res = _runner.invoke(
+        app,
+        ["actuator", "publish", "--dry-run", "--package-dir", str(pkg)],
+        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.output
+    assert "robot-md" in res.stdout
+    assert "site/actuators/index.json" in res.stdout
+    assert "claude-code-plugins" not in res.stdout
+
+
+def test_publish_dry_run_with_plugin_emits_two_pr_payloads(tmp_path):
+    pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=True)
+    res = _runner.invoke(
+        app,
+        ["actuator", "publish", "--dry-run", "--package-dir", str(pkg)],
+        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.output
+    assert "claude-code-plugins" in res.stdout
+    assert "marketplace.json" in res.stdout
+    assert "site/actuators/index.json" in res.stdout
+
+
+def test_publish_dry_run_missing_pyproject_errors(tmp_path):
+    res = _runner.invoke(
+        app,
+        ["actuator", "publish", "--dry-run", "--package-dir", str(tmp_path)],
+        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
+    )
+    assert res.exit_code != 0
+    assert "pyproject.toml" in res.output.lower()

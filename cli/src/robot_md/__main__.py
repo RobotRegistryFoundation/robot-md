@@ -2054,6 +2054,87 @@ def actuator_search_cmd(
     typer.echo(out)
 
 
+@actuator_app.command("publish")
+def actuator_publish_cmd(
+    package_dir: Path = typer.Option(
+        Path("."),
+        "--package-dir",
+        "-C",
+        help="Path to the actuator package root (default: cwd).",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Print would-be PR payloads instead of opening PRs.",
+    ),
+    publisher: str = typer.Option(
+        "",
+        "--publisher",
+        help="Publisher identifier (default: derived from `gh api user`).",
+    ),
+) -> None:
+    """Publish a scaffolded actuator to the catalog.
+
+    Detects whether the package has a Claude-plugin layout. If yes, opens TWO
+    PRs (against RobotRegistryFoundation/claude-code-plugins for the marketplace
+    entry, and against RobotRegistryFoundation/robot-md for the catalog). If
+    no, opens ONE PR (catalog only).
+
+    With --dry-run, no PRs are opened — just prints the payloads it would push.
+    """
+    from datetime import datetime, timezone
+
+    from robot_md.actuator import build_registry_entry, detect_package_metadata
+
+    try:
+        meta = detect_package_metadata(package_dir.resolve())
+    except FileNotFoundError as e:
+        typer.secho(f"Could not read package: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
+
+    if not publisher:
+        publisher = "github:unknown"
+    published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    entry = build_registry_entry(meta, publisher=publisher, published_at=published_at)
+
+    if dry_run:
+        typer.echo("=== Catalog PR (RobotRegistryFoundation/robot-md) ===")
+        typer.echo(f"  Branch: publish/{meta['name']}-{meta['version']}")
+        typer.echo("  Title: registry(actuator): publish " + meta["name"] + " v" + meta["version"])
+        typer.echo("  Modifies: site/actuators/index.json")
+        typer.echo("  Entry payload:")
+        import json as _json
+
+        typer.echo(_json.dumps(entry, indent=2))
+        if meta["has_plugin_layout"]:
+            typer.echo("\n=== Marketplace PR (RobotRegistryFoundation/claude-code-plugins) ===")
+            typer.echo(f"  Branch: publish/{meta['name']}-{meta['version']}")
+            typer.echo("  Title: marketplace: add " + meta["name"] + " plugin")
+            typer.echo("  Modifies: marketplace.json")
+            typer.echo("  Plugin block:")
+            typer.echo(
+                _json.dumps(
+                    {
+                        "name": meta["name"],
+                        "version": meta["version"],
+                        "description": meta.get("description", ""),
+                        "repository": meta.get("repository_url", ""),
+                    },
+                    indent=2,
+                )
+            )
+        return
+
+    from robot_md.actuator import open_marketplace_pr, open_registry_pr
+
+    catalog_url = open_registry_pr(entry)
+    typer.echo(f"Catalog PR: {catalog_url}")
+    if meta["has_plugin_layout"]:
+        marketplace_url = open_marketplace_pr(meta)
+        typer.echo(f"Marketplace PR: {marketplace_url}")
+
+
 @app.command("publish-discovery")
 def publish_discovery(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
