@@ -2063,26 +2063,46 @@ def actuator_publish_cmd(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Print would-be PR payloads instead of opening PRs.",
+        help="Print the would-be RRF POST body instead of sending it.",
     ),
-    publisher: str = typer.Option(
+    github_user: str = typer.Option(
         "",
-        "--publisher",
-        help="Publisher identifier (default: derived from `gh api user`).",
+        "--github-user",
+        help="GitHub username (used as publisher-key namespace; defaults to `gh api user`).",
     ),
 ) -> None:
-    """Publish a scaffolded actuator to the catalog.
+    """Publish a scaffolded actuator to RRF (mints or appends an RPN)."""
+    import json as _json
+    import subprocess
 
-    Detects whether the package has a Claude-plugin layout. If yes, opens TWO
-    PRs (against RobotRegistryFoundation/claude-code-plugins for the marketplace
-    entry, and against RobotRegistryFoundation/robot-md for the catalog). If
-    no, opens ONE PR (catalog only).
+    from robot_md.actuator import (
+        _build_register_body,
+        _build_version_body,
+        actuator_publish_first_time,
+        actuator_publish_version_update,
+        detect_package_metadata,
+        load_published_rpn,
+    )
+    from robot_md.publisher_key import load_or_mint_publisher_key
+    from robot_md.rrf_packages import RRF_PACKAGES_BASE
 
-    With --dry-run, no PRs are opened — just prints the payloads it would push.
-    """
-    from datetime import datetime, timezone
-
-    from robot_md.actuator import build_registry_entry, detect_package_metadata
+    if not github_user:
+        try:
+            github_user = subprocess.run(
+                ["gh", "api", "user", "--jq", ".login"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        except Exception:
+            github_user = ""
+        if not github_user:
+            typer.secho(
+                "Could not auto-detect GitHub user. Pass --github-user.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(FILE_ERROR)
 
     try:
         meta = detect_package_metadata(package_dir.resolve())
@@ -2090,47 +2110,30 @@ def actuator_publish_cmd(
         typer.secho(f"Could not read package: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(FILE_ERROR) from e
 
-    if not publisher:
-        publisher = "github:unknown"
-    published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-    entry = build_registry_entry(meta, publisher=publisher, published_at=published_at)
+    cached_rpn, _ = load_published_rpn(meta["name"])
 
     if dry_run:
-        typer.echo("=== Catalog PR (RobotRegistryFoundation/robot-md) ===")
-        typer.echo(f"  Branch: publish/{meta['name']}-{meta['version']}")
-        typer.echo("  Title: registry(actuator): publish " + meta["name"] + " v" + meta["version"])
-        typer.echo("  Modifies: site/actuators/index.json")
-        typer.echo("  Entry payload:")
-        import json as _json
-
-        typer.echo(_json.dumps(entry, indent=2))
-        if meta["has_plugin_layout"]:
-            typer.echo("\n=== Marketplace PR (RobotRegistryFoundation/claude-code-plugins) ===")
-            typer.echo(f"  Branch: publish/{meta['name']}-{meta['version']}")
-            typer.echo("  Title: marketplace: add " + meta["name"] + " plugin")
-            typer.echo("  Modifies: marketplace.json")
-            typer.echo("  Plugin block:")
-            typer.echo(
-                _json.dumps(
-                    {
-                        "name": meta["name"],
-                        "version": meta["version"],
-                        "description": meta.get("description", ""),
-                        "repository": meta.get("repository_url", ""),
-                    },
-                    indent=2,
-                )
-            )
+        kp = load_or_mint_publisher_key(github_user)
+        if cached_rpn:
+            body = _build_version_body(meta["version"], kp)
+            url = f"{RRF_PACKAGES_BASE}/{cached_rpn}/versions"
+            typer.echo("=== Version-update POST ===")
+            typer.echo(f"URL: POST {url}")
+        else:
+            body = _build_register_body(meta, kp)
+            typer.echo("=== First-publish POST ===")
+            typer.echo(f"URL: POST {RRF_PACKAGES_BASE}/register")
+        typer.echo("Body:")
+        typer.echo(_json.dumps(body, indent=2, default=str))
         return
 
-    from robot_md.actuator import open_marketplace_pr, open_registry_pr
-
-    catalog_url = open_registry_pr(entry)
-    typer.echo(f"Catalog PR: {catalog_url}")
-    if meta["has_plugin_layout"]:
-        marketplace_url = open_marketplace_pr(meta)
-        typer.echo(f"Marketplace PR: {marketplace_url}")
+    if cached_rpn:
+        out = actuator_publish_version_update(package_dir.resolve(), github_user=github_user)
+        typer.echo(f"Updated {meta['name']} → version {meta['version']} on RPN {cached_rpn}")
+    else:
+        out = actuator_publish_first_time(package_dir.resolve(), github_user=github_user)
+        typer.echo(f"Published {meta['name']} v{meta['version']} as {out['rpn']}")
+        typer.echo(f"  → {out['record_url']}")
 
 
 @app.command("publish-discovery")

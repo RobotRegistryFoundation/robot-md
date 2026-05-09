@@ -10,8 +10,13 @@ from typer.testing import CliRunner
 
 from robot_md.__main__ import app
 from robot_md.actuator import (
+    actuator_publish_first_time,
+    actuator_publish_version_update,
     build_registry_entry,
     detect_package_metadata,
+    load_published_rpn,
+    publish_record_path,
+    record_published_rpn,
 )
 
 _runner = CliRunner()
@@ -123,86 +128,116 @@ def test_build_registry_entry_with_plugin_includes_marketplace_block():
     )
 
 
-def test_publish_dry_run_no_plugin_emits_one_pr_payload(tmp_path):
+def test_publish_record_path_under_home(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    p = publish_record_path("feetech-arm")
+    assert p == tmp_path / ".robot-md" / "published" / "feetech-arm.json"
+
+
+def test_record_and_load_published_rpn_roundtrip(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    record_published_rpn(
+        "feetech-arm", "RPN-000000000007", "https://x/v2/packages/RPN-000000000007"
+    )
+    rpn, url = load_published_rpn("feetech-arm")
+    assert rpn == "RPN-000000000007"
+    assert url == "https://x/v2/packages/RPN-000000000007"
+
+
+def test_load_published_rpn_returns_none_for_unknown(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert load_published_rpn("nope") == (None, None)
+
+
+def test_first_time_publish_calls_register(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
     pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=False)
+    captured = {}
+
+    def _fake_register(*, signed_body, timeout=10.0):
+        captured["body"] = signed_body
+        return {"rpn": "RPN-000000000007", "registered_at": "x", "record_url": "x"}
+
+    monkeypatch.setattr("robot_md.actuator.register_package", _fake_register)
+    monkeypatch.setattr("robot_md.actuator.load_or_mint_publisher_key", lambda u: _DummyKp())
+    monkeypatch.setattr(
+        "robot_md.actuator._sign",
+        lambda fields, kp: {**fields, "sig": {"ml_dsa": "FAKE", "ed25519": "FAKE"}},
+    )
+    out = actuator_publish_first_time(pkg, github_user="alice")
+    assert out["rpn"] == "RPN-000000000007"
+    assert captured["body"]["name"] == "my-actuator"
+    assert captured["body"]["package_type"] == "actuator"
+    assert "sig" in captured["body"]
+    rpn, _ = load_published_rpn("my-actuator")
+    assert rpn == "RPN-000000000007"
+
+
+def test_version_update_calls_append_version(monkeypatch, tmp_path):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=False)
+    record_published_rpn("my-actuator", "RPN-000000000007", "x")
+    captured = {}
+
+    def _fake_append(rpn, *, signed_body, timeout=10.0):
+        captured["rpn"] = rpn
+        captured["body"] = signed_body
+        return {"rpn": rpn, "versions": []}
+
+    monkeypatch.setattr("robot_md.actuator.append_version", _fake_append)
+    monkeypatch.setattr("robot_md.actuator.load_or_mint_publisher_key", lambda u: _DummyKp())
+    monkeypatch.setattr(
+        "robot_md.actuator._sign",
+        lambda fields, kp: {**fields, "sig": {"ml_dsa": "FAKE", "ed25519": "FAKE"}},
+    )
+    actuator_publish_version_update(pkg, github_user="alice")
+    assert captured["rpn"] == "RPN-000000000007"
+    assert "version" in captured["body"]
+    assert "sig" in captured["body"]
+
+
+class _DummyKp:
+    pq_kid = "publisher-alice"
+    pq_signing_pub = b"PUB"
+    pq_signing_sec = b"SEC"
+    ed25519_pub = b"EPUB"
+    ed25519_sec = b"ESEC"
+    ml_dsa = None
+
+
+def test_publish_dry_run_first_time_prints_register_payload(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=False)
+    monkeypatch.setattr("robot_md.actuator.load_or_mint_publisher_key", lambda u: _DummyKp())
+    monkeypatch.setattr(
+        "robot_md.actuator._sign",
+        lambda fields, kp: {**fields, "sig": {"ml_dsa": "FAKE", "ed25519": "FAKE"}},
+    )
     res = _runner.invoke(
         app,
-        ["actuator", "publish", "--dry-run", "--package-dir", str(pkg)],
+        ["actuator", "publish", "--dry-run", "--package-dir", str(pkg), "--github-user", "alice"],
         env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
     )
     assert res.exit_code == 0, res.output
-    assert "robot-md" in res.stdout
-    assert "site/actuators/index.json" in res.stdout
-    assert "claude-code-plugins" not in res.stdout
+    assert "POST" in res.stdout
+    assert "/v2/packages/register" in res.stdout
+    assert "feetech-arm" in res.stdout or "my-actuator" in res.stdout
+    assert "sig" in res.stdout
 
 
-def test_publish_dry_run_with_plugin_emits_two_pr_payloads(tmp_path):
-    pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=True)
+def test_publish_dry_run_version_update_prints_append_payload(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=False)
+    record_published_rpn("my-actuator", "RPN-000000000007", "x")
+    monkeypatch.setattr("robot_md.actuator.load_or_mint_publisher_key", lambda u: _DummyKp())
+    monkeypatch.setattr(
+        "robot_md.actuator._sign",
+        lambda fields, kp: {**fields, "sig": {"ml_dsa": "FAKE", "ed25519": "FAKE"}},
+    )
     res = _runner.invoke(
         app,
-        ["actuator", "publish", "--dry-run", "--package-dir", str(pkg)],
+        ["actuator", "publish", "--dry-run", "--package-dir", str(pkg), "--github-user", "alice"],
         env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
     )
     assert res.exit_code == 0, res.output
-    assert "claude-code-plugins" in res.stdout
-    assert "marketplace.json" in res.stdout
-    assert "site/actuators/index.json" in res.stdout
-
-
-def test_publish_dry_run_missing_pyproject_errors(tmp_path):
-    res = _runner.invoke(
-        app,
-        ["actuator", "publish", "--dry-run", "--package-dir", str(tmp_path)],
-        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
-    )
-    assert res.exit_code != 0
-    assert "pyproject.toml" in res.output.lower()
-
-
-def test_open_registry_pr_writes_entry_and_calls_gh(tmp_path, monkeypatch):
-    from robot_md.actuator import open_registry_pr
-
-    calls: list[list[str]] = []
-    pr_url = "https://github.com/RobotRegistryFoundation/robot-md/pull/999"
-
-    def _fake_run(cmd, *args, **kwargs):
-        calls.append(cmd)
-
-        class _R:
-            stdout = pr_url if cmd[:2] == ["gh", "pr"] else ""
-            returncode = 0
-
-        return _R()
-
-    monkeypatch.setattr("robot_md.actuator.subprocess.run", _fake_run)
-    monkeypatch.setenv("ROBOT_MD_PUBLISH_WORKTREE", str(tmp_path / "wt"))
-    entry = {"type": "actuator", "name": "x", "version": "1"}
-    out = open_registry_pr(entry)
-    assert out == pr_url
-    invoked = [c[0] for c in calls if c]
-    assert "gh" in invoked
-    assert "git" in invoked
-
-
-def test_open_marketplace_pr_emits_correct_title(tmp_path, monkeypatch):
-    from robot_md.actuator import open_marketplace_pr
-
-    pr_url = "https://github.com/RobotRegistryFoundation/claude-code-plugins/pull/42"
-    titles_seen: list[str] = []
-
-    def _fake_run(cmd, *args, **kwargs):
-        if cmd[:3] == ["gh", "pr", "create"]:
-            i = cmd.index("--title")
-            titles_seen.append(cmd[i + 1])
-
-        class _R:
-            stdout = pr_url if cmd[:2] == ["gh", "pr"] else ""
-            returncode = 0
-
-        return _R()
-
-    monkeypatch.setattr("robot_md.actuator.subprocess.run", _fake_run)
-    monkeypatch.setenv("ROBOT_MD_PUBLISH_WORKTREE", str(tmp_path / "wt"))
-    out = open_marketplace_pr({"name": "feetech-arm", "version": "0.5"})
-    assert out == pr_url
-    assert any("feetech-arm" in t for t in titles_seen)
+    assert "/v2/packages/RPN-000000000007/versions" in res.stdout
