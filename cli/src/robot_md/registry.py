@@ -18,7 +18,7 @@ DEFAULT_CACHE_PATH = Path.home() / ".cache" / "robot-md" / "registry-index.json"
 def fetch_index(
     *,
     url: str = DEFAULT_CATALOG_URL,
-    cache_path: Path = DEFAULT_CACHE_PATH,
+    cache_path: Path | None = None,
     offline: bool = False,
     timeout: float = 10.0,
 ) -> dict:
@@ -28,6 +28,8 @@ def fetch_index(
     - offline=False: fetch fresh, write to cache, return parsed JSON. On HTTP
       failure, fall back to cache (raises FileNotFoundError if no cache).
     """
+    if cache_path is None:
+        cache_path = DEFAULT_CACHE_PATH
     if offline:
         return json.loads(cache_path.read_text())
     try:

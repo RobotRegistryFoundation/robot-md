@@ -1,12 +1,15 @@
 """Tests for robot_md.actuator.actuator_search business logic."""
+
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
-import pytest
+from typer.testing import CliRunner
 
+from robot_md.__main__ import app
 from robot_md.actuator import actuator_search
+
+runner = CliRunner()
 
 
 def _fake_index() -> dict:
@@ -14,21 +17,26 @@ def _fake_index() -> dict:
         "schema_version": "1.0",
         "entries": [
             {
-                "type": "actuator", "name": "feetech-arm",
-                "version": "1.0", "description": "Feetech bus arm driver",
+                "type": "actuator",
+                "name": "feetech-arm",
+                "version": "1.0",
+                "description": "Feetech bus arm driver",
                 "hardware_tags": ["arm", "feetech"],
                 "manifest_signals": ["SO-ARM101"],
                 "install": {"package_manager": "pip", "package": "feetech-arm"},
             },
             {
-                "type": "actuator", "name": "rpi-camera",
-                "version": "0.3", "description": "Raspberry Pi camera driver",
+                "type": "actuator",
+                "name": "rpi-camera",
+                "version": "0.3",
+                "description": "Raspberry Pi camera driver",
                 "hardware_tags": ["raspberry-pi", "camera"],
                 "manifest_signals": [],
                 "install": {"package_manager": "pip", "package": "rpi-camera"},
             },
             {
-                "type": "skill", "name": "skill-x",
+                "type": "skill",
+                "name": "skill-x",
                 "description": "a skill, not an actuator",
                 "hardware_tags": [],
                 "install": {"package_manager": "pip", "package": "skill-x"},
@@ -67,3 +75,41 @@ def test_actuator_search_threshold_marks_weak():
     # only prints up to limit anyway). Check the no-match path triggers when
     # nothing scores above 0.
     assert "No matches" in out or "weak match" in out
+
+
+def test_search_subcommand_help_is_listed():
+    res = runner.invoke(
+        app, ["actuator", "--help"], env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"}
+    )
+    assert res.exit_code == 0
+    assert "search" in res.stdout
+
+
+def test_search_offline_uses_cache(tmp_path, monkeypatch):
+    cache = tmp_path / "registry-index.json"
+    cache.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "entries": [
+                    {
+                        "type": "actuator",
+                        "name": "cached-act",
+                        "version": "1",
+                        "description": "cached entry",
+                        "hardware_tags": ["test"],
+                        "manifest_signals": [],
+                        "install": {"package_manager": "pip", "package": "cached-act"},
+                    }
+                ],
+            }
+        )
+    )
+    monkeypatch.setattr("robot_md.registry.DEFAULT_CACHE_PATH", cache)
+    res = runner.invoke(
+        app,
+        ["actuator", "search", "test", "--offline"],
+        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.output
+    assert "cached-act" in res.stdout

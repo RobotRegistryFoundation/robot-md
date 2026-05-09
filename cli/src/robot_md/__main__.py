@@ -1994,6 +1994,66 @@ def actuator_init_cmd(
     out_console.print("    robot-md-gateway list-actuators")
 
 
+@actuator_app.command("search")
+def actuator_search_cmd(
+    query: str = typer.Argument("", help="Free-text query (hardware tags, fuzzy description)."),
+    manifest: Path | None = typer.Option(
+        None,
+        "--manifest",
+        help="Path to a ROBOT.md to extract manifest_signals from.",
+    ),
+    type_filter: str = typer.Option(
+        "actuator",
+        "--type",
+        help="Entry type to search (actuator | skill | plugin | mcp).",
+    ),
+    threshold: float = typer.Option(
+        0.3,
+        "--threshold",
+        help="Soft match minimum. Below-threshold matches are tagged but still listed.",
+    ),
+    offline: bool = typer.Option(
+        False,
+        "--offline",
+        help="Use cached index only — do not hit the network.",
+    ),
+) -> None:
+    """Search the actuator catalog at https://robotmd.dev/actuators/."""
+    from robot_md.actuator import actuator_search
+    from robot_md.registry import fetch_index
+
+    try:
+        index = fetch_index(offline=offline)
+    except FileNotFoundError:
+        typer.secho(
+            "No catalog cache available. Run without --offline first to populate it.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(FILE_ERROR) from None
+
+    parsed_manifest: dict | None = None
+    if manifest is not None:
+        try:
+            import frontmatter
+
+            with manifest.open("r") as fh:
+                post = frontmatter.load(fh)
+            parsed_manifest = post.metadata
+        except Exception as e:
+            typer.secho(f"Could not parse manifest: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(FILE_ERROR) from e
+
+    out = actuator_search(
+        index,
+        query=query,
+        manifest=parsed_manifest,
+        type_filter=type_filter,
+        threshold=threshold,
+    )
+    typer.echo(out)
+
+
 @app.command("publish-discovery")
 def publish_discovery(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
