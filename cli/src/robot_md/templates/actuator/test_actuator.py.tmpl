@@ -1,0 +1,19 @@
+"""Protocol-conformance tests for {{ name }}."""
+
+from __future__ import annotations
+
+from robot_md_gateway.actuator import Actuator
+
+from {{ name_underscored }}.actuator import {{ NameClass }}Actuator
+
+
+def test_implements_actuator_protocol():
+    instance = {{ NameClass }}Actuator()
+    assert isinstance(instance, Actuator)
+
+
+def test_metadata():
+    instance = {{ NameClass }}Actuator()
+    assert instance.name == "{{ name }}"
+    assert instance.description
+    assert isinstance(instance.config_schema, dict)

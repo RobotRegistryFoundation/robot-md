@@ -1,0 +1,30 @@
+# {{ name }}
+
+Production actuator for `robot-md-gateway`.
+
+## Install
+
+```bash
+pip install -e .
+robot-md install-skill {{ name_underscored }}
+```
+
+## Verify
+
+```bash
+robot-md-gateway list-actuators
+# expect to see: {{ name }}
+```
+
+## Develop
+
+The default `execute()` raises `NotImplementedError`. Open Claude Code in
+this directory and ask it to read your `ROBOT.md` and fill in the
+implementation against your hardware.
+
+## Test
+
+```bash
+pip install -e '.[dev]'
+pytest -v
+```
