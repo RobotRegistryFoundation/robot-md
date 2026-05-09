@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Actuator catalog — ROBOT.md</title>
+  <meta name="description" content="Discover production actuators for robot-md-gateway. Search by hardware tag, manifest signal, or fuzzy text. Install via pip or /plugin install.">
+  <meta name="theme-color" content="#F4EFE6">
+  <meta property="og:title" content="Actuator catalog — ROBOT.md">
+  <meta property="og:description" content="Production actuators discoverable from CLI or browser. Search-before-write.">
+  <meta property="og:url" content="https://robotmd.dev/actuators/">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="https://robotmd.dev/actuators/">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/design.css">
+  <style>
+    .filter-bar { display:flex; gap:12px; align-items:center; margin: 24px 0 12px; }
+    .filter-bar input { flex:1; font-family: var(--mono); font-size: 14px; padding: 10px 14px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); border-radius: 2px; }
+    .filter-bar select { font-family: var(--mono); font-size: 12px; padding: 9px 12px; border: 1px solid var(--rule); background: var(--paper-2); color: var(--ink); }
+    .entry-card { padding: 20px 24px; border: 1px solid var(--rule); margin-bottom: 12px; }
+    .entry-card.hidden { display: none; }
+    .entry-name { font-family: var(--mono); font-weight: 600; font-size: 15px; color: var(--ink); }
+    .entry-version { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-left: 8px; }
+    .entry-type { font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-left: 12px; }
+    .entry-desc { font-size: 13.5px; color: var(--ink-2); margin: 8px 0 12px; line-height: 1.5; }
+    .entry-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 12px; }
+    .entry-tag { font-family: var(--mono); font-size: 10.5px; padding: 2px 8px; background: var(--paper-2); border: 1px solid var(--rule); color: var(--ink-3); }
+    .entry-install { font-family: var(--mono); font-size: 12px; background: var(--ink); color: #E8E3D3; padding: 10px 14px; margin: 6px 0; }
+    .entry-plugin-badge { font-family: var(--mono); font-size: 10.5px; padding: 3px 8px; background: var(--accent); color: var(--paper); margin-left: 8px; letter-spacing: .08em; text-transform: uppercase; }
+    .empty-state { padding: 40px 24px; text-align: center; color: var(--ink-3); border: 1px dashed var(--rule); }
+  </style>
+</head>
+<body>
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="https://docs.robotmd.dev/spec/">Spec</a>
+        <a href="/agents/claude-code/">Agents</a>
+        <a href="https://docs.robotmd.dev/mcp/">MCP</a>
+        <a href="/actuators/" class="current" aria-current="page">Actuators</a>
+        <a href="/registry/">Registry</a>
+        <a href="https://docs.robotmd.dev/compliance/">Compliance</a>
+        <a href="/managed-agents/">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+  <header class="page-header">
+    <div class="wrap">
+      <div class="page-eyebrow">
+        <span>Actuator catalog</span>
+        <span class="rule-line" aria-hidden="true"></span>
+        <span><a href="https://robotmd.dev/cookbook/">cookbook</a> · search-before-write</span>
+      </div>
+      <h1 class="page-heading">Discoverable production <em>actuators</em>.</h1>
+      <p class="page-lede">
+        Each entry maps a hardware archetype or manifest signal to a published Python package
+        and (when shipped) a Claude Code plugin. Search from the CLI:
+        <code style="font-family:var(--mono);font-size:0.85em">robot-md actuator search "raspberry pi camera"</code>.
+      </p>
+    </div>
+  </header>
+  <section class="sec">
+    <div class="wrap">
+      <div class="filter-bar">
+        <input id="filter" placeholder="Filter by name, description, hardware tag…" aria-label="Filter actuators">
+        <select id="type-filter" aria-label="Filter by type">
+          <option value="">All types</option>
+          <option value="actuator">actuator</option>
+          <option value="skill">skill</option>
+          <option value="plugin">plugin</option>
+          <option value="mcp">mcp</option>
+        </select>
+      </div>
+      <div id="entries"></div>
+      <div id="empty" class="empty-state" hidden>
+        No actuators published yet — be the first.
+        Run <code style="font-family:var(--mono)">robot-md actuator publish</code> from your package directory.
+      </div>
+    </div>
+  </section>
+  <footer class="wrap foot">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="https://docs.robotmd.dev/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/actuators/">Actuators</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+  <script>
+    (async () => {
+      const container = document.getElementById('entries');
+      const empty = document.getElementById('empty');
+      const filter = document.getElementById('filter');
+      const typeFilter = document.getElementById('type-filter');
+      let data = { entries: [] };
+      try {
+        const res = await fetch('./index.json', { cache: 'no-cache' });
+        data = await res.json();
+      } catch (e) {
+        container.innerHTML = '<div class="empty-state">Catalog data unavailable. Try again later.</div>';
+        return;
+      }
+      function renderEntry(e) {
+        const div = document.createElement('div');
+        div.className = 'entry-card';
+        div.dataset.haystack = [e.name, e.description, (e.hardware_tags || []).join(' '), (e.manifest_signals || []).join(' ')].join(' ').toLowerCase();
+        div.dataset.type = e.type || 'actuator';
+        const pluginBadge = e.plugin_marketplace_entry
+          ? `<span class="entry-plugin-badge">Available as Claude Code plugin</span>` : '';
+        const tags = (e.hardware_tags || []).map(t => `<span class="entry-tag">${t}</span>`).join('');
+        const pluginCmd = e.plugin_marketplace_entry
+          ? `<div class="entry-install">$ ${e.plugin_marketplace_entry.install_command}</div>` : '';
+        const pipCmd = e.install
+          ? `<div class="entry-install">$ ${e.install.package_manager} install ${e.install.package}${e.install.post_install ? ' && ' + e.install.post_install : ''}</div>`
+          : '';
+        div.innerHTML = `
+          <div>
+            <span class="entry-name">${e.name}</span>
+            <span class="entry-version">${e.version || ''}</span>
+            <span class="entry-type">${e.type || 'actuator'}</span>
+            ${pluginBadge}
+          </div>
+          <div class="entry-desc">${e.description || ''}</div>
+          <div class="entry-tags">${tags}</div>
+          ${pluginCmd}
+          ${pipCmd}
+        `;
+        return div;
+      }
+      const entries = (data.entries || []).map(renderEntry);
+      entries.forEach(el => container.appendChild(el));
+      function applyFilter() {
+        const q = filter.value.trim().toLowerCase();
+        const t = typeFilter.value;
+        let visible = 0;
+        entries.forEach(el => {
+          const matchText = !q || el.dataset.haystack.includes(q);
+          const matchType = !t || el.dataset.type === t;
+          const show = matchText && matchType;
+          el.classList.toggle('hidden', !show);
+          if (show) visible++;
+        });
+        empty.hidden = visible > 0 || (data.entries || []).length === 0;
+        if ((data.entries || []).length === 0) empty.hidden = false;
+      }
+      filter.addEventListener('input', applyFilter);
+      typeFilter.addEventListener('change', applyFilter);
+      applyFilter();
+    })();
+  </script>
+</body>
+</html>

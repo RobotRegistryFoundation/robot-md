@@ -6,9 +6,24 @@ Plan 2 ships `actuator init`. Plans 3+ will add `actuator search` and
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import sys
+import tempfile
 from importlib import resources
 from pathlib import Path
+
+if sys.version_info >= (3, 11):
+    import tomllib as _toml
+else:
+    import tomli as _toml  # type: ignore[import-not-found]  # 3.10 only
+
+from robot_md.registry import (
+    extract_manifest_signals,
+    format_search_results,
+    score_entry,
+)
 
 _KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
@@ -120,3 +135,281 @@ def scaffold_actuator_package(
     )
 
     return pkg_root
+
+
+def actuator_search(
+    index: dict,
+    *,
+    query: str,
+    manifest: dict | None,
+    type_filter: str = "actuator",
+    threshold: float = 0.3,
+    limit: int = 5,
+) -> str:
+    """Filter index entries by type, score them against query+manifest,
+    and return the formatted output string."""
+    entries = [e for e in index.get("entries", []) if e.get("type") == type_filter]
+    signals = extract_manifest_signals(manifest) if manifest else None
+    scored = [(e, score_entry(e, query=query, manifest_signals=signals)) for e in entries]
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    nonzero = [pair for pair in scored if pair[1] > 0.0]
+    if not nonzero:
+        return format_search_results([], threshold=threshold, limit=limit)
+    return format_search_results(nonzero, threshold=threshold, limit=limit)
+
+
+def detect_package_metadata(pkg_dir: Path) -> dict:
+    """Scan a scaffolded actuator package and return metadata for publish.
+
+    Reads:
+      - pyproject.toml for name, version, description, Repository URL
+      - src/<snake>/skills/*.SKILL.md frontmatter for hardware_tags + manifest_signals
+      - claude-plugin/.claude-plugin/plugin.json existence flag
+
+    Raises FileNotFoundError if pyproject.toml is missing.
+    """
+    pyproject = pkg_dir / "pyproject.toml"
+    if not pyproject.is_file():
+        raise FileNotFoundError(f"missing {pyproject}")
+    with pyproject.open("rb") as fh:
+        data = _toml.load(fh)
+    project = data.get("project", {})
+    urls = project.get("urls", {}) or {}
+    repo_url = urls.get("Repository") or urls.get("repository") or ""
+
+    snake = (project.get("name") or pkg_dir.name).replace("-", "_")
+    skills_dir = pkg_dir / "src" / snake / "skills"
+    skill_files: list[str] = []
+    hardware_tags: list[str] = []
+    manifest_signals: list[str] = []
+    if skills_dir.is_dir():
+        import frontmatter
+
+        for sf in sorted(skills_dir.glob("*.SKILL.md")):
+            skill_files.append(sf.name)
+            try:
+                post = frontmatter.load(sf)
+            except Exception:
+                continue
+            for k_src, k_dst in (
+                ("hardware_tags", hardware_tags),
+                ("manifest_signals", manifest_signals),
+            ):
+                v = post.metadata.get(k_src)
+                if isinstance(v, list):
+                    k_dst.extend(str(x) for x in v)
+
+    plugin_marker = pkg_dir / "claude-plugin" / ".claude-plugin" / "plugin.json"
+    return {
+        "name": project.get("name", pkg_dir.name),
+        "version": project.get("version", "0.0.0"),
+        "description": project.get("description", ""),
+        "repository_url": repo_url,
+        "hardware_tags": hardware_tags,
+        "manifest_signals": manifest_signals,
+        "has_plugin_layout": plugin_marker.is_file(),
+        "skill_files": skill_files,
+    }
+
+
+def build_registry_entry(
+    meta: dict,
+    *,
+    publisher: str,
+    published_at: str,
+) -> dict:
+    """Build the JSON entry shape that goes into site/actuators/index.json."""
+    name = meta["name"]
+    entry: dict = {
+        "type": "actuator",
+        "name": name,
+        "version": meta["version"],
+        "description": meta.get("description", ""),
+        "install": {
+            "package_manager": "pip",
+            "package": name,
+            "post_install": f"robot-md install-skill {name}",
+        },
+        "hardware_tags": meta.get("hardware_tags", []),
+        "manifest_signals": meta.get("manifest_signals", []),
+        "repository": meta.get("repository_url", ""),
+        "skill_files": meta.get("skill_files", []),
+        "publisher": publisher,
+        "published_at": published_at,
+        "verified": False,
+    }
+    if meta.get("has_plugin_layout"):
+        entry["plugin_marketplace_entry"] = {
+            "marketplace": "robotregistryfoundation",
+            "plugin_name": name,
+            "install_command": f"/plugin install {name}@robotregistryfoundation",
+        }
+    return entry
+
+
+REGISTRY_REPO = "RobotRegistryFoundation/robot-md"
+MARKETPLACE_REPO = "RobotRegistryFoundation/claude-code-plugins"
+
+
+def _publish_worktree(label: str) -> Path:
+    """Pick the per-publish worktree path. Allows tests to override via env."""
+    base = os.environ.get("ROBOT_MD_PUBLISH_WORKTREE")
+    if base:
+        p = Path(base) / label
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    return Path(tempfile.mkdtemp(prefix=f"robot-md-publish-{label}-"))
+
+
+def _gh(*args: str, capture: bool = False, check: bool = True) -> str:
+    """Run a gh CLI command. Returns stdout if capture=True."""
+    res = subprocess.run(
+        list(args),
+        capture_output=capture,
+        text=True,
+        check=check,
+    )
+    return res.stdout if capture else ""
+
+
+def _git(cwd: Path, *args: str, check: bool = True) -> None:
+    subprocess.run(["git", *args], cwd=str(cwd), check=check)
+
+
+def open_registry_pr(entry: dict) -> str:
+    """Fork robot-md, append entry to site/actuators/index.json, push, open PR.
+
+    Returns the PR URL.
+    """
+    import json as _json
+
+    name = entry["name"]
+    version = entry["version"]
+    branch = f"publish/{name}-{version}"
+    wt = _publish_worktree(f"registry-{name}")
+
+    subprocess.run(
+        ["gh", "repo", "fork", REGISTRY_REPO, "--clone=false", "--remote=false"],
+        check=False,
+    )
+    user = (
+        subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        or "unknown"
+    )
+
+    fork_url = f"https://github.com/{user}/robot-md.git"
+    subprocess.run(["git", "clone", fork_url, str(wt)], check=True)
+    _git(wt, "checkout", "-b", branch)
+
+    index_path = wt / "site" / "actuators" / "index.json"
+    data = _json.loads(index_path.read_text()) if index_path.is_file() else {"entries": []}
+    data.setdefault("entries", []).append(entry)
+    data["generated_at"] = entry.get("published_at", data.get("generated_at"))
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(_json.dumps(data, indent=2) + "\n")
+
+    _git(wt, "add", str(index_path))
+    _git(wt, "commit", "-m", f"registry(actuator): publish {name} v{version}")
+    _git(wt, "push", "origin", branch)
+
+    pr_body = (
+        f"Adds `{name}` v{version} to the actuator catalog.\n\n"
+        "**Conformance checklist**:\n"
+        "- [ ] Implements `robot_md_gateway.actuators` Protocol\n"
+        "- [ ] Tests pass\n"
+        "- [ ] SKILL.md present at `<pkg>/skills/`\n"
+        "- [ ] Repository accessible at the URL in the entry\n"
+        "- [ ] `pip install <package>` works\n"
+    )
+    out = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            REGISTRY_REPO,
+            "--title",
+            f"registry(actuator): publish {name} v{version}",
+            "--body",
+            pr_body,
+            "--head",
+            f"{user}:{branch}",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
+
+
+def open_marketplace_pr(meta: dict) -> str:
+    """Fork claude-code-plugins, append plugin block to marketplace.json, push, open PR.
+
+    Returns the PR URL.
+    """
+    import json as _json
+
+    name = meta["name"]
+    version = meta["version"]
+    branch = f"publish/{name}-{version}"
+    wt = _publish_worktree(f"marketplace-{name}")
+
+    subprocess.run(
+        ["gh", "repo", "fork", MARKETPLACE_REPO, "--clone=false", "--remote=false"],
+        check=False,
+    )
+    user = (
+        subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        or "unknown"
+    )
+
+    fork_url = f"https://github.com/{user}/claude-code-plugins.git"
+    subprocess.run(["git", "clone", fork_url, str(wt)], check=True)
+    _git(wt, "checkout", "-b", branch)
+
+    mp_path = wt / "marketplace.json"
+    data = _json.loads(mp_path.read_text()) if mp_path.is_file() else {"plugins": []}
+    data.setdefault("plugins", []).append(
+        {
+            "name": name,
+            "version": version,
+            "description": meta.get("description", ""),
+            "repository": meta.get("repository_url", ""),
+        }
+    )
+    mp_path.parent.mkdir(parents=True, exist_ok=True)
+    mp_path.write_text(_json.dumps(data, indent=2) + "\n")
+
+    _git(wt, "add", str(mp_path))
+    _git(wt, "commit", "-m", f"marketplace: add {name} plugin")
+    _git(wt, "push", "origin", branch)
+
+    out = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            MARKETPLACE_REPO,
+            "--title",
+            f"marketplace: add {name} plugin",
+            "--body",
+            f"Adds `{name}` v{version} to the Claude Code plugin marketplace.",
+            "--head",
+            f"{user}:{branch}",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
