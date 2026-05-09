@@ -7,8 +7,14 @@ Plan 2 ships `actuator init`. Plans 3+ will add `actuator search` and
 from __future__ import annotations
 
 import re
+import sys
 from importlib import resources
 from pathlib import Path
+
+if sys.version_info >= (3, 11):
+    import tomllib as _toml
+else:
+    import tomli as _toml  # noqa: F401  (declared in pyproject deps for 3.10)
 
 from robot_md.registry import (
     extract_manifest_signals,
@@ -147,3 +153,90 @@ def actuator_search(
     if not nonzero:
         return format_search_results([], threshold=threshold, limit=limit)
     return format_search_results(nonzero, threshold=threshold, limit=limit)
+
+
+def detect_package_metadata(pkg_dir: Path) -> dict:
+    """Scan a scaffolded actuator package and return metadata for publish.
+
+    Reads:
+      - pyproject.toml for name, version, description, Repository URL
+      - src/<snake>/skills/*.SKILL.md frontmatter for hardware_tags + manifest_signals
+      - claude-plugin/.claude-plugin/plugin.json existence flag
+
+    Raises FileNotFoundError if pyproject.toml is missing.
+    """
+    pyproject = pkg_dir / "pyproject.toml"
+    if not pyproject.is_file():
+        raise FileNotFoundError(f"missing {pyproject}")
+    with pyproject.open("rb") as fh:
+        data = _toml.load(fh)
+    project = data.get("project", {})
+    urls = project.get("urls", {}) or {}
+    repo_url = urls.get("Repository") or urls.get("repository") or ""
+
+    snake = (project.get("name") or pkg_dir.name).replace("-", "_")
+    skills_dir = pkg_dir / "src" / snake / "skills"
+    skill_files: list[str] = []
+    hardware_tags: list[str] = []
+    manifest_signals: list[str] = []
+    if skills_dir.is_dir():
+        import frontmatter
+
+        for sf in sorted(skills_dir.glob("*.SKILL.md")):
+            skill_files.append(sf.name)
+            try:
+                post = frontmatter.load(sf)
+            except Exception:
+                continue
+            for k_src, k_dst in (("hardware_tags", hardware_tags),
+                                  ("manifest_signals", manifest_signals)):
+                v = post.metadata.get(k_src)
+                if isinstance(v, list):
+                    k_dst.extend(str(x) for x in v)
+
+    plugin_marker = pkg_dir / "claude-plugin" / ".claude-plugin" / "plugin.json"
+    return {
+        "name": project.get("name", pkg_dir.name),
+        "version": project.get("version", "0.0.0"),
+        "description": project.get("description", ""),
+        "repository_url": repo_url,
+        "hardware_tags": hardware_tags,
+        "manifest_signals": manifest_signals,
+        "has_plugin_layout": plugin_marker.is_file(),
+        "skill_files": skill_files,
+    }
+
+
+def build_registry_entry(
+    meta: dict,
+    *,
+    publisher: str,
+    published_at: str,
+) -> dict:
+    """Build the JSON entry shape that goes into site/actuators/index.json."""
+    name = meta["name"]
+    entry: dict = {
+        "type": "actuator",
+        "name": name,
+        "version": meta["version"],
+        "description": meta.get("description", ""),
+        "install": {
+            "package_manager": "pip",
+            "package": name,
+            "post_install": f"robot-md install-skill {name}",
+        },
+        "hardware_tags": meta.get("hardware_tags", []),
+        "manifest_signals": meta.get("manifest_signals", []),
+        "repository": meta.get("repository_url", ""),
+        "skill_files": meta.get("skill_files", []),
+        "publisher": publisher,
+        "published_at": published_at,
+        "verified": False,
+    }
+    if meta.get("has_plugin_layout"):
+        entry["plugin_marketplace_entry"] = {
+            "marketplace": "robotregistryfoundation",
+            "plugin_name": name,
+            "install_command": f"/plugin install {name}@robotregistryfoundation",
+        }
+    return entry
