@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cookbook — wire any robot to Claude in 10 minutes — ROBOT.md</title>
+  <meta name="description"
+    content="Walkthrough: install robot-md + robot-md-gateway, author a ROBOT.md, register with RRF, run a skill via Claude Code, and produce a signed RCAN-L4 audit bundle. ≈10 minutes from clean machine, against any robot you bring.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Cookbook — wire any robot to Claude in 10 minutes">
+  <meta property="og:description" content="From pipx install to signed audit bundle in 10 minutes. Demonstrates robot-md 1.5.0 + robot-md-mcp 0.3.0 + robot-md-gateway 0.4.0a1. Hardware-agnostic.">
+  <meta property="og:url" content="https://robotmd.dev/cookbook/">
+  <meta property="og:type" content="article">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/cookbook/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    /* Cookbook page-specific styles. Tokens come from /css/design.css. */
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+    .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 24px; }
+    main > section { padding: 56px 0; border-top: 1px solid var(--rule); }
+    main > section:first-of-type { border-top: 0; }
+
+    /* Hero */
+    .ck-hero { padding: 96px 0 72px; }
+    .ck-hero h1 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(34px, 5vw, 56px);
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      margin: 0 0 16px;
+    }
+    .ck-hero h1 em {
+      font-family: var(--serif);
+      font-style: italic;
+      color: var(--accent-ink);
+      font-weight: 600;
+    }
+    .ck-hero .lede {
+      font-size: 19px;
+      color: var(--ink-2);
+      max-width: 720px;
+      margin: 0 0 24px;
+    }
+    .ck-eta {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 13px;
+      background: var(--accent-wash);
+      color: var(--accent-ink);
+      padding: 4px 10px;
+      border-radius: 2px;
+    }
+
+    /* Beat headings */
+    .beat-num {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin: 0 0 8px;
+    }
+    .beat-h {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(24px, 3vw, 32px);
+      letter-spacing: -0.005em;
+      margin: 0 0 16px;
+    }
+    .beat-body { max-width: 760px; }
+    .beat-body p { margin: 0 0 14px; }
+
+    /* Code blocks */
+    pre.code {
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      padding: 14px 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-x: auto;
+      margin: 14px 0;
+    }
+    code { font-family: var(--mono); font-size: 0.92em; background: var(--paper-2); padding: 1px 5px; border-radius: 2px; }
+
+    /* Gap callout */
+    .gap-callout {
+      border-left: 3px solid var(--accent);
+      background: #FBF4DA;
+      padding: 14px 18px;
+      margin: 18px 0;
+      font-size: 14px;
+      color: var(--ink-2);
+    }
+    .gap-callout strong { color: var(--accent-ink); }
+
+    /* Outbound case-studies callout */
+    .case-callout {
+      border-left: 3px solid var(--accent-ink);
+      background: var(--paper-2);
+      padding: 18px 20px;
+      margin: 18px 0;
+      font-size: 15px;
+      color: var(--ink-2);
+    }
+    .case-callout a { color: var(--accent-ink); }
+
+    /* Authority disclaimer */
+    .authority {
+      border: 1px solid var(--rule);
+      background: var(--paper-2);
+      padding: 18px 20px;
+      margin: 32px 0 0;
+      font-size: 14px;
+      color: var(--ink-2);
+    }
+    .authority h4 {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin: 0 0 8px;
+    }
+
+    /* Verification footer */
+    .verify-line {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-3);
+      text-align: center;
+      padding: 24px 0 56px;
+    }
+  </style>
+</head>
+
+<body>
+  <main>
+
+    <!-- BEAT 1: HERO -->
+    <section class="ck-hero">
+      <div class="wrap">
+        <p class="ck-eta">≈ 10 min</p>
+        <h1>Wire <em>any robot</em> to Claude — get a signed audit bundle.</h1>
+        <p class="lede">
+          Install <code>robot-md</code>, author a <code>ROBOT.md</code>, register with RRF, run a skill via Claude Code,
+          and walk away with an RCAN-L4-conformant signed audit bundle. The runtime is Claude Code + the model;
+          the gateway is deterministic plumbing; safety is enforced at Layer 3. No new code; everything below
+          uses published tools.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 2: INSTALL -->
+    <section id="install">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 02 — Install</p>
+        <h2 class="beat-h">Two installs and you're wired.</h2>
+
+        <p>Recommended: install the Claude Code plugin, which bundles the CLI, the MCP bridge, and the gateway.</p>
+
+        <pre class="code">claude plugin add robot-md</pre>
+
+        <p>Manual fallback (or for non-Claude-Code MCP clients):</p>
+
+        <pre class="code">pipx install robot-md
+pipx install robot-md-gateway
+claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
+
+        <p>
+          <em>Why two paths?</em> The plugin install is a single command that registers all three surfaces in one move —
+          best for Claude Code users. The manual install gives you each surface independently, which is what you want
+          if you're driving a different MCP-aware agent (Cursor, Cline, etc.) or scripting CI.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 3: AUTHOR -->
+    <section id="author">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 03 — Author</p>
+        <h2 class="beat-h">One command, one manifest.</h2>
+
+        <p>Generate a starter <code>ROBOT.md</code> from bare init:</p>
+
+        <pre class="code">robot-md init my-robot --non-interactive</pre>
+
+        <p>
+          The output is a YAML-fronted Markdown file describing identity, capabilities, calibration,
+          and the safety contract. You'll commit this file alongside your robot's source — like a <code>CLAUDE.md</code>,
+          but for a physical machine.
+        </p>
+        <p>
+          Connect your cameras, sensors, and USB devices <strong>before</strong> you run <code>init</code>:
+          bare init enumerates whatever your machine actually exposes today, so plugging in your hardware
+          first means the manifest captures it. <a href="/cookbook/sample.ROBOT.md">Inspect the sample output</a>
+          — it was captured against a Raspberry Pi 5 with a camera module, so it lists Pi-specific video
+          drivers. Yours will reflect whatever you've plugged in. Edit any field that doesn't match before
+          moving on.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEATS 4-7 (added in Task 5) -->
+
+    <!-- BEAT 8 (added in Task 6) -->
+
+    <!-- AUTHORITY DISCLAIMER + VERIFICATION FOOTER (added in Task 6) -->
+
+  </main>
+</body>
+
+</html>
