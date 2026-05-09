@@ -4,13 +4,24 @@ from __future__ import annotations
 
 import base64
 import copy
+import http.server
+import json as _json
+import socketserver
+import threading
 import uuid
+from typing import Any, ClassVar
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from rcan.audit_bundle import canonical_json
 
-from robot_md.invoke import build_envelope, load_bearer_for_tier, sign_envelope
+from robot_md.invoke import (
+    build_envelope,
+    fetch_last_audit_entry,
+    invoke_envelope,
+    load_bearer_for_tier,
+    sign_envelope,
+)
 from robot_md.signing import generate_keypair
 
 
@@ -138,3 +149,120 @@ def test_load_bearer_for_tier_no_match_raises(tmp_path):
 def test_load_bearer_for_tier_missing_file_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_bearer_for_tier(tmp_path / "nope.yaml", "actuate")
+
+
+class _MockHandler(http.server.BaseHTTPRequestHandler):
+    """Simple mock gateway. Class attributes capture state across requests."""
+    last_envelope: ClassVar[dict[str, Any] | None] = None
+    last_authorization: ClassVar[str | None] = None
+    invoke_response: ClassVar[dict[str, Any]] = {
+        "ok": True,
+        "manifest_kid": "test-kid",
+        "scope": "actuate",
+        "tool_name": "home_pose",
+        "actuator_name": "noop",
+        "outcome_kind": "no_op",
+    }
+    audit_last_response: ClassVar[dict[str, Any]] = {
+        "msg_id": "fixed-msg",
+        "decision": "allow",
+        "actuator_name": "noop",
+        "actuator_outcome_kind": "no_op",
+    }
+
+    def log_message(self, *_a, **_kw):  # silence test output
+        pass
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length)
+        type(self).last_envelope = _json.loads(body)
+        type(self).last_authorization = self.headers.get("Authorization")
+        payload = _json.dumps(type(self).invoke_response).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_GET(self):
+        type(self).last_authorization = self.headers.get("Authorization")
+        payload = _json.dumps(type(self).audit_last_response).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+
+def _start_mock_gateway():
+    httpd = socketserver.TCPServer(("127.0.0.1", 0), _MockHandler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    return httpd, thread
+
+
+def test_invoke_envelope_posts_to_gateway_with_bearer():
+    _MockHandler.last_envelope = None
+    _MockHandler.last_authorization = None
+    httpd, _ = _start_mock_gateway()
+    try:
+        port = httpd.server_address[1]
+        env = build_envelope(
+            ruri="rcan://RRN-000000000123/skill",
+            tool_name="home_pose",
+            tool_args={"speed": 0.3},
+            manifest_path="/tmp/ROBOT.md",
+        )
+        result = invoke_envelope(
+            envelope=env,
+            gateway_url=f"http://127.0.0.1:{port}",
+            bearer="tok-actuate-1",
+        )
+        assert result["ok"] is True
+        assert result["actuator_name"] == "noop"
+        assert _MockHandler.last_authorization == "Bearer tok-actuate-1"
+        assert _MockHandler.last_envelope["msg_id"] == env["msg_id"]
+    finally:
+        httpd.shutdown()
+
+
+def test_fetch_last_audit_entry_returns_dict():
+    _MockHandler.last_authorization = None
+    httpd, _ = _start_mock_gateway()
+    try:
+        port = httpd.server_address[1]
+        entry = fetch_last_audit_entry(
+            gateway_url=f"http://127.0.0.1:{port}",
+            bearer="tok-actuate-1",
+        )
+        assert entry["msg_id"] == "fixed-msg"
+        assert entry["actuator_outcome_kind"] == "no_op"
+        assert _MockHandler.last_authorization == "Bearer tok-actuate-1"
+    finally:
+        httpd.shutdown()
+
+
+def test_invoke_envelope_raises_on_4xx():
+    class _Reject(_MockHandler):
+        def do_POST(self):
+            self.send_response(403)
+            self.send_header("Content-Type", "application/json")
+            payload = b'{"detail":"unknown bearer"}'
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+    httpd = socketserver.TCPServer(("127.0.0.1", 0), _Reject)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        port = httpd.server_address[1]
+        env = build_envelope(ruri="rcan://x/s", tool_name="t", tool_args={}, manifest_path="/p")
+        with pytest.raises(RuntimeError, match="403"):
+            invoke_envelope(
+                envelope=env,
+                gateway_url=f"http://127.0.0.1:{port}",
+                bearer="bad-token",
+            )
+    finally:
+        httpd.shutdown()

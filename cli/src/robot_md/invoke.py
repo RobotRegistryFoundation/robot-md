@@ -12,8 +12,11 @@ No mocks. No demo flags. The signing path uses the operator's
 from __future__ import annotations
 
 import base64
+import json
 import secrets
 import time
+import urllib.error
+import urllib.request
 import uuid
 from pathlib import Path
 from typing import Any
@@ -100,3 +103,55 @@ def load_bearer_for_tier(yaml_path: Path, tier: str) -> str:
         if row.get("tier") == tier:
             return str(row["token"])
     raise LookupError(f"no bearer entry with tier {tier!r} in {yaml_path}")
+
+
+def invoke_envelope(
+    *,
+    envelope: dict[str, Any],
+    gateway_url: str,
+    bearer: str,
+    timeout: float = 10.0,
+) -> dict[str, Any]:
+    """POST a (signed or unsigned) envelope to `<gateway_url>/v1/invoke`.
+
+    Returns the parsed JSON response body on 2xx. On 4xx/5xx raises
+    RuntimeError with the status code and response body included.
+    """
+    url = gateway_url.rstrip("/") + "/v1/invoke"
+    body = json.dumps(envelope).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {bearer}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"gateway returned {e.code}: {body_text}") from e
+
+
+def fetch_last_audit_entry(
+    *,
+    gateway_url: str,
+    bearer: str,
+    timeout: float = 10.0,
+) -> dict[str, Any]:
+    """GET `<gateway_url>/v1/audit/last`, return parsed JSON body."""
+    url = gateway_url.rstrip("/") + "/v1/audit/last"
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"Authorization": f"Bearer {bearer}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        body_text = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"gateway returned {e.code}: {body_text}") from e
