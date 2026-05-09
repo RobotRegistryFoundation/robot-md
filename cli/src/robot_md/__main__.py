@@ -2090,7 +2090,7 @@ def actuator_publish_cmd(
         meta = detect_package_metadata(package_dir.resolve())
     except FileNotFoundError as e:
         typer.secho(f"Could not read package: {e}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(FILE_ERROR)
+        raise typer.Exit(FILE_ERROR) from e
 
     if not publisher:
         publisher = "github:unknown"

@@ -6,8 +6,11 @@ Plan 2 ships `actuator init`. Plans 3+ will add `actuator search` and
 
 from __future__ import annotations
 
+import os
 import re
+import subprocess
 import sys
+import tempfile
 from importlib import resources
 from pathlib import Path
 
@@ -242,3 +245,171 @@ def build_registry_entry(
             "install_command": f"/plugin install {name}@robotregistryfoundation",
         }
     return entry
+
+
+REGISTRY_REPO = "RobotRegistryFoundation/robot-md"
+MARKETPLACE_REPO = "RobotRegistryFoundation/claude-code-plugins"
+
+
+def _publish_worktree(label: str) -> Path:
+    """Pick the per-publish worktree path. Allows tests to override via env."""
+    base = os.environ.get("ROBOT_MD_PUBLISH_WORKTREE")
+    if base:
+        p = Path(base) / label
+        p.mkdir(parents=True, exist_ok=True)
+        return p
+    return Path(tempfile.mkdtemp(prefix=f"robot-md-publish-{label}-"))
+
+
+def _gh(*args: str, capture: bool = False, check: bool = True) -> str:
+    """Run a gh CLI command. Returns stdout if capture=True."""
+    res = subprocess.run(
+        list(args),
+        capture_output=capture,
+        text=True,
+        check=check,
+    )
+    return res.stdout if capture else ""
+
+
+def _git(cwd: Path, *args: str, check: bool = True) -> None:
+    subprocess.run(["git", *args], cwd=str(cwd), check=check)
+
+
+def open_registry_pr(entry: dict) -> str:
+    """Fork robot-md, append entry to site/actuators/index.json, push, open PR.
+
+    Returns the PR URL.
+    """
+    import json as _json
+
+    name = entry["name"]
+    version = entry["version"]
+    branch = f"publish/{name}-{version}"
+    wt = _publish_worktree(f"registry-{name}")
+
+    subprocess.run(
+        ["gh", "repo", "fork", REGISTRY_REPO, "--clone=false", "--remote=false"],
+        check=False,
+    )
+    user = (
+        subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        or "unknown"
+    )
+
+    fork_url = f"https://github.com/{user}/robot-md.git"
+    subprocess.run(["git", "clone", fork_url, str(wt)], check=True)
+    _git(wt, "checkout", "-b", branch)
+
+    index_path = wt / "site" / "actuators" / "index.json"
+    data = _json.loads(index_path.read_text()) if index_path.is_file() else {"entries": []}
+    data.setdefault("entries", []).append(entry)
+    data["generated_at"] = entry.get("published_at", data.get("generated_at"))
+    index_path.parent.mkdir(parents=True, exist_ok=True)
+    index_path.write_text(_json.dumps(data, indent=2) + "\n")
+
+    _git(wt, "add", str(index_path))
+    _git(wt, "commit", "-m", f"registry(actuator): publish {name} v{version}")
+    _git(wt, "push", "origin", branch)
+
+    pr_body = (
+        f"Adds `{name}` v{version} to the actuator catalog.\n\n"
+        "**Conformance checklist**:\n"
+        "- [ ] Implements `robot_md_gateway.actuators` Protocol\n"
+        "- [ ] Tests pass\n"
+        "- [ ] SKILL.md present at `<pkg>/skills/`\n"
+        "- [ ] Repository accessible at the URL in the entry\n"
+        "- [ ] `pip install <package>` works\n"
+    )
+    out = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            REGISTRY_REPO,
+            "--title",
+            f"registry(actuator): publish {name} v{version}",
+            "--body",
+            pr_body,
+            "--head",
+            f"{user}:{branch}",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()
+
+
+def open_marketplace_pr(meta: dict) -> str:
+    """Fork claude-code-plugins, append plugin block to marketplace.json, push, open PR.
+
+    Returns the PR URL.
+    """
+    import json as _json
+
+    name = meta["name"]
+    version = meta["version"]
+    branch = f"publish/{name}-{version}"
+    wt = _publish_worktree(f"marketplace-{name}")
+
+    subprocess.run(
+        ["gh", "repo", "fork", MARKETPLACE_REPO, "--clone=false", "--remote=false"],
+        check=False,
+    )
+    user = (
+        subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        or "unknown"
+    )
+
+    fork_url = f"https://github.com/{user}/claude-code-plugins.git"
+    subprocess.run(["git", "clone", fork_url, str(wt)], check=True)
+    _git(wt, "checkout", "-b", branch)
+
+    mp_path = wt / "marketplace.json"
+    data = _json.loads(mp_path.read_text()) if mp_path.is_file() else {"plugins": []}
+    data.setdefault("plugins", []).append(
+        {
+            "name": name,
+            "version": version,
+            "description": meta.get("description", ""),
+            "repository": meta.get("repository_url", ""),
+        }
+    )
+    mp_path.parent.mkdir(parents=True, exist_ok=True)
+    mp_path.write_text(_json.dumps(data, indent=2) + "\n")
+
+    _git(wt, "add", str(mp_path))
+    _git(wt, "commit", "-m", f"marketplace: add {name} plugin")
+    _git(wt, "push", "origin", branch)
+
+    out = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--repo",
+            MARKETPLACE_REPO,
+            "--title",
+            f"marketplace: add {name} plugin",
+            "--body",
+            f"Adds `{name}` v{version} to the Claude Code plugin marketplace.",
+            "--head",
+            f"{user}:{branch}",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return out.stdout.strip()

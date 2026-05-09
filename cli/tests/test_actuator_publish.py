@@ -6,11 +6,15 @@ import json
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
+from robot_md.__main__ import app
 from robot_md.actuator import (
     build_registry_entry,
     detect_package_metadata,
 )
+
+_runner = CliRunner()
 
 
 def _scaffold_minimal_actuator(parent: Path, *, with_plugin: bool) -> Path:
@@ -119,13 +123,6 @@ def test_build_registry_entry_with_plugin_includes_marketplace_block():
     )
 
 
-from typer.testing import CliRunner
-
-from robot_md.__main__ import app
-
-_runner = CliRunner()
-
-
 def test_publish_dry_run_no_plugin_emits_one_pr_payload(tmp_path):
     pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=False)
     res = _runner.invoke(
@@ -160,3 +157,52 @@ def test_publish_dry_run_missing_pyproject_errors(tmp_path):
     )
     assert res.exit_code != 0
     assert "pyproject.toml" in res.output.lower()
+
+
+def test_open_registry_pr_writes_entry_and_calls_gh(tmp_path, monkeypatch):
+    from robot_md.actuator import open_registry_pr
+
+    calls: list[list[str]] = []
+    pr_url = "https://github.com/RobotRegistryFoundation/robot-md/pull/999"
+
+    def _fake_run(cmd, *args, **kwargs):
+        calls.append(cmd)
+
+        class _R:
+            stdout = pr_url if cmd[:2] == ["gh", "pr"] else ""
+            returncode = 0
+
+        return _R()
+
+    monkeypatch.setattr("robot_md.actuator.subprocess.run", _fake_run)
+    monkeypatch.setenv("ROBOT_MD_PUBLISH_WORKTREE", str(tmp_path / "wt"))
+    entry = {"type": "actuator", "name": "x", "version": "1"}
+    out = open_registry_pr(entry)
+    assert out == pr_url
+    invoked = [c[0] for c in calls if c]
+    assert "gh" in invoked
+    assert "git" in invoked
+
+
+def test_open_marketplace_pr_emits_correct_title(tmp_path, monkeypatch):
+    from robot_md.actuator import open_marketplace_pr
+
+    pr_url = "https://github.com/RobotRegistryFoundation/claude-code-plugins/pull/42"
+    titles_seen: list[str] = []
+
+    def _fake_run(cmd, *args, **kwargs):
+        if cmd[:3] == ["gh", "pr", "create"]:
+            i = cmd.index("--title")
+            titles_seen.append(cmd[i + 1])
+
+        class _R:
+            stdout = pr_url if cmd[:2] == ["gh", "pr"] else ""
+            returncode = 0
+
+        return _R()
+
+    monkeypatch.setattr("robot_md.actuator.subprocess.run", _fake_run)
+    monkeypatch.setenv("ROBOT_MD_PUBLISH_WORKTREE", str(tmp_path / "wt"))
+    out = open_marketplace_pr({"name": "feetech-arm", "version": "0.5"})
+    assert out == pr_url
+    assert any("feetech-arm" in t for t in titles_seen)
