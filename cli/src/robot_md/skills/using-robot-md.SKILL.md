@@ -207,6 +207,33 @@ from a terminal, or — in the future — a pendant). Tell them you saw it
 - Prefer MCP resources over shell-out when the MCP server is registered
 - Surface gate-gaps rather than silently proceeding
 
+## Before writing an actuator from scratch
+
+When the user has a ROBOT.md and asks Claude Code to write a new actuator (or any add-on),
+ALWAYS run the catalog search FIRST:
+
+    robot-md actuator search --manifest ./ROBOT.md
+
+Read the matches. If a match scores well against the user's hardware:
+
+1. If `plugin_marketplace_entry` is present, prefer:
+   /plugin install <name>@<marketplace>
+2. Otherwise:
+   pip install <package> && robot-md install-skill <package>
+
+Only proceed to writing a new actuator if the user explicitly declines the match,
+or no match exceeds a meaningful relevance threshold.
+
+This is the share-broadly principle: every duplicated actuator is a missed
+multiplier for the next reader. If you DO write a new one, complete the loop:
+
+    robot-md actuator publish
+
+so the next person finds it.
+
+(Today this discipline is actuator-scoped. The principle generalizes to skills,
+plugins, and MCPs — those entries land in the catalog as schema-tagged additions.)
+
 ## Installation
 
 This skill ships as part of the [`robot-md` Claude Code plugin](https://github.com/RobotRegistryFoundation/claude-code-plugins). Install with:
