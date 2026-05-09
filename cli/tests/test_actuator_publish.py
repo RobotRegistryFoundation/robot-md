@@ -1,4 +1,5 @@
 """Tests for robot_md.actuator.detect_package_metadata + publish helpers."""
+
 from __future__ import annotations
 
 import json
@@ -38,10 +39,14 @@ manifest_signals: [SO-ARM101]
     if with_plugin:
         plugin_dir = pkg / "claude-plugin" / ".claude-plugin"
         plugin_dir.mkdir(parents=True)
-        (plugin_dir / "plugin.json").write_text(json.dumps({
-            "name": "my-actuator",
-            "version": "0.2.0",
-        }))
+        (plugin_dir / "plugin.json").write_text(
+            json.dumps(
+                {
+                    "name": "my-actuator",
+                    "version": "0.2.0",
+                }
+            )
+        )
     return pkg
 
 
@@ -71,7 +76,8 @@ def test_detect_metadata_raises_on_missing_pyproject(tmp_path):
 
 def test_build_registry_entry_without_plugin():
     meta = {
-        "name": "rpi-cam", "version": "1.0",
+        "name": "rpi-cam",
+        "version": "1.0",
         "description": "Pi camera driver",
         "repository_url": "https://github.com/me/rpi-cam",
         "hardware_tags": ["raspberry-pi", "camera"],
@@ -91,16 +97,23 @@ def test_build_registry_entry_without_plugin():
 
 def test_build_registry_entry_with_plugin_includes_marketplace_block():
     meta = {
-        "name": "feetech-arm", "version": "0.5",
+        "name": "feetech-arm",
+        "version": "0.5",
         "description": "Feetech arm",
         "repository_url": "https://github.com/me/feetech-arm",
-        "hardware_tags": ["arm"], "manifest_signals": ["SO-ARM101"],
+        "hardware_tags": ["arm"],
+        "manifest_signals": ["SO-ARM101"],
         "has_plugin_layout": True,
         "skill_files": ["using-feetech-arm.SKILL.md"],
     }
     e = build_registry_entry(
-        meta, publisher="github:me", published_at="2026-05-09T00:00:00Z",
+        meta,
+        publisher="github:me",
+        published_at="2026-05-09T00:00:00Z",
     )
     assert e["plugin_marketplace_entry"]["marketplace"] == "robotregistryfoundation"
     assert e["plugin_marketplace_entry"]["plugin_name"] == "feetech-arm"
-    assert e["plugin_marketplace_entry"]["install_command"] == "/plugin install feetech-arm@robotregistryfoundation"
+    assert (
+        e["plugin_marketplace_entry"]["install_command"]
+        == "/plugin install feetech-arm@robotregistryfoundation"
+    )

@@ -14,7 +14,7 @@ from pathlib import Path
 if sys.version_info >= (3, 11):
     import tomllib as _toml
 else:
-    import tomli as _toml  # noqa: F401  (declared in pyproject deps for 3.10)
+    import tomli as _toml  # type: ignore[import-not-found]  # 3.10 only
 
 from robot_md.registry import (
     extract_manifest_signals,
@@ -188,8 +188,10 @@ def detect_package_metadata(pkg_dir: Path) -> dict:
                 post = frontmatter.load(sf)
             except Exception:
                 continue
-            for k_src, k_dst in (("hardware_tags", hardware_tags),
-                                  ("manifest_signals", manifest_signals)):
+            for k_src, k_dst in (
+                ("hardware_tags", hardware_tags),
+                ("manifest_signals", manifest_signals),
+            ):
                 v = post.metadata.get(k_src)
                 if isinstance(v, list):
                     k_dst.extend(str(x) for x in v)
