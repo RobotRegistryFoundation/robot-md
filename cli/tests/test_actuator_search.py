@@ -113,3 +113,47 @@ def test_search_offline_uses_cache(tmp_path, monkeypatch):
     )
     assert res.exit_code == 0, res.output
     assert "cached-act" in res.stdout
+
+
+import re
+
+from robot_md.actuator import RPN_PATTERN, actuator_search_by_rpn
+
+
+def test_rpn_pattern_matches_well_formed():
+    assert RPN_PATTERN.match("RPN-000000000001")
+    assert not RPN_PATTERN.match("RPN-1")
+    assert not RPN_PATTERN.match("RRN-000000000001")
+
+
+def test_actuator_search_by_rpn_calls_fetch_one(monkeypatch):
+    captured = {}
+
+    def _fake(rpn, **kw):
+        captured["rpn"] = rpn
+        return {"rpn": rpn, "name": "found", "version": "1.0",
+                "description": "x", "hardware_tags": [],
+                "install": {"package_manager": "pip", "package": "found"}}
+
+    monkeypatch.setattr("robot_md.actuator.fetch_one", _fake)
+    out = actuator_search_by_rpn("RPN-000000000001")
+    assert "found" in out
+    assert "RPN-000000000001" in out
+    assert captured["rpn"] == "RPN-000000000001"
+
+
+def test_search_command_dispatches_to_rpn_lookup(monkeypatch):
+    def _fake(rpn, **kw):
+        return {"rpn": rpn, "name": "looked-up", "version": "1.0",
+                "description": "via direct lookup", "hardware_tags": [],
+                "install": {"package_manager": "pip", "package": "x"}}
+
+    monkeypatch.setattr("robot_md.actuator.fetch_one", _fake)
+    res = runner.invoke(
+        app,
+        ["actuator", "search", "RPN-000000000001"],
+        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
+    )
+    assert res.exit_code == 0, res.output
+    assert "looked-up" in res.stdout
+    assert "RPN-000000000001" in res.stdout

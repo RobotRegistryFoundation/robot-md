@@ -28,10 +28,12 @@ from robot_md.registry import (
 )
 from robot_md.rrf_packages import (
     append_version,
+    fetch_one,
     register_package,
 )
 
 _KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+RPN_PATTERN = re.compile(r"^RPN-\d{12}$")
 
 
 def _validate_name(name: str) -> None:
@@ -162,6 +164,13 @@ def actuator_search(
     if not nonzero:
         return format_search_results([], threshold=threshold, limit=limit)
     return format_search_results(nonzero, threshold=threshold, limit=limit)
+
+
+def actuator_search_by_rpn(rpn: str) -> str:
+    """Direct GET against RRF; format the single record like a search hit."""
+    rec = fetch_one(rpn)
+    body = format_search_results([(rec, 1.0)], threshold=0.0, limit=1)
+    return f"{rpn}\n{body}"
 
 
 def detect_package_metadata(pkg_dir: Path) -> dict:

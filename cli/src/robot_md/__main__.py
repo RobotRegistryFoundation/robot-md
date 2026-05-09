@@ -2017,8 +2017,17 @@ def actuator_search_cmd(
     ),
 ) -> None:
     """Search the actuator catalog at https://robotmd.dev/actuators/."""
-    from robot_md.actuator import actuator_search
+    from robot_md.actuator import RPN_PATTERN, actuator_search, actuator_search_by_rpn
     from robot_md.registry import fetch_index
+
+    stripped = (query or "").strip()
+    if RPN_PATTERN.match(stripped):
+        try:
+            typer.echo(actuator_search_by_rpn(stripped))
+            return
+        except Exception as e:
+            typer.secho(f"RPN lookup failed: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(FILE_ERROR) from e
 
     try:
         index = fetch_index(offline=offline)
