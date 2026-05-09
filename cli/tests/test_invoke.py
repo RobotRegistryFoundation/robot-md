@@ -282,7 +282,11 @@ def test_invoke_envelope_raises_on_4xx():
 
 
 def test_invoke_command_help_shows_required_args():
-    res = runner.invoke(app, ["invoke", "--help"])
+    res = runner.invoke(
+        app,
+        ["invoke", "--help"],
+        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
+    )
     assert res.exit_code == 0
     out = res.stdout
     assert "--tool" in out
