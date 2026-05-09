@@ -131,7 +131,10 @@ def iter_all_installed_skills() -> Iterator[tuple[str, Path]]:
             try:
                 for skill_path in iter_skills_for_package(pkg):
                     yield pkg, skill_path
-            except ModuleNotFoundError:
-                # Distribution lists a package that isn't importable.
-                # Skip rather than crash enumeration.
+            except Exception:
+                # Importing arbitrary third-party packages can raise anything
+                # (ModuleNotFoundError for stale RECORD entries; AssertionError
+                # from setuptools' distutils-hack on Py3.10/3.11; ImportError
+                # from packages with optional native deps). Skip rather than
+                # let one bad package crash the whole enumeration.
                 continue
