@@ -2170,7 +2170,7 @@ def _resolve_github_user_or_fail() -> str:
 @actuator_app.command("revoke")
 def actuator_revoke_cmd(
     rpn: str = typer.Argument(..., help="The RPN to revoke (e.g. RPN-000000000007)."),
-    reason: str = typer.Option(..., "--reason", help="Revocation reason (free text)."),
+    reason: str = typer.Option("", "--reason", help="Revocation reason (free text)."),
     github_user: str = typer.Option(
         "", "--github-user", help="GitHub user namespace; defaults to `gh api user`."
     ),
@@ -2179,6 +2179,10 @@ def actuator_revoke_cmd(
     from robot_md.actuator import RPN_PATTERN, _build_revoke_body
     from robot_md.publisher_key import load_or_mint_publisher_key
     from robot_md.rrf_packages import PackageNotFoundError, revoke_package
+
+    if not reason:
+        typer.secho("Missing --reason: provide a revocation reason", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
 
     if not RPN_PATTERN.match(rpn):
         typer.secho(f"Malformed RPN: {rpn}", fg=typer.colors.RED, err=True)
