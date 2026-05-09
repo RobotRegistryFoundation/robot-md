@@ -219,7 +219,111 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
       </div>
     </section>
 
-    <!-- BEATS 4-7 (added in Task 5) -->
+    <!-- BEAT 4: TALK TO CLAUDE -->
+    <section id="talk-to-claude">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 04 — Talk to Claude</p>
+        <h2 class="beat-h">Open Claude Code and ask.</h2>
+
+        <p>
+          With <code>robot-md-mcp</code> installed, Claude Code reads your <code>ROBOT.md</code> as four MCP resources
+          (manifest, capabilities, safety, calibration) and exposes two tools (<code>validate</code>, <code>render</code>).
+          Try any of these:
+        </p>
+
+        <pre class="code">"What can this robot do?"
+"Is this manifest valid?"
+"What are the safety gates?"</pre>
+
+        <p>
+          Claude reads the manifest, calls <code>validate</code> if it needs to check conformance, and answers in
+          natural language — grounded in the file you just generated. <strong>The agent is read-only here.</strong>
+          Layer 2 (MCP) is advisory; it cannot move the robot.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 5: REGISTER -->
+    <section id="register">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 05 — Register</p>
+        <h2 class="beat-h">Mint an RRN.</h2>
+
+        <p>
+          Register your robot with the Robot Registry Foundation. <code>robot-md register</code> POSTs a signed
+          RCAN envelope to <code>robotregistryfoundation.org</code>, mints an <code>RRN-NNNNNNNNNNNN</code>,
+          and writes it back into your manifest's <code>metadata.rrn</code>.
+        </p>
+
+        <pre class="code">robot-md register ROBOT.md</pre>
+
+        <p>
+          You'll see your robot live at <code>https://robotregistryfoundation.org/r/&lt;RRN&gt;</code>. The RRN is
+          the public identifier the audit bundle (beat 7) cryptographically binds to.
+        </p>
+      </div>
+    </section>
+
+    <!-- BEAT 6: RUN A SKILL -->
+    <section id="run-skill">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 06 — Run a skill</p>
+        <h2 class="beat-h">Tell Claude what to do.</h2>
+
+        <p>
+          Now ask Claude to do something — pick any registered skill from your manifest's capabilities section.
+          For example:
+        </p>
+
+        <pre class="code">"Move to home pose."
+"Run the calibration routine."</pre>
+
+        <p>
+          Claude routes the request through <code>robot-md-gateway</code>'s <code>/dispatch</code> endpoint.
+          The gateway checks the manifest, applies the tier policy, runs safety gates, and only then calls into
+          the driver. Every dispatch appends to the audit chain.
+        </p>
+
+        <aside class="gap-callout">
+          <strong>Tool gap (queued):</strong> Today, <code>robot-md-gateway</code> 0.4.0a1 does not ship a
+          motion-OOTB path for fresh readers — its default mode validates and audits, but doesn't execute.
+          Tracking this gap so the cookbook can ship a hardware-less cast next:
+          <a href="https://github.com/RobotRegistryFoundation/robot-md-gateway/issues/17">issue #17 in
+          robot-md-gateway</a>. For runs against real hardware in the meantime, see
+          <a href="/case-studies/">case studies</a>.
+        </aside>
+      </div>
+    </section>
+
+    <!-- BEAT 7: AUDIT BUNDLE -->
+    <section id="audit-bundle">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 07 — See the audit bundle</p>
+        <h2 class="beat-h">Regulator-grade evidence.</h2>
+
+        <p>
+          Each run produces a JSON file in <code>./bundles/</code> — an RCAN-L4 envelope, Ed25519-signed,
+          bound to your RRN. Verify it:
+        </p>
+
+        <pre class="code">rcan verify ./bundles/run-001.json</pre>
+
+        <p>Inline excerpt of what's inside:</p>
+
+        <pre class="code">{
+  "rcan_version": "3.4.0",
+  "rcan_conformance": "L4",
+  "robot": { "rrn": "RRN-000000000123" },
+  "skill_id": "your-skill-id",
+  "signature": { "kid": "robot-2026-key-1" }
+}</pre>
+
+        <p>
+          That's it. Ten minutes from clean machine to a signed, RRN-bound, Layer-4-conformant audit bundle —
+          using only published tools, against any robot.
+        </p>
+      </div>
+    </section>
 
     <!-- BEAT 8 (added in Task 6) -->
 
