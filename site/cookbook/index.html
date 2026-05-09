@@ -325,9 +325,46 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
       </div>
     </section>
 
-    <!-- BEAT 8 (added in Task 6) -->
+    <!-- BEAT 8: CASE-STUDIES BRIDGE -->
+    <section id="case-studies-bridge">
+      <div class="wrap beat-body">
+        <p class="beat-num">Beat 08 — See it in the wild</p>
+        <h2 class="beat-h">Case studies live separately.</h2>
 
-    <!-- AUTHORITY DISCLAIMER + VERIFICATION FOOTER (added in Task 6) -->
+        <p>
+          Want to see this walkthrough running against real hardware, varied models, and varied harnesses?
+          That evidence lives at the case-studies surface — separate from the cookbook so the recipe stays
+          generic and the proof can grow over time.
+        </p>
+
+        <aside class="case-callout">
+          <strong>↗ <a href="/case-studies/">Case studies</a>:</strong> ongoing runs of this walkthrough on
+          real robots, across model + harness + version combinations. Each case study is a self-contained
+          report with the run's signed audit bundle attached. (If the link 404s, the surface is still in
+          flight — the cookbook ships independently of it.)
+        </aside>
+      </div>
+    </section>
+
+    <!-- AUTHORITY DISCLAIMER -->
+    <section id="authority">
+      <div class="wrap">
+        <div class="authority">
+          <h4>Where safety is actually enforced</h4>
+          <p>
+            <code>ROBOT.md</code> is a declaration. Claude Code and <code>robot-md-mcp</code> are
+            <strong>advisory</strong> — they cannot physically move a robot. Physical safety is enforced at Layer 3
+            by <code>robot-md-gateway</code>, which validates every dispatch against the manifest, applies the tier
+            policy, and signs the audit chain. The cookbook walkthrough exercises all four layers; the bundle in
+            beat 7 is the cryptographic receipt.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <p class="verify-line">
+      Last verified against robot-md 1.5.0, robot-md-mcp 0.3.0, robot-md-gateway 0.4.0a1 — <span id="verify-date">2026-05-08</span>
+    </p>
 
   </main>
 </body>
