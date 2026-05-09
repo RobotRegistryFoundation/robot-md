@@ -15,6 +15,8 @@ so `robot-md install-skill` can install it without network access.
 
 from __future__ import annotations
 
+import importlib
+from collections.abc import Iterator
 from pathlib import Path
 
 SKILL_NAME = "using-robot-md"
@@ -57,3 +59,20 @@ def install(
     target_dir.mkdir(parents=True, exist_ok=True)
     target_file.write_text(skill_content())
     return target_file
+
+
+def iter_skills_for_package(package_name: str) -> Iterator[Path]:
+    """Yield each `<package>/skills/*.SKILL.md` file in an installed package.
+
+    Resolves `package_name` via importlib (must be importable; raises
+    ModuleNotFoundError otherwise). Empty iterator if the package has no
+    `skills/` subdir.
+    """
+    mod = importlib.import_module(package_name)
+    if not mod.__file__:
+        return
+    pkg_dir = Path(mod.__file__).parent
+    skills_dir = pkg_dir / "skills"
+    if not skills_dir.is_dir():
+        return
+    yield from sorted(skills_dir.glob("*.SKILL.md"))
