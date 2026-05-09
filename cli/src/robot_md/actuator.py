@@ -30,6 +30,8 @@ from robot_md.rrf_packages import (
     append_version,
     fetch_one,
     register_package,
+    revoke_package,
+    transfer_package,
 )
 
 _KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -310,6 +312,34 @@ def _build_register_body(meta: dict, kp: KeyPair) -> dict:
 
 def _build_version_body(version: str, kp: KeyPair) -> dict:
     return _sign({"version": version}, kp)
+
+
+def _build_revoke_body(reason: str, kp: KeyPair) -> dict:
+    return _sign({"reason": reason}, kp)
+
+
+def _build_transfer_body(new_pq_pub: str, new_pq_kid: str, new_ed_pub: str, kp: KeyPair) -> dict:
+    return _sign(
+        {
+            "new_pq_signing_pub": new_pq_pub,
+            "new_pq_kid": new_pq_kid,
+            "new_ed25519_pub": new_ed_pub,
+        },
+        kp,
+    )
+
+
+def _read_pub_keys_from_pem(pem_path: Path) -> tuple[str, str, str]:
+    """Extract (pq_signing_pub_b64, pq_kid, ed25519_pub_b64) from a PEM bundle.
+
+    Format: a PEM file with a sidecar metadata.json next to it. Pattern after how
+    publisher_key writes the private bundle.
+    """
+    metadata_path = pem_path.with_suffix(".metadata.json")
+    if not metadata_path.is_file():
+        raise FileNotFoundError(f"missing sidecar metadata: {metadata_path}")
+    meta = json.loads(metadata_path.read_text())
+    return meta["pq_signing_pub"], meta["pq_kid"], meta["ed25519_pub"]
 
 
 def actuator_publish_first_time(pkg_dir: Path, *, github_user: str) -> dict:

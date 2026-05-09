@@ -2145,6 +2145,84 @@ def actuator_publish_cmd(
         typer.echo(f"  → {out['record_url']}")
 
 
+def _resolve_github_user_or_fail() -> str:
+    import subprocess
+
+    try:
+        out = subprocess.run(
+            ["gh", "api", "user", "--jq", ".login"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        if out:
+            return out
+    except Exception:
+        pass
+    typer.secho(
+        "Could not auto-detect GitHub user. Pass --github-user.",
+        fg=typer.colors.RED, err=True,
+    )
+    raise typer.Exit(FILE_ERROR)
+
+
+@actuator_app.command("revoke")
+def actuator_revoke_cmd(
+    rpn: str = typer.Argument(..., help="The RPN to revoke (e.g. RPN-000000000007)."),
+    reason: str = typer.Option(..., "--reason", help="Revocation reason (free text)."),
+    github_user: str = typer.Option("", "--github-user",
+        help="GitHub user namespace; defaults to `gh api user`."),
+) -> None:
+    """Revoke a published package. Owner-only."""
+    from robot_md.actuator import RPN_PATTERN, _build_revoke_body, revoke_package
+    from robot_md.publisher_key import load_or_mint_publisher_key
+    from robot_md.rrf_packages import PackageNotFoundError
+
+    if not RPN_PATTERN.match(rpn):
+        typer.secho(f"Malformed RPN: {rpn}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
+
+    if not github_user:
+        github_user = _resolve_github_user_or_fail()
+
+    kp = load_or_mint_publisher_key(github_user)
+    body = _build_revoke_body(reason, kp)
+    try:
+        revoke_package(rpn, signed_body=body)
+        typer.echo(f"Revoked {rpn}: {reason}")
+    except PackageNotFoundError:
+        typer.secho(f"No package with RPN {rpn}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
+
+
+@actuator_app.command("transfer")
+def actuator_transfer_cmd(
+    rpn: str = typer.Argument(..., help="The RPN to transfer."),
+    to_key: Path = typer.Option(..., "--to-key",
+        help="Path to a PEM file (with .metadata.json sidecar) holding the new owner's public keys."),
+    github_user: str = typer.Option("", "--github-user"),
+) -> None:
+    """Transfer a package's publisher key. Owner-only — current owner signs."""
+    from robot_md.actuator import RPN_PATTERN, _build_transfer_body, _read_pub_keys_from_pem, transfer_package
+    from robot_md.publisher_key import load_or_mint_publisher_key
+    from robot_md.rrf_packages import PackageNotFoundError
+
+    if not RPN_PATTERN.match(rpn):
+        typer.secho(f"Malformed RPN: {rpn}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
+
+    if not github_user:
+        github_user = _resolve_github_user_or_fail()
+
+    new_pq_pub, new_pq_kid, new_ed_pub = _read_pub_keys_from_pem(to_key)
+    kp = load_or_mint_publisher_key(github_user)
+    body = _build_transfer_body(new_pq_pub, new_pq_kid, new_ed_pub, kp)
+    try:
+        transfer_package(rpn, signed_body=body)
+        typer.echo(f"Transferred {rpn} to publisher {new_pq_kid}")
+    except PackageNotFoundError:
+        typer.secho(f"No package with RPN {rpn}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR)
+
+
 @app.command("publish-discovery")
 def publish_discovery(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
