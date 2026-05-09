@@ -10,6 +10,12 @@ import re
 from importlib import resources
 from pathlib import Path
 
+from robot_md.registry import (
+    extract_manifest_signals,
+    format_search_results,
+    score_entry,
+)
+
 _KEBAB_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 
@@ -120,3 +126,24 @@ def scaffold_actuator_package(
     )
 
     return pkg_root
+
+
+def actuator_search(
+    index: dict,
+    *,
+    query: str,
+    manifest: dict | None,
+    type_filter: str = "actuator",
+    threshold: float = 0.3,
+    limit: int = 5,
+) -> str:
+    """Filter index entries by type, score them against query+manifest,
+    and return the formatted output string."""
+    entries = [e for e in index.get("entries", []) if e.get("type") == type_filter]
+    signals = extract_manifest_signals(manifest) if manifest else None
+    scored = [(e, score_entry(e, query=query, manifest_signals=signals)) for e in entries]
+    scored.sort(key=lambda pair: pair[1], reverse=True)
+    nonzero = [pair for pair in scored if pair[1] > 0.0]
+    if not nonzero:
+        return format_search_results([], threshold=threshold, limit=limit)
+    return format_search_results(nonzero, threshold=threshold, limit=limit)
