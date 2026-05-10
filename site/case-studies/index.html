@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Case studies — ROBOT.md</title>
+  <meta name="description"
+    content="Real operators wiring real robots through the OpenCastor / RobotRegistryFoundation stack — package, registration, certification — with cert IDs you can verify yourself.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Case studies — ROBOT.md">
+  <meta property="og:description" content="Real operators. Real evidence. Cert IDs you can verify yourself.">
+  <meta property="og:url" content="https://robotmd.dev/case-studies/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/case-studies/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    /* Page-specific styles — shared tokens in /css/design.css */
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    footer.foot {
+      padding: 28px 0 44px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--rule);
+    }
+    footer.foot a { color: var(--ink-3) }
+    footer.foot a:hover { color: var(--accent) }
+
+    /* ============================================================
+       CASE LIST
+       ============================================================ */
+    .case-list {
+      padding: 56px 0;
+    }
+
+    .case-card {
+      border: 1px solid var(--rule);
+      background: var(--paper-2);
+      margin-bottom: 24px;
+      max-width: 760px;
+    }
+    .case-card a {
+      display: block;
+      padding: 28px 28px 24px;
+      text-decoration: none;
+      border: none;
+    }
+    .case-card a:hover { background: var(--paper-3) }
+    .case-card h2 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(22px, 2.5vw, 28px);
+      letter-spacing: -0.01em;
+      margin: 0 0 10px;
+      color: var(--ink);
+    }
+    .case-card p {
+      color: var(--ink-2);
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+    .case-card p:last-child { margin-bottom: 0 }
+
+    .case-status {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 2px;
+      margin-bottom: 12px;
+    }
+    .case-status--provisional {
+      background: var(--accent-wash);
+      color: var(--accent-ink);
+    }
+
+    .case-meta {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-3) !important;
+      letter-spacing: .04em;
+    }
+
+    .case-list__footer {
+      max-width: 760px;
+      margin: 32px 0 0;
+      font-size: 14px;
+      color: var(--ink-3);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== SITE NAV ===== -->
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="https://docs.robotmd.dev/spec/">Spec</a>
+        <a href="/agents/">Agents</a>
+        <a href="https://docs.robotmd.dev/mcp/">MCP</a>
+        <a href="/actuators/">Actuators</a>
+        <a href="/registry/">Registry</a>
+        <a href="https://docs.robotmd.dev/compliance/">Compliance</a>
+        <a href="/managed-agents/">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+      <div class="page-eyebrow">
+        <span>Case studies</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h1 class="page-heading">Real operators.<br><em>Real evidence.</em></h1>
+      <p class="page-lede">
+        Each case study documents one operator wiring a real robot through the
+        OpenCastor / RobotRegistryFoundation stack — package, registration,
+        certification — with cert IDs you can verify yourself.
+      </p>
+    </div>
+  </header>
+
+  <!-- ===== CASE LIST ===== -->
+  <main>
+    <div class="wrap case-list">
+
+      <article class="case-card">
+        <a href="/case-studies/bob-so-arm101/">
+          <p class="case-status case-status--provisional">Track 3 — PROVISIONAL</p>
+          <h2>Bob — SO-ARM101</h2>
+          <p>
+            RPN-000000000002 dispatched end-to-end on a Raspberry Pi 5 with 5 cert IDs covering
+            bypass-denial, gated motion, replay defense, and 100-iteration 6-joint
+            range-of-motion fidelity.
+          </p>
+          <p class="case-meta">RRN-000000000002 · so-arm101 · witness Craig</p>
+        </a>
+      </article>
+
+      <p class="case-list__footer">
+        More case studies will appear here as additional operators register their robots.
+      </p>
+
+    </div>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="wrap foot">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="/cookbook/">Cookbook</a> ·
+      <a href="https://docs.robotmd.dev/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/robots">Robots</a> ·
+      <a href="/status">Status</a> ·
+      <a href="/report.html">Report issue</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+
+</body>
+
+</html>

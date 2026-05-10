@@ -318,7 +318,7 @@ robot-md actuator search "feetech bus servo"</pre>
           body and verify the signature yourself:
         </p>
 
-        <pre class="code">curl -s https://robotregistryfoundation.org/v2/packages/RPN-000000000001/proof \
+        <pre class="code">curl -s https://robotregistryfoundation.org/v2/packages/RPN-000000000002/proof \
   | python3 -c "import json,sys,base64,rcan; rec=json.loads(sys.stdin.read()); sys.exit(0 if rcan.verify_body(rec, base64.b64decode(rec['pq_signing_pub'])) else 1)" \
   &amp;&amp; echo OK</pre>
 
@@ -331,10 +331,10 @@ robot-md actuator search "feetech bus servo"</pre>
         <p>Inline excerpt of what the signed record looks like:</p>
 
         <pre class="code">{
-  "name": "robot-md-example-actuator",
-  "version": "0.1.0",
+  "name": "so-arm101-actuator",
+  "version": "0.2.1",
   "package_type": "actuator",
-  "hardware_tags": ["example", "tutorial"],
+  "hardware_tags": ["so-arm101", "scs-bus"],
   "pq_signing_pub": "...",
   "pq_kid": "publisher-...",
   "ed25519_pub": "...",
@@ -345,6 +345,8 @@ robot-md actuator search "feetech bus servo"</pre>
           That's it. Ten minutes from clean machine to a verified, RPN-anchored, RCAN-signed actuator
           entry — using only published tools, against any robot.
         </p>
+
+        <p>For an end-to-end story of a real operator wiring this package into a registered robot, see <a href="/case-studies/bob-so-arm101/">/case-studies/bob-so-arm101/</a>.</p>
       </div>
     </section>
 
