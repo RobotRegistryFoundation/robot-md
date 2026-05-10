@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bob — SO-ARM101 (Track 3 PROVISIONAL) — case study — ROBOT.md</title>
+  <meta name="description"
+    content="End-to-end walkthrough: SO-ARM101 on Raspberry Pi 5, 5 cert IDs covering bypass-denial, gated motion, replay defense, and 6-joint range-of-motion fidelity. All countersigned by rrf-root. Curl-verifiable.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Bob — SO-ARM101 (Track 3 PROVISIONAL) — case study">
+  <meta property="og:description" content="5 cert IDs. 2 run-bundles. All RRF-countersigned, all curl-verifiable.">
+  <meta property="og:url" content="https://robotmd.dev/case-studies/bob-so-arm101/">
+  <meta property="og:type" content="article">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/case-studies/bob-so-arm101/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    /* Page-specific styles — shared tokens in /css/design.css */
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    footer.foot {
+      padding: 28px 0 44px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--rule);
+    }
+    footer.foot a { color: var(--ink-3) }
+    footer.foot a:hover { color: var(--accent) }
+
+    /* ============================================================
+       CASE STUDY BODY
+       ============================================================ */
+    .breadcrumb {
+      padding: 16px 0 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      color: var(--ink-3);
+    }
+    .breadcrumb a { color: var(--ink-3) }
+    .breadcrumb a:hover { color: var(--accent) }
+
+    .case-status {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 2px;
+      margin: 12px 0 20px;
+    }
+    .case-status--provisional {
+      background: var(--accent-wash);
+      color: var(--accent-ink);
+    }
+
+    /* Meta grid */
+    .case-meta-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 20px;
+      font-size: 14px;
+      color: var(--ink-2);
+      margin: 0;
+      max-width: 560px;
+    }
+    .case-meta-grid dt {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      padding-top: 2px;
+    }
+    .case-meta-grid dd { margin: 0 }
+
+    /* Body sections */
+    .case-body {
+      padding: 48px 0 72px;
+    }
+    .case-body section {
+      max-width: 760px;
+      padding: 40px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .case-body section:first-of-type { border-top: 0; padding-top: 0 }
+    .case-body h2 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(22px, 2.5vw, 28px);
+      letter-spacing: -0.01em;
+      margin: 0 0 16px;
+    }
+    .case-body h3 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 18px;
+      margin: 28px 0 12px;
+    }
+    .case-body p { margin: 0 0 14px }
+    .case-body ol, .case-body ul {
+      margin: 0 0 14px;
+      padding-left: 24px;
+    }
+    .case-body li { margin-bottom: 8px }
+
+    /* Evidence table */
+    .evidence-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 16px 0 24px;
+    }
+    .evidence-table th {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 2px solid var(--rule);
+      white-space: nowrap;
+    }
+    .evidence-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--paper-3);
+      vertical-align: top;
+      line-height: 1.45;
+    }
+    .evidence-table tr:last-child td { border-bottom: none }
+    .evidence-table td code {
+      font-family: var(--mono);
+      font-size: 11px;
+      background: var(--paper-2);
+      padding: 2px 5px;
+      border-radius: 2px;
+      word-break: break-all;
+    }
+    @media (max-width: 720px) {
+      .evidence-table { display: block; overflow-x: auto }
+    }
+
+    /* Code blocks */
+    pre.code {
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      padding: 14px 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-x: auto;
+      margin: 14px 0;
+    }
+    code { font-family: var(--mono); font-size: 0.92em; background: var(--paper-2); padding: 1px 5px; border-radius: 2px; }
+
+    /* Not-signed-off aside */
+    .gap-callout {
+      border-left: 3px solid var(--accent);
+      background: #FBF4DA;
+      padding: 14px 18px;
+      margin: 18px 0;
+      font-size: 14px;
+      color: var(--ink-2);
+    }
+    .gap-callout strong { color: var(--accent-ink) }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== SITE NAV ===== -->
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="https://docs.robotmd.dev/spec/">Spec</a>
+        <a href="/agents/">Agents</a>
+        <a href="https://docs.robotmd.dev/mcp/">MCP</a>
+        <a href="/actuators/">Actuators</a>
+        <a href="/registry/">Registry</a>
+        <a href="https://docs.robotmd.dev/compliance/">Compliance</a>
+        <a href="/managed-agents/">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+      <p class="breadcrumb"><a href="/case-studies/">← Case studies</a></p>
+      <div class="page-eyebrow">
+        <span>Case study</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h1 class="page-heading">Bob — <em>SO-ARM101</em></h1>
+      <p class="case-status case-status--provisional">Track 3 — PROVISIONAL</p>
+
+      <dl class="case-meta-grid">
+        <dt>RRN</dt><dd>RRN-000000000002</dd>
+        <dt>Robot class</dt><dd>so-arm101</dd>
+        <dt>Witness</dt><dd>Craig (witness-bob-craigm)</dd>
+        <dt>Declaration</dt><dd>2026-05-10 (r2)</dd>
+        <dt>Status</dt><dd>PROVISIONAL — gated on physical ESTOP hardware</dd>
+      </dl>
+    </div>
+  </header>
+
+  <!-- ===== CASE STUDY BODY ===== -->
+  <main>
+    <div class="wrap case-body">
+
+      <!-- PROBLEM -->
+      <section id="problem">
+        <h2>Problem</h2>
+        <p>
+          On 2026-05-09 the RobotRegistryFoundation registry was reset, invalidating every cert ID,
+          transparency-log entry, and run-bundle previously issued. Re-establishing public, verifiable
+          evidence required rebuilding from zero against real (non-stub) hardware before any claim
+          could carry weight.
+        </p>
+      </section>
+
+      <!-- APPROACH -->
+      <section id="approach">
+        <h2>Approach</h2>
+        <p>Three sequential phases:</p>
+        <ol>
+          <li>
+            <strong>Phase 1 — real actuator.</strong> Ship <code>so-arm101-actuator</code> v0.1.1 to
+            PyPI (RPN-000000000002), wire it through <code>robot-md-gateway</code> via entry-point
+            dispatch on Bob (Raspberry Pi 5 + SO-ARM101 over <code>/dev/ttyACM0</code>).
+          </li>
+          <li>
+            <strong>Phase 2 — re-issue cert envelope.</strong> Re-run the prior cert-intake suite
+            (<code>GW-001</code>, <code>GATED-MOTION-100</code>, <code>REPLAY-10</code>) post-reset,
+            and add <code>MOTION-FIDELITY-100</code> against real hardware on the gravity-neutral
+            <code>shoulder_pan</code> joint. 4 cert IDs minted at log indices 1–4.
+          </li>
+          <li>
+            <strong>Phase 3 — range-of-motion breadth.</strong> Calibrate Bob's actual reachable
+            joint ranges (three previously-unknown mechanical stops discovered: elbow_flex
+            floor ~−0.241 rad, wrist_flex ceiling ~+0.462 rad, wrist_roll ceiling ~+1.537 rad).
+            Ship <code>so-arm101-actuator</code> v0.2.1 with Bob-calibrated <code>SAFE_RANGE_RAD</code>
+            + <code>SO_ARM101_MOVE_TOLERANCE_RAD</code> env override. Run <code>FULL-SWEEP-100</code>
+            at tolerance 0.07 rad. 5th cert minted at log index 5.
+          </li>
+        </ol>
+      </section>
+
+      <!-- EVIDENCE -->
+      <section id="evidence">
+        <h2>Evidence</h2>
+        <p>
+          All five cert IDs and both run-bundles are countersigned by <code>rrf-root</code> in the
+          public transparency log. Each row below includes a copy-pasteable verification command.
+        </p>
+
+        <table class="evidence-table">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Iterations</th>
+              <th>Outcome</th>
+              <th>Cert ID</th>
+              <th>Log idx</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>GW-001 (<code>/dev/ttyACM0</code> bypass denied)</td>
+              <td>10</td>
+              <td>10/10 EACCES</td>
+              <td><code>cert_86cf536308b20cd925684084af2d663c</code></td>
+              <td>1</td>
+            </tr>
+            <tr>
+              <td>bob.local/GATED-MOTION-100 (dispatch path)</td>
+              <td>100</td>
+              <td>100/100 within 5 s; p50=21 ms p95=25 ms</td>
+              <td><code>cert_0e0ca979ca6925cc8ec4131a15c20b0e</code></td>
+              <td>2</td>
+            </tr>
+            <tr>
+              <td>bob.local/REPLAY-10 (in-process replay defense)</td>
+              <td>10</td>
+              <td>10/10 deny:replay</td>
+              <td><code>cert_44fad966dc2b8987cf2cfa60e77931bc</code></td>
+              <td>3</td>
+            </tr>
+            <tr>
+              <td>bob.local/MOTION-FIDELITY-100 (shoulder_pan only)</td>
+              <td>100</td>
+              <td>100/100 reached; p50=341 ms p95=369 ms</td>
+              <td><code>cert_c4ec0bda561e21e621d4acfb0c760128</code></td>
+              <td>4</td>
+            </tr>
+            <tr>
+              <td>bob.local/FULL-SWEEP-100 (all 6 joints, tolerance 0.07 rad)</td>
+              <td>100</td>
+              <td>100/100 reached; p50=509 ms p95=759 ms max=825 ms</td>
+              <td><code>cert_c19b998f6a67d97699b8fd66bd2bae1d</code></td>
+              <td>5</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Verify yourself</h3>
+        <pre class="code">curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/cert-intake/cert_86cf536308b20cd925684084af2d663c/proof
+curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/cert-intake/cert_0e0ca979ca6925cc8ec4131a15c20b0e/proof
+curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/cert-intake/cert_44fad966dc2b8987cf2cfa60e77931bc/proof
+curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/cert-intake/cert_c4ec0bda561e21e621d4acfb0c760128/proof
+curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/cert-intake/cert_c19b998f6a67d97699b8fd66bd2bae1d/proof
+curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/run-bundles/runbundle_0d215563624c
+curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/run-bundles/runbundle_8ec34ed19180</pre>
+        <p>
+          Each call returns JSON with <code>transparency_log_index</code> and
+          <code>rrf_log_signature</code>. The <code>-A</code> User-Agent matters —
+          Cloudflare blocks the default <code>curl/&lt;version&gt;</code>.
+        </p>
+      </section>
+
+      <!-- RESULT -->
+      <section id="result">
+        <h2>Result</h2>
+        <p>
+          <strong>Signed off:</strong> bypass denial, gated dispatch latency, replay defense,
+          single-joint motion fidelity, and 6-joint range-of-motion fidelity — all on real hardware,
+          all post-reset.
+        </p>
+
+        <div class="gap-callout">
+          <strong>Not signed off:</strong>
+          <ul style="margin: 8px 0 0; padding-left: 20px">
+            <li>
+              <code>SF-001</code> (ESTOP latency ≤ 100 ms physical) — gated on physical ESTOP
+              hardware the operator does not currently have.
+            </li>
+            <li>
+              <code>SF-002</code> (network-loss safe-stop ≤ 3.5 s) — N/A on this rig
+              (WiFi-only; no wired interface to drop).
+            </li>
+          </ul>
+        </div>
+
+        <p>
+          <strong>Path to NORMATIVE:</strong> add <code>SF-001</code> evidence against physical
+          ESTOP, then re-issue this declaration as NORMATIVE citing all six cert IDs.
+        </p>
+      </section>
+
+      <!-- REPRODUCIBILITY -->
+      <section id="reproducibility">
+        <h2>Reproducibility</h2>
+        <p>To replicate this evidence on a comparable rig:</p>
+        <ol>
+          <li>
+            <code>pip install so-arm101-actuator==0.2.1</code> on a host wired to an SO-ARM101
+            over <code>/dev/ttyACM0</code>.
+          </li>
+          <li>
+            Calibrate your rig's <code>SAFE_RANGE_RAD</code> via a sweep test (the v0.2.1
+            defaults reflect Bob's mechanical stops; your rig may differ). Set per-joint
+            overrides via <code>SO_ARM101_SAFE_RANGE_RAD</code> env var if needed.
+          </li>
+          <li>
+            Pick a <code>SO_ARM101_MOVE_TOLERANCE_RAD</code> that matches your rig's steady-state
+            precision (the v0.2.1 default is 0.02; Bob runs at 0.07 to accommodate gravity-load
+            undershoot on shoulder_lift).
+          </li>
+          <li>
+            Install + run <code>robot-md-gateway</code> 0.5.0a2 via systemd; register your robot
+            under your own RRN.
+          </li>
+          <li>
+            Pre-sign INVOKE envelopes with your operator key (see
+            <a href="/spec/">spec</a> for envelope canonicalization rules).
+          </li>
+          <li>
+            Dispatch envelopes through the gateway; collect outcome telemetry; build cert +
+            run-bundle bodies; POST to <code>/v2/cert-intake</code> and
+            <code>/v2/run-bundles</code>.
+          </li>
+          <li>Verify each ID round-trips via <code>/proof</code>.</li>
+        </ol>
+        <p>
+          The pose list for <code>FULL-SWEEP-100</code> is deterministic given seed:
+          <code>so_arm101_actuator.sweep.generate_sweep_poses(iterations=100, seed=42)</code> —
+          same seed, same poses.
+        </p>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="wrap foot">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="/case-studies/">Case studies</a> ·
+      <a href="/cookbook/">Cookbook</a> ·
+      <a href="https://docs.robotmd.dev/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/status">Status</a> ·
+      <a href="/report.html">Report issue</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+
+</body>
+
+</html>
