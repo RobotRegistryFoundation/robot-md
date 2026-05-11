@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Registered robots — ROBOT.md</title>
 <meta name="description" content="Browse robots registered on the Robot Registry Foundation. Live data from rcan.dev. Each card links to the robot's public resolver and its ROBOT.md entry.">
-<meta name="theme-color" content="#F4EFE6">
+<meta name="theme-color" content="var(--paper)">
 <meta property="og:title" content="Registered robots — ROBOT.md">
 <meta property="og:description" content="Browse the live list of robots registered with ROBOT.md / RCAN.">
 <meta property="og:url" content="https://robotmd.dev/robots">
@@ -17,18 +17,18 @@
 
 <style>
   :root{
-    --paper:#F4EFE6;
-    --paper-2:#ECE5D6;
-    --paper-3:#DFD5BF;
-    --ink:#111110;
-    --ink-2:#2A2825;
-    --ink-3:#5A574F;
-    --ink-4:#8A8578;
-    --rule:#1d1c1a;
-    --accent:#B34A2A;
-    --accent-ink:#5A1F0E;
-    --accent-wash:#EBD9C9;
-    --ok:#2F6B3E;
+    --paper:var(--paper);
+    --paper-2:var(--paper-2);
+    --paper-3:var(--paper-3);
+    --ink:var(--ink);
+    --ink-2:var(--ink-2);
+    --ink-3:var(--ink-3);
+    --ink-4:var(--ink-4);
+    --rule:var(--rule);
+    --accent:var(--accent);
+    --accent-ink:var(--accent-ink);
+    --accent-wash:var(--accent-wash);
+    --ok:var(--ok);
 
     --sans:'Inter Tight', system-ui, -apple-system, Helvetica, Arial, sans-serif;
     --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -61,7 +61,7 @@
   .card .desc{font-family:var(--serif);font-style:italic;font-size:14px;color:var(--ink-2);line-height:1.5;margin:4px 0 8px;flex:1 1 auto}
   .card .tier{display:inline-block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;padding:3px 8px;background:var(--accent-wash);color:var(--accent-ink);font-weight:600;border:1px solid var(--accent);align-self:flex-start}
   .card .tier.verified{background:#D4E5CF;color:var(--ok);border-color:var(--ok)}
-  .card .tier.manufacturer,.card .tier.certified{background:#1d1c1a;color:var(--paper);border-color:var(--rule)}
+  .card .tier.manufacturer,.card .tier.certified{background:var(--rule);color:var(--paper);border-color:var(--rule)}
   .card .meta{display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px dashed var(--ink-4);font-family:var(--mono);font-size:11px;color:var(--ink-3)}
   .card .arrow{font-family:var(--mono);color:var(--accent);font-size:14px}
   .card a.cover{position:absolute;inset:0;border-bottom:none}
@@ -71,6 +71,7 @@
 
   footer{margin-top:48px;padding-top:20px;border-top:1px solid var(--ink-4);font-family:var(--mono);font-size:12px;color:var(--ink-3);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
 </style>
+  <link rel="stylesheet" href="/css/tokens.css">
 </head>
 <body>
 
