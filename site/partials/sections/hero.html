@@ -1,0 +1,39 @@
+  <section class="hero">
+    <div class="wrap">
+
+      <div class="hero-eyebrow">
+        <span>
+          <span class="status-dot" aria-hidden="true"></span>
+          <span data-stat="robot_md_version">v1.4.0</span> · <span data-stat="rrf_endpoints_live">5</span> §22–26 endpoints live
+        </span>
+        <span class="rule-line" aria-hidden="true"></span>
+        <span>Getting started · one line</span>
+      </div>
+
+      <h1 class="hero-heading">
+        The manifest agents read<br>
+        before they touch your robot.
+      </h1>
+
+      <p class="hero-lede">
+        ROBOT.md is to a robot what CLAUDE.md and AGENTS.md are to a codebase.
+        One file — YAML + markdown — so a planning LLM can safely operate a
+        single robot. Speaks the <a href="https://rcan.dev/compatibility">RCAN protocol</a>. Built for Anthropic surfaces,
+        flexible for any MCP-aware agent.
+      </p>
+
+      <!-- Install command + copy button -->
+      <div class="install-block" id="install">
+        <pre aria-label="Install command"><span class="prompt">$</span> <span class="cmd">pip install robot-md &amp;&amp; robot-md init</span></pre>
+        <button class="install-copy-btn"
+                aria-label="Copy install command"
+                data-copy="pip install robot-md && robot-md init">
+          Copy
+        </button>
+      </div>
+
+      <!-- Proof bar — populated at page-load by /js/stats.js from /_stats.json -->
+<!--#include partials/proof-bar.html-->
+
+    </div>
+  </section>
