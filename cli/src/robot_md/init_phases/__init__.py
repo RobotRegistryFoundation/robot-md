@@ -26,6 +26,7 @@ from robot_md.init_phases.calibrate_extrinsic import phase_calibrate_extrinsic  
 from robot_md.init_phases.calibrate_sign import phase_calibrate_sign  # noqa: E402
 from robot_md.init_phases.calibrate_zero import phase_calibrate_zero  # noqa: E402
 from robot_md.init_phases.compliance_scaffold import phase_compliance_scaffold  # noqa: E402
+from robot_md.init_phases.install_backend import phase_install_backend  # noqa: E402
 from robot_md.init_phases.install_mcp import phase_install_mcp  # noqa: E402
 from robot_md.init_phases.install_skill import phase_install_skill  # noqa: E402
 from robot_md.init_phases.register import phase_register  # noqa: E402
@@ -41,6 +42,7 @@ __all__ = [
     "phase_calibrate_sign",
     "phase_calibrate_zero",
     "phase_compliance_scaffold",
+    "phase_install_backend",
     "phase_install_mcp",
     "phase_install_skill",
     "phase_register",

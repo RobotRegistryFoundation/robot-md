@@ -57,6 +57,7 @@ def test_default_flow_runs_all_phases_in_order(tmp_path, fake_scan):
 
     with (
         patch("robot_md.init.scan_system", return_value=fake_scan),
+        patch("robot_md.init.phase_install_backend", side_effect=_track("install_backend")),
         patch("robot_md.init.phase_write_manifest", side_effect=_track("write_manifest")),
         patch("robot_md.init.phase_register", side_effect=_track("register")),
         patch("robot_md.init.phase_install_mcp", side_effect=_track("install_mcp")),
@@ -80,8 +81,10 @@ def test_default_flow_runs_all_phases_in_order(tmp_path, fake_scan):
 
     assert rc == 0
     # install_mcp deprecated per SP1 R1 — no longer called by default_flow.
+    # install_backend runs between write_manifest and register (Spec A Task 17).
     assert calls == [
         "write_manifest",
+        "install_backend",
         "register",
         "install_skill",
         "sign_cal",
@@ -135,6 +138,7 @@ def test_non_fatal_failures_continue_and_exit_zero(tmp_path, fake_scan):
 
     with (
         patch("robot_md.init.scan_system", return_value=fake_scan),
+        patch("robot_md.init.phase_install_backend", return_value=_ok("install_backend")),
         patch("robot_md.init.phase_write_manifest", return_value=_ok("write_manifest")),
         patch("robot_md.init.phase_install_mcp", return_value=_fail("install_mcp")),
         patch("robot_md.init.phase_install_skill", return_value=_ok("install_skill")),
@@ -172,6 +176,7 @@ def test_skip_flags_omit_phases(tmp_path, fake_scan):
 
     with (
         patch("robot_md.init.scan_system", return_value=fake_scan),
+        patch("robot_md.init.phase_install_backend", return_value=_ok("install_backend")),
         patch("robot_md.init.phase_write_manifest", side_effect=_rec("write_manifest")),
         patch("robot_md.init.phase_register", side_effect=_rec("register")),
         patch("robot_md.init.phase_install_mcp", side_effect=_rec("install_mcp")),
@@ -204,6 +209,10 @@ def test_tally_prints_one_line_per_executed_phase(tmp_path, fake_scan, capsys):
     _zero_msg = "zero_pose_steps patched"
     with (
         patch("robot_md.init.scan_system", return_value=fake_scan),
+        patch(
+            "robot_md.init.phase_install_backend",
+            return_value=_ok("install_backend"),
+        ),
         patch(
             "robot_md.init.phase_write_manifest",
             return_value=_ok("write_manifest", "wrote ROBOT.md"),
@@ -287,6 +296,7 @@ def test_claude_md_refresh_runs_after_register_so_rrn_is_not_stale(tmp_path, fak
 
     with (
         patch("robot_md.init.scan_system", return_value=fake_scan),
+        patch("robot_md.init.phase_install_backend", return_value=_ok("install_backend")),
         patch("robot_md.init.phase_register", side_effect=_fake_register),
         patch("robot_md.init.phase_install_mcp", return_value=_ok("install_mcp")),
         patch("robot_md.init.phase_install_skill", return_value=_ok("install_skill")),
