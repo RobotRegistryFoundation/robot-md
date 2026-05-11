@@ -2589,10 +2589,12 @@ def dashboard_serve(
 from robot_md.hotplug.cli import app as hotplug_daemon_app  # noqa: E402
 from robot_md.hotplug.cli import operator_app as hotplug_operator_app  # noqa: E402
 from robot_md.spatial_eval.cli import app as spatial_eval_app  # noqa: E402
+from robot_md.trial import trial_app  # noqa: E402
 
 app.add_typer(hotplug_daemon_app, name="hotplug-daemon")
 app.add_typer(hotplug_operator_app, name="hotplug")
 app.add_typer(spatial_eval_app, name="spatial-eval")
+app.add_typer(trial_app, name="trial")
 
 
 if __name__ == "__main__":

@@ -570,3 +570,13 @@ def test_finalize_refuses_partial_trial(trial_home):
     result = CliRunner().invoke(trial_app, ["finalize", "--trial", d.name])
     assert result.exit_code != 0
     assert "10" in result.output  # complaint mentions expected count
+
+
+def test_trial_subcommand_registered_in_main_cli():
+    """`robot-md trial --help` should list start/iteration/finalize/abort."""
+    import subprocess
+
+    result = subprocess.run(["robot-md", "trial", "--help"], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    for cmd in ("start", "iteration", "finalize", "abort"):
+        assert cmd in result.stdout, f"trial {cmd} not registered"
