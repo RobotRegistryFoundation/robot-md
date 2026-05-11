@@ -9,6 +9,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.10.3] - 2026-05-11
+
+### Fixed
+- **Cold-install UX: serial-bus probe failures are no longer silent.**
+  Previously, when `/dev/ttyACM*` was hardened to gateway-only ownership
+  (the default udev rule on cert-bearing rigs), `robot-md init`'s
+  auto-discovery would catch the `PermissionError`, swallow it, and fall
+  back to `preset: minimal` — operator only noticed when the rendered
+  manifest had no `arm.pick` / `arm.place` capabilities. `_probe_servo_buses`
+  now catches `PermissionError` specifically, surfaces a stderr warning
+  with the exact remediation command, and appends to `scan.warnings`.
+  `scan_feetech` re-raises `PermissionError` unchanged instead of wrapping
+  it in a generic `RuntimeError`.
+- **`robot-md init --force` preserves `metadata.rrn` + `metadata.record_url`.**
+  Previously, `--force` regenerated the manifest from scratch via
+  `merge_preset_into_draft`, dropping the operator's already-minted RRN
+  and orphaning the signing keypair under `~/.robot-md/keys/<rrn>.signing.json`.
+  `phase_write_manifest` now reads the existing manifest's frontmatter
+  before regenerating and carries forward the two registration-identity
+  fields. A subsequent `robot-md register` run still overwrites them
+  (correct), but a `--force` re-init without re-register no longer
+  silently orphans the keypair.
+
+### Added
+- **`robot-md install-gateway` adds `$SUDO_USER` to the `robot-md-gateway` group.**
+  After the systemd unit is installed and the gateway is verified active,
+  the invoking user (`$SUDO_USER`) is added to the `robot-md-gateway` group
+  so that a subsequent `robot-md init` can read `/dev/ttyACM*` for serial-bus
+  auto-discovery. The operator must log out + back in (or run `newgrp
+  robot-md-gateway`) before the new group takes effect — `install-gateway`
+  prints this remediation. New `--no-add-user` flag opts out on locked-down
+  service hosts that intentionally keep operator accounts out of the
+  gateway group.
+
+### Notes
+- Closes #82. All three remediations from the issue ship together. Tested
+  end-to-end on Bob during Spec B Phase E T22 cold-install prep.
+- No code changes to the CLI surface that would affect existing manifests
+  or signing flows. The carry-forward only kicks in when `--force` is
+  passed and an existing manifest is present.
+
+---
+
 ## [1.10.2] - 2026-05-11
 
 ### Fixed
