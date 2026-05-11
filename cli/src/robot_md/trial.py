@@ -89,10 +89,7 @@ def start_cmd(
             f"  ({COLD_INSTALL_START_FILE} not found"
             " — wall-clock anchor downgraded to post-install)"
         )
-    missing_env = [
-        v for v in ("ROBOT_MD_RURI", "ROBOT_MD_MANIFEST_PATH")
-        if not os.environ.get(v)
-    ]
+    missing_env = [v for v in ("ROBOT_MD_RURI", "ROBOT_MD_MANIFEST_PATH") if not os.environ.get(v)]
     if missing_env:
         typer.echo(
             "  WARN: capture-pre / capture-post will fail with RuntimeError until you set "
