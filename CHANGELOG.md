@@ -9,6 +9,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.10.2] - 2026-05-11
+
+### Fixed
+- Release workflow's `pypi-publish` job now fires on tag push, not only on
+  manual `workflow_dispatch`. The previous gate (added Apr 17 when
+  Trusted Publisher was unconfigured) was made vestigial by the later
+  switch to `PYPI_TOKEN`, but the gate stayed and silently skipped PyPI
+  upload for v1.10.1 — the GitHub release shipped while PyPI still
+  served 1.10.0. Manual dispatch with `publish_pypi=true` is preserved
+  as an explicit re-publish escape hatch.
+
+### Notes
+- This release is a no-code republish of 1.10.1's CLI payload to make
+  `pip install robot-md` actually deliver the `_gateway_invoke`
+  full-envelope fix (closes #69, originally shipped in 1.10.1).
+
+---
+
 ## [1.10.1] - 2026-05-11
 
 ### Fixed
