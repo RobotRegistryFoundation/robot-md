@@ -42,6 +42,7 @@ from robot_md.ruri import construct_ruri
 from robot_md.signing import generate_keypair, save_keypair, sign_body
 
 DEFAULT_ENDPOINT = "https://robotregistryfoundation.org/v2/robots/register"
+DEFAULT_AUTHORITIES_ENDPOINT = "https://robotregistryfoundation.org/v2/authorities/register"
 
 
 def _keystore_dir() -> Path:
@@ -409,6 +410,67 @@ def post_to_rrf(endpoint: str, body: dict[str, Any], *, timeout: float = 15.0) -
     )
 
 
+def post_envelope_authority(
+    endpoint: str, body: dict[str, Any], *, timeout: float = 15.0
+) -> dict[str, Any]:
+    """POST a signed authority body to /v2/authorities/register and return the
+    parsed response. Raises :class:`RuntimeError` on network or non-2xx.
+    """
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        endpoint,
+        data=data,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "robot-md-cli/0.1 (+https://robotmd.dev)",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read().decode("utf-8")
+    except urllib.error.HTTPError as e:
+        err_text = e.read().decode("utf-8", errors="replace") if hasattr(e, "read") else str(e)
+        raise RuntimeError(
+            f"authorities/register returned {e.code}: {err_text.strip()[:500]}"
+        ) from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"could not reach {endpoint}: {e.reason}") from e
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"authorities/register returned non-JSON: {text[:200]}") from e
+
+
+def _register_envelope_authority(
+    rrn: str,
+    kp: Any,
+    meta: dict[str, Any],
+    *,
+    authorities_endpoint: str = DEFAULT_AUTHORITIES_ENDPOINT,
+) -> dict[str, Any]:
+    """Bind the robot's pq_kid to an ``operator-envelope`` authority so the
+    gateway's ``/v2/keys/{pq_kid}`` resolver can find an Ed25519 PEM for it.
+
+    Without this step ``robot-md-gateway`` returns 403 on every
+    envelope-signed invoke after a fresh mint (closes #84). Mirrors the
+    manual ``scripts/register-operator-kid.ts`` flow, but signed by the
+    robot's own keypair via the public ``POST /v2/authorities/register``
+    endpoint — no admin auth or bulk-put needed.
+    """
+    ed_pub_b64 = base64.b64encode(kp.ed25519_pub).decode()
+    base_body: dict[str, Any] = {
+        "organization": str(meta.get("manufacturer") or meta.get("robot_name") or rrn),
+        "display_name": f"{meta.get('robot_name') or rrn} — envelope signer",
+        "purpose": "operator-envelope",
+        "signing_pub": ed_pub_b64,
+        "signing_alg": ["Ed25519", "ML-DSA-65"],
+    }
+    signed = sign_body(kp, base_body)
+    return post_envelope_authority(authorities_endpoint, signed)
+
+
 def write_rrn_to_manifest(manifest_path: Path, rrn: str, record_url: str) -> None:
     """Rewrite metadata.rrn and metadata.rcan_uri in the manifest.
 
@@ -552,6 +614,29 @@ def cli_register(
     api_key = result.raw.get("api_key")
     if api_key:
         _write_apikey(result.rrn, api_key)
+
+    # 4.5. Bind pq_kid → operator-envelope authority so the gateway's
+    # /v2/keys/<pq_kid> resolver can verify envelope signatures from this
+    # robot. Non-fatal: if the authorities POST fails, the manifest is
+    # still valid and the operator can re-publish later (closes #84).
+    authorities_endpoint = endpoint.replace("/robots/register", "/authorities/register")
+    try:
+        post_envelope_authority(
+            authorities_endpoint, sign_body(kp, {
+                "organization": str(meta.get("manufacturer") or meta.get("robot_name") or result.rrn),
+                "display_name": f"{meta.get('robot_name') or result.rrn} — envelope signer",
+                "purpose": "operator-envelope",
+                "signing_pub": base64.b64encode(kp.ed25519_pub).decode(),
+                "signing_alg": ["Ed25519", "ML-DSA-65"],
+            }),
+        )
+    except RuntimeError as e:
+        print(
+            f"  warning: could not register envelope-authority kid for {result.rrn}: {e}\n"
+            f"  gateway envelope verification will 404 until this is retried "
+            f"(re-run `robot-md register` won't help — manifest already has an RRN).",
+            file=sys.stderr,
+        )
 
     # 5. Write RRN back into manifest.
     try:
