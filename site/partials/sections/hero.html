@@ -12,19 +12,20 @@
 
       <h1 class="hero-heading">
         The manifest agents read<br>
-        before they touch your robot.
+        before touching your robot.
       </h1>
 
       <p class="hero-lede">
-        ROBOT.md is to a robot what CLAUDE.md and AGENTS.md are to a codebase.
-        One file — YAML + markdown — so a planning LLM can safely operate a
-        single robot. Speaks the <a href="https://rcan.dev/compatibility">RCAN protocol</a>. Built for Anthropic surfaces,
-        flexible for any MCP-aware agent.
+        ROBOT.md is to a robot what CLAUDE.md is to a codebase —
+        one YAML + markdown file so any planning agent can operate hardware safely.
+        Speaks the <a href="https://rcan.dev/compatibility">RCAN protocol</a>.
       </p>
 
       <!-- Install command + copy button -->
       <div class="install-block" id="install">
-        <pre aria-label="Install command"><span class="prompt">$</span> <span class="cmd">pip install robot-md &amp;&amp; robot-md init</span></pre>
+        <pre aria-label="Install command"><span class="prompt">$</span> <span class="cmd">pip install robot-md &amp;&amp; robot-md init</span>
+<span class="comment"># verify</span>
+<span class="prompt">$</span> <span class="cmd">robot-md --version</span></pre>
         <button class="install-copy-btn"
                 aria-label="Copy install command"
                 data-copy="pip install robot-md && robot-md init">
