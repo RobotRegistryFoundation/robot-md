@@ -209,41 +209,69 @@
         <span>§ 01 — Install</span>
         <span class="rule-line" aria-hidden="true"></span>
       </div>
-      <h2 class="sec-title">One command. No config files.</h2>
+      <h2 class="sec-title">Three steps. ~2 minutes on a fresh Pi.</h2>
       <p class="sec-lede">
-        Wire the MCP server into Claude Code from your robot project root.
+        Plugin-first: the marketplace handles MCP wiring; the CLI handles manifest + gateway install.
       </p>
 
       <div style="margin-top:28px;">
-        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">Step 1 — Install the CLI</p>
+        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px;">Step 1 — Add the marketplace + install the plugin (in Claude Code)</p>
         <div class="install-block">
-          <pre aria-label="Install robot-md CLI"><span class="prompt">$</span> <span class="cmd">pip install robot-md</span></pre>
+          <pre aria-label="Add plugin marketplace"><span class="prompt">/</span><span class="cmd">plugin marketplace add RobotRegistryFoundation/claude-code-plugins</span>
+<span class="prompt">/</span><span class="cmd">plugin install robot-md</span></pre>
           <button class="install-copy-btn"
-                  aria-label="Copy install command"
-                  data-copy="pip install robot-md">Copy</button>
+                  aria-label="Copy plugin install commands"
+                  data-copy="/plugin marketplace add RobotRegistryFoundation/claude-code-plugins
+/plugin install robot-md">Copy</button>
         </div>
 
-        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 8px;">Step 2 — Create your ROBOT.md</p>
+        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 8px;">Step 2 — Install + init (in any terminal)</p>
         <div class="install-block">
-          <pre aria-label="Init robot-md"><span class="prompt">$</span> <span class="cmd">robot-md init my-robot --preset so-arm101</span></pre>
+          <pre aria-label="Install + init"><span class="prompt">$</span> <span class="cmd">python3 -m pip install --user --break-system-packages robot-md</span>
+<span class="prompt">$</span> <span class="cmd">robot-md init bob --preset so-arm101 --register --contact-email you@example.com</span>
+<span class="prompt">$</span> <span class="cmd">robot-md install-gateway</span>        <span style="color:var(--ink-3);"># required for actual motion</span></pre>
           <button class="install-copy-btn"
-                  aria-label="Copy init command">Copy</button>
+                  aria-label="Copy install + init commands"
+                  data-copy="python3 -m pip install --user --break-system-packages robot-md
+robot-md init bob --preset so-arm101 --register --contact-email you@example.com
+robot-md install-gateway">Copy</button>
         </div>
 
-        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 8px;">Step 3 — Wire the MCP server</p>
+        <p style="font-size:13px;color:var(--ink-3);margin:8px 0 0;line-height:1.6;">
+          Pi OS users: <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">--break-system-packages</code> is the PEP-668 escape.
+          Prefer pipx? Use <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">pipx install robot-md</code> instead of the <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">pip install</code> line.
+        </p>
+
+        <p style="font-size:14px;color:var(--ink-3);font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;margin:20px 0 8px;">Step 3 — First prompt (back in Claude Code)</p>
         <div class="install-block">
-          <pre aria-label="Wire MCP to Claude Code"><span class="prompt">$</span> <span class="cmd">claude mcp add robot-md -- npx -y robot-md-mcp ./ROBOT.md</span></pre>
-          <button class="install-copy-btn"
-                  aria-label="Copy MCP add command">Copy</button>
+          <pre aria-label="First prompt"><span class="prompt">&gt;</span> <span class="cmd">What's the state of the robot?</span></pre>
         </div>
+        <p style="font-size:14px;color:var(--ink-2);margin-top:8px;line-height:1.6;">
+          The plugin auto-wires its MCP server. The <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">using-robot-md</code>
+          skill walks you through troubleshooting if anything errors.
+        </p>
       </div>
 
-      <p style="font-size:14px;color:var(--ink-2);margin-top:16px;line-height:1.6;">
-        Open Claude Code. Run <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">/mcp</code>
-        to confirm <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md</code>
-        is connected. Ask <em>"what can this robot do?"</em> — the <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">using-robot-md</code>
-        skill reads capabilities from the MCP server and answers from your manifest, not training data.
+      <p style="font-size:14px;color:var(--ink-2);margin-top:20px;line-height:1.6;">
+        See the <a href="/cookbook/">cookbook</a> for the generic recipe across robots,
+        or the <a href="/case-studies/bob-so-arm101/">Bob SO-ARM101 case study</a>
+        for an end-to-end proof point with cert IDs.
       </p>
+
+      <details style="margin-top:24px;border-top:1px solid var(--rule);padding-top:20px;">
+        <summary style="cursor:pointer;font-family:var(--mono);font-size:13px;color:var(--ink-2);letter-spacing:.06em;text-transform:uppercase;">Manual / alternative install (without the plugin)</summary>
+        <div style="margin-top:12px;">
+          <div class="install-block">
+            <pre aria-label="Manual MCP add"><span class="prompt">$</span> <span class="cmd">claude mcp add robot-md -- npx -y robot-md-mcp /absolute/path/to/ROBOT.md</span></pre>
+            <button class="install-copy-btn"
+                    aria-label="Copy manual MCP command"
+                    data-copy="claude mcp add robot-md -- npx -y robot-md-mcp /absolute/path/to/ROBOT.md">Copy</button>
+          </div>
+          <p style="font-size:13px;color:var(--ink-3);margin-top:8px;line-height:1.6;">
+            Use this if you can't use the plugin (e.g. air-gapped, custom workflow). The plugin path is the supported route for normal operation.
+          </p>
+        </div>
+      </details>
     </div>
   </section>
 

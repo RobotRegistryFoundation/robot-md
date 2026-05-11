@@ -1,9 +1,43 @@
 ---
 name: using-robot-md
-description: Use whenever the operator asks about the robot declared by this project's ROBOT.md — what it can do, whether something is safe, whether the manifest is valid, how to pose or calibrate it, how to register it. Triggers on any mention of the robot's capabilities, drivers, safety gates, or the ROBOT.md/robot-md tooling.
+description: Use when the user wants to install, configure, or operate robot-md — cold install on a fresh Pi, or post-install operation (asking what the robot can do, whether something is safe, validating/rendering/registering the manifest, posing or calibrating). Triggers on robot-md install + any mention of the robot's capabilities/drivers/safety/manifest tooling.
 ---
 
 # Using robot-md
+
+## First-time setup recipe
+
+If you're seeing this on first plugin load, the operator has just installed the plugin and wants to wire up their robot. Run these commands in a terminal:
+
+```bash
+# 1) Install robot-md from PyPI. On Pi OS Bookworm+ you need --break-system-packages.
+python3 -m pip install --user --break-system-packages robot-md
+
+# 2) Initialize a manifest. Replace <name> + email; the preset is so-arm101 by default.
+robot-md init <name> --preset so-arm101 --register --contact-email you@example.com
+
+# 3) (Optional, but required for actual motion) Install the enforcement gateway.
+robot-md install-gateway
+
+# 4) Health check.
+robot-md doctor
+```
+
+Each step should take ~30 s. Total cold-install time on a fresh Pi: under 2 minutes.
+
+### When something errors
+
+Paste the error message back and we'll find the workaround. Common ones today:
+
+- **PEP 668 `externally-managed-environment`** → `pip install` needs `--break-system-packages` on Pi OS. The robot-md CLI handles this automatically inside `init`, but the first `pip install` step is operator-driven.
+- **`claude mcp list` shows "Failed to connect"** → either you haven't `cd`'d into a directory with a `ROBOT.md`, or `ROBOT_MD_PATH` isn't set. Try `export ROBOT_MD_PATH=$HOME/<name>/ROBOT.md`.
+- **`/dev/ttyACM0` permission denied** → the gateway claims the device by design. Talk to the gateway at `127.0.0.1:8080`, not the device directly.
+
+### After install
+
+Once `robot-md doctor` returns 0 fails, you're ready for the first prompt: try "what's the state of the robot?" — the MCP should answer from frontmatter resources without any motion. The remainder of this skill covers ongoing operation of the manifest.
+
+---
 
 ## Overview
 
