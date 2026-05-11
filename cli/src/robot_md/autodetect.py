@@ -439,7 +439,9 @@ def _run(cmd: list[str]) -> str | None:
     return result.stdout
 
 
-def _probe_servo_buses(devices: list[Device]) -> list[Device]:
+def _probe_servo_buses(
+    devices: list[Device], warnings: list[str] | None = None
+) -> list[Device]:
     """Actively probe serial ports to discover their actual protocol.
 
     For each `/dev/ttyACM*` or `/dev/ttyUSB*` in `devices`, call
@@ -451,7 +453,13 @@ def _probe_servo_buses(devices: list[Device]) -> list[Device]:
     UARTs often host console/login gettys, and sending Feetech bytes to a
     login shell would be a mess). Opt out via env `ROBOT_MD_SKIP_BUS_PROBE=1`.
 
-    Silent no-op on: missing SDK, no servos, probe exception. Never raises.
+    `PermissionError` from a probe is **surfaced**, not swallowed: appended
+    to the optional `warnings` list and printed to stderr with a remediation
+    hint. The probe still returns no Feetech device for that port (preset
+    matching cannot proceed without bus access), but the operator now sees
+    *why* their SO-ARM101 wasn't auto-detected instead of silently getting
+    `preset: minimal`. Other exceptions (SDK missing, transient bus error)
+    remain silent — they are not actionable for the operator.
     """
     if os.environ.get("ROBOT_MD_SKIP_BUS_PROBE") == "1":
         return []
@@ -466,6 +474,21 @@ def _probe_servo_buses(devices: list[Device]) -> list[Device]:
             from robot_md.bus_scan import scan_feetech  # lazy
 
             servos = scan_feetech(d.path)
+        except PermissionError:
+            msg = (
+                f"{d.path} exists but is not readable by the current user "
+                "(likely owned by robot-md-gateway:robot-md-gateway, mode "
+                "crw-rw----). Auto-discovery cannot probe for actuators on "
+                "this bus, so preset matching will fall back to a minimal "
+                "shape with no `arm.pick` / `arm.place` capabilities. Fix: "
+                "`sudo usermod -aG robot-md-gateway $USER` then `newgrp "
+                "robot-md-gateway` (or log out + back in), then re-run "
+                "`robot-md init --force`."
+            )
+            if warnings is not None:
+                warnings.append(msg)
+            print(f"warning: {msg}", file=sys.stderr)
+            continue
         except Exception:
             continue
         if not servos:
@@ -511,7 +534,7 @@ def scan_system() -> Scan:
     # Active bus probe — if a serial tty responds to Feetech protocol, add
     # a synthetic Device(protocol="feetech") so preset matching can score
     # so-arm101 / so-arm101-leader above the alphabetical-first fallback.
-    scan.devices.extend(_probe_servo_buses(scan.devices))
+    scan.devices.extend(_probe_servo_buses(scan.devices, warnings=scan.warnings))
     # Compose typed probes (depthai → realsense → v4l2)
     cameras: list[DetectedCamera] = []
     cameras.extend(probe_depthai_cameras())

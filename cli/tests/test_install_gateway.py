@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from robot_md.install_gateway import (
+    _invoking_user,
     already_installed,
     render_default_bearers,
     render_env_file,
@@ -56,3 +57,20 @@ def test_not_installed_when_venv_missing():
     """venv binary missing → False without invoking systemctl."""
     with patch("pathlib.Path.exists", return_value=False):
         assert already_installed() is False
+
+
+def test_invoking_user_returns_sudo_user_when_set():
+    with patch.dict("os.environ", {"SUDO_USER": "alice"}, clear=False):
+        assert _invoking_user() == "alice"
+
+
+def test_invoking_user_returns_none_when_sudo_user_unset():
+    with patch.dict("os.environ", {}, clear=True):
+        assert _invoking_user() is None
+
+
+def test_invoking_user_returns_none_when_sudo_user_is_root():
+    # Direct root login (no SUDO_USER set, or SUDO_USER=root) → don't try to
+    # add root to its own group; nothing meaningful to do.
+    with patch.dict("os.environ", {"SUDO_USER": "root"}, clear=False):
+        assert _invoking_user() is None

@@ -99,7 +99,20 @@ def already_installed() -> bool:
     return result.returncode == 0 and result.stdout.strip() == "active"
 
 
-def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
+def _invoking_user() -> str | None:
+    """Return the user who invoked sudo, or None when running unprivileged
+    or directly as root with no SUDO_USER. Used to grant the operator access
+    to the `robot-md-gateway` group during install so that `robot-md init`
+    can probe /dev/ttyACM* (which the udev rule hardens to gateway-only)."""
+    user = os.environ.get("SUDO_USER")
+    if user and user != "root":
+        return user
+    return None
+
+
+def install_gateway(
+    *, manifest_path: str, yes: bool = False, add_user_to_group: bool = True
+) -> int:
     """Full install sequence. Requires sudo. Returns 0 on success.
 
     Steps:
@@ -113,6 +126,14 @@ def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
       8. sudo write /etc/systemd/system/robot-md-gateway.service
       9. sudo systemctl daemon-reload && systemctl enable --now robot-md-gateway
      10. Verify curl 127.0.0.1:8080 returns any HTTP response.
+     11. When add_user_to_group=True (default) and $SUDO_USER is set,
+         add the invoking user to the `robot-md-gateway` group so they
+         can probe /dev/ttyACM* during a later `robot-md init`. The udev
+         rule hardens those devices to gateway-only; without this step,
+         `robot-md init`'s auto-discovery silently misses serial actuators
+         and falls back to `preset: minimal`. Pass --no-add-user on
+         production rigs that intentionally keep the operator account out
+         of the gateway group.
     """
     if already_installed():
         print("robot-md-gateway already installed and active. Nothing to do.")
@@ -192,6 +213,32 @@ def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
     except Exception as e:
         print(f"gateway started but health probe failed: {e}")
         return 1
+
+    if add_user_to_group:
+        invoker = _invoking_user()
+        if invoker:
+            r = subprocess.run(
+                [*sudo, "usermod", "-aG", "robot-md-gateway", invoker],
+                capture_output=True,
+                text=True,
+            )
+            if r.returncode == 0:
+                print(
+                    f"added '{invoker}' to robot-md-gateway group "
+                    "(needed for robot-md init's serial-bus probe)."
+                )
+                print(
+                    "  → log out + back in, OR run "
+                    "`newgrp robot-md-gateway` / `sg robot-md-gateway -c '<cmd>'`,\n"
+                    "    before `robot-md init` so /dev/ttyACM* is readable."
+                )
+            else:
+                print(
+                    f"warning: failed to add '{invoker}' to robot-md-gateway "
+                    f"group ({r.stderr.strip()}). robot-md init's serial probe "
+                    f"will fail with PermissionError until you run:\n"
+                    f"    sudo usermod -aG robot-md-gateway {invoker}"
+                )
 
     print("robot-md-gateway installed and active.")
     return 0

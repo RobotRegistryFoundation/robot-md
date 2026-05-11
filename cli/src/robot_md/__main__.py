@@ -1802,6 +1802,18 @@ def install_gateway_cmd(
         "-y",
         help="Skip the sudo confirmation prompt.",
     ),
+    no_add_user: bool = typer.Option(
+        False,
+        "--no-add-user",
+        help=(
+            "Do NOT add the invoking user ($SUDO_USER) to the "
+            "robot-md-gateway group. Use this on locked-down service hosts "
+            "where the operator account intentionally must not gain access "
+            "to /dev/ttyACM*. Without this flag, the user is added to the "
+            "group so that `robot-md init`'s serial-bus probe can read "
+            "/dev/ttyACM*."
+        ),
+    ),
 ) -> None:
     """Scaffold the robot-md-gateway systemd service on a fresh host (sudo).
 
@@ -1811,7 +1823,11 @@ def install_gateway_cmd(
     """
     from robot_md.install_gateway import install_gateway as _install_gateway
 
-    rc = _install_gateway(manifest_path=str(manifest), yes=yes)
+    rc = _install_gateway(
+        manifest_path=str(manifest),
+        yes=yes,
+        add_user_to_group=not no_add_user,
+    )
     if rc != 0:
         raise typer.Exit(code=rc)
 

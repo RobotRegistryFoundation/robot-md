@@ -67,6 +67,56 @@ def test_probe_exception_does_not_crash():
     assert result == []
 
 
+def test_permission_error_surfaces_to_warnings(capsys):
+    """PermissionError on /dev/ttyACM* must NOT be silently swallowed.
+    Caught on Bob during Spec B Phase E T22 cold install; tracked at #82."""
+    devices = [_tty("/dev/ttyACM0")]
+    warnings: list[str] = []
+    with patch(
+        "robot_md.bus_scan.scan_feetech",
+        side_effect=PermissionError(13, "Permission denied", "/dev/ttyACM0"),
+    ):
+        result = _probe_servo_buses(devices, warnings=warnings)
+
+    assert result == []
+    assert len(warnings) == 1
+    assert "/dev/ttyACM0" in warnings[0]
+    assert "robot-md-gateway" in warnings[0]
+    assert "usermod" in warnings[0]
+    captured = capsys.readouterr()
+    assert "/dev/ttyACM0" in captured.err
+    assert "usermod" in captured.err
+
+
+def test_permission_error_without_warnings_list_still_prints(capsys):
+    """Backward compat: legacy callers without a warnings list still get
+    the stderr remediation hint so the message cannot be lost."""
+    devices = [_tty("/dev/ttyACM0")]
+    with patch(
+        "robot_md.bus_scan.scan_feetech",
+        side_effect=PermissionError(13, "Permission denied", "/dev/ttyACM0"),
+    ):
+        result = _probe_servo_buses(devices)
+    assert result == []
+    captured = capsys.readouterr()
+    assert "/dev/ttyACM0" in captured.err
+
+
+def test_generic_exception_still_silent(capsys):
+    """Non-PermissionError exceptions remain silent — not operator-actionable."""
+    devices = [_tty("/dev/ttyACM0")]
+    warnings: list[str] = []
+    with patch(
+        "robot_md.bus_scan.scan_feetech",
+        side_effect=RuntimeError("scservo_sdk not installed"),
+    ):
+        result = _probe_servo_buses(devices, warnings=warnings)
+    assert result == []
+    assert warnings == []
+    captured = capsys.readouterr()
+    assert captured.err == ""
+
+
 def test_env_var_skip_disables_probe():
     devices = [_tty("/dev/ttyACM0")]
     with (

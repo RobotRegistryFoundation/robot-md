@@ -85,6 +85,11 @@ def scan_feetech(port: str, baud: int = 1_000_000) -> list[ServoEntry]:
     try:
         ph = PortHandler(port)
         opened = ph.openPort()
+    except PermissionError:
+        # Re-raise unchanged — autodetect's probe loop catches this
+        # specifically and emits a remediation hint (the udev rule on
+        # cert-bearing rigs hardens /dev/ttyACM* to gateway-only).
+        raise
     except Exception as e:  # pyserial may raise SerialException on a bad port
         raise RuntimeError(
             f"failed to open {port}: {e} — is the gateway still holding the "
