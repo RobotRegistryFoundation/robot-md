@@ -1,4 +1,8 @@
-from robot_md.install_gateway import render_systemd_unit
+from robot_md.install_gateway import (
+    render_default_bearers,
+    render_env_file,
+    render_systemd_unit,
+)
 
 
 def test_systemd_unit_content():
@@ -18,3 +22,17 @@ def test_systemd_unit_content():
         "--bearers /etc/robot-md-gateway/bearers.yaml"
     ) in unit
     assert "DeviceAllow=/dev/ttyACM0 rw" in unit
+
+
+def test_render_env_file_contains_required_keys():
+    env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
+    assert "ROBOT_MD_PATH=/etc/robot-md-gateway/ROBOT.md" in env
+    assert "ROBOT_MD_BEARERS_FILE=/etc/robot-md-gateway/bearers.yaml" in env
+    assert "ROBOT_MD_LOG_LEVEL=INFO" in env
+    assert "ROBOT_MD_REQUIRE_ENVELOPE_SIGNATURE=1" in env
+
+
+def test_render_default_bearers_yaml_minimal():
+    text = render_default_bearers()
+    assert "bearers:" in text
+    assert "REPLACE-WITH-MINTED-TOKEN" in text
