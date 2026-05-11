@@ -855,3 +855,28 @@ footer.foot {
 }
 footer.foot a { color: var(--ink-3) }
 footer.foot a:hover { color: var(--accent) }
+
+/* ============================================================
+   Page-eyebrow (used by /agents/, /agents/claude-code/, future per-surface pages)
+   ============================================================ */
+.page-eyebrow { padding: 64px 0 32px }
+.page-eyebrow h1 { font-family: var(--serif); font-style: italic; font-size: 48px; margin: 12px 0 16px; line-height: 1.1 }
+.page-eyebrow .lede { font-size: 18px; max-width: 60ch; color: var(--ink-2); margin: 0 }
+
+/* ============================================================
+   Surface directory table (/agents/)
+   ============================================================ */
+.surface-directory { width: 100%; border-collapse: collapse; margin: 32px 0 96px; max-width: 880px }
+.surface-directory td { padding: 16px 12px; border-bottom: 1px solid var(--rule); vertical-align: top; font-size: 16px }
+.surface-directory td:first-child { font-weight: 600; width: 220px }
+.surface-directory code { font-family: var(--mono); font-size: 13px; background: var(--paper-2); padding: 2px 8px; border-radius: var(--radius-sm); white-space: nowrap }
+.surface-directory .badge { font-family: var(--mono); font-size: 11px; padding: 2px 8px; background: var(--paper-3); border-radius: var(--radius-sm); text-transform: uppercase; letter-spacing: .1em; display: inline-block }
+
+/* ============================================================
+   Claude Code surface page sub-section styling
+   ============================================================ */
+.cta-arrow { font-family: var(--mono); font-size: 14px; letter-spacing: .04em; border-bottom: 1px solid var(--accent-ink); display: inline-block; padding: 2px 0 }
+.cta-arrow:hover { color: var(--accent-ink); border-color: var(--accent) }
+.trouble dt { font-family: var(--mono); font-size: 14px; margin-top: 16px; color: var(--ink) }
+.trouble dt code { background: var(--paper-2); padding: 2px 6px; border-radius: var(--radius-sm); font-size: 12px }
+.trouble dd { margin: 4px 0 0; padding-left: 0; color: var(--ink-2); max-width: 70ch }
