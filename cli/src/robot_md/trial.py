@@ -147,14 +147,20 @@ def iteration_cmd(
         )
         raise typer.Exit(code=2)
 
+    state = json.loads((d / "start.json").read_text())
+    if state.get("aborted_at"):
+        typer.echo(f"error: trial aborted at {state['aborted_at']}")
+        raise typer.Exit(code=2)
+
     if capture_pre:
         _capture_pre(d)
         return
     if capture_post:
         _capture_post(d)
         return
-    # reset_confirmed handled in Task 11
-    raise typer.Exit(code=0)
+    if reset_confirmed:
+        _reset_confirmed(d)
+        return
 
 
 VERDICT_RULE = (
@@ -240,3 +246,32 @@ def _capture_post(d: pathlib.Path) -> None:
         f"iteration {state['iteration']}: verdict={'PASS' if red_in_bowl else 'FAIL'}"
         f" duration={duration_s:.1f}s"
     )
+
+
+def _reset_confirmed(d: pathlib.Path) -> None:
+    iters = sorted(d.glob("iter_*.json"), key=lambda p: int(p.stem.split("_")[1]))
+    if not iters:
+        typer.echo("error: no iteration to confirm reset for")
+        raise typer.Exit(code=2)
+    cur = iters[-1]
+    state = json.loads(cur.read_text())
+    state["operator_reset_confirmed_at"] = _utcnow_iso()
+    cur.write_text(json.dumps(state, indent=2) + "\n")
+    typer.echo(
+        f"iteration {state['iteration']}: reset confirmed at {state['operator_reset_confirmed_at']}"
+    )
+
+
+@trial_app.command("abort")
+def abort_cmd(
+    trial_id: str = typer.Option(..., "--trial"),
+) -> None:
+    """Abort a trial, preventing further iterations."""
+    d = _trial_dir(trial_id)
+    if not d.exists():
+        typer.echo(f"error: unknown trial: {trial_id}")
+        raise typer.Exit(code=2)
+    state = json.loads((d / "start.json").read_text())
+    state["aborted_at"] = _utcnow_iso()
+    (d / "start.json").write_text(json.dumps(state, indent=2) + "\n")
+    typer.echo(f"trial {trial_id} aborted at {state['aborted_at']}")
