@@ -6,10 +6,11 @@
         <span class="rule-line" aria-hidden="true"></span>
       </div>
 
-      <h2 class="sec-title">ROBOT.md → MCP → Claude Code → robot moves.</h2>
+      <h2 class="sec-title">ROBOT.md → MCP → Claude Code → gateway → robot moves.</h2>
       <p class="sec-lede">
-        The full loop — manifest declaration to physical action — in one
-        conversation. No axis conventions to learn.
+        The full loop — manifest declaration through Layer 3 enforcement to
+        physical action — all in one conversation. The gateway is what
+        verifies and moves; declaration alone never does.
       </p>
 
       <div class="demo-grid" style="margin-top: 32px;">
@@ -21,7 +22,9 @@
             <span class="label">~/bob · robot-md · MCP session</span>
           </div>
           <div class="demo-terminal-body">
-            <div class="dt-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md &amp;&amp; robot-md init</span></div>
+            <div class="dt-line prompt"><span class="p">$</span><span class="cmd">claude plugin add robot-md</span></div>
+            <div class="dt-line out">  <span class="ok">✓</span> robot-md plugin installed · MCP wired</div>
+            <div class="dt-line prompt"><span class="p">$</span><span class="cmd">robot-md init</span></div>
             <div class="dt-line out">  <span class="ok">✓</span> <span class="k">ROBOT.md</span> + <span class="k">CLAUDE.md</span> written — preset <span class="v">so-arm101</span></div>
             <div class="dt-line out">  <span class="ok">✓</span> registered — <span class="v">RRN-<span data-stat="example-rrn">000000000003</span></span></div>
             <div class="dt-line out">  <span class="ok">✓</span> calibrated — zero pose recorded via IK<br></div>
