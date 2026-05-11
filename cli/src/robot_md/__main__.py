@@ -352,7 +352,13 @@ def register(
     rcan_version: str | None = typer.Option(None, "--rcan-version"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Sign + print body, don't POST."),
 ) -> None:
-    """Mint an RRN on Robot Registry Foundation with signed POST (RCAN 3.0)."""
+    """Mint an RRN on Robot Registry Foundation with signed POST (RCAN 3.0).
+
+    Before signing, prints the RRN the next mint will allocate (preflight
+    against `/v2/robots/_next`) so operators can see which slot they'll
+    receive. RRNs below the reserved floor are protected for canonical
+    robots and are not auto-minted.
+    """
     from robot_md.register import DEFAULT_ENDPOINT, cli_register
 
     rc = cli_register(

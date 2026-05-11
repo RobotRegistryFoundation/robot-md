@@ -332,6 +332,41 @@ def _extract_mint_fields(
 # -------------------------------------------------------------- network + side
 
 
+def peek_next_rrn(endpoint: str, *, timeout: float = 5.0) -> dict[str, Any] | None:
+    """GET <endpoint-base>/_next to preview the RRN the next mint will allocate.
+
+    `endpoint` is the mint endpoint (`.../v2/robots/register`); the peek lives
+    at `.../v2/robots/_next` (added 2026-05-11 — see RRF PR #101).
+
+    Returns the parsed JSON body on success or None on any failure (404 from
+    older RRF deployments, network error, malformed JSON). Preflight is
+    best-effort UX, never a mint gate — the caller must continue regardless.
+    """
+    if not endpoint.endswith("/register"):
+        return None
+    peek_url = endpoint.rsplit("/", 1)[0] + "/_next"
+    req = urllib.request.Request(
+        peek_url,
+        method="GET",
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "robot-md-cli/0.1 (+https://robotmd.dev)",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            text = resp.read().decode("utf-8")
+    except Exception:
+        return None
+    try:
+        obj = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(obj, dict) or "next_rrn" not in obj:
+        return None
+    return obj
+
+
 def post_to_rrf(endpoint: str, body: dict[str, Any], *, timeout: float = 15.0) -> MintResult:
     """POST the mint body. Raises :class:`RuntimeError` on network or 5xx
     failures; returns :class:`MintResult` on both first-time (201) and
@@ -481,6 +516,18 @@ def cli_register(
 
     req.pq_kid = kp.pq_kid
     req.ruri = construct_ruri(parsed.frontmatter)
+
+    # 1.5. Preflight: surface the RRN the next mint will allocate so the
+    # operator can see it before signing. Best-effort — older RRF deployments
+    # without /_next return None and we proceed silently.
+    preview = peek_next_rrn(endpoint)
+    if preview is not None:
+        next_rrn = preview.get("next_rrn", "?")
+        reserved = preview.get("reserved_floor")
+        msg = f"  Next RRN: {next_rrn}"
+        if reserved:
+            msg += f" (RRNs below {reserved:012d} reserved for canonical robots)"
+        print(msg, file=sys.stderr)
 
     # 2. Sign canonical body.
     body = req.as_body()
