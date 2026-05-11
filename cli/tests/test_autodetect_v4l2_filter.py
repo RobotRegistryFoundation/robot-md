@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 from robot_md.autodetect import probe_v4l2_cameras
 
 
