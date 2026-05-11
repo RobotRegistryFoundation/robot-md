@@ -624,13 +624,17 @@ def cli_register(
     display_name = f"{meta.get('robot_name') or result.rrn} — envelope signer"
     try:
         post_envelope_authority(
-            authorities_endpoint, sign_body(kp, {
-                "organization": org,
-                "display_name": display_name,
-                "purpose": "operator-envelope",
-                "signing_pub": base64.b64encode(kp.ed25519_pub).decode(),
-                "signing_alg": ["Ed25519", "ML-DSA-65"],
-            }),
+            authorities_endpoint,
+            sign_body(
+                kp,
+                {
+                    "organization": org,
+                    "display_name": display_name,
+                    "purpose": "operator-envelope",
+                    "signing_pub": base64.b64encode(kp.ed25519_pub).decode(),
+                    "signing_alg": ["Ed25519", "ML-DSA-65"],
+                },
+            ),
         )
     except RuntimeError as e:
         print(

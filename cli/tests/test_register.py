@@ -260,8 +260,16 @@ def test_cli_register_publishes_envelope_authority_after_mint(tmp_path, monkeypa
     assert captured["authority_endpoint"].endswith("/v2/authorities/register")
     auth = captured["authority"]
     # All 8 required fields per RRF functions/v2/authorities/register.ts
-    for key in ("organization", "display_name", "purpose", "signing_pub",
-                "pq_signing_pub", "pq_kid", "signing_alg", "sig"):
+    for key in (
+        "organization",
+        "display_name",
+        "purpose",
+        "signing_pub",
+        "pq_signing_pub",
+        "pq_kid",
+        "signing_alg",
+        "sig",
+    ):
         assert key in auth, f"missing required field: {key}"
     assert auth["purpose"] == "operator-envelope"
     assert auth["signing_alg"] == ["Ed25519", "ML-DSA-65"]
