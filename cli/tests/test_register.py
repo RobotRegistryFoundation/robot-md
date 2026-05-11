@@ -217,6 +217,99 @@ def test_cli_register_saves_keypair_after_success(tmp_path, monkeypatch):
     assert apikey_path.exists()
 
 
+# ---- envelope-authority auto-registration (closes #84) ------------------
+
+
+def test_cli_register_publishes_envelope_authority_after_mint(tmp_path, monkeypatch):
+    """After a successful robot mint, register also POSTs to
+    /v2/authorities/register so the robot's pq_kid resolves at /v2/keys/{kid}.
+    Without this step gateway envelope auth 403s on first invoke."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    path = _write(tmp_path)
+
+    captured: dict[str, dict] = {}
+
+    def fake_post(endpoint, body, timeout=15.0):
+        from robot_md.register import MintResult
+
+        captured["mint"] = body
+        return MintResult(
+            rrn="RRN-000000000099",
+            registered_at="2026-05-11T21:00:00Z",
+            record_url="https://robotregistryfoundation.org/v2/robots/RRN-000000000099",
+            raw={"rrn": "RRN-000000000099", "api_key": "secret-xyz"},
+        )
+
+    def fake_authority_post(endpoint, body, timeout=15.0):
+        captured["authority_endpoint"] = endpoint
+        captured["authority"] = body
+        return {
+            "ran": "RAN-000000000042",
+            "status": "active",
+            "registered_at": "2026-05-11T21:00:01Z",
+        }
+
+    with (
+        patch("robot_md.register.post_to_rrf", fake_post),
+        patch("robot_md.register.post_envelope_authority", fake_authority_post),
+    ):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
+
+    assert rc == 0
+    # The authority POST went to the authorities/register endpoint
+    assert captured["authority_endpoint"].endswith("/v2/authorities/register")
+    auth = captured["authority"]
+    # All 8 required fields per RRF functions/v2/authorities/register.ts
+    for key in (
+        "organization",
+        "display_name",
+        "purpose",
+        "signing_pub",
+        "pq_signing_pub",
+        "pq_kid",
+        "signing_alg",
+        "sig",
+    ):
+        assert key in auth, f"missing required field: {key}"
+    assert auth["purpose"] == "operator-envelope"
+    assert auth["signing_alg"] == ["Ed25519", "ML-DSA-65"]
+    # sig.ed25519_pub must equal signing_pub (RRF rejects otherwise)
+    assert auth["sig"]["ed25519_pub"] == auth["signing_pub"]
+    assert set(auth["sig"].keys()) == {"ml_dsa", "ed25519", "ed25519_pub"}
+    # pq_kid in the authority body matches the one minted on the robot record
+    assert auth["pq_kid"] == captured["mint"]["pq_kid"]
+    # Body self-verifies via the same primitive RRF uses (rcan-ts verifyBody)
+    assert verify_body(auth) is True
+
+
+def test_cli_register_succeeds_when_envelope_authority_post_fails(tmp_path, monkeypatch, capsys):
+    """If the authority POST fails (network error, RRF down, etc.), register
+    must still return 0 — the manifest already has a valid RRN. A warning is
+    printed; operator can re-publish via a later command."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    path = _write(tmp_path)
+
+    def fake_post(endpoint, body, timeout=15.0):
+        from robot_md.register import MintResult
+
+        return MintResult(
+            rrn="RRN-000000000099", registered_at="x", record_url="u", raw={"api_key": "k"}
+        )
+
+    def fake_authority_post_fails(endpoint, body, timeout=15.0):
+        raise RuntimeError("authorities/register returned 503: backend unavailable")
+
+    with (
+        patch("robot_md.register.post_to_rrf", fake_post),
+        patch("robot_md.register.post_envelope_authority", fake_authority_post_fails),
+    ):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
+
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "envelope" in err.lower() or "authority" in err.lower()
+
+
 def test_cli_register_already_registered_raises(tmp_path, monkeypatch):
     """Running register on a manifest that already has metadata.rrn is an error
     in v0.9.1 — rotation is a later release."""
