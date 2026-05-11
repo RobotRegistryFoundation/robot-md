@@ -611,7 +611,13 @@ class _CapturingURLOpen:
         return _Resp(self.response)
 
 
-def _set_envelope_env(monkeypatch, *, ruri="rcan://RRN-test/skill", scope=None, manifest="/tmp/ROBOT.md"):
+def _set_envelope_env(
+    monkeypatch,
+    *,
+    ruri="rcan://RRN-test/skill",
+    scope=None,
+    manifest="/tmp/ROBOT.md",
+):
     monkeypatch.setenv("ROBOT_MD_RURI", ruri)
     monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", manifest)
     if scope is None:
