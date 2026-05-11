@@ -100,8 +100,8 @@ def install_one(package: str, *, min_version: str = "") -> InstallResult:
     if is_externally_managed_env():
         cmd.insert(cmd.index("install") + 1, "--break-system-packages")
         sys.stderr.write(
-            f"⚠ Adding --break-system-packages because this Python install is "
-            f"externally-managed (PEP 668). Consider pipx for a cleaner future install.\n"
+            "⚠ Adding --break-system-packages because this Python install is "
+            "externally-managed (PEP 668). Consider pipx for a cleaner future install.\n"
         )
     result = subprocess.run(cmd, capture_output=True, text=True)
     return InstallResult(
@@ -128,11 +128,16 @@ def phase_install_backend(scan) -> PhaseResult:
         sys.stdout.write(f"    Installing {m.package}…\n")
         r = install_one(m.package, min_version=m.min_version)
         if not r.ok:
+            stderr_tail = r.stderr.splitlines()[-1] if r.stderr else "unknown error"
             return PhaseResult(
                 phase="install_backend",
                 status="failed",
-                message=f"failed to install {r.package}: {r.stderr.splitlines()[-1] if r.stderr else 'unknown error'}",
-                detail={"installed": installed, "failed_package": r.package, "stderr": r.stderr},
+                message=f"failed to install {r.package}: {stderr_tail}",
+                detail={
+                    "installed": installed,
+                    "failed_package": r.package,
+                    "stderr": r.stderr,
+                },
             )
         installed.append(r.package)
         sys.stdout.write(f"    ✓ {r.package}\n")

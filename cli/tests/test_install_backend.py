@@ -3,7 +3,6 @@ from unittest.mock import patch
 from robot_md.autodetect import Device, Scan
 from robot_md.init_phases.install_backend import (
     InstallResult,
-    PackageMatch,
     install_one,
     is_externally_managed_env,
     match_packages_for_devices,
