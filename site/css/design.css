@@ -202,6 +202,60 @@ a:hover { color: var(--accent); border-color: var(--accent) }
   }
 }
 
+/* footer 3-column grid — Phase 2 */
+.foot { padding-top: 32px; padding-bottom: 44px; border-top: 1px solid var(--rule); display: block; }
+.footer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  margin-bottom: 28px;
+}
+@media (max-width: 720px) {
+  .footer-grid { grid-template-columns: 1fr; gap: 20px; }
+}
+.footer-col-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+.footer-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.footer-col li { margin: 0; }
+.footer-col a {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  color: var(--ink-2);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.footer-col a:hover { color: var(--accent); }
+
+.footer-bottom {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.footer-bottom a { color: var(--ink-3); }
+.footer-bottom a:hover { color: var(--accent); }
+
 /* ============================================================
    PAGE HEADER (secondary pages)
    ============================================================ */

@@ -35,24 +35,7 @@
       line-height: 1.55;
     }
 
-    /* ============================================================
-       FOOTER
-       ============================================================ */
-    footer.foot {
-      padding: 28px 0 44px;
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--ink-3);
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      flex-wrap: wrap;
-      border-top: 1px solid var(--rule);
-    }
-    footer.foot a { color: var(--ink-3) }
-    footer.foot a:hover { color: var(--accent) }
+    /* footer rules moved to design.css (Phase 2 — see footer.html partial) */
 
     /* ============================================================
        CASE STUDY BODY
@@ -465,20 +448,7 @@ curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/run-b
     </div>
   </main>
 
-  <!-- ===== FOOTER ===== -->
-  <footer class="wrap foot">
-    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
-    <div>
-      <a href="/">Home</a> ·
-      <a href="/case-studies/">Case studies</a> ·
-      <a href="/cookbook/">Cookbook</a> ·
-      <a href="https://docs.robotmd.dev/spec/">Spec</a> ·
-      <a href="/registry/">Registry</a> ·
-      <a href="/status">Status</a> ·
-      <a href="/report.html">Report issue</a> ·
-      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
-    </div>
-  </footer>
+<!--#include partials/footer.html-->
 
 </body>
 
