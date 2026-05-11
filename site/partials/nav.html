@@ -1,11 +1,37 @@
       <nav aria-label="Site navigation">
-        <a href="https://docs.robotmd.dev/spec/">Spec</a>
-        <a href="/agents/">Agents</a>
-        <a href="https://docs.robotmd.dev/mcp/">MCP</a>
-        <a href="/actuators/">Actuators</a>
-        <a href="/registry/">Registry</a>
-        <a href="https://docs.robotmd.dev/compliance/">Compliance</a>
-        <a href="/managed-agents/">Managed Agents</a>
-        <a href="/robots">Robots</a>
+        <a href="/cookbook/">Cookbook</a>
+        <a href="/cookbook/recipes/">Recipes</a>
+
+        <div class="nav-dropdown" data-nav-dropdown>
+          <button type="button"
+                  class="nav-dropdown-trigger"
+                  aria-expanded="false"
+                  aria-haspopup="true"
+                  aria-controls="nav-build">
+            Build <span class="nav-dropdown-caret" aria-hidden="true">▾</span>
+          </button>
+          <ul id="nav-build" class="nav-dropdown-menu" hidden>
+            <li><a href="/agents/">Agents</a></li>
+            <li><a href="https://docs.robotmd.dev/mcp/">MCP</a></li>
+            <li><a href="/actuators/">Actuators</a></li>
+          </ul>
+        </div>
+
+        <div class="nav-dropdown" data-nav-dropdown>
+          <button type="button"
+                  class="nav-dropdown-trigger"
+                  aria-expanded="false"
+                  aria-haspopup="true"
+                  aria-controls="nav-reference">
+            Reference <span class="nav-dropdown-caret" aria-hidden="true">▾</span>
+          </button>
+          <ul id="nav-reference" class="nav-dropdown-menu" hidden>
+            <li><a href="https://docs.robotmd.dev/spec/">Spec</a></li>
+            <li><a href="https://docs.robotmd.dev/compliance/">Compliance</a></li>
+            <li><a href="/registry/">Registry</a></li>
+            <li><a href="/robots">Robots</a></li>
+          </ul>
+        </div>
+
         <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
       </nav>
