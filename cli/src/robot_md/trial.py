@@ -10,6 +10,7 @@ State directory layout (per trial):
 Cold-install wall-clock anchor:
     ~/.robot-md-cold-install-start.txt  (operator-written before cold install)
 """
+
 from __future__ import annotations
 
 import datetime as dt
