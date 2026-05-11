@@ -262,6 +262,92 @@ def _reset_confirmed(d: pathlib.Path) -> None:
     )
 
 
+WALL_CLOCK_TARGET_S = 600  # 10 minutes
+EXPECTED_ITERATIONS = 10
+
+
+def _parse_utc(s: str) -> dt.datetime:
+    return dt.datetime.strptime(s, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
+
+
+@trial_app.command("finalize")
+def finalize_cmd(
+    trial_id: str = typer.Option(..., "--trial"),
+) -> None:
+    """Roll iter_*.json files into evidence.json with cold-install wall-clock verdict."""
+    d = _trial_dir(trial_id)
+    if not d.exists():
+        typer.echo(f"error: unknown trial: {trial_id}")
+        raise typer.Exit(code=2)
+    start = json.loads((d / "start.json").read_text())
+    iter_files = sorted(d.glob("iter_*.json"), key=lambda p: int(p.stem.split("_")[1]))
+    if len(iter_files) != EXPECTED_ITERATIONS:
+        typer.echo(f"error: trial has {len(iter_files)} iterations, expected {EXPECTED_ITERATIONS}")
+        raise typer.Exit(code=2)
+
+    iters = [json.loads(p.read_text()) for p in iter_files]
+    passed = sum(1 for it in iters if it.get("verdict", {}).get("pass"))
+    trial_duration_s = sum(float(it.get("duration_s") or 0) for it in iters)
+
+    cold_block: dict
+    iter1 = iters[0]
+    if iter1.get("verdict", {}).get("pass") and start.get("cold_install_start_marker"):
+        start_marker = start["cold_install_start_marker"]
+        end_marker = iter1["post_state"]["captured_at"]
+        elapsed_s = (_parse_utc(end_marker) - _parse_utc(start_marker)).total_seconds()
+        verdict = "PASS" if elapsed_s <= WALL_CLOCK_TARGET_S else "FAIL"
+        cold_block = {
+            "start_marker": start_marker,
+            "start_anchor": start.get("start_anchor", "claude_code_first_command"),
+            "end_marker": end_marker,
+            "end_anchor": "iteration_1_pass",
+            "elapsed_s": elapsed_s,
+            "claim": f"≤ {WALL_CLOCK_TARGET_S} s (10 min)",
+            "verdict": verdict,
+        }
+    else:
+        cold_block = {
+            "start_marker": start.get("cold_install_start_marker"),
+            "start_anchor": start.get("start_anchor", "robot_md_trial_start_only"),
+            "end_marker": None,
+            "end_anchor": "iteration_1_pass",
+            "elapsed_s": None,
+            "claim": f"≤ {WALL_CLOCK_TARGET_S} s (10 min)",
+            "verdict": "N/A",
+        }
+
+    evidence = {
+        "property": start["property"],
+        "rig": "bob-rig-2026",
+        "rrn": "RRN-000000000002",
+        "actuators": [
+            {"name": "so-arm101", "rpn": "RPN-000000000002"},
+            {"name": "oak-d", "rpn": "RPN-000000000003"},
+        ],
+        "captured_at": _utcnow_iso(),
+        "trial_duration_s": trial_duration_s,
+        "cold_install_wallclock": cold_block,
+        "total": EXPECTED_ITERATIONS,
+        "passed": passed,
+        "iterations": iters,
+        "scope_disclaimers": [
+            "Per-motion HiTL claim NOT made; envelopes batch-signed by bob-operator-2026.",
+            "Verification uses hardcoded HSV+depth thresholds;"
+            " not robust to non-standard lighting.",
+            "Camera mount: bird's-eye, ~30cm above table, pointing down.",
+            "Claude reasoning quality affects trial duration; per-iteration soft timeout is 30s.",
+            "Wall-clock anchor is operator-tagged; honor system.",
+        ],
+    }
+    (d / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    typer.echo(
+        f"Trial {trial_id} finalized."
+        f" {passed}/{EXPECTED_ITERATIONS} passed."
+        f" Total duration: {trial_duration_s:.0f}s."
+    )
+    typer.echo(f"Evidence at: {d / 'evidence.json'}")
+
+
 @trial_app.command("abort")
 def abort_cmd(
     trial_id: str = typer.Option(..., "--trial"),

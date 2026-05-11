@@ -477,3 +477,96 @@ def test_capture_post_fails_when_post_red_not_found(trial_home, monkeypatch):
     iter1 = json.loads((d / "iter_1.json").read_text())
     verdict = iter1["verdict"]
     assert verdict["pass"] is False
+
+
+# ---------------------------------------------------------------------------
+# Task 12: trial finalize
+# ---------------------------------------------------------------------------
+
+
+def _seed_n_iters(d: pathlib.Path, n: int, all_pass: bool = True) -> None:
+    for i in range(1, n + 1):
+        state = {
+            "iteration": i,
+            "started_at": f"2026-05-11T14:0{i}:00Z",
+            "duration_s": 24.7,
+            "pre_state": {
+                "joint_positions_rad": {},
+                "perceive_red_blob": {},
+                "perceive_bowl_top": {},
+            },
+            "post_state": {
+                "joint_positions_rad": {},
+                "perceive_red_blob": {},
+                "perceive_bowl_top": {},
+                "captured_at": f"2026-05-11T14:0{i}:30Z",
+            },
+            "verdict": {
+                "pass": all_pass,
+                "red_in_bowl": all_pass,
+                "centroid_inside_bbox": all_pass,
+                "depth_delta_mm": 3,
+                "pixel_distance_to_bowl_centroid_px": 3,
+                "rule": "...",
+            },
+            "operator_reset_confirmed_at": f"2026-05-11T14:0{i}:45Z",
+        }
+        (d / f"iter_{i}.json").write_text(json.dumps(state) + "\n")
+
+
+def test_finalize_writes_evidence_json_with_passed_tally(trial_home):
+    d = _seed_trial(trial_home)
+    _seed_n_iters(d, 10)
+    from robot_md.trial import trial_app
+
+    result = CliRunner().invoke(trial_app, ["finalize", "--trial", d.name])
+    assert result.exit_code == 0, result.output
+    ev = json.loads((d / "evidence.json").read_text())
+    assert ev["property"] == "bob.local/PICK-PLACE-10"
+    assert ev["total"] == 10
+    assert ev["passed"] == 10
+    assert len(ev["iterations"]) == 10
+
+
+def test_finalize_records_wall_clock_pass_when_iter1_passes(trial_home):
+    d = _seed_trial(trial_home)
+    state = json.loads((d / "start.json").read_text())
+    state["cold_install_start_marker"] = "2026-05-11T13:52:00Z"
+    state["start_anchor"] = "claude_code_first_command"
+    (d / "start.json").write_text(json.dumps(state) + "\n")
+    _seed_n_iters(d, 10)
+    from robot_md.trial import trial_app
+
+    result = CliRunner().invoke(trial_app, ["finalize", "--trial", d.name])
+    assert result.exit_code == 0
+    ev = json.loads((d / "evidence.json").read_text())
+    assert ev["cold_install_wallclock"]["start_anchor"] == "claude_code_first_command"
+    assert ev["cold_install_wallclock"]["end_anchor"] == "iteration_1_pass"
+    assert ev["cold_install_wallclock"]["elapsed_s"] > 0
+    assert ev["cold_install_wallclock"]["verdict"] == "PASS"
+
+
+def test_finalize_records_wall_clock_na_when_iter1_fails(trial_home):
+    d = _seed_trial(trial_home)
+    state = json.loads((d / "start.json").read_text())
+    state["cold_install_start_marker"] = "2026-05-11T13:52:00Z"
+    state["start_anchor"] = "claude_code_first_command"
+    (d / "start.json").write_text(json.dumps(state) + "\n")
+    _seed_n_iters(d, 10, all_pass=False)
+    from robot_md.trial import trial_app
+
+    result = CliRunner().invoke(trial_app, ["finalize", "--trial", d.name])
+    assert result.exit_code == 0
+    ev = json.loads((d / "evidence.json").read_text())
+    assert ev["passed"] == 0
+    assert ev["cold_install_wallclock"]["verdict"] == "N/A"
+
+
+def test_finalize_refuses_partial_trial(trial_home):
+    d = _seed_trial(trial_home)
+    _seed_n_iters(d, 7)
+    from robot_md.trial import trial_app
+
+    result = CliRunner().invoke(trial_app, ["finalize", "--trial", d.name])
+    assert result.exit_code != 0
+    assert "10" in result.output  # complaint mentions expected count
