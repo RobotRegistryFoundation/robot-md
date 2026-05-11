@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Recipes — ROBOT.md cookbook</title>
+  <meta name="description"
+    content="Variant walkthroughs of the ROBOT.md cookbook for specific hardware-or-skill combinations. Each recipe assumes you've done (or skimmed) the cookbook first.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Recipes — ROBOT.md cookbook">
+  <meta property="og:description"
+    content="Variant cookbook walkthroughs for specific hardware-or-skill combinations.">
+  <meta property="og:url" content="https://robotmd.dev/cookbook/recipes/">
+  <meta property="og:type" content="website">
+
+  <link rel="canonical" href="https://robotmd.dev/cookbook/recipes/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/design.css">
+  <link rel="stylesheet" href="/css/apex.css">
+
+  <style>
+    .breadcrumb {
+      padding: 16px 0 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      color: var(--ink-3);
+    }
+    .breadcrumb a { color: var(--ink-3); }
+    .breadcrumb a:hover { color: var(--accent); }
+
+    .recipes-list {
+      display: grid;
+      gap: 0;
+      border: 1px solid var(--rule);
+      margin-top: 28px;
+    }
+    .recipe-card {
+      padding: 24px 28px;
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .recipe-card:last-child { border-bottom: none; }
+    .recipe-card .recipe-eyebrow {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .recipe-card h3 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 20px;
+      letter-spacing: -0.01em;
+      margin: 0;
+    }
+    .recipe-card h3 a { color: var(--ink); }
+    .recipe-card h3 a:hover { color: var(--accent); }
+    .recipe-card p {
+      margin: 0;
+      font-size: 14px;
+      color: var(--ink-2);
+      line-height: 1.5;
+    }
+
+    .contribute-line {
+      margin-top: 28px;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      color: var(--ink-3);
+    }
+    .contribute-line a { color: var(--accent); }
+  </style>
+</head>
+
+<body>
+
+<!--#include partials/site-nav.html-->
+
+<main class="wrap">
+
+  <p class="breadcrumb"><a href="/cookbook/">← Cookbook</a></p>
+
+  <header class="page-eyebrow">
+    <p class="sec-eyebrow">§ Recipes</p>
+    <h1>Cookbook recipes.</h1>
+    <p class="lede">
+      The <a href="/cookbook/">cookbook</a> is the canonical end-to-end —
+      the one tutorial you do first. Recipes are bite-sized variants that
+      show specific hardware-or-skill combinations end-to-end. Each recipe
+      assumes you've done (or at least skimmed) the cookbook first.
+    </p>
+  </header>
+
+  <div class="recipes-list">
+
+    <article class="recipe-card">
+      <span class="recipe-eyebrow">Hardware · 6-DOF arm</span>
+      <h3><a href="/cookbook/recipes/so-arm101/">SO-ARM101 on Raspberry Pi 5</a></h3>
+      <p>
+        Wire a 6-DOF arm to Claude in about 30 minutes. Feetech driver
+        on <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">/dev/ttyACM0</code>;
+        named poses; one signed run-bundle to verify.
+        For the certified-evidence version, see the
+        <a href="/case-studies/bob-so-arm101/">case study</a>.
+      </p>
+    </article>
+
+  </div>
+
+  <p class="contribute-line">
+    More recipes coming. Have one to contribute? <a href="https://github.com/RobotRegistryFoundation/robot-md/issues/new?labels=recipe">File an issue →</a>
+  </p>
+
+</main>
+
+<!--#include partials/footer.html-->
+
+</body>
+</html>

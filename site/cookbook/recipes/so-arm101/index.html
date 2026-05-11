@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SO-ARM101 on Raspberry Pi 5 — recipe — ROBOT.md cookbook</title>
+  <meta name="description"
+    content="Wire a 6-DOF SO-ARM101 arm to Claude in ≈30 minutes. Feetech driver on /dev/ttyACM0, named poses, one signed run-bundle to verify.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="SO-ARM101 on Raspberry Pi 5 — recipe">
+  <meta property="og:description"
+    content="Bite-sized cookbook variant for a specific 6-DOF arm. ≈30 minutes end to end.">
+  <meta property="og:url" content="https://robotmd.dev/cookbook/recipes/so-arm101/">
+  <meta property="og:type" content="article">
+
+  <link rel="canonical" href="https://robotmd.dev/cookbook/recipes/so-arm101/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/design.css">
+  <link rel="stylesheet" href="/css/apex.css">
+
+  <style>
+    .breadcrumb {
+      padding: 16px 0 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      color: var(--ink-3);
+    }
+    .breadcrumb a { color: var(--ink-3); }
+    .breadcrumb a:hover { color: var(--accent); }
+
+    .recipe-meta {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      padding: 12px 0 8px;
+    }
+    .recipe-meta span strong { color: var(--ink); font-weight: 500; }
+
+    /* Step blocks (recipe-local; cookbook uses .beat-* internally) */
+    .step-block {
+      padding: 28px 0 8px;
+      max-width: 760px;
+    }
+    .step-num {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 6px;
+    }
+    .step-h {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      margin: 0 0 12px;
+      color: var(--ink);
+    }
+    .step-block p {
+      margin: 0 0 12px;
+      line-height: 1.6;
+      color: var(--ink-2);
+    }
+    .step-block pre {
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      margin: 8px 0 16px;
+    }
+    .step-block code {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      background: var(--paper-2);
+      padding: 1px 5px;
+      border-radius: 2px;
+    }
+    .step-block pre code {
+      background: none;
+      padding: 0;
+    }
+
+    .variant-notes {
+      margin-top: 28px;
+      padding: 20px 24px;
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      max-width: 760px;
+    }
+    .variant-notes h3 {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin: 0 0 12px;
+    }
+    .variant-notes ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--ink-2);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .variant-notes li { margin-bottom: 6px; }
+
+    .next-link {
+      margin-top: 28px;
+      padding-top: 20px;
+      border-top: 1px solid var(--rule);
+      max-width: 760px;
+      font-size: 14.5px;
+      color: var(--ink-2);
+    }
+  </style>
+</head>
+
+<body>
+
+<!--#include partials/site-nav.html-->
+
+<main class="wrap">
+
+  <p class="breadcrumb"><a href="/cookbook/recipes/">← Recipes</a></p>
+
+  <header class="page-eyebrow">
+    <p class="sec-eyebrow">§ Recipe</p>
+    <h1>SO-ARM101 on Raspberry Pi 5.</h1>
+    <p class="lede">
+      Wire a 6-DOF arm to Claude. Feetech driver on
+      <code style="font-family:var(--mono);background:var(--paper-2);padding:1px 5px;border-radius:2px;">/dev/ttyACM0</code>;
+      named poses; one signed run-bundle to verify. About 30 minutes.
+    </p>
+  </header>
+
+  <div class="recipe-meta">
+    <span><strong>Time</strong> · ≈ 30 min</span>
+    <span><strong>Hardware</strong> · SO-ARM101 + Raspberry Pi 5</span>
+    <span><strong>Driver</strong> · feetech</span>
+    <span><strong>Difficulty</strong> · cookbook+</span>
+  </div>
+
+  <section class="step-block" id="step-01">
+    <p class="step-num">Step 01 — Bill of materials</p>
+    <h2 class="step-h">What you need.</h2>
+    <ul style="line-height:1.7;color:var(--ink-2);">
+      <li>SO-ARM101 6-DOF arm (with included PCB + USB-C cable).</li>
+      <li>Raspberry Pi 5 (4 GB or 8 GB) running Raspberry Pi OS 64-bit.</li>
+      <li>USB-C power for the arm; PoE or USB-C for the Pi.</li>
+      <li>An MCP-aware agent surface — Claude Code recommended (see <a href="/agents/">Agents</a>).</li>
+    </ul>
+  </section>
+
+  <section class="step-block" id="step-02">
+    <p class="step-num">Step 02 — Install</p>
+    <h2 class="step-h">robot-md + the SO-ARM101 actuator.</h2>
+    <p>
+      The cookbook covers the Claude Code plugin install path. For this recipe
+      we install via <code>pipx</code> directly so you can wire the actuator
+      package alongside.
+    </p>
+<pre>$ pipx install robot-md
+$ pip install so-arm101-actuator   <span style="color:var(--ink-3)"># published as part of the actuator catalog</span></pre>
+    <p>
+      Verify the actuator advertises itself:
+    </p>
+<pre>$ robot-md actuators list | grep so-arm101</pre>
+  </section>
+
+  <section class="step-block" id="step-03">
+    <p class="step-num">Step 03 — Author</p>
+    <h2 class="step-h">Generate a ROBOT.md for this hardware.</h2>
+    <p>
+      <code>robot-md init</code> auto-detects USB devices on
+      <code>/dev/ttyACM*</code> and proposes a starter manifest.
+      Accept the SO-ARM101 preset:
+    </p>
+<pre>$ robot-md init --preset so-arm101</pre>
+    <p>
+      The generated <code>ROBOT.md</code> binds the feetech driver to
+      <code>/dev/ttyACM0</code> and seeds a <code>ready</code> named pose
+      that holds the arm extended forward (wrist_flex centered so the
+      STS3215 servo can hold indefinitely against gravity).
+    </p>
+  </section>
+
+  <section class="step-block" id="step-04">
+    <p class="step-num">Step 04 — Register</p>
+    <h2 class="step-h">Mint an RRN.</h2>
+    <p>
+      Same as the cookbook — register with RRF to get a Robot Registration
+      Number. The registration generates the keypair the run-bundle
+      cryptographically binds to.
+    </p>
+<pre>$ robot-md register</pre>
+    <p>
+      You'll get back an RRN of the form
+      <code>RRN-000000000XXX</code>. Save it; the audit bundle (Step 06)
+      verifies against this identifier.
+    </p>
+  </section>
+
+  <section class="step-block" id="step-05">
+    <p class="step-num">Step 05 — Talk to Claude</p>
+    <h2 class="step-h">Run a skill from the agent surface.</h2>
+    <p>
+      In the same directory as your <code>ROBOT.md</code>, open Claude Code
+      (or your chosen MCP-aware agent) and ask:
+    </p>
+<pre>"What can this robot do?"</pre>
+    <p>
+      Claude will read <code>ROBOT.md</code> and report the declared
+      capabilities. Then ask it to move the arm to the
+      <code>ready</code> pose:
+    </p>
+<pre>"Pose the arm at ready."</pre>
+    <p>
+      The gateway runs a dry-run first; the named-pose move requires no
+      HITL gate, so it'll execute on confirmation.
+    </p>
+  </section>
+
+  <section class="step-block" id="step-06">
+    <p class="step-num">Step 06 — Verify</p>
+    <h2 class="step-h">Inspect the signed run-bundle.</h2>
+    <p>
+      Every action goes into a RCAN-signed run-bundle. List recent bundles:
+    </p>
+<pre>$ robot-md bundles list --limit 5</pre>
+    <p>
+      Pick the most recent <code>runbundle_*</code> ID and verify it
+      end-to-end:
+    </p>
+<pre>$ robot-md bundles verify runbundle_&lt;ID&gt;</pre>
+    <p>
+      You'll see each action signed, the pose decomposition, and the
+      RRF countersignature. The bundle is curl-verifiable from
+      <code>https://rrf.robotmd.dev/v2/run-bundles/runbundle_&lt;ID&gt;</code>.
+    </p>
+  </section>
+
+  <aside class="variant-notes">
+    <h3>SO-ARM101 variant notes</h3>
+    <ul>
+      <li><strong>wrist_flex stalls</strong> at high pitch angles. The
+          <code>ready</code> pose centers wrist_flex at 2048 to keep the
+          STS3215 holding indefinitely. Custom poses with wrist_flex
+          beyond ±60° may stall; check <code>robot-md doctor</code>.</li>
+      <li><strong>Preset extrinsic transform</strong> assumes a
+          horizontally-mounted base. Re-run
+          <code>robot-md calibrate --extrinsic</code> if you've mounted the
+          arm at an angle.</li>
+      <li><strong>Driver:</strong> <code>feetech</code> is the upstream
+          driver (not <code>scservo_sdk</code> directly). The actuator
+          package wraps the upstream PyPI feetech-servo-sdk with a known
+          workaround for its broken 1.0.0 factory function.</li>
+      <li><strong>Pi 5 vs Pi 4:</strong> Pi 5 recommended — cooler
+          thermal envelope keeps the actuator loop responsive. Pi 4
+          works but you'll see occasional servo timeouts under load.</li>
+    </ul>
+  </aside>
+
+  <p class="next-link">
+    Looking for the certified-evidence version with 5 cert IDs and 2
+    countersigned run-bundles? See the
+    <a href="/case-studies/bob-so-arm101/">SO-ARM101 case study</a>.
+    Want a different recipe? <a href="/cookbook/recipes/">Browse all recipes</a>.
+  </p>
+
+</main>
+
+<!--#include partials/footer.html-->
+
+</body>
+</html>
