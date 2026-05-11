@@ -17,8 +17,14 @@ import os
 import subprocess
 from pathlib import Path
 
+_EXEC_START = (
+    "/opt/robot-md-gateway/.venv/bin/robot-md-gateway serve "
+    "--host 127.0.0.1 --port 8080 "
+    "--bearers /etc/robot-md-gateway/bearers.yaml"
+)
 
-SYSTEMD_UNIT_TEMPLATE = """\
+
+SYSTEMD_UNIT_TEMPLATE = f"""\
 [Unit]
 Description=robot-md-gateway — enforcement gateway between agent intent and actuators
 After=network-online.target
@@ -29,7 +35,7 @@ User=robot-md-gateway
 Group=robot-md-gateway
 WorkingDirectory=/opt/robot-md-gateway
 EnvironmentFile=/etc/robot-md-gateway/gateway.env
-ExecStart=/opt/robot-md-gateway/.venv/bin/robot-md-gateway serve --host 127.0.0.1 --port 8080 --bearers /etc/robot-md-gateway/bearers.yaml
+ExecStart={_EXEC_START}
 Restart=on-failure
 RestartSec=3s
 
@@ -120,11 +126,12 @@ def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
 
     sudo = ["sudo"]
     steps = [
-        sudo + ["useradd", "--system", "--no-create-home", "--shell", "/usr/sbin/nologin",
-                "robot-md-gateway"],
-        sudo + ["mkdir", "-p", "/opt/robot-md-gateway", "/etc/robot-md-gateway"],
-        sudo + ["python3", "-m", "venv", "/opt/robot-md-gateway/.venv"],
-        sudo + ["/opt/robot-md-gateway/.venv/bin/pip", "install", "robot-md-gateway"],
+        [*sudo, "useradd", "--system", "--no-create-home", "--shell",
+         "/usr/sbin/nologin", "robot-md-gateway"],
+        [*sudo, "mkdir", "-p", "/opt/robot-md-gateway", "/etc/robot-md-gateway"],
+        [*sudo, "python3", "-m", "venv", "/opt/robot-md-gateway/.venv"],
+        [*sudo, "/opt/robot-md-gateway/.venv/bin/pip", "install",
+         "robot-md-gateway"],
     ]
     for cmd in steps:
         r = subprocess.run(cmd)
@@ -134,22 +141,26 @@ def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
             return 1
 
     for filename, content in [
-        ("/etc/robot-md-gateway/gateway.env", render_env_file(manifest_path=manifest_path)),
+        ("/etc/robot-md-gateway/gateway.env",
+         render_env_file(manifest_path=manifest_path)),
         ("/etc/robot-md-gateway/bearers.yaml", render_default_bearers()),
         ("/etc/systemd/system/robot-md-gateway.service", render_systemd_unit()),
     ]:
-        r = subprocess.run(sudo + ["tee", filename], input=content, text=True, capture_output=True)
+        r = subprocess.run(
+            [*sudo, "tee", filename],
+            input=content, text=True, capture_output=True,
+        )
         if r.returncode != 0:
             print(f"failed to write {filename}")
             return 1
 
     if os.path.exists(manifest_path) and manifest_path != "/etc/robot-md-gateway/ROBOT.md":
-        subprocess.run(sudo + ["cp", manifest_path, "/etc/robot-md-gateway/ROBOT.md"])
+        subprocess.run([*sudo, "cp", manifest_path, "/etc/robot-md-gateway/ROBOT.md"])
 
-    subprocess.run(sudo + ["chown", "-R", "robot-md-gateway:robot-md-gateway",
-                           "/opt/robot-md-gateway", "/etc/robot-md-gateway"])
-    subprocess.run(sudo + ["systemctl", "daemon-reload"])
-    r = subprocess.run(sudo + ["systemctl", "enable", "--now", "robot-md-gateway"])
+    subprocess.run([*sudo, "chown", "-R", "robot-md-gateway:robot-md-gateway",
+                    "/opt/robot-md-gateway", "/etc/robot-md-gateway"])
+    subprocess.run([*sudo, "systemctl", "daemon-reload"])
+    r = subprocess.run([*sudo, "systemctl", "enable", "--now", "robot-md-gateway"])
     if r.returncode != 0:
         print("systemctl enable failed")
         return 1
