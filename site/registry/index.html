@@ -259,7 +259,7 @@
 
       <p style="font-size:14px;color:var(--ink-2);margin-top:16px;line-height:1.6;">
         The command signs the registration payload with your robot's key (generated at init time)
-        and POSTs to <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">https://robotregistryfoundation.org/api/register</code>.
+        and POSTs to <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">https://robotregistryfoundation.org/v2/register</code>.
         On success, <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">metadata.rrn</code>
         and <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">metadata.rrn_uri</code>
         are written back to your ROBOT.md.
@@ -293,37 +293,37 @@
         <tbody>
           <tr>
             <td>§22</td>
-            <td>/api/compliance/fria</td>
+            <td>/v2/fria</td>
             <td>FRIA — Fundamental Rights Impact Assessment</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§23</td>
-            <td>/api/compliance/safety-benchmark</td>
+            <td>/v2/safety-benchmark</td>
             <td>Safety benchmark (ISO 42001 self-assessment)</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§24</td>
-            <td>/api/compliance/ifu</td>
+            <td>/v2/ifu</td>
             <td>IFU Art. 13(3) — Instructions for Use</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§25</td>
-            <td>/api/compliance/incident-report</td>
+            <td>/v2/incident-report</td>
             <td>Incident report Art. 72</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§26</td>
-            <td>/api/compliance/eu-register</td>
+            <td>/v2/eu-register</td>
             <td>EU Register Art. 49 filing</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§27</td>
-            <td>/api/compliance/fria-signed</td>
+            <td>/v2/fria-signed</td>
             <td>FRIA with post-quantum signature (in flight)</td>
             <td><span class="ep-wip">◌ In flight</span></td>
           </tr>
@@ -396,7 +396,7 @@
         or directly at RRF), the RRF broadcasts a revocation event to all registered
         <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">M2M_TRUSTED</code>
         listeners. Peer runtimes (OpenCastor, robot-md-gateway) poll
-        <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">https://robotregistryfoundation.org/api/revocation/&lt;rrn&gt;</code>
+        <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">https://robotregistryfoundation.org/v2/revocation/&lt;rrn&gt;</code>
         on a configurable interval (default: 60 seconds). Any request signed with a revoked key is
         rejected with <code style="font-family:var(--mono);font-size:12.5px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">403 KEY_REVOKED</code>.
       </p>
