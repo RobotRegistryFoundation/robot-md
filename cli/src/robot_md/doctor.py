@@ -18,7 +18,9 @@ Output: a rich Table. Exit code 0 if all checks pass or only warn, 1 on any fail
 
 from __future__ import annotations
 
+import grp
 import os
+import pwd
 import socket
 import sys
 from dataclasses import dataclass
@@ -111,6 +113,17 @@ def _which(cmd: str) -> str | None:
         if p.is_file() and os.access(p, os.X_OK):
             return str(p)
     return None
+
+
+def _is_owned_by_gateway(path: Path) -> bool:
+    """True if the path is owned by the system robot-md-gateway user/group."""
+    try:
+        st = path.stat()
+        owner = pwd.getpwuid(st.st_uid).pw_name
+        group = grp.getgrgid(st.st_gid).gr_name
+    except (KeyError, OSError):
+        return False
+    return owner == "robot-md-gateway" or group == "robot-md-gateway"
 
 
 # ---------------------------------------------------------------- 2. manifest
@@ -251,6 +264,10 @@ def check_drivers(fm: dict[str, Any] | None) -> list[CheckResult]:
             p = Path(port)
             if not p.exists():
                 out.append(_fail(label, "drivers", f"{port} — does not exist (unplugged?)"))
+            elif _is_owned_by_gateway(p):
+                out.append(_warn(label, "drivers",
+                    f"{port} — claimed by robot-md-gateway user (intentional); "
+                    f"talk to the gateway at 127.0.0.1:8080, not the device directly."))
             elif not os.access(p, os.R_OK | os.W_OK):
                 out.append(_warn(label, "drivers", f"{port} — exists but not RW (dialout group?)"))
             else:
