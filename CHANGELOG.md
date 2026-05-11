@@ -9,6 +9,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.10.1] - 2026-05-11
+
+### Fixed
+- `robot-md trial`'s `_gateway_invoke` now builds the full `InvokeEnvelope`
+  the gateway requires — `msg_id`, `type`, `ruri`, `scope`, `tool_name`,
+  `tool_args`, `manifest_path`, `actuator_name`. Prior 1.10.0 omitted
+  `ruri` / `scope` / `manifest_path`, which caused a 422 from any gateway
+  with `extra='forbid'` and silently dropped the `actuator_name` on
+  multi-actuator gateways (robot-md-gateway >= 0.5.0a3). Closes #69.
+
+### Changed
+- `trial start` warns when `ROBOT_MD_RURI` / `ROBOT_MD_MANIFEST_PATH` are
+  unset — these are required by `_gateway_invoke` and the trial would
+  otherwise fail at the first `--capture-pre`.
+
+### Notes
+- Requires `robot-md-gateway >= 0.5.0a3` if the rig hosts multiple
+  actuators behind one gateway (typical for pick-place rigs with both
+  perception and motion drivers).
+
+---
+
 ## [1.10.0] - 2026-05-11
 
 ### Added

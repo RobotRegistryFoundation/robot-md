@@ -19,6 +19,7 @@ import os
 import pathlib
 import secrets
 import urllib.request
+import uuid
 
 import typer
 
@@ -88,6 +89,16 @@ def start_cmd(
             f"  ({COLD_INSTALL_START_FILE} not found"
             " — wall-clock anchor downgraded to post-install)"
         )
+    missing_env = [
+        v for v in ("ROBOT_MD_RURI", "ROBOT_MD_MANIFEST_PATH")
+        if not os.environ.get(v)
+    ]
+    if missing_env:
+        typer.echo(
+            "  WARN: capture-pre / capture-post will fail with RuntimeError until you set "
+            + ", ".join(missing_env)
+            + " (required for the gateway envelope; see robot-md 1.10.1 release notes)."
+        )
     typer.echo(f"Trial ID: {trial_id}")
     typer.echo("→ Run your Claude Code session now. After each iteration:")
     typer.echo(f"  robot-md trial iteration --trial {trial_id} --capture-pre")
@@ -103,16 +114,52 @@ def _next_iter_number(trial_dir: pathlib.Path) -> int:
 
 
 def _gateway_invoke(actuator: str, tool: str, args: dict) -> dict:
+    """POST a full InvokeEnvelope to the gateway and return the parsed response.
+
+    The receiver requires msg_id / type / ruri / scope / tool_name / tool_args /
+    manifest_path. The first three live outside any single trial command and
+    are read from env vars set once by the operator before `trial start`:
+
+        ROBOT_MD_RURI           e.g. rcan://RRN-000000000002/skill
+        ROBOT_MD_SCOPE          e.g. "read" (default) or "actuate"
+        ROBOT_MD_MANIFEST_PATH  absolute path to ROBOT.md on this host
+
+    `msg_id` is generated per request. The gateway must be configured with
+    multi-actuator dispatch (robot-md-gateway >= 0.5.0a3) — `actuator_name`
+    selects between the perception and motion actuators.
+
+    Raises RuntimeError if any required env var is missing — fail loudly
+    rather than send a 422-bound request.
+    """
+    ruri = os.environ.get("ROBOT_MD_RURI")
+    if not ruri:
+        raise RuntimeError(
+            "ROBOT_MD_RURI is required by robot-md trial. "
+            "Set it once before `robot-md trial start` (the rcan:// URI of "
+            "this robot's RRN registration)."
+        )
+    manifest_path = os.environ.get("ROBOT_MD_MANIFEST_PATH")
+    if not manifest_path:
+        raise RuntimeError(
+            "ROBOT_MD_MANIFEST_PATH is required by robot-md trial. "
+            "Set it to the absolute path of the signed ROBOT.md the gateway "
+            "should verify against (e.g., ~/.robot-md/ROBOT.md)."
+        )
+    scope = os.environ.get("ROBOT_MD_SCOPE", "read")
+
     url = os.environ.get("ROBOT_MD_GATEWAY_URL", "http://127.0.0.1:8080") + "/v1/invoke"
     bearer = os.environ.get("ROBOT_MD_GATEWAY_BEARER", "")
-    body = json.dumps(
-        {
-            "type": "invoke",
-            "actuator_name": actuator,
-            "tool_name": tool,
-            "tool_args": args,
-        }
-    ).encode("utf-8")
+    envelope = {
+        "msg_id": f"trial-{uuid.uuid4().hex[:12]}",
+        "type": "rcan/v1/invoke",
+        "ruri": ruri,
+        "scope": scope,
+        "tool_name": tool,
+        "tool_args": args,
+        "manifest_path": manifest_path,
+        "actuator_name": actuator,
+    }
+    body = json.dumps(envelope).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,

@@ -580,3 +580,113 @@ def test_trial_subcommand_registered_in_main_cli():
     assert result.returncode == 0, result.stderr
     for cmd in ("start", "iteration", "finalize", "abort"):
         assert cmd in result.stdout, f"trial {cmd} not registered"
+
+
+class _CapturingURLOpen:
+    """Stand-in for urllib.request.urlopen that captures the request and returns canned JSON."""
+
+    def __init__(self, response: dict):
+        self.response = response
+        self.captured: dict = {}
+
+    def __call__(self, req, timeout=10):
+        # Record the outbound shape so tests can assert against it.
+        self.captured["url"] = req.full_url
+        self.captured["headers"] = dict(req.headers)
+        self.captured["body"] = json.loads(req.data.decode("utf-8"))
+
+        class _Resp:
+            def __init__(self, payload):
+                self._payload = json.dumps(payload).encode("utf-8")
+
+            def read(self):
+                return self._payload
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        return _Resp(self.response)
+
+
+def _set_envelope_env(monkeypatch, *, ruri="rcan://RRN-test/skill", scope=None, manifest="/tmp/ROBOT.md"):
+    monkeypatch.setenv("ROBOT_MD_RURI", ruri)
+    monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", manifest)
+    if scope is None:
+        monkeypatch.delenv("ROBOT_MD_SCOPE", raising=False)
+    else:
+        monkeypatch.setenv("ROBOT_MD_SCOPE", scope)
+
+
+def test_gateway_invoke_builds_full_envelope(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    _set_envelope_env(monkeypatch, ruri="rcan://RRN-bob/skill", manifest="/etc/robot-md/ROBOT.md")
+    monkeypatch.setenv("ROBOT_MD_GATEWAY_BEARER", "test-bearer")
+    capture = _CapturingURLOpen({"telemetry": {"found": True}})
+    monkeypatch.setattr(trial_mod.urllib.request, "urlopen", capture)
+
+    result = trial_mod._gateway_invoke("oak-d", "perceive", {"query": "red_blob"})
+
+    assert result == {"telemetry": {"found": True}}
+    body = capture.captured["body"]
+    assert body["type"] == "rcan/v1/invoke"
+    assert body["ruri"] == "rcan://RRN-bob/skill"
+    assert body["scope"] == "read"  # default when env not set
+    assert body["tool_name"] == "perceive"
+    assert body["tool_args"] == {"query": "red_blob"}
+    assert body["manifest_path"] == "/etc/robot-md/ROBOT.md"
+    assert body["actuator_name"] == "oak-d"
+    assert body["msg_id"].startswith("trial-") and len(body["msg_id"]) == 6 + 12
+    assert capture.captured["headers"].get("Authorization") == "Bearer test-bearer"
+
+
+def test_gateway_invoke_respects_scope_env(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    _set_envelope_env(monkeypatch, scope="actuate")
+    capture = _CapturingURLOpen({"ok": True})
+    monkeypatch.setattr(trial_mod.urllib.request, "urlopen", capture)
+
+    trial_mod._gateway_invoke("so-arm101", "read_state", {})
+
+    assert capture.captured["body"]["scope"] == "actuate"
+
+
+def test_gateway_invoke_msg_id_unique_per_call(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    _set_envelope_env(monkeypatch)
+    capture_a = _CapturingURLOpen({"ok": True})
+    monkeypatch.setattr(trial_mod.urllib.request, "urlopen", capture_a)
+    trial_mod._gateway_invoke("oak-d", "perceive", {})
+    msg_a = capture_a.captured["body"]["msg_id"]
+
+    capture_b = _CapturingURLOpen({"ok": True})
+    monkeypatch.setattr(trial_mod.urllib.request, "urlopen", capture_b)
+    trial_mod._gateway_invoke("oak-d", "perceive", {})
+    msg_b = capture_b.captured["body"]["msg_id"]
+
+    assert msg_a != msg_b
+
+
+def test_gateway_invoke_requires_ruri(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    monkeypatch.delenv("ROBOT_MD_RURI", raising=False)
+    monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", "/tmp/ROBOT.md")
+
+    with pytest.raises(RuntimeError, match="ROBOT_MD_RURI"):
+        trial_mod._gateway_invoke("oak-d", "perceive", {})
+
+
+def test_gateway_invoke_requires_manifest_path(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    monkeypatch.setenv("ROBOT_MD_RURI", "rcan://RRN-test/skill")
+    monkeypatch.delenv("ROBOT_MD_MANIFEST_PATH", raising=False)
+
+    with pytest.raises(RuntimeError, match="ROBOT_MD_MANIFEST_PATH"):
+        trial_mod._gateway_invoke("oak-d", "perceive", {})
