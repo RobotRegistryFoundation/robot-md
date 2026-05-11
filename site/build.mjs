@@ -11,21 +11,18 @@ const SITE = path.resolve('site');
 const OUT = path.join(SITE, '_build');
 const INCLUDE_RE = /<!--\s*#include\s+(partials\/[\w\-./]+\.html)\s*-->/g;
 
-async function expand(content, depth = 0) {
-  if (depth > 8) throw new Error('include depth limit exceeded');
+async function expand(content) {
   let out = content;
-  let changed = true;
-  while (changed) {
-    changed = false;
+  for (let pass = 0; pass < 8; pass++) {
     const matches = [...out.matchAll(INCLUDE_RE)];
+    if (matches.length === 0) return out;
     for (const m of matches) {
       const includePath = path.join(SITE, m[1]);
       const text = await fs.readFile(includePath, 'utf8');
       out = out.replace(m[0], text);
-      changed = true;
     }
   }
-  return out;
+  throw new Error('include expansion exceeded 8 passes — check for circular includes');
 }
 
 async function walk(dir) {
