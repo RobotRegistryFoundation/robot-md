@@ -11,7 +11,7 @@ the operator can't actually use without the backend).
 from __future__ import annotations
 
 import os  # noqa: F401
-import subprocess  # noqa: F401
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -77,3 +77,34 @@ def is_externally_managed_env() -> bool:
     stdlib = Path(sysconfig.get_path("stdlib"))
     marker = stdlib / "EXTERNALLY-MANAGED"
     return marker.exists()
+
+
+@dataclass(frozen=True)
+class InstallResult:
+    package: str
+    ok: bool
+    stdout: str = ""
+    stderr: str = ""
+
+
+def install_one(package: str, *, min_version: str = "") -> InstallResult:
+    """Run `pip install --user [--break-system-packages] <pkg>[>=ver]`.
+
+    Emits a one-line stderr explanation when --break-system-packages is added
+    so the operator can see the workaround without surprise.
+    """
+    spec = package + (f">={min_version}" if min_version else "")
+    cmd = [sys.executable, "-m", "pip", "install", "--user", spec]
+    if is_externally_managed_env():
+        cmd.insert(cmd.index("install") + 1, "--break-system-packages")
+        sys.stderr.write(
+            f"⚠ Adding --break-system-packages because this Python install is "
+            f"externally-managed (PEP 668). Consider pipx for a cleaner future install.\n"
+        )
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    return InstallResult(
+        package=package,
+        ok=(result.returncode == 0),
+        stdout=result.stdout,
+        stderr=result.stderr,
+    )

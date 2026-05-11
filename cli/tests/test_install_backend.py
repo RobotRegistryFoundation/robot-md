@@ -2,7 +2,9 @@ from unittest.mock import patch
 
 from robot_md.autodetect import Device
 from robot_md.init_phases.install_backend import (
+    InstallResult,
     PackageMatch,
+    install_one,
     is_externally_managed_env,
     match_packages_for_devices,
 )
@@ -61,3 +63,41 @@ def test_pep668_not_detected_in_venv():
     """A venv (sys.prefix != base_prefix) is never externally-managed."""
     with patch("sys.prefix", "/tmp/venv"), patch("sys.base_prefix", "/usr"):
         assert is_externally_managed_env() is False
+
+
+def test_install_one_invokes_pip_with_break_system_packages_when_externally_managed():
+    """When PEP 668 is in effect, pip install adds --break-system-packages."""
+    captured_argv = []
+
+    def fake_run(cmd, **kwargs):
+        captured_argv.append(cmd)
+        from subprocess import CompletedProcess
+        return CompletedProcess(cmd, returncode=0,
+                                stdout="Successfully installed so-arm101-actuator-0.2.1\n",
+                                stderr="")
+
+    with patch("robot_md.init_phases.install_backend.is_externally_managed_env",
+               return_value=True), \
+         patch("subprocess.run", side_effect=fake_run):
+        result = install_one("so-arm101-actuator")
+
+    assert result.ok
+    assert any("--break-system-packages" in arg for arg in captured_argv[0])
+    assert "so-arm101-actuator" in captured_argv[0]
+
+
+def test_install_one_omits_break_system_packages_in_venv():
+    """In a venv, pip install does NOT pass --break-system-packages."""
+    captured = []
+
+    def fake_run(cmd, **kwargs):
+        captured.append(cmd)
+        from subprocess import CompletedProcess
+        return CompletedProcess(cmd, returncode=0, stdout="", stderr="")
+
+    with patch("robot_md.init_phases.install_backend.is_externally_managed_env",
+               return_value=False), \
+         patch("subprocess.run", side_effect=fake_run):
+        install_one("oak-d-actuator")
+
+    assert not any("--break-system-packages" in arg for arg in captured[0])
