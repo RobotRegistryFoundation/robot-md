@@ -1779,11 +1779,14 @@ def install_skill_cmd(
 def install_gateway_cmd(
     manifest: Path = typer.Option(
         Path("/etc/robot-md-gateway/ROBOT.md"),
-        "--manifest", "-m",
+        "--manifest",
+        "-m",
         help="Path to the ROBOT.md the gateway will enforce against.",
     ),
     yes: bool = typer.Option(
-        False, "--yes", "-y",
+        False,
+        "--yes",
+        "-y",
         help="Skip the sudo confirmation prompt.",
     ),
 ) -> None:

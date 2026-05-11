@@ -90,7 +90,9 @@ def already_installed() -> bool:
     try:
         result = subprocess.run(
             ["systemctl", "is-active", "robot-md-gateway"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
@@ -117,21 +119,29 @@ def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
         return 0
 
     if not yes:
-        confirm = input("This will sudo to create /opt/robot-md-gateway/, "
-                        "/etc/robot-md-gateway/, a system user, and a systemd "
-                        "unit. Continue? [y/N]: ")
+        confirm = input(
+            "This will sudo to create /opt/robot-md-gateway/, "
+            "/etc/robot-md-gateway/, a system user, and a systemd "
+            "unit. Continue? [y/N]: "
+        )
         if confirm.strip().lower() not in ("y", "yes"):
             print("aborted.")
             return 2
 
     sudo = ["sudo"]
     steps = [
-        [*sudo, "useradd", "--system", "--no-create-home", "--shell",
-         "/usr/sbin/nologin", "robot-md-gateway"],
+        [
+            *sudo,
+            "useradd",
+            "--system",
+            "--no-create-home",
+            "--shell",
+            "/usr/sbin/nologin",
+            "robot-md-gateway",
+        ],
         [*sudo, "mkdir", "-p", "/opt/robot-md-gateway", "/etc/robot-md-gateway"],
         [*sudo, "python3", "-m", "venv", "/opt/robot-md-gateway/.venv"],
-        [*sudo, "/opt/robot-md-gateway/.venv/bin/pip", "install",
-         "robot-md-gateway"],
+        [*sudo, "/opt/robot-md-gateway/.venv/bin/pip", "install", "robot-md-gateway"],
     ]
     for cmd in steps:
         r = subprocess.run(cmd)
@@ -141,14 +151,15 @@ def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
             return 1
 
     for filename, content in [
-        ("/etc/robot-md-gateway/gateway.env",
-         render_env_file(manifest_path=manifest_path)),
+        ("/etc/robot-md-gateway/gateway.env", render_env_file(manifest_path=manifest_path)),
         ("/etc/robot-md-gateway/bearers.yaml", render_default_bearers()),
         ("/etc/systemd/system/robot-md-gateway.service", render_systemd_unit()),
     ]:
         r = subprocess.run(
             [*sudo, "tee", filename],
-            input=content, text=True, capture_output=True,
+            input=content,
+            text=True,
+            capture_output=True,
         )
         if r.returncode != 0:
             print(f"failed to write {filename}")
@@ -157,8 +168,16 @@ def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
     if os.path.exists(manifest_path) and manifest_path != "/etc/robot-md-gateway/ROBOT.md":
         subprocess.run([*sudo, "cp", manifest_path, "/etc/robot-md-gateway/ROBOT.md"])
 
-    subprocess.run([*sudo, "chown", "-R", "robot-md-gateway:robot-md-gateway",
-                    "/opt/robot-md-gateway", "/etc/robot-md-gateway"])
+    subprocess.run(
+        [
+            *sudo,
+            "chown",
+            "-R",
+            "robot-md-gateway:robot-md-gateway",
+            "/opt/robot-md-gateway",
+            "/etc/robot-md-gateway",
+        ]
+    )
     subprocess.run([*sudo, "systemctl", "daemon-reload"])
     r = subprocess.run([*sudo, "systemctl", "enable", "--now", "robot-md-gateway"])
     if r.returncode != 0:
@@ -167,6 +186,7 @@ def install_gateway(*, manifest_path: str, yes: bool = False) -> int:
 
     try:
         import urllib.request
+
         with urllib.request.urlopen("http://127.0.0.1:8080/", timeout=5) as resp:
             print(f"gateway returned HTTP {resp.status}")
     except Exception as e:

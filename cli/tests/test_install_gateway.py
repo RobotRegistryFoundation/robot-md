@@ -43,8 +43,10 @@ def test_render_default_bearers_yaml_minimal():
 
 def test_already_installed_detection():
     """venv binary present AND systemctl reports active → True."""
-    with patch("pathlib.Path.exists", return_value=True), \
-         patch("robot_md.install_gateway.subprocess.run") as run_mock:
+    with (
+        patch("pathlib.Path.exists", return_value=True),
+        patch("robot_md.install_gateway.subprocess.run") as run_mock,
+    ):
         run_mock.return_value.returncode = 0
         run_mock.return_value.stdout = "active\n"
         assert already_installed() is True
