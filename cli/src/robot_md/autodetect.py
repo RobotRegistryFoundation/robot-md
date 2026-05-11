@@ -439,9 +439,7 @@ def _run(cmd: list[str]) -> str | None:
     return result.stdout
 
 
-def _probe_servo_buses(
-    devices: list[Device], warnings: list[str] | None = None
-) -> list[Device]:
+def _probe_servo_buses(devices: list[Device], warnings: list[str] | None = None) -> list[Device]:
     """Actively probe serial ports to discover their actual protocol.
 
     For each `/dev/ttyACM*` or `/dev/ttyUSB*` in `devices`, call
