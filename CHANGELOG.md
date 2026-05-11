@@ -9,6 +9,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.10.4] - 2026-05-11
+
+### Fixed
+
+- **`register` auto-binds the robot's `pq_kid` as an `operator-envelope`
+  authority.** After a successful mint, `robot-md register` (and `init
+  --register`) now POSTs to `/v2/authorities/register` with `purpose:
+  operator-envelope`, signed by the robot's own keypair. Without this step,
+  `robot-md-gateway`'s envelope verifier returned 403 `kid not registered`
+  on every signed invoke — e.g., from `robot-md trial iteration
+  --capture-pre`, blocking PICK-PLACE-10 cert minting end-to-end. The
+  gateway resolves kids via `GET /v2/keys/<kid>`, which scans authority
+  records only; robot mints persisted `pq_signing_pub` to `robot:<rrn>`
+  but never wrote a `kid:<pq_kid>:<ts>` → `authority:<ran>` mapping. The
+  `/v2/authorities/register` endpoint already supported `purpose:
+  operator-envelope` for this case (mirrors the manual
+  `scripts/register-operator-kid.ts` flow used to seed `bob-operator-2026`).
+  Non-fatal on failure — register still returns 0 with a warning. Closes #84.
+- **`install-gateway` default `ROBOT_MD_TOOL_ALLOWLIST` includes `perceive`.**
+  Without `perceive` on the allowlist, the Spec B trial flow's first
+  hardware call — `_gateway_invoke("oak-d", "perceive", {"query":
+  "red_blob"})` for pre-state capture — 403'd on tool-allowlist even after
+  passing envelope auth. Closes #85.
+
+### Changed
+
+- `robot-md-gateway` dependency tightened from `>=0.5.0a1` to `>=0.5.0a3`
+  so fresh `pip install robot-md` pulls the version that actually reads
+  `bearers.yaml`'s `actuators:` list. Gateway 0.5.0a1 / 0.5.0a2 silently
+  fall back to the legacy singleton `actuator:` entry, breaking multi-
+  actuator dispatch (e.g., oak-d for perceive alongside so-arm101 for arm).
+
+---
+
 ## [1.10.3] - 2026-05-11
 
 ### Fixed
