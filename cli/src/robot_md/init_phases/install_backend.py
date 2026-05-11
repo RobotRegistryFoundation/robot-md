@@ -30,10 +30,7 @@ class PackageMatch:
 
 _RULES: list = [
     (
-        lambda devs: any(
-            d.protocol == "feetech" and d.role == "servo-bus"
-            for d in devs
-        ),
+        lambda devs: any(d.protocol == "feetech" and d.role == "servo-bus" for d in devs),
         PackageMatch(
             package="so-arm101-actuator",
             reason="Feetech servo bus detected — the SO-ARM101 driver is the supported backend.",
@@ -42,8 +39,7 @@ _RULES: list = [
     ),
     (
         lambda devs: any(
-            getattr(d, "vid", None) == "03e7"
-            and getattr(d, "pid", None) in ("2485", "f63c")
+            getattr(d, "vid", None) == "03e7" and getattr(d, "pid", None) in ("2485", "f63c")
             for d in devs
         ),
         PackageMatch(
@@ -74,6 +70,7 @@ def is_externally_managed_env() -> bool:
       Pi OS Bookworm+ ships one; pure Python.org installs do not.
     """
     import sysconfig
+
     if sys.prefix != sys.base_prefix:
         return False
     stdlib = Path(sysconfig.get_path("stdlib"))

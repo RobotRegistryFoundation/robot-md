@@ -265,9 +265,14 @@ def check_drivers(fm: dict[str, Any] | None) -> list[CheckResult]:
             if not p.exists():
                 out.append(_fail(label, "drivers", f"{port} — does not exist (unplugged?)"))
             elif _is_owned_by_gateway(p):
-                out.append(_warn(label, "drivers",
-                    f"{port} — claimed by robot-md-gateway user (intentional); "
-                    f"talk to the gateway at 127.0.0.1:8080, not the device directly."))
+                out.append(
+                    _warn(
+                        label,
+                        "drivers",
+                        f"{port} — claimed by robot-md-gateway user (intentional); "
+                        f"talk to the gateway at 127.0.0.1:8080, not the device directly.",
+                    )
+                )
             elif not os.access(p, os.R_OK | os.W_OK):
                 out.append(_warn(label, "drivers", f"{port} — exists but not RW (dialout group?)"))
             else:

@@ -14,12 +14,12 @@ def test_version_command_matches_installed_metadata():
     )
     out = result.stdout.strip()
     assert out.endswith(expected), (
-        f"version drift: --version reported {out!r}, "
-        f"pip metadata reports {expected!r}"
+        f"version drift: --version reported {out!r}, pip metadata reports {expected!r}"
     )
 
 
 def test_dunder_version_matches_installed_metadata():
     """`robot_md.__version__` must come from importlib.metadata, not a literal."""
     import robot_md
+
     assert robot_md.__version__ == pkg_version("robot-md")
