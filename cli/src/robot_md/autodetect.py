@@ -763,7 +763,7 @@ def emit_draft(scan: Scan) -> str:
     lines: list[str] = []
     lines.append("---")
     lines.append(_DRAFT_HEADER_YAML_COMMENT.rstrip())
-    lines.append('rcan_version: "3.0"')
+    lines.append('rcan_version: "3.2"')
     lines.append("metadata:")
     lines.append('  robot_name: "CHANGE-ME"  # TODO: short display name; must match H1 below')
     lines.append('  rrn: ""  # blank until `robot-md register` (v0.2) returns one')
