@@ -545,6 +545,7 @@ _PHASE_NAMES = (
     "PhaseResult",
     "phase_write_manifest",
     "phase_register",
+    "phase_install_backend",
     "phase_install_mcp",
     "phase_install_skill",
     "phase_calibrate_sign",
@@ -621,6 +622,7 @@ def default_flow(
     _self = sys.modules[__name__]
     phase_write_manifest = _self.phase_write_manifest  # type: ignore[attr-defined]
     phase_register = _self.phase_register  # type: ignore[attr-defined]
+    phase_install_backend = _self.phase_install_backend  # type: ignore[attr-defined]
     # install_mcp deprecated per SP1 R1 — plugin's .mcp.json handles wiring.
     phase_install_skill = _self.phase_install_skill  # type: ignore[attr-defined]
     phase_calibrate_sign = _self.phase_calibrate_sign  # type: ignore[attr-defined]
@@ -657,6 +659,16 @@ def default_flow(
     if r_write.status != "ok":
         _print_tally(results, out_path)
         return 2  # only fatal exit path
+
+    # Phase 1.25: auto-install backend packages indicated by the hardware scan.
+    # The manifest references devices the operator can't actually drive without
+    # the matching backend; failing here is fatal to the init flow.
+    ib_result = phase_install_backend(scan)
+    results.append(ib_result)
+    if ib_result.status == "failed":
+        sys.stderr.write(f"✗ {ib_result.message}\n")
+        _print_tally(results, out_path)
+        return 1
 
     # Phase 1.5: scaffold scripts/ + compliance/ alongside the manifest.
     # EU AI Act evidence has to live somewhere reproducible — emit-* artifacts

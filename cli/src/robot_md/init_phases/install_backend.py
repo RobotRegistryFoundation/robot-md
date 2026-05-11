@@ -42,7 +42,9 @@ _RULES: list = [
     ),
     (
         lambda devs: any(
-            d.vid == "03e7" and d.pid in ("2485", "f63c") for d in devs
+            getattr(d, "vid", None) == "03e7"
+            and getattr(d, "pid", None) in ("2485", "f63c")
+            for d in devs
         ),
         PackageMatch(
             package="oak-d-actuator",
