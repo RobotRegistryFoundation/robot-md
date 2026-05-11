@@ -211,6 +211,15 @@ USB_DB: dict[tuple[str, str], dict[str, str]] = {
     },
 }
 
+# --------------------------------------------------------------------------- #
+# V4L2 known non-camera filters                                              #
+# --------------------------------------------------------------------------- #
+# Known non-camera V4L2 device-name prefixes. Conservative: false positives
+# (hiding a real camera) are worse than false negatives (showing a probe
+# node). Each entry MUST be documented with provenance.
+V4L2_KNOWN_NON_CAMERA_PREFIXES = (
+    "pispbe-",  # Raspberry Pi ISP back-end probe nodes (provenance: Pi 5 + IMX708)
+)
 
 # --------------------------------------------------------------------------- #
 # Data types                                                                  #
@@ -687,6 +696,8 @@ def probe_v4l2_cameras() -> list[DetectedCamera]:
     for path in devices:
         caps = _v4l2_device_capabilities(path)
         model = caps.get("model", "USB Camera")
+        if any(model.startswith(p) for p in V4L2_KNOWN_NON_CAMERA_PREFIXES):
+            continue  # filtered; debug logging optional in future
         cams.append(
             DetectedCamera(
                 driver_id=_slugify(model) + "-" + Path(path).name,
