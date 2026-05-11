@@ -48,10 +48,36 @@ def test_check_manifest_bob_valid():
 
 
 def test_check_manifest_no_cwd_file(tmp_path, monkeypatch):
+    # When cwd has no ROBOT.md and walking up to the filesystem root yields
+    # none either, doctor must skip cleanly. tmp_path on most CI images
+    # has no ROBOT.md anywhere on the path up to /.
     monkeypatch.chdir(tmp_path)
     results, fm = doctor.check_manifest(None)
     assert fm is None
     assert any(r.status == "skip" and "no ROBOT.md" in r.detail for r in results)
+
+
+def test_check_manifest_walks_up_from_subdir(tmp_path, monkeypatch):
+    """Doctor must find ROBOT.md when launched from a sub-directory of the
+    manifest dir, matching `robot-md mcp`'s discovery behavior.
+
+    Regression: pre-v1.9.1 doctor only checked Path.cwd() / "ROBOT.md", so
+    `cd ./scripts && robot-md doctor` from a manifest dir would report
+    "no ROBOT.md" even though one was one level up.
+    """
+    bob = Path(__file__).parent.parent.parent / "examples" / "bob.ROBOT.md"
+    if not bob.exists():
+        pytest.skip("examples/bob.ROBOT.md not in this tree")
+    manifest_dir = tmp_path / "robot"
+    manifest_dir.mkdir()
+    (manifest_dir / "ROBOT.md").write_text(bob.read_text())
+    subdir = manifest_dir / "scripts"
+    subdir.mkdir()
+    monkeypatch.chdir(subdir)
+
+    results, fm = doctor.check_manifest(None)
+    assert fm is not None, "doctor should walk up to find ROBOT.md in parent dir"
+    assert any(r.name == "manifest parse" and r.status == "pass" for r in results)
 
 
 def test_check_drivers_fail_on_missing_serial(tmp_path):

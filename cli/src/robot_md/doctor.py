@@ -134,12 +134,21 @@ def check_manifest(path: Path | None) -> tuple[list[CheckResult], dict[str, Any]
     out: list[CheckResult] = []
 
     if path is None:
-        candidate = Path.cwd() / "ROBOT.md"
-        if candidate.exists():
-            path = candidate
+        # Walk up from cwd looking for ROBOT.md — matches the discovery
+        # behavior of `robot-md mcp` so doctor + mcp pick the same manifest
+        # regardless of which sub-directory the operator launches from.
+        from robot_md.mcp.server import find_manifest_via_cwd_walk
+
+        found = find_manifest_via_cwd_walk(Path.cwd())
+        if found is not None:
+            path = found
         else:
             out.append(
-                _skip("manifest", "manifest", "no ROBOT.md in cwd (pass --path to target one)")
+                _skip(
+                    "manifest",
+                    "manifest",
+                    f"no ROBOT.md walking up from {Path.cwd()} (pass --path to target one)",
+                )
             )
             return out, None
 
@@ -274,7 +283,14 @@ def check_drivers(fm: dict[str, Any] | None) -> list[CheckResult]:
                     )
                 )
             elif not os.access(p, os.R_OK | os.W_OK):
-                out.append(_warn(label, "drivers", f"{port} — exists but not RW (dialout group?)"))
+                out.append(
+                    _warn(
+                        label,
+                        "drivers",
+                        f"{port} — exists but not RW. Fix: "
+                        f"`sudo usermod -aG dialout $USER` then log out + back in.",
+                    )
+                )
             else:
                 out.append(_pass(label, "drivers", f"{port} — RW"))
         elif host:

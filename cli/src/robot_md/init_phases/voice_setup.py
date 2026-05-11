@@ -135,7 +135,11 @@ def run_voice_setup(
     """Returns rc (0 on success, even when no audio devices were found)."""
     devs_mod = _try_import_pendantd()
     if devs_mod is None:
-        sys.stdout.write("pendantd not detected; skipping voice setup\n")
+        sys.stdout.write(
+            "pendantd not detected; skipping voice setup.\n"
+            "  (pendantd is the optional voice/wake-word daemon. Install with\n"
+            "  `pip install pendantd` if you want push-to-talk; safe to skip otherwise.)\n"
+        )
         return 0
 
     sys.stdout.write(_HEADER + "\n")

@@ -1782,6 +1782,13 @@ def install_gateway_cmd(
         "--manifest",
         "-m",
         help="Path to the ROBOT.md the gateway will enforce against.",
+        # Don't validate readability — the default lives under
+        # /etc/robot-md-gateway/ owned by the gateway user and is unreadable
+        # by the operator. install_gateway() handles missing/unreadable
+        # paths gracefully, and its `already_installed()` early-exit must
+        # be allowed to fire before typer rejects the call.
+        exists=False,
+        readable=False,
     ),
     yes: bool = typer.Option(
         False,
@@ -1790,7 +1797,12 @@ def install_gateway_cmd(
         help="Skip the sudo confirmation prompt.",
     ),
 ) -> None:
-    """Scaffold the robot-md-gateway systemd service on a fresh host (sudo)."""
+    """Scaffold the robot-md-gateway systemd service on a fresh host (sudo).
+
+    Idempotent: when the gateway is already installed and active, prints a
+    status line and exits 0 without touching anything. Safe to re-run on
+    hosts that already have the gateway.
+    """
     from robot_md.install_gateway import install_gateway as _install_gateway
 
     rc = _install_gateway(manifest_path=str(manifest), yes=yes)
