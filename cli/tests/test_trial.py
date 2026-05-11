@@ -580,3 +580,148 @@ def test_trial_subcommand_registered_in_main_cli():
     assert result.returncode == 0, result.stderr
     for cmd in ("start", "iteration", "finalize", "abort"):
         assert cmd in result.stdout, f"trial {cmd} not registered"
+
+
+def _set_envelope_env(
+    monkeypatch,
+    *,
+    ruri="rcan://RRN-000000000099/skill",
+    scope=None,
+    manifest="/tmp/ROBOT.md",
+):
+    monkeypatch.setenv("ROBOT_MD_RURI", ruri)
+    monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", manifest)
+    if scope is None:
+        monkeypatch.delenv("ROBOT_MD_SCOPE", raising=False)
+    else:
+        monkeypatch.setenv("ROBOT_MD_SCOPE", scope)
+
+
+class _FakeKeypair:
+    """Stand-in SigningKeypair-shaped object for trial._gateway_invoke tests.
+
+    Only needs pq_kid + ed25519_sec because sign_envelope reads exactly those.
+    The 32-byte secret is deterministic so msg_id is the only per-call entropy.
+    """
+
+    pq_kid = "kid:test:fake-99"
+    ed25519_sec = bytes(range(32))
+
+
+def _stub_signing(monkeypatch, trial_mod):
+    monkeypatch.setattr(trial_mod, "load_keypair", lambda rrn: _FakeKeypair())
+
+
+def test_gateway_invoke_builds_full_envelope(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    _set_envelope_env(
+        monkeypatch, ruri="rcan://RRN-000000000002/skill", manifest="/etc/robot-md/ROBOT.md"
+    )
+    monkeypatch.setenv("ROBOT_MD_GATEWAY_BEARER", "test-bearer")
+    _stub_signing(monkeypatch, trial_mod)
+
+    captured: dict = {}
+
+    def _fake_invoke(*, envelope, gateway_url, bearer, timeout=10.0):
+        captured["envelope"] = envelope
+        captured["gateway_url"] = gateway_url
+        captured["bearer"] = bearer
+        return {"telemetry": {"found": True}}
+
+    monkeypatch.setattr(trial_mod, "invoke_envelope", _fake_invoke)
+
+    result = trial_mod._gateway_invoke("oak-d", "perceive", {"query": "red_blob"})
+
+    assert result == {"telemetry": {"found": True}}
+    env = captured["envelope"]
+    assert env["type"] == "rcan/v1/invoke"
+    assert env["ruri"] == "rcan://RRN-000000000002/skill"
+    assert env["scope"] == "read"  # default when env not set
+    assert env["tool_name"] == "perceive"
+    assert env["tool_args"] == {"query": "red_blob"}
+    assert env["manifest_path"] == "/etc/robot-md/ROBOT.md"
+    assert env["actuator_name"] == "oak-d"
+    assert env["msg_id"]  # build_envelope generates a uuid4
+    assert env["nonce"] and env["timestamp_ms"]
+    assert env["envelope_signature"]["kid"] == _FakeKeypair.pq_kid
+    assert env["envelope_signature"]["sig"]  # non-empty
+    assert captured["bearer"] == "test-bearer"
+
+
+def test_gateway_invoke_respects_scope_env(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    _set_envelope_env(monkeypatch, scope="actuate")
+    _stub_signing(monkeypatch, trial_mod)
+    captured: dict = {}
+    monkeypatch.setattr(
+        trial_mod,
+        "invoke_envelope",
+        lambda *, envelope, gateway_url, bearer, timeout=10.0: (
+            captured.update(envelope=envelope) or {"ok": True}
+        ),
+    )
+
+    trial_mod._gateway_invoke("so-arm101", "read_state", {})
+
+    assert captured["envelope"]["scope"] == "actuate"
+
+
+def test_gateway_invoke_msg_id_unique_per_call(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    _set_envelope_env(monkeypatch)
+    _stub_signing(monkeypatch, trial_mod)
+    seen: list[str] = []
+
+    def _capture(*, envelope, gateway_url, bearer, timeout=10.0):
+        seen.append(envelope["msg_id"])
+        return {"ok": True}
+
+    monkeypatch.setattr(trial_mod, "invoke_envelope", _capture)
+
+    trial_mod._gateway_invoke("oak-d", "perceive", {})
+    trial_mod._gateway_invoke("oak-d", "perceive", {})
+
+    assert len(seen) == 2 and seen[0] != seen[1]
+
+
+def test_gateway_invoke_requires_ruri(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    monkeypatch.delenv("ROBOT_MD_RURI", raising=False)
+    monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", "/tmp/ROBOT.md")
+
+    with pytest.raises(RuntimeError, match="ROBOT_MD_RURI"):
+        trial_mod._gateway_invoke("oak-d", "perceive", {})
+
+
+def test_gateway_invoke_requires_manifest_path(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    monkeypatch.setenv("ROBOT_MD_RURI", "rcan://RRN-000000000099/skill")
+    monkeypatch.delenv("ROBOT_MD_MANIFEST_PATH", raising=False)
+
+    with pytest.raises(RuntimeError, match="ROBOT_MD_MANIFEST_PATH"):
+        trial_mod._gateway_invoke("oak-d", "perceive", {})
+
+
+def test_gateway_invoke_missing_keypair_raises(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    _set_envelope_env(monkeypatch)
+    monkeypatch.setattr(trial_mod, "load_keypair", lambda rrn: None)
+
+    with pytest.raises(RuntimeError, match="no signing keypair"):
+        trial_mod._gateway_invoke("oak-d", "perceive", {})
+
+
+def test_gateway_invoke_rejects_bad_ruri_scheme(monkeypatch):
+    from robot_md import trial as trial_mod
+
+    monkeypatch.setenv("ROBOT_MD_RURI", "https://RRN-000000000099/skill")
+    monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", "/tmp/ROBOT.md")
+
+    with pytest.raises(RuntimeError, match="rcan://"):
+        trial_mod._gateway_invoke("oak-d", "perceive", {})
