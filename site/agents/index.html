@@ -2,53 +2,709 @@
 <html lang="en">
 
 <head>
-<!--#include partials/head.html-->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Agents — ROBOT.md</title>
+  <meta name="description"
+    content="Five tested agent surfaces (Claude Code, Gemini CLI, Codex, ChatGPT, Amazon Q) plus Compliance-bot — the managed agent that files EU AI Act packets in one day.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Agents — ROBOT.md">
+  <meta property="og:description"
+    content="Free integrations with five agent surfaces; managed Compliance-bot for one-day EU AI Act filings.">
+  <meta property="og:url" content="https://robotmd.dev/agents/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/agents/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/design.css">
+  <link rel="stylesheet" href="/css/apex.css">
+
+  <style>
+    /* Page-specific styles for §B managed offering — moved here from former /managed-agents/ */
+
+    /* ============================================================
+       SURFACES TABLE (§A)
+       ============================================================ */
+    .surface-directory { width: 100%; border-collapse: collapse; margin-top: 28px; }
+    .surface-directory td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--rule);
+      font-size: 14.5px;
+      vertical-align: middle;
+    }
+    .surface-directory td:first-child { width: 25%; font-weight: 500; color: var(--ink); }
+    .surface-directory td code {
+      font-family: var(--mono); font-size: 12.5px;
+      background: var(--paper-2); padding: 2px 7px; border-radius: 2px;
+    }
+    .surface-directory .badge {
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 2px;
+      background: var(--paper-3); color: var(--ink-2); border: 1px solid var(--rule);
+    }
+
+    /* ============================================================
+       SECTION DIVIDER between §A and §B
+       ============================================================ */
+    .section-divider {
+      border-top: 1px solid var(--rule);
+      padding-top: 64px;
+      margin-top: 24px;
+    }
+
+    /* ============================================================
+       OPEN-CORE SPLIT DIAGRAM
+       ============================================================ */
+    .split-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+      border: 1px solid var(--rule);
+      margin-top: 28px;
+      overflow: hidden;
+    }
+    @media (max-width: 720px) {
+      .split-grid { grid-template-columns: 1fr }
+    }
+
+    .split-card {
+      padding: 28px 28px 24px;
+      border-right: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--paper);
+    }
+    .split-card:last-child { border-right: none }
+    @media (max-width: 720px) {
+      .split-card { border-right: none; border-bottom: 1px solid var(--rule) }
+      .split-card:last-child { border-bottom: none }
+    }
+
+    .split-card .tier-label {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 2px;
+      width: fit-content;
+    }
+    .tier-oss     { background: var(--paper-3); color: var(--ink-2); border: 1px solid var(--rule) }
+    .tier-managed { background: var(--accent); color: var(--paper) }
+
+    .split-card .product-name {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+
+    .split-card .product-lede {
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 17px;
+      color: var(--ink-2);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .split-card ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+    .split-card ul li {
+      font-size: 14px;
+      color: var(--ink-2);
+      padding-left: 18px;
+      position: relative;
+      line-height: 1.5;
+    }
+    .split-card ul li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-family: var(--mono);
+      font-size: 11px;
+      top: 2px;
+    }
+    .split-card ul li code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--paper-2);
+      padding: 1px 5px;
+      border-radius: 2px;
+    }
+
+    .split-card .pkg-link {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      color: var(--accent);
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px dashed var(--rule);
+    }
+
+    /* ============================================================
+       COMPLIANCE-BOT FLOW
+       ============================================================ */
+    .flow-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border: 1px solid var(--rule);
+      overflow: hidden;
+      margin-top: 28px;
+    }
+    @media (max-width: 900px) {
+      .flow-steps { grid-template-columns: repeat(2, 1fr) }
+      .flow-step:nth-child(2) { border-right: none }
+      .flow-step:nth-child(-n+2) { border-bottom: 1px solid var(--rule) }
+    }
+    @media (max-width: 600px) {
+      .flow-steps { grid-template-columns: 1fr }
+    }
+
+    .flow-step {
+      padding: 24px 22px;
+      border-right: 1px solid var(--rule);
+      background: var(--paper);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .flow-step:last-child { border-right: none }
+    @media (max-width: 600px) {
+      .flow-step { border-right: none; border-bottom: 1px solid var(--rule) }
+      .flow-step:last-child { border-bottom: none }
+    }
+
+    .flow-step .step-n {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .flow-step .step-name {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--ink);
+    }
+    .flow-step .step-detail {
+      font-size: 13.5px;
+      color: var(--ink-2);
+      line-height: 1.5;
+    }
+
+    /* ============================================================
+       ANTHROPIC MANAGED AGENTS CONTEXT BLOCK
+       ============================================================ */
+    .anthropic-block {
+      background: var(--ink);
+      color: var(--paper);
+      padding: 40px 48px;
+      margin-top: 32px;
+    }
+    @media (max-width: 720px) { .anthropic-block { padding: 28px 20px } }
+
+    .anthropic-block .eyebrow {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+
+    .anthropic-block .headline {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(18px, 2.4vw, 28px);
+      letter-spacing: -0.015em;
+      margin: 0 0 14px;
+      color: var(--paper);
+    }
+
+    .anthropic-block .body-text {
+      font-size: 14.5px;
+      color: #c8c3b8;
+      max-width: 680px;
+      line-height: 1.6;
+      margin: 0 0 20px;
+    }
+
+    .anthropic-block .ref-link {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .08em;
+      color: var(--accent);
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: 2px;
+    }
+
+    /* ============================================================
+       WAITLIST FORM
+       ============================================================ */
+    .waitlist-section {
+      padding: 64px 0;
+      border-bottom: none;
+    }
+
+    .waitlist-card {
+      border: 1px solid var(--rule);
+      background: var(--paper-2);
+      padding: 40px;
+      max-width: 600px;
+    }
+    @media (max-width: 720px) { .waitlist-card { padding: 24px 20px } }
+
+    .waitlist-card .wl-label {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+
+    .waitlist-card h2 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 26px;
+      letter-spacing: -0.015em;
+      margin: 0 0 10px;
+      color: var(--ink);
+    }
+
+    .waitlist-card .wl-desc {
+      font-size: 15px;
+      color: var(--ink-2);
+      line-height: 1.6;
+      margin: 0 0 24px;
+    }
+
+    .waitlist-form {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .waitlist-form label {
+      display: block;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      margin-bottom: 6px;
+    }
+
+    .waitlist-form .field-group {
+      flex: 1;
+      min-width: 200px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .waitlist-form input[type="email"] {
+      font-family: var(--mono);
+      font-size: 14px;
+      padding: 10px 14px;
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      color: var(--ink);
+      border-radius: 2px;
+      outline: none;
+      transition: border-color .15s;
+      width: 100%;
+    }
+    .waitlist-form input[type="email"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent-wash);
+    }
+
+    .waitlist-form button[type="submit"] {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 10px 22px;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 2px;
+      cursor: pointer;
+      align-self: flex-end;
+      transition: background .15s;
+      flex-shrink: 0;
+    }
+    .waitlist-form button[type="submit"]:hover { background: var(--accent) }
+    .waitlist-form button[type="submit"]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .waitlist-note {
+      font-size: 12.5px;
+      color: var(--ink-4);
+      line-height: 1.5;
+      margin-top: 14px;
+    }
+  </style>
 </head>
 
 <body>
 
 <!--#include partials/site-nav.html-->
-<main class="wrap">
-  <header class="page-eyebrow">
-    <p class="sec-eyebrow">§ Surfaces</p>
-    <h1>Agent surfaces</h1>
-    <p class="lede">ROBOT.md works with any MCP-aware agent. Five surfaces are tested and shipped.</p>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+
+      <div class="page-eyebrow">
+        <span>Agents</span>
+        <span class="rule-line" aria-hidden="true"></span>
+        <span>Surfaces &amp; managed offerings</span>
+      </div>
+
+      <h1 class="page-heading">
+        Agents.
+      </h1>
+
+      <p class="page-lede">
+        Five tested integrations into MCP-aware agent surfaces — free.
+        One managed offering — Compliance-bot — that files EU AI Act
+        packets in one day.
+      </p>
+
+    </div>
   </header>
 
-  <table class="surface-directory" role="presentation">
-    <tbody>
-      <tr>
-        <td><strong>Claude Code</strong></td>
-        <td><code>claude mcp add robot-md</code></td>
-        <td><a href="/agents/claude-code/">Primary →</a></td>
-      </tr>
-      <tr>
-        <td>Gemini CLI</td>
-        <td><code>gemini --mcp robot-md</code></td>
-        <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
-      </tr>
-      <tr>
-        <td>Codex</td>
-        <td><code>codex tools add robot-md</code></td>
-        <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
-      </tr>
-      <tr>
-        <td>ChatGPT Custom GPT</td>
-        <td>Web Browsing + Knowledge file</td>
-        <td><span class="badge">via web</span></td>
-      </tr>
-      <tr>
-        <td>Amazon Q</td>
-        <td><code>q mcp add robot-md</code></td>
-        <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
-      </tr>
-    </tbody>
-  </table>
-</main>
+  <!-- ===== §A — SURFACES (FREE INTEGRATIONS) ===== -->
+  <section class="sec" id="surfaces">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ A — Free integrations</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">Agent surfaces.</h2>
+      <p class="sec-lede">
+        ROBOT.md works with any MCP-aware agent. Five surfaces are
+        tested and shipped.
+      </p>
+
+      <table class="surface-directory" role="presentation">
+        <tbody>
+          <tr>
+            <td><strong>Claude Code</strong></td>
+            <td><code>claude mcp add robot-md</code></td>
+            <td><a href="/agents/claude-code/">Primary →</a></td>
+          </tr>
+          <tr>
+            <td>Gemini CLI</td>
+            <td><code>gemini --mcp robot-md</code></td>
+            <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
+          </tr>
+          <tr>
+            <td>Codex</td>
+            <td><code>codex tools add robot-md</code></td>
+            <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
+          </tr>
+          <tr>
+            <td>ChatGPT Custom GPT</td>
+            <td>Web Browsing + Knowledge file</td>
+            <td><span class="badge">via web</span></td>
+          </tr>
+          <tr>
+            <td>Amazon Q</td>
+            <td><code>q mcp add robot-md</code></td>
+            <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
+          </tr>
+        </tbody>
+      </table>
+
+    </div>
+  </section>
+
+  <!-- ===== §B — MANAGED OFFERING ===== -->
+  <section class="sec section-divider" id="managed">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ B — Managed offering</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">
+        Compliance in one day. Not one <em style="font-family:var(--serif);font-style:italic">month.</em>
+      </h2>
+      <p class="sec-lede">
+        Give Compliance-bot your robot repo. Get back a signed FRIA, IFU,
+        safety-benchmark, and EU-register filing — all five RCAN §22–26
+        packets — without reading a single EU AI Act article yourself.
+      </p>
+
+    </div>
+  </section>
+
+  <!-- ===== §B.1 — WHAT COMPLIANCE-BOT DOES ===== -->
+  <section class="sec" id="what-it-does">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ B.1 — Compliance-bot</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">Automated compliance filing for regulated robots.</h2>
+      <p class="sec-lede">
+        The RCAN §22–26 compliance stack is already live.
+        Compliance-bot is the hosted agent that automates it.
+      </p>
+
+      <div class="flow-steps" aria-label="Compliance-bot 4-step flow" role="list">
+
+        <div class="flow-step" role="listitem">
+          <div class="step-n">Input</div>
+          <div class="step-name">Your robot repo</div>
+          <div class="step-detail">
+            Point Compliance-bot at a GitHub repo containing a valid
+            <code style="font-family:var(--mono);font-size:12px;background:var(--paper-2);padding:1px 4px;border-radius:2px;">ROBOT.md</code>
+            with an issued RRN. Nothing else required.
+          </div>
+        </div>
+
+        <div class="flow-step" role="listitem">
+          <div class="step-n">Analysis</div>
+          <div class="step-name">Manifest audit</div>
+          <div class="step-detail">
+            The agent reads the manifest, cross-checks capabilities against
+            RCAN §22 FRIA criteria, and drafts the attestation text. Flags gaps
+            for human review before filing.
+          </div>
+        </div>
+
+        <div class="flow-step" role="listitem">
+          <div class="step-n">Filing</div>
+          <div class="step-name">5 packets signed + sent</div>
+          <div class="step-detail">
+            FRIA · safety-benchmark · IFU Art. 13(3) · incident-report Art. 72
+            · EU-register Art. 49 — all signed with your robot's key and
+            routed to RRF's live endpoints.
+          </div>
+        </div>
+
+        <div class="flow-step" role="listitem">
+          <div class="step-n">Output</div>
+          <div class="step-name">Signed receipts</div>
+          <div class="step-detail">
+            You get a compliance bundle: signed envelopes, RRF confirmation
+            hashes, and a human-readable summary ready for your legal team
+            or regulator.
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== §B.2 — OPEN-CORE SPLIT ===== -->
+  <section class="sec" id="open-core">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ B.2 — Open-core model</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">OSS agent SDK. Hosted convenience layer.</h2>
+      <p class="sec-lede">
+        The compliance tooling is open-source. The hosted agent is the
+        convenience layer — no infrastructure to run, no SDK to integrate.
+      </p>
+
+      <div class="split-grid">
+
+        <!-- OSS tier -->
+        <div class="split-card">
+          <div class="tier-label tier-oss">Open source · Apache-2.0</div>
+          <div class="product-name">robot-md-gateway</div>
+          <p class="product-lede">
+            The reference enforcement gateway: receives signed action
+            requests, verifies, and dispatches to drivers. Self-host on
+            your robot or your own cloud.
+          </p>
+          <ul>
+            <li>Full <code>robot-md-mcp</code> surface — all 6 resources + 3 tools</li>
+            <li>Default-deny tier gate; hardened systemd unit</li>
+            <li>Audit log; RCAN-signed envelopes for all dispatch events</li>
+            <li>All §22–26 filing commands available as CLI primitives</li>
+            <li>Provision with <code>/enable-dispatch</code> from Claude Code</li>
+          </ul>
+          <a class="pkg-link"
+             href="https://github.com/RobotRegistryFoundation/robot-md-gateway">
+            github.com/RobotRegistryFoundation/robot-md-gateway →
+          </a>
+        </div>
+
+        <!-- Managed Agent tier -->
+        <div class="split-card" style="background: var(--accent-wash);">
+          <div class="tier-label tier-managed">Managed Agent · hosted</div>
+          <div class="product-name">Compliance-bot</div>
+          <p class="product-lede">
+            The hosted Managed Agent. Give it a repo, get back a full
+            compliance bundle — no infrastructure, no CLI, no reading
+            of RCAN section numbers.
+          </p>
+          <ul>
+            <li>Accepts a GitHub repo URL or a <code>ROBOT.md</code> file upload</li>
+            <li>Runs a pre-flight audit and flags gaps before filing</li>
+            <li>Files all 5 §22–26 packets in one session</li>
+            <li>Returns signed receipts + human-readable compliance bundle</li>
+            <li>Powered by Anthropic Managed Agents (see §B.3 below)</li>
+          </ul>
+          <a class="pkg-link" href="#waitlist" style="color: var(--accent-ink); border-top-color: var(--accent-ink);">
+            Join the waitlist ↓
+          </a>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== §B.3 — ANTHROPIC MANAGED AGENTS CONTEXT ===== -->
+  <section class="sec" id="anthropic-surface" style="padding-bottom: 32px;">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ B.3 — Anthropic surface alignment</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">Built on Anthropic Managed Agents.</h2>
+      <p class="sec-lede">
+        Compliance-bot is the first robot-md product built on Anthropic's
+        just-announced Managed Agents platform — composable cloud-hosted
+        agents with a public API.
+      </p>
+
+      <div class="anthropic-block">
+        <div class="eyebrow">Anthropic · Managed Agents (beta)</div>
+        <h3 class="headline">
+          Composable APIs for cloud-hosted agents.
+          robot-md's commercial wedge runs here.
+        </h3>
+        <p class="body-text">
+          Anthropic's Managed Agents platform provides the infrastructure for
+          cloud-hosted, composable agent workflows. Compliance-bot is the
+          robot-md flagship built on this surface: it receives a robot repo,
+          orchestrates a multi-step compliance filing workflow, and returns
+          signed attestation packets — all without the operator running any
+          local infrastructure.
+        </p>
+        <p class="body-text" style="margin-bottom: 16px;">
+          The open-source
+          <code style="font-family:var(--mono);font-size:13px;color:#E8E3D3;background:var(--ink-2);padding:1px 5px;border-radius:2px;">robot-md-gateway</code>
+          is the reference enforcement gateway — self-hosted for developers
+          who want full control. Compliance-bot is the managed convenience
+          layer for operators who want the outcome without the infrastructure.
+        </p>
+        <a class="ref-link"
+           href="https://claude.com/blog/product-development-in-the-agentic-era"
+           target="_blank"
+           rel="noopener">
+          Anthropic: Product development in the agentic era →
+        </a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== WAITLIST FORM ===== -->
+  <section class="waitlist-section" id="waitlist">
+    <div class="wrap">
+
+      <div class="waitlist-card">
+        <div class="wl-label">Waitlist · Compliance-bot</div>
+        <h2>Get early access.</h2>
+        <p class="wl-desc">
+          Compliance-bot is in private preview. Leave your email and we'll
+          contact you when it's ready — or when we need a test case.
+          No spam. No sales cadence. One email when the beta opens.
+        </p>
+
+        <p id="waitlist-count-badge"
+           style="display:none;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--ok);margin:0 0 16px;">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"
+               xmlns="http://www.w3.org/2000/svg">
+            <circle cx="7" cy="7" r="6.5" stroke="currentColor"/>
+            <path d="M4 7l2 2 4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span id="waitlist-count-num">0</span> on the waitlist
+        </p>
+
+        <form class="waitlist-form"
+              id="waitlist-form"
+              action="/api/managed-agents/waitlist"
+              method="POST"
+              aria-label="Compliance-bot waitlist sign-up">
+          <div class="field-group">
+            <label for="waitlist-email">Work email</label>
+            <input type="email"
+                   id="waitlist-email"
+                   name="email"
+                   placeholder="you@company.com"
+                   required
+                   autocomplete="email"
+                   aria-describedby="waitlist-privacy-note">
+          </div>
+          <button type="submit">Join waitlist</button>
+        </form>
+
+        <p id="waitlist-error"
+           role="alert"
+           style="display:none;color:var(--accent);font-size:13px;margin-top:10px;"></p>
+
+        <p id="waitlist-msg"
+           role="status"
+           style="display:none;font-size:15px;color:var(--ok);font-family:var(--sans);margin-top:16px;font-weight:500;"></p>
+
+        <p class="waitlist-note" id="waitlist-privacy-note">
+          Your email is only used to contact you about Compliance-bot.
+          No third-party sharing. Unsubscribe in one reply.
+        </p>
+      </div>
+
+    </div>
+  </section>
 
 <!--#include partials/cta-band.html-->
 
 <!--#include partials/footer.html-->
+
+<script src="/js/waitlist.js" defer></script>
 
 </body>
 </html>

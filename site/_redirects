@@ -32,3 +32,7 @@
 /examples/turtlebot4/       https://docs.robotmd.dev/examples/turtlebot4/   301
 /examples/turtlebot4.md     https://docs.robotmd.dev/examples/turtlebot4/   301
 /examples/turtlebot4.ROBOT.md https://docs.robotmd.dev/examples/turtlebot4/ 301
+
+# Phase 2 — managed-agents consolidated under /agents/#managed
+/managed-agents              /agents/#managed                                301
+/managed-agents/             /agents/#managed                                301
