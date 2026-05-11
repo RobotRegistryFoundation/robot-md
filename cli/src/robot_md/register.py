@@ -620,11 +620,13 @@ def cli_register(
     # robot. Non-fatal: if the authorities POST fails, the manifest is
     # still valid and the operator can re-publish later (closes #84).
     authorities_endpoint = endpoint.replace("/robots/register", "/authorities/register")
+    org = str(meta.get("manufacturer") or meta.get("robot_name") or result.rrn)
+    display_name = f"{meta.get('robot_name') or result.rrn} — envelope signer"
     try:
         post_envelope_authority(
             authorities_endpoint, sign_body(kp, {
-                "organization": str(meta.get("manufacturer") or meta.get("robot_name") or result.rrn),
-                "display_name": f"{meta.get('robot_name') or result.rrn} — envelope signer",
+                "organization": org,
+                "display_name": display_name,
                 "purpose": "operator-envelope",
                 "signing_pub": base64.b64encode(kp.ed25519_pub).decode(),
                 "signing_alg": ["Ed25519", "ML-DSA-65"],

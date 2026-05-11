@@ -243,7 +243,11 @@ def test_cli_register_publishes_envelope_authority_after_mint(tmp_path, monkeypa
     def fake_authority_post(endpoint, body, timeout=15.0):
         captured["authority_endpoint"] = endpoint
         captured["authority"] = body
-        return {"ran": "RAN-000000000042", "status": "active", "registered_at": "2026-05-11T21:00:01Z"}
+        return {
+            "ran": "RAN-000000000042",
+            "status": "active",
+            "registered_at": "2026-05-11T21:00:01Z",
+        }
 
     with (
         patch("robot_md.register.post_to_rrf", fake_post),
