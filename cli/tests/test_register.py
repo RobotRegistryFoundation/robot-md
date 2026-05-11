@@ -19,6 +19,7 @@ from robot_md.register import (
     MintRequest,
     _extract_mint_fields,
     cli_register,
+    peek_next_rrn,
     post_to_rrf,
 )
 from robot_md.signing import verify_body
@@ -406,3 +407,126 @@ def test_signed_register_body_carries_sibling_ids(tmp_path, monkeypatch):
     assert body["rhn_ids"] == ["RHN-000000000099"]
     # Signature covers the full body (body+ids canonical scheme)
     assert verify_body(body) is True
+
+
+# ---- preflight: peek_next_rrn + cli_register integration -----------------
+
+
+def test_peek_next_rrn_derives_peek_url_from_register_endpoint(monkeypatch):
+    """peek_next_rrn rewrites .../register to .../_next."""
+    captured = {}
+
+    class _Resp:
+        def __init__(self, payload):
+            self._payload = json.dumps(payload).encode()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+        def read(self):
+            return self._payload
+
+    def fake_urlopen(req, timeout=None):
+        captured["url"] = req.full_url
+        captured["headers"] = dict(req.header_items())
+        return _Resp({"next_rrn": "RRN-000000000010", "reserved_floor": 10})
+
+    with patch("urllib.request.urlopen", fake_urlopen):
+        result = peek_next_rrn(DEFAULT_ENDPOINT)
+
+    assert result == {"next_rrn": "RRN-000000000010", "reserved_floor": 10}
+    assert captured["url"].endswith("/v2/robots/_next")
+    # UA header must be set — Cloudflare blocks default Python-urllib UA at 403.
+    ua = next((v for k, v in captured["headers"].items() if k.lower() == "user-agent"), None)
+    assert ua is not None
+    assert "robot-md" in ua.lower()
+
+
+def test_peek_next_rrn_returns_none_on_404(monkeypatch):
+    """Older RRF deployments without /_next 404 — preflight must be silent."""
+    import urllib.error
+
+    def fake_urlopen(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
+
+    with patch("urllib.request.urlopen", fake_urlopen):
+        assert peek_next_rrn(DEFAULT_ENDPOINT) is None
+
+
+def test_peek_next_rrn_returns_none_on_malformed_endpoint():
+    """Endpoints that don't end in /register can't derive a peek URL."""
+    assert peek_next_rrn("https://example.com/api/mint") is None
+
+
+def test_peek_next_rrn_returns_none_on_malformed_json(monkeypatch):
+    class _Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return False
+
+        def read(self):
+            return b"not json"
+
+    with patch("urllib.request.urlopen", lambda *_a, **_kw: _Resp()):
+        assert peek_next_rrn(DEFAULT_ENDPOINT) is None
+
+
+def test_cli_register_prints_preflight_rrn_before_posting(tmp_path, monkeypatch, capsys):
+    """The next-RRN preview must land on stderr before sign+POST happens."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    path = _write(tmp_path)
+
+    def fake_peek(endpoint, timeout=5.0):
+        return {"next_rrn": "RRN-000000000042", "reserved_floor": 10}
+
+    def fake_post(endpoint, body, timeout=15.0):
+        from robot_md.register import MintResult
+
+        return MintResult(
+            rrn="RRN-000000000042",
+            registered_at="2026-05-11T00:00:00Z",
+            record_url="https://robotregistryfoundation.org/v2/robots/RRN-000000000042",
+            raw={"rrn": "RRN-000000000042", "api_key": "k"},
+        )
+
+    with (
+        patch("robot_md.register.peek_next_rrn", fake_peek),
+        patch("robot_md.register.post_to_rrf", fake_post),
+    ):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
+
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "Next RRN: RRN-000000000042" in err
+    assert "reserved for canonical robots" in err
+
+
+def test_cli_register_proceeds_silently_when_preflight_fails(tmp_path, monkeypatch, capsys):
+    """An older RRF (peek returns None) must not abort the mint."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    path = _write(tmp_path)
+
+    def fake_post(endpoint, body, timeout=15.0):
+        from robot_md.register import MintResult
+
+        return MintResult(
+            rrn="RRN-000000000099",
+            registered_at="x",
+            record_url="u",
+            raw={"api_key": "k"},
+        )
+
+    with (
+        patch("robot_md.register.peek_next_rrn", lambda *_a, **_kw: None),
+        patch("robot_md.register.post_to_rrf", fake_post),
+    ):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
+
+    assert rc == 0
+    # No "Next RRN:" line should have been printed.
+    assert "Next RRN:" not in capsys.readouterr().err
