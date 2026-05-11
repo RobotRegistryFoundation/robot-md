@@ -136,15 +136,14 @@ def iteration_cmd(
     """Capture pre/post state for one iteration of a trial."""
     d = _trial_dir(trial_id)
     if not d.exists():
-        typer.echo(f"error: unknown trial: {trial_id}", err=True)
+        typer.echo(f"error: unknown trial: {trial_id}")
         raise typer.Exit(code=2)
 
     n = sum([capture_pre, capture_post, reset_confirmed])
     if n != 1:
         typer.echo(
             "error: pass exactly one of --capture-pre, --capture-post-and-verdict,"
-            " --reset-confirmed",
-            err=True,
+            " --reset-confirmed"
         )
         raise typer.Exit(code=2)
 

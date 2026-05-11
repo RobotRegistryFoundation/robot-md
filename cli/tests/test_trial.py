@@ -219,8 +219,7 @@ def test_capture_pre_increments_iteration_number(trial_home, monkeypatch):
 def test_capture_pre_rejects_unknown_trial(trial_home):
     from robot_md.trial import trial_app
 
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(trial_app, ["iteration", "--trial", "trial_nope", "--capture-pre"])
     assert result.exit_code != 0
-    combined = result.output + (result.stderr if result.stderr else "")
-    assert "unknown trial" in combined.lower()
+    assert "unknown trial" in result.output.lower()
