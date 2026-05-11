@@ -397,6 +397,46 @@ def test_capture_post_fails_when_depth_delta_over_80mm(trial_home, monkeypatch):
     assert verdict["depth_delta_mm"] == 105
 
 
+# ---------------------------------------------------------------------------
+# Task 11: --reset-confirmed + abort
+# ---------------------------------------------------------------------------
+
+
+def test_reset_confirmed_writes_timestamp(trial_home):
+    d = _seed_trial(trial_home)
+    _seed_iter_pre(d)
+    # Mark iter as post-done so reset is the natural next step
+    iter1 = json.loads((d / "iter_1.json").read_text())
+    iter1["verdict"] = {"pass": True}
+    (d / "iter_1.json").write_text(json.dumps(iter1) + "\n")
+    from robot_md.trial import trial_app
+
+    result = CliRunner().invoke(trial_app, ["iteration", "--trial", d.name, "--reset-confirmed"])
+    assert result.exit_code == 0
+    iter1 = json.loads((d / "iter_1.json").read_text())
+    assert iter1["operator_reset_confirmed_at"].endswith("Z")
+
+
+def test_trial_abort_writes_aborted_at(trial_home):
+    d = _seed_trial(trial_home)
+    from robot_md.trial import trial_app
+
+    result = CliRunner().invoke(trial_app, ["abort", "--trial", d.name])
+    assert result.exit_code == 0
+    state = json.loads((d / "start.json").read_text())
+    assert state["aborted_at"].endswith("Z")
+
+
+def test_aborted_trial_rejects_further_iterations(trial_home, monkeypatch):
+    d = _seed_trial(trial_home)
+    from robot_md.trial import trial_app
+
+    CliRunner().invoke(trial_app, ["abort", "--trial", d.name])
+    result = CliRunner().invoke(trial_app, ["iteration", "--trial", d.name, "--capture-pre"])
+    assert result.exit_code != 0
+    assert "aborted" in result.output.lower()
+
+
 def test_capture_post_fails_when_post_red_not_found(trial_home, monkeypatch):
     from robot_md.trial import trial_app
 
