@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import pathlib
 
 import pytest
 from typer.testing import CliRunner
@@ -98,3 +99,127 @@ def test_trial_start_prints_trial_id_and_protocol(trial_home):
     assert "--capture-pre" in result.output
     assert "--capture-post-and-verdict" in result.output
     assert "--reset-confirmed" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _seed_trial(trial_home: pathlib.Path, trial_id: str = "trial_abc123") -> pathlib.Path:
+    d = trial_home / ".robot-md" / "trials" / trial_id
+    d.mkdir(parents=True)
+    (d / "frames").mkdir()
+    state = {
+        "trial_id": trial_id,
+        "property": "bob.local/PICK-PLACE-10",
+        "started_at": "2026-05-11T14:00:00Z",
+        "cold_install_start_marker": None,
+        "start_anchor": "robot_md_trial_start_only",
+        "iterations": [],
+        "aborted_at": None,
+    }
+    (d / "start.json").write_text(json.dumps(state) + "\n")
+    return d
+
+
+# ---------------------------------------------------------------------------
+# --capture-pre tests
+# ---------------------------------------------------------------------------
+
+
+def test_capture_pre_writes_iter_json_with_perceive_results(trial_home, monkeypatch):
+    from robot_md.trial import trial_app
+
+    d = _seed_trial(trial_home)
+
+    def _fake_invoke(actuator: str, tool: str, args: dict) -> dict:
+        if actuator == "oak-d" and args.get("query") == "red_blob":
+            return {
+                "actuator_name": "oak-d",
+                "outcome_kind": "executed",
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [612, 358],
+                    "centroid_depth_mm": 327,
+                    "bbox_px": [598, 344, 626, 372],
+                    "pixel_count": 478,
+                    "provenance": {},
+                },
+            }
+        if actuator == "oak-d" and args.get("query") == "bowl_top":
+            return {
+                "actuator_name": "oak-d",
+                "outcome_kind": "executed",
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [285, 412],
+                    "centroid_depth_mm": 305,
+                    "bbox_px": [220, 350, 350, 470],
+                    "pixel_count": 9412,
+                    "provenance": {},
+                },
+            }
+        if actuator == "so-arm101" and tool == "read_state":
+            return {
+                "actuator_name": "so-arm101",
+                "outcome_kind": "executed",
+                "telemetry": {
+                    "positions": {
+                        "shoulder_pan": 0.0,
+                        "shoulder_lift": 0.1,
+                        "elbow_flex": 0.0,
+                        "wrist_flex": 0.0,
+                        "wrist_roll": 0.0,
+                        "gripper": 0.0,
+                    }
+                },
+            }
+        raise AssertionError(f"unexpected: {actuator}/{tool}/{args}")
+
+    monkeypatch.setattr("robot_md.trial._gateway_invoke", _fake_invoke)
+
+    runner = CliRunner()
+    result = runner.invoke(trial_app, ["iteration", "--trial", d.name, "--capture-pre"])
+    assert result.exit_code == 0, result.output
+
+    iter_file = d / "iter_1.json"
+    assert iter_file.exists()
+    iter1 = json.loads(iter_file.read_text())
+    assert iter1["iteration"] == 1
+    assert iter1["pre_state"]["perceive_red_blob"]["found"] is True
+    assert iter1["pre_state"]["perceive_red_blob"]["centroid_px"] == [612, 358]
+    assert iter1["pre_state"]["perceive_bowl_top"]["found"] is True
+    assert iter1["pre_state"]["joint_positions_rad"]["gripper"] == 0.0
+    assert iter1["started_at"].endswith("Z")
+
+
+def test_capture_pre_increments_iteration_number(trial_home, monkeypatch):
+    from robot_md.trial import trial_app
+
+    d = _seed_trial(trial_home)
+    (d / "iter_1.json").write_text("{}\n")
+    (d / "iter_2.json").write_text("{}\n")
+
+    def _fake_invoke(actuator: str, tool: str, args: dict) -> dict:
+        return {"telemetry": {"found": False, "positions": {}}}
+
+    monkeypatch.setattr("robot_md.trial._gateway_invoke", _fake_invoke)
+
+    runner = CliRunner()
+    result = runner.invoke(trial_app, ["iteration", "--trial", d.name, "--capture-pre"])
+    assert result.exit_code == 0, result.output
+
+    iter3_file = d / "iter_3.json"
+    assert iter3_file.exists()
+    iter3 = json.loads(iter3_file.read_text())
+    assert iter3["iteration"] == 3
+
+
+def test_capture_pre_rejects_unknown_trial(trial_home):
+    from robot_md.trial import trial_app
+
+    runner = CliRunner()
+    result = runner.invoke(trial_app, ["iteration", "--trial", "trial_nope", "--capture-pre"])
+    assert result.exit_code != 0
+    assert "unknown trial" in result.output.lower()
