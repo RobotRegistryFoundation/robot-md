@@ -15,8 +15,10 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import pathlib
 import secrets
+import urllib.request
 
 import typer
 
@@ -93,3 +95,79 @@ def start_cmd(
     typer.echo(f"  robot-md trial iteration --trial {trial_id} --capture-post-and-verdict")
     typer.echo("  → reset brick →")
     typer.echo(f"  robot-md trial iteration --trial {trial_id} --reset-confirmed")
+
+
+def _next_iter_number(trial_dir: pathlib.Path) -> int:
+    existing = sorted(trial_dir.glob("iter_*.json"))
+    return len(existing) + 1
+
+
+def _gateway_invoke(actuator: str, tool: str, args: dict) -> dict:
+    url = os.environ.get("ROBOT_MD_GATEWAY_URL", "http://127.0.0.1:8080") + "/v1/invoke"
+    bearer = os.environ.get("ROBOT_MD_GATEWAY_BEARER", "")
+    body = json.dumps(
+        {
+            "type": "invoke",
+            "actuator_name": actuator,
+            "tool_name": tool,
+            "tool_args": args,
+        }
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {bearer}",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read())
+
+
+@trial_app.command("iteration")
+def iteration_cmd(
+    trial_id: str = typer.Option(..., "--trial", help="Trial ID from `robot-md trial start`"),
+    capture_pre: bool = typer.Option(False, "--capture-pre"),
+    capture_post: bool = typer.Option(False, "--capture-post-and-verdict"),
+    reset_confirmed: bool = typer.Option(False, "--reset-confirmed"),
+) -> None:
+    """Capture pre/post state for one iteration of a trial."""
+    d = _trial_dir(trial_id)
+    if not d.exists():
+        typer.echo(f"error: unknown trial: {trial_id}", err=True)
+        raise typer.Exit(code=2)
+
+    n = sum([capture_pre, capture_post, reset_confirmed])
+    if n != 1:
+        typer.echo(
+            "error: pass exactly one of --capture-pre, --capture-post-and-verdict,"
+            " --reset-confirmed",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+
+    if capture_pre:
+        _capture_pre(d)
+        return
+    # capture_post and reset_confirmed handled in Tasks 10 + 11
+    raise typer.Exit(code=0)
+
+
+def _capture_pre(d: pathlib.Path) -> None:
+    n = _next_iter_number(d)
+    red = _gateway_invoke("oak-d", "perceive", {"query": "red_blob"})
+    bowl = _gateway_invoke("oak-d", "perceive", {"query": "bowl_top"})
+    state = _gateway_invoke("so-arm101", "read_state", {})
+    iter_state = {
+        "iteration": n,
+        "started_at": _utcnow_iso(),
+        "pre_state": {
+            "joint_positions_rad": state.get("telemetry", {}).get("positions", {}),
+            "perceive_red_blob": red.get("telemetry", {}),
+            "perceive_bowl_top": bowl.get("telemetry", {}),
+        },
+    }
+    (d / f"iter_{n}.json").write_text(json.dumps(iter_state, indent=2) + "\n")
+    typer.echo(f"iteration {n}: pre-state captured at {iter_state['started_at']}")
