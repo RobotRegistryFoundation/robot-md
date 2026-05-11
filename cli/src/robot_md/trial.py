@@ -18,10 +18,11 @@ import json
 import os
 import pathlib
 import secrets
-import urllib.request
-import uuid
 
 import typer
+
+from robot_md.invoke import build_envelope, invoke_envelope, sign_envelope
+from robot_md.signing import load_keypair
 
 trial_app = typer.Typer(help="Capture pick-and-place trial evidence for cert minting.")
 
@@ -110,23 +111,38 @@ def _next_iter_number(trial_dir: pathlib.Path) -> int:
     return len(existing) + 1
 
 
-def _gateway_invoke(actuator: str, tool: str, args: dict) -> dict:
-    """POST a full InvokeEnvelope to the gateway and return the parsed response.
+def _rrn_from_ruri(ruri: str) -> str:
+    """Extract the RRN-* prefix from an rcan://RRN-.../... URI."""
+    if not ruri.startswith("rcan://"):
+        raise RuntimeError(f"ROBOT_MD_RURI must start with rcan:// — got {ruri!r}")
+    rest = ruri[len("rcan://") :]
+    rrn = rest.split("/", 1)[0]
+    if not rrn.startswith("RRN-"):
+        raise RuntimeError(f"ROBOT_MD_RURI host must be an RRN-* identifier — got {rrn!r}")
+    return rrn
 
-    The receiver requires msg_id / type / ruri / scope / tool_name / tool_args /
-    manifest_path. The first three live outside any single trial command and
-    are read from env vars set once by the operator before `trial start`:
+
+def _gateway_invoke(actuator: str, tool: str, args: dict) -> dict:
+    """Build, sign, and POST a full RCAN InvokeEnvelope to the gateway.
+
+    Required env vars (set once by the operator before `trial start`):
 
         ROBOT_MD_RURI           e.g. rcan://RRN-000000000002/skill
-        ROBOT_MD_SCOPE          e.g. "read" (default) or "actuate"
+        ROBOT_MD_SCOPE          "read" (default) or "actuate"
         ROBOT_MD_MANIFEST_PATH  absolute path to ROBOT.md on this host
+        ROBOT_MD_GATEWAY_URL    default http://127.0.0.1:8080
+        ROBOT_MD_GATEWAY_BEARER read-tier bearer token
 
-    `msg_id` is generated per request. The gateway must be configured with
-    multi-actuator dispatch (robot-md-gateway >= 0.5.0a3) — `actuator_name`
-    selects between the perception and motion actuators.
+    Envelope shape matches `robot_md_gateway.receiver.InvokeEnvelope`
+    (msg_id / type / ruri / scope / tool_name / tool_args / manifest_path /
+    actuator_name) plus `nonce` + `timestamp_ms` from `build_envelope`. The
+    envelope is signed Ed25519 with the operator's keypair at
+    `~/.robot-md/keys/<rrn>.signing.json`; the gateway resolves the kid via
+    RRFResolver and verifies the signature before dispatch.
 
-    Raises RuntimeError if any required env var is missing — fail loudly
-    rather than send a 422-bound request.
+    The gateway must be configured with multi-actuator dispatch
+    (robot-md-gateway >= 0.5.0a3) — `actuator_name` selects between the
+    perception and motion actuators.
     """
     ruri = os.environ.get("ROBOT_MD_RURI")
     if not ruri:
@@ -144,30 +160,29 @@ def _gateway_invoke(actuator: str, tool: str, args: dict) -> dict:
         )
     scope = os.environ.get("ROBOT_MD_SCOPE", "read")
 
-    url = os.environ.get("ROBOT_MD_GATEWAY_URL", "http://127.0.0.1:8080") + "/v1/invoke"
-    bearer = os.environ.get("ROBOT_MD_GATEWAY_BEARER", "")
-    envelope = {
-        "msg_id": f"trial-{uuid.uuid4().hex[:12]}",
-        "type": "rcan/v1/invoke",
-        "ruri": ruri,
-        "scope": scope,
-        "tool_name": tool,
-        "tool_args": args,
-        "manifest_path": manifest_path,
-        "actuator_name": actuator,
-    }
-    body = json.dumps(envelope).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {bearer}",
-        },
-        method="POST",
+    rrn = _rrn_from_ruri(ruri)
+    keypair = load_keypair(rrn)
+    if keypair is None:
+        raise RuntimeError(
+            f"no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — "
+            "run `robot-md register` first."
+        )
+
+    envelope = build_envelope(
+        ruri=ruri,
+        tool_name=tool,
+        tool_args=args,
+        manifest_path=manifest_path,
+        scope=scope,
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())
+    # Multi-actuator routing field (gateway >= 0.5.0a3). Added pre-signing so
+    # it's covered by the Ed25519 signature.
+    envelope["actuator_name"] = actuator
+    envelope = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
+
+    gateway_url = os.environ.get("ROBOT_MD_GATEWAY_URL", "http://127.0.0.1:8080")
+    bearer = os.environ.get("ROBOT_MD_GATEWAY_BEARER", "")
+    return invoke_envelope(envelope=envelope, gateway_url=gateway_url, bearer=bearer)
 
 
 @trial_app.command("iteration")
