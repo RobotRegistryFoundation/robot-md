@@ -12,17 +12,7 @@
       <a class="wordmark" href="/" aria-label="ROBOT.md home">
         ROBOT<span class="dot">.</span><span class="md">md</span>
       </a>
-      <nav aria-label="Site navigation">
-        <a href="https://docs.robotmd.dev/spec/">Spec</a>
-        <a href="/agents/">Agents</a>
-        <a href="https://docs.robotmd.dev/mcp/">MCP</a>
-        <a href="/actuators/">Actuators</a>
-        <a href="/registry/">Registry</a>
-        <a href="https://docs.robotmd.dev/compliance/">Compliance</a>
-        <a href="/managed-agents/">Managed Agents</a>
-        <a href="/robots">Robots</a>
-        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
-      </nav>
+<!--#include partials/nav.html-->
       <a class="nav-cta" href="#install">Install →</a>
     </div>
   </header>
@@ -63,24 +53,7 @@
       </div>
 
       <!-- Proof bar — populated at page-load by /js/stats.js from /_stats.json -->
-      <div class="proof-bar" role="region" aria-label="Project statistics">
-        <div class="proof-item">
-          <span class="val"><span data-stat="robots_registered">1</span></span>
-          robots registered
-        </div>
-        <div class="proof-item">
-          <span class="val">7</span>
-          peer runtimes
-        </div>
-        <div class="proof-item">
-          <span class="val"><span data-stat="rrf_endpoints_live">5</span></span>
-          §22–26 endpoints live
-        </div>
-        <div class="proof-item">
-          <span class="val"><span data-stat="robot_md_version">v1.4.0</span></span>
-          on PyPI
-        </div>
-      </div>
+<!--#include partials/proof-bar.html-->
 
     </div>
   </section>
@@ -437,74 +410,10 @@ claude</pre>
   </section>
 
   <!-- ===== BEAT 7: THREE CTAs ===== -->
-  <section class="cta-band" id="get-started" aria-label="Get started">
-    <div class="wrap">
-      <div class="cta-inner">
-
-        <div class="cta-card">
-          <div class="cta-num">01 — Install</div>
-          <h2 class="cta-heading">Start in one command.</h2>
-          <p class="cta-body">
-            Install <code style="font-family:var(--mono);font-size:13px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md</code>,
-            author a <code style="font-family:var(--mono);font-size:13px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">ROBOT.md</code>,
-            register with RRF, run a skill, and walk away with a signed audit bundle —
-            all in about ten minutes. The cookbook walks you through every step.
-          </p>
-          <a class="cta-action" href="/cookbook/">Open the cookbook →</a>
-        </div>
-
-        <div class="cta-card">
-          <div class="cta-num">02 — Read spec</div>
-          <h2 class="cta-heading">Understand the format.</h2>
-          <p class="cta-body">
-            The ROBOT.md spec defines every required and optional field,
-            the <a href="https://rcan.dev/compatibility">RCAN protocol</a> conformance rules, and the compliance packet
-            filing requirements. Normative text, schema, and examples.
-          </p>
-          <a class="cta-action" href="https://docs.robotmd.dev/spec/">Read spec →</a>
-        </div>
-
-        <div class="cta-card">
-          <div class="cta-num">03 — Talk to us</div>
-          <h2 class="cta-heading">Compliance-bot waitlist.</h2>
-          <p class="cta-body">
-            Give your robot repo to Compliance-bot and get back a signed
-            FRIA + IFU + safety-benchmark + EU-register filing in one day.
-            Powered by Anthropic Managed Agents. Join the waitlist.
-          </p>
-          <a class="cta-action" href="/managed-agents/">Learn more →</a>
-        </div>
-
-      </div>
-    </div>
-  </section>
+<!--#include partials/cta-band.html-->
 
   <!-- ===== AUTHORITY DISCLAIMER ===== -->
-  <section class="sec" id="authority-disclaimer" style="padding-top:32px;padding-bottom:32px;">
-    <div class="wrap">
-      <!-- BEGIN: ecosystem authority disclaimer (canonical, derived from spec §10) -->
-      <blockquote style="border-left:3px solid var(--accent,#c2a460);margin:0;padding:16px 20px;background:var(--paper-2,#f0ebe0);border-radius:4px;font-size:14px;line-height:1.6;color:var(--ink-2,#555);">
-        <strong>Where safety is actually enforced.</strong><br>
-        Physical safety is enforced at Layer 3 (<code style="font-family:var(--mono)">robot-md-gateway</code>) or Layer 4 (a runtime that embeds it, e.g., OpenCastor). Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it.
-      </blockquote>
-      <!-- END: ecosystem authority disclaimer -->
-    </div>
-  </section>
-
-  <!-- ===== FOOTER ===== -->
-  <footer class="wrap foot">
-    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
-    <div>
-      <a href="https://docs.robotmd.dev/spec/">Spec</a> ·
-      <a href="/registry/">Registry</a> ·
-      <a href="https://docs.robotmd.dev/compliance/">Compliance</a> ·
-      <a href="/managed-agents/">Managed Agents</a> ·
-      <a href="/robots">Robots</a> ·
-      <a href="/status">Status</a> ·
-      <a href="/report.html">Report issue</a> ·
-      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
-    </div>
-  </footer>
+<!--#include partials/footer.html-->
 
   <!-- Copy install command (kept external so script-src 'self' stays strict) -->
   <script src="/js/copy-button.js" defer></script>
