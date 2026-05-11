@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from robot_md.autodetect import Device
-from robot_md.init_phases import PhaseResult  # noqa: F401
+from robot_md.init_phases import PhaseResult
 
 
 @dataclass(frozen=True)
@@ -107,4 +107,36 @@ def install_one(package: str, *, min_version: str = "") -> InstallResult:
         ok=(result.returncode == 0),
         stdout=result.stdout,
         stderr=result.stderr,
+    )
+
+
+def phase_install_backend(scan) -> PhaseResult:
+    """Init phase entry point. Installs all backend packages indicated by the scan."""
+    matches = match_packages_for_devices(scan.devices)
+    if not matches:
+        return PhaseResult(
+            phase="install_backend",
+            status="ok",
+            message="no backend packages required (no matching hardware)",
+            detail={"installed": []},
+        )
+    installed: list[str] = []
+    for m in matches:
+        sys.stdout.write(f"  • {m.reason}\n")
+        sys.stdout.write(f"    Installing {m.package}…\n")
+        r = install_one(m.package, min_version=m.min_version)
+        if not r.ok:
+            return PhaseResult(
+                phase="install_backend",
+                status="failed",
+                message=f"failed to install {r.package}: {r.stderr.splitlines()[-1] if r.stderr else 'unknown error'}",
+                detail={"installed": installed, "failed_package": r.package, "stderr": r.stderr},
+            )
+        installed.append(r.package)
+        sys.stdout.write(f"    ✓ {r.package}\n")
+    return PhaseResult(
+        phase="install_backend",
+        status="ok",
+        message=f"installed {len(installed)} backend package(s)",
+        detail={"installed": installed},
     )
