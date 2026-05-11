@@ -63,7 +63,7 @@ def render_env_file(*, manifest_path: str) -> str:
 ROBOT_MD_PATH={manifest_path}
 ROBOT_MD_BEARERS_FILE=/etc/robot-md-gateway/bearers.yaml
 ROBOT_MD_LOG_LEVEL=INFO
-ROBOT_MD_TOOL_ALLOWLIST=mcp__robot__execute_capability,mcp__robot__render,mcp__robot__validate,move,home,read_state
+ROBOT_MD_TOOL_ALLOWLIST=mcp__robot__execute_capability,mcp__robot__render,mcp__robot__validate,move,home,read_state,perceive
 ROBOT_MD_REQUIRE_ENVELOPE_SIGNATURE=1
 """
 
