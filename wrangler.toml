@@ -4,13 +4,14 @@
 #
 #   1. Cloudflare Dashboard (recommended for first setup):
 #      - Pages > Create project > Connect to Git > RobotRegistryFoundation/robot-md
-#      - Build command: (none)
-#      - Output directory: site
+#      - Build command: node site/scripts/inject-stats.js && node site/build.mjs
+#      - Output directory: site/_build
 #      - Root directory: (none)
 #      - Custom domain: robotmd.dev
 #
 #   2. Wrangler CLI (requires CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID):
-#      npx wrangler pages deploy site --project-name=robotmd-dev
+#      node site/scripts/inject-stats.js && node site/build.mjs
+#      npx wrangler pages deploy site/_build --project-name=robotmd-dev
 #
 #   3. GitHub Actions (auto-deploys on push to main):
 #      See .github/workflows/deploy-site.yml
@@ -20,7 +21,7 @@
 
 name = "robotmd-dev"
 compatibility_date = "2024-10-01"
-pages_build_output_dir = "site"
+pages_build_output_dir = "site/_build"
 
 # KV namespace for the Compliance-bot waitlist (Pages Function).
 # To provision:

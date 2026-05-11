@@ -36,17 +36,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build site (expand SSI partials)
+        run: node site/build.mjs
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy site --project-name=robotmd-dev --branch=main --commit-hash=${{ github.sha }} --commit-message="${{ github.sha }} (deploy via Actions)"
+          command: pages deploy site/_build --project-name=robotmd-dev --branch=main --commit-hash=${{ github.sha }} --commit-message="${{ github.sha }} (deploy via Actions)"
 
       - name: Smoke test
         run: |
           set -e
           sleep 10
           curl -sfI https://robotmd.dev/ | head -5
-          curl -sf https://robotmd.dev/ | grep -q "ROBOT.md" || { echo "landing page missing keyword"; exit 1; }
+          body=$(curl -sf https://robotmd.dev/)
+          echo "$body" | grep -q "ROBOT.md" || { echo "landing page missing keyword"; exit 1; }
+          echo "$body" | grep -q '<link rel="stylesheet"' || { echo "landing page missing stylesheet link — SSI includes likely unexpanded (build step skipped?)"; exit 1; }
+          echo "$body" | grep -q '<!--#include' && { echo "landing page contains raw SSI directives — build did not run"; exit 1; } || true
           echo "site live at https://robotmd.dev/"
