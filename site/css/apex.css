@@ -363,7 +363,7 @@ a:hover { color: var(--accent); border-color: var(--accent) }
   white-space: nowrap;
   animation: marquee-slide 60s linear infinite;
 }
-.marquee .track span { opacity: .65 }
+.marquee .track span { color: var(--ink-3) }
 .marquee .track b { color: var(--accent); font-weight: 600 }
 @keyframes marquee-slide {
   from { transform: translateX(0) }
@@ -430,7 +430,7 @@ a:hover { color: var(--accent); border-color: var(--accent) }
 .dt-line.out .mute { color: #5a574f }
 .dt-line.banner { color: #7fb27a; padding: 3px 0 }
 .dt-line.user { color: #E8E3D3 }
-.dt-line.user .speaker { color: var(--accent-ink); font-weight: 600; margin-right: 6px }
+.dt-line.user .speaker { color: var(--accent); font-weight: 600; margin-right: 6px }
 .dt-line.agent .speaker { color: var(--accent); font-weight: 600; margin-right: 6px }
 .dt-cursor {
   display: inline-block;
