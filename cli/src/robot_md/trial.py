@@ -150,8 +150,18 @@ def iteration_cmd(
     if capture_pre:
         _capture_pre(d)
         return
-    # capture_post and reset_confirmed handled in Tasks 10 + 11
+    if capture_post:
+        _capture_post(d)
+        return
+    # reset_confirmed handled in Task 11
     raise typer.Exit(code=0)
+
+
+VERDICT_RULE = (
+    "post.red_blob.centroid_px ∈ post.bowl_top.bbox_px AND "
+    "|post.red_blob.centroid_depth_mm - post.bowl_top.centroid_depth_mm| <= 80"
+)
+DEPTH_DELTA_TOLERANCE_MM = 80
 
 
 def _capture_pre(d: pathlib.Path) -> None:
@@ -170,3 +180,63 @@ def _capture_pre(d: pathlib.Path) -> None:
     }
     (d / f"iter_{n}.json").write_text(json.dumps(iter_state, indent=2) + "\n")
     typer.echo(f"iteration {n}: pre-state captured at {iter_state['started_at']}")
+
+
+def _capture_post(d: pathlib.Path) -> None:
+    iters = sorted(d.glob("iter_*.json"), key=lambda p: int(p.stem.split("_")[1]))
+    if not iters:
+        typer.echo("error: no iteration in progress; run --capture-pre first")
+        raise typer.Exit(code=2)
+    cur = iters[-1]
+    state = json.loads(cur.read_text())
+    if "post_state" in state:
+        typer.echo(f"error: iteration {state['iteration']} already has post_state")
+        raise typer.Exit(code=2)
+
+    red = _gateway_invoke("oak-d", "perceive", {"query": "red_blob"})
+    bowl = _gateway_invoke("oak-d", "perceive", {"query": "bowl_top"})
+    joints = _gateway_invoke("so-arm101", "read_state", {})
+
+    red_t = red.get("telemetry", {})
+    bowl_t = bowl.get("telemetry", {})
+
+    centroid_inside = False
+    depth_delta = None
+    pixel_distance = None
+    if red_t.get("found") and bowl_t.get("found"):
+        cu, cv = red_t["centroid_px"]
+        u0, v0, u1, v1 = bowl_t["bbox_px"]
+        centroid_inside = (u0 <= cu <= u1) and (v0 <= cv <= v1)
+        depth_delta = abs(int(red_t["centroid_depth_mm"]) - int(bowl_t["centroid_depth_mm"]))
+        bx, by = bowl_t["centroid_px"]
+        pixel_distance = int(((cu - bx) ** 2 + (cv - by) ** 2) ** 0.5)
+    depth_within = depth_delta is not None and depth_delta <= DEPTH_DELTA_TOLERANCE_MM
+    red_in_bowl = bool(centroid_inside and depth_within)
+
+    post_iso = _utcnow_iso()
+    started = dt.datetime.strptime(state["started_at"], "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=dt.timezone.utc
+    )
+    ended = dt.datetime.strptime(post_iso, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
+    duration_s = (ended - started).total_seconds()
+
+    state["post_state"] = {
+        "joint_positions_rad": joints.get("telemetry", {}).get("positions", {}),
+        "perceive_red_blob": red_t,
+        "perceive_bowl_top": bowl_t,
+        "captured_at": post_iso,
+    }
+    state["duration_s"] = duration_s
+    state["verdict"] = {
+        "rule": VERDICT_RULE,
+        "red_in_bowl": red_in_bowl,
+        "centroid_inside_bbox": centroid_inside,
+        "pixel_distance_to_bowl_centroid_px": pixel_distance,
+        "depth_delta_mm": depth_delta,
+        "pass": red_in_bowl,
+    }
+    cur.write_text(json.dumps(state, indent=2) + "\n")
+    typer.echo(
+        f"iteration {state['iteration']}: verdict={'PASS' if red_in_bowl else 'FAIL'}"
+        f" duration={duration_s:.1f}s"
+    )
