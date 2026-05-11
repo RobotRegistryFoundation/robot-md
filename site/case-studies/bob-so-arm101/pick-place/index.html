@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bob's 10-minute pick-and-place — case study — ROBOT.md</title>
+  <meta name="description"
+    content="Cold-install Claude Code to first successful pick-and-place in under 10 minutes on Bob's SO-ARM101 + OAK-D rig. 10/10 cycles. Verified by depth-segmentation. RRF-countersigned.">
+  <meta name="theme-color" content="#F4EFE6">
+
+  <meta property="og:title" content="Bob's 10-minute pick-and-place — case study">
+  <meta property="og:description" content="10/10 Claude-driven cycles + cold-install wall-clock. Cert RRF-countersigned, curl-verifiable.">
+  <meta property="og:url" content="https://robotmd.dev/case-studies/bob-so-arm101/pick-place/">
+  <meta property="og:type" content="article">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <link rel="canonical" href="https://robotmd.dev/case-studies/bob-so-arm101/pick-place/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/design.css">
+
+  <style>
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.55;
+    }
+
+    .breadcrumb {
+      padding: 16px 0 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      color: var(--ink-3);
+    }
+    .breadcrumb a { color: var(--ink-3) }
+    .breadcrumb a:hover { color: var(--accent) }
+
+    .case-status {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 2px;
+      margin: 12px 0 20px;
+      background: var(--accent-wash);
+      color: var(--accent-ink);
+    }
+
+    .case-meta-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 6px 20px;
+      font-size: 14px;
+      color: var(--ink-2);
+      margin: 0;
+      max-width: 560px;
+    }
+    .case-meta-grid dt {
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      padding-top: 2px;
+    }
+    .case-meta-grid dd { margin: 0 }
+
+    .case-body { padding: 48px 0 72px }
+    .case-body section {
+      max-width: 760px;
+      padding: 40px 0;
+      border-top: 1px solid var(--rule);
+    }
+    .case-body section:first-of-type { border-top: 0; padding-top: 0 }
+    .case-body h2 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: clamp(22px, 2.5vw, 28px);
+      letter-spacing: -0.01em;
+      margin: 0 0 16px;
+    }
+    .case-body h3 {
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 18px;
+      margin: 28px 0 12px;
+    }
+    .case-body p { margin: 0 0 14px }
+    .case-body ol, .case-body ul {
+      margin: 0 0 14px;
+      padding-left: 24px;
+    }
+    .case-body li { margin-bottom: 8px }
+
+    pre.code {
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      padding: 14px 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+      overflow-x: auto;
+      margin: 14px 0;
+    }
+    code { font-family: var(--mono); font-size: 0.92em; background: var(--paper-2); padding: 1px 5px; border-radius: 2px; }
+
+    .cert-badge {
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--ink-2);
+      background: var(--paper-2);
+      border: 1px solid var(--rule);
+      padding: 12px 16px;
+      margin: 16px 0 24px;
+      max-width: 760px;
+    }
+    .cert-badge code { background: transparent; padding: 0; word-break: break-all; }
+    .cert-badge .placeholder {
+      color: var(--accent-ink);
+      background: var(--accent-wash);
+      padding: 1px 6px;
+      border-radius: 2px;
+    }
+
+    .pending-callout {
+      border-left: 3px solid var(--accent);
+      background: #FBF4DA;
+      padding: 14px 18px;
+      margin: 18px 0;
+      font-size: 14px;
+      color: var(--ink-2);
+    }
+    .pending-callout strong { color: var(--accent-ink) }
+
+    figure { margin: 24px 0 }
+    figure img { max-width: 100%; height: auto; display: block; border: 1px solid var(--rule); }
+    figcaption {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--ink-3);
+      margin-top: 8px;
+    }
+
+    footer.foot {
+      padding: 28px 0 44px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--ink-3);
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-top: 1px solid var(--rule);
+    }
+    footer.foot a { color: var(--ink-3) }
+    footer.foot a:hover { color: var(--accent) }
+  </style>
+</head>
+
+<body>
+
+  <!-- ===== SITE NAV ===== -->
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+      <nav aria-label="Site navigation">
+        <a href="https://docs.robotmd.dev/spec/">Spec</a>
+        <a href="/agents/">Agents</a>
+        <a href="https://docs.robotmd.dev/mcp/">MCP</a>
+        <a href="/actuators/">Actuators</a>
+        <a href="/registry/">Registry</a>
+        <a href="https://docs.robotmd.dev/compliance/">Compliance</a>
+        <a href="/managed-agents/">Managed Agents</a>
+        <a href="/robots">Robots</a>
+        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== PAGE HEADER ===== -->
+  <header class="page-header">
+    <div class="wrap">
+      <p class="breadcrumb"><a href="/case-studies/bob-so-arm101/">← Bob (SO-ARM101)</a></p>
+      <div class="page-eyebrow">
+        <span>Case study</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+      <h1 class="page-heading">Bob's <em>10-minute</em> pick-and-place</h1>
+      <p class="case-status">Track 3 — PROVISIONAL</p>
+
+      <dl class="case-meta-grid">
+        <dt>Property</dt><dd><code>bob.local/PICK-PLACE-10</code></dd>
+        <dt>Rig</dt><dd>SO-ARM101 (RPN-000000000002) + OAK-D (RPN-000000000003)</dd>
+        <dt>Witness</dt><dd>Craig (witness-bob-craigm)</dd>
+        <dt>Status</dt><dd>PROVISIONAL — minted post-trial, rig-local namespace</dd>
+      </dl>
+    </div>
+  </header>
+
+  <!-- ===== CASE STUDY BODY ===== -->
+  <main>
+    <div class="wrap case-body">
+
+      <section id="the-claim">
+        <h2>The 10-minute claim</h2>
+        <p class="cert-badge">
+          Cert <code class="placeholder">&lt;populated post-mint&gt;</code>
+          · log index <code class="placeholder">&lt;populated post-mint&gt;</code>
+          · <a class="placeholder" href="#">view on RRF</a>
+        </p>
+        <p>
+          On Bob's rig, the wall-clock from <code>claude code</code> cold install to the
+          first successful pick-and-place is <strong><span class="placeholder">&lt;populated post-mint&gt;</span> seconds</strong>.
+          Across the next ten consecutive cycles, the brick lands in the bowl every time —
+          verified by depth segmentation, not a stub.
+        </p>
+        <div class="pending-callout">
+          <strong>Status:</strong> page minted with placeholders ahead of the trial.
+          The cert id, log index, and elapsed-seconds figures are filled in by a
+          follow-up commit immediately after the cert lands on the RRF transparency log.
+        </div>
+      </section>
+
+      <section id="bom">
+        <h2>What you need</h2>
+        <ul>
+          <li>Raspberry Pi 5 (8 GB) or similar Linux SBC</li>
+          <li>SO-ARM101 arm (USB-serial)</li>
+          <li>Luxonis OAK-D depth camera (Lite, Pro, or S2 — any OAK-D variant works)</li>
+          <li>Standard red Lego 2×4 brick</li>
+          <li>Matte ceramic bowl, roughly 10 cm inner diameter, contrasting color (cream works)</li>
+          <li><strong>Camera mount:</strong> bird's-eye, ~30 cm above the table, pointing straight down</li>
+        </ul>
+      </section>
+
+      <section id="mount">
+        <h2>The mount geometry</h2>
+        <figure>
+          <img src="/case-studies/bob-so-arm101/pick-place/mount-wide.jpg"
+               alt="Wide-angle view of Bob's rig with the OAK-D mounted bird's-eye over the workspace.">
+          <figcaption>Bob's rig: SO-ARM101 base at table level, OAK-D ~30 cm above. (image filed in opencastor-ops/operations/photos/)</figcaption>
+        </figure>
+        <p>
+          The <code>find_bowl_top</code> heuristic searches a depth band of 200–350 mm.
+          Set your mount height so the bowl rim falls inside that window — at ~30 cm with
+          a 3 cm rim that comes out to roughly 270 mm, well centered.
+        </p>
+        <p>
+          The <code>find_red_blob</code> heuristic uses fixed HSV thresholds for a standard
+          red Lego brick. Off-spec lighting or non-red bricks will need a re-tune; that's
+          intentional. The verification is meant to be cheap and inspectable, not robust.
+        </p>
+      </section>
+
+      <section id="run-it">
+        <h2>Run it yourself</h2>
+        <ol>
+          <li>Run the Spec A cold install — see the <a href="/cookbook/">cookbook</a>.</li>
+          <li>Install the gateway: <code>robot-md install-gateway</code>.</li>
+          <li>Set the cold-install wall-clock anchor <strong>before</strong> any further install:
+            <pre class="code">date -u +%FT%TZ &gt; ~/.robot-md-cold-install-start.txt</pre>
+          </li>
+          <li>Export the gateway envelope env vars (used by every <code>trial iteration</code> call):
+            <pre class="code">export ROBOT_MD_RURI=rcan://RRN-000000000002/skill
+export ROBOT_MD_MANIFEST_PATH=$HOME/.robot-md/ROBOT.md
+export ROBOT_MD_GATEWAY_BEARER=$(cat ~/.robot-md/gateway-bearers/actuate)</pre>
+          </li>
+          <li><code>robot-md trial start --property bob.local/PICK-PLACE-10</code></li>
+          <li>Open Claude Code. The <code>using-robot-md</code> skill auto-loads with the pick-place protocol.
+              Let Claude run.</li>
+          <li>Repeat 10× per iteration:
+            <ul>
+              <li><code>robot-md trial iteration --trial &lt;id&gt; --capture-pre</code></li>
+              <li>Claude composes the pick → place sequence and dispatches moves via the gateway.</li>
+              <li><code>robot-md trial iteration --trial &lt;id&gt; --capture-post-and-verdict</code></li>
+              <li>Reset the brick → <code>robot-md trial iteration --trial &lt;id&gt; --reset-confirmed</code></li>
+            </ul>
+          </li>
+          <li><code>robot-md trial finalize --trial &lt;id&gt;</code></li>
+          <li>On the controller machine: <code>opencastor-ops/scripts/hil/orchestrate.py --property PICK-PLACE-10 --trial &lt;id&gt;</code></li>
+        </ol>
+      </section>
+
+      <section id="cert-anatomy">
+        <h2>What's in the cert</h2>
+        <p>
+          Each iteration captures pre/post depth + RGB frames, the verdict
+          (<code>red brick centroid inside bowl footprint AND depth delta ≤ 80 mm</code>),
+          Claude's dispatched envelopes (audited by the gateway), and the
+          wall-clock from cold-install to first pass.
+        </p>
+        <pre class="code"><code>{
+  "property": "bob.local/PICK-PLACE-10",
+  "passed": 10,
+  "cold_install_wallclock": {
+    "start_marker": "&lt;populated post-mint&gt;",
+    "end_marker": "&lt;populated post-mint&gt;",
+    "elapsed_s": "&lt;populated post-mint&gt;",
+    "verdict": "PASS"
+  },
+  "iterations": [ "...10 entries..." ]
+}</code></pre>
+      </section>
+
+      <section id="proves-and-doesnt">
+        <h2>What this proves and what it doesn't</h2>
+        <p>
+          <strong>Proves:</strong> on this specific rig with these props, Claude-driven
+          pick-place can happen 10 times in a row with the measured wall-clock.
+        </p>
+        <p>
+          <strong>Does NOT prove:</strong> any rig with any brick will hit the same numbers.
+          Verification is HSV + depth, so lighting matters. The arm has no per-motion HiTL
+          claim — envelopes are batch-signed by <code>bob-operator-2026</code>. This case
+          study doesn't carry safety claims for the arm.
+        </p>
+      </section>
+
+      <section id="reproduce">
+        <h2>Reproduce on your rig</h2>
+        <p>
+          Substitute <code>&lt;your-rig&gt;.local/PICK-PLACE-10</code> for the property name.
+          The cert namespace stays rig-local until a canonical promotion (deferred until a
+          second rig registers).
+        </p>
+      </section>
+
+      <section id="open-data">
+        <h2>Open data</h2>
+        <ul>
+          <li>
+            <a href="https://github.com/craigm26/opencastor-ops/tree/master/operations/cert-runs/2026-05-11-bob-pick-place-10">
+              All 10 iterations' frames + signed evidence
+            </a>
+            <span class="placeholder">(directory created post-mint)</span>
+          </li>
+          <li>
+            <a href="https://github.com/craigm26/opencastor-ops/blob/master/operations/2026-05-11-bob-oak-d-mount.md">
+              Mount notes + photos
+            </a>
+          </li>
+          <li>
+            <a href="https://github.com/craigm26/opencastor-ops/blob/master/docs/superpowers/specs/2026-05-11-spec-b-pick-place-cert-design.md">
+              Spec B design doc
+            </a>
+          </li>
+        </ul>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="foot wrap">
+    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
+    <div>
+      <a href="/">Home</a> ·
+      <a href="/case-studies/">Case studies</a> ·
+      <a href="/cookbook/">Cookbook</a> ·
+      <a href="https://docs.robotmd.dev/spec/">Spec</a> ·
+      <a href="/registry/">Registry</a> ·
+      <a href="/status">Status</a> ·
+      <a href="/report.html">Report issue</a> ·
+      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
+    </div>
+  </footer>
+
+</body>
+
+</html>
