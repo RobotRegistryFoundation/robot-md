@@ -223,3 +223,217 @@ def test_capture_pre_rejects_unknown_trial(trial_home):
     result = runner.invoke(trial_app, ["iteration", "--trial", "trial_nope", "--capture-pre"])
     assert result.exit_code != 0
     assert "unknown trial" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# --capture-post-and-verdict helpers + tests
+# ---------------------------------------------------------------------------
+
+
+def _seed_iter_pre(d: pathlib.Path, iter_num: int = 1) -> None:
+    iter_state = {
+        "iteration": iter_num,
+        "started_at": "2026-05-11T14:01:00Z",
+        "pre_state": {
+            "joint_positions_rad": {"gripper": 0.0},
+            "perceive_red_blob": {
+                "found": True,
+                "centroid_px": [612, 358],
+                "centroid_depth_mm": 327,
+                "bbox_px": [598, 344, 626, 372],
+                "pixel_count": 478,
+                "provenance": {},
+            },
+            "perceive_bowl_top": {
+                "found": True,
+                "centroid_px": [285, 412],
+                "centroid_depth_mm": 305,
+                "bbox_px": [220, 350, 350, 470],
+                "pixel_count": 9412,
+                "provenance": {},
+            },
+        },
+    }
+    (d / f"iter_{iter_num}.json").write_text(json.dumps(iter_state) + "\n")
+
+
+def test_capture_post_marks_pass_when_red_inside_bowl(trial_home, monkeypatch):
+    from robot_md.trial import trial_app
+
+    d = _seed_trial(trial_home)
+    _seed_iter_pre(d)
+
+    def _fake_invoke(actuator: str, tool: str, args: dict) -> dict:
+        if actuator == "oak-d" and args.get("query") == "red_blob":
+            return {
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [288, 410],
+                    "centroid_depth_mm": 308,
+                    "bbox_px": [275, 397, 301, 423],
+                    "pixel_count": 312,
+                    "provenance": {},
+                }
+            }
+        if actuator == "oak-d" and args.get("query") == "bowl_top":
+            return {
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [285, 412],
+                    "centroid_depth_mm": 305,
+                    "bbox_px": [220, 350, 350, 470],
+                    "pixel_count": 9412,
+                    "provenance": {},
+                }
+            }
+        if actuator == "so-arm101" and tool == "read_state":
+            return {"telemetry": {"positions": {"gripper": 0.0}}}
+        raise AssertionError(f"unexpected: {actuator}/{tool}/{args}")
+
+    monkeypatch.setattr("robot_md.trial._gateway_invoke", _fake_invoke)
+
+    result = CliRunner().invoke(
+        trial_app, ["iteration", "--trial", d.name, "--capture-post-and-verdict"]
+    )
+    assert result.exit_code == 0, result.output
+
+    iter1 = json.loads((d / "iter_1.json").read_text())
+    verdict = iter1["verdict"]
+    assert verdict["pass"] is True
+    assert verdict["red_in_bowl"] is True
+    assert verdict["depth_delta_mm"] == 3
+    assert iter1["duration_s"] >= 0
+
+
+def test_capture_post_fails_when_red_outside_bowl_bbox(trial_home, monkeypatch):
+    from robot_md.trial import trial_app
+
+    d = _seed_trial(trial_home)
+    _seed_iter_pre(d)
+
+    def _fake_invoke(actuator: str, tool: str, args: dict) -> dict:
+        if actuator == "oak-d" and args.get("query") == "red_blob":
+            return {
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [50, 50],
+                    "centroid_depth_mm": 308,
+                    "bbox_px": [40, 40, 60, 60],
+                    "pixel_count": 100,
+                    "provenance": {},
+                }
+            }
+        if actuator == "oak-d" and args.get("query") == "bowl_top":
+            return {
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [285, 412],
+                    "centroid_depth_mm": 305,
+                    "bbox_px": [220, 350, 350, 470],
+                    "pixel_count": 9412,
+                    "provenance": {},
+                }
+            }
+        if actuator == "so-arm101" and tool == "read_state":
+            return {"telemetry": {"positions": {}}}
+        raise AssertionError(f"unexpected: {actuator}/{tool}/{args}")
+
+    monkeypatch.setattr("robot_md.trial._gateway_invoke", _fake_invoke)
+
+    result = CliRunner().invoke(
+        trial_app, ["iteration", "--trial", d.name, "--capture-post-and-verdict"]
+    )
+    assert result.exit_code == 0, result.output
+
+    iter1 = json.loads((d / "iter_1.json").read_text())
+    verdict = iter1["verdict"]
+    assert verdict["pass"] is False
+    assert verdict["red_in_bowl"] is False
+
+
+def test_capture_post_fails_when_depth_delta_over_80mm(trial_home, monkeypatch):
+    from robot_md.trial import trial_app
+
+    d = _seed_trial(trial_home)
+    _seed_iter_pre(d)
+
+    def _fake_invoke(actuator: str, tool: str, args: dict) -> dict:
+        if actuator == "oak-d" and args.get("query") == "red_blob":
+            return {
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [288, 410],
+                    "centroid_depth_mm": 200,
+                    "bbox_px": [275, 397, 301, 423],
+                    "pixel_count": 312,
+                    "provenance": {},
+                }
+            }
+        if actuator == "oak-d" and args.get("query") == "bowl_top":
+            return {
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [285, 412],
+                    "centroid_depth_mm": 305,
+                    "bbox_px": [220, 350, 350, 470],
+                    "pixel_count": 9412,
+                    "provenance": {},
+                }
+            }
+        if actuator == "so-arm101" and tool == "read_state":
+            return {"telemetry": {"positions": {"gripper": 0.0}}}
+        raise AssertionError(f"unexpected: {actuator}/{tool}/{args}")
+
+    monkeypatch.setattr("robot_md.trial._gateway_invoke", _fake_invoke)
+
+    result = CliRunner().invoke(
+        trial_app, ["iteration", "--trial", d.name, "--capture-post-and-verdict"]
+    )
+    assert result.exit_code == 0, result.output
+
+    iter1 = json.loads((d / "iter_1.json").read_text())
+    verdict = iter1["verdict"]
+    assert verdict["pass"] is False
+    assert verdict["depth_delta_mm"] == 105
+
+
+def test_capture_post_fails_when_post_red_not_found(trial_home, monkeypatch):
+    from robot_md.trial import trial_app
+
+    d = _seed_trial(trial_home)
+    _seed_iter_pre(d)
+
+    def _fake_invoke(actuator: str, tool: str, args: dict) -> dict:
+        if actuator == "oak-d" and args.get("query") == "red_blob":
+            return {
+                "telemetry": {
+                    "found": False,
+                    "pixel_count": 0,
+                    "provenance": {},
+                }
+            }
+        if actuator == "oak-d" and args.get("query") == "bowl_top":
+            return {
+                "telemetry": {
+                    "found": True,
+                    "centroid_px": [285, 412],
+                    "centroid_depth_mm": 305,
+                    "bbox_px": [220, 350, 350, 470],
+                    "pixel_count": 9412,
+                    "provenance": {},
+                }
+            }
+        if actuator == "so-arm101" and tool == "read_state":
+            return {"telemetry": {"positions": {"gripper": 0.0}}}
+        raise AssertionError(f"unexpected: {actuator}/{tool}/{args}")
+
+    monkeypatch.setattr("robot_md.trial._gateway_invoke", _fake_invoke)
+
+    result = CliRunner().invoke(
+        trial_app, ["iteration", "--trial", d.name, "--capture-post-and-verdict"]
+    )
+    assert result.exit_code == 0, result.output
+
+    iter1 = json.loads((d / "iter_1.json").read_text())
+    verdict = iter1["verdict"]
+    assert verdict["pass"] is False
