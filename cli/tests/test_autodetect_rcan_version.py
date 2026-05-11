@@ -1,4 +1,5 @@
 import yaml
+
 from robot_md.autodetect import Scan, emit_draft
 
 

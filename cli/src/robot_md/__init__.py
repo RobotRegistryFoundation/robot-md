@@ -1,6 +1,7 @@
 """robot-md — parse, validate, and render ROBOT.md files."""
 
-from importlib.metadata import version as _pkg_version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 try:
     __version__ = _pkg_version("robot-md")
