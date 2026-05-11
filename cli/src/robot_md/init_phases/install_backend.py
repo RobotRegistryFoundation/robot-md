@@ -14,7 +14,7 @@ import os  # noqa: F401
 import subprocess  # noqa: F401
 import sys
 from dataclasses import dataclass
-from pathlib import Path  # noqa: F401
+from pathlib import Path
 
 from robot_md.autodetect import Device
 from robot_md.init_phases import PhaseResult  # noqa: F401
@@ -62,3 +62,18 @@ def match_packages_for_devices(devices: list[Device]) -> list[PackageMatch]:
             matches.append(match)
             seen.add(match.package)
     return matches
+
+
+def is_externally_managed_env() -> bool:
+    """True when the current Python install is PEP-668 externally-managed.
+
+    - In a venv (sys.prefix != sys.base_prefix) → False (never managed).
+    - Otherwise, look for an `EXTERNALLY-MANAGED` marker in the stdlib dir.
+      Pi OS Bookworm+ ships one; pure Python.org installs do not.
+    """
+    import sysconfig
+    if sys.prefix != sys.base_prefix:
+        return False
+    stdlib = Path(sysconfig.get_path("stdlib"))
+    marker = stdlib / "EXTERNALLY-MANAGED"
+    return marker.exists()

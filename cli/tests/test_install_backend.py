@@ -1,6 +1,9 @@
+from unittest.mock import patch
+
 from robot_md.autodetect import Device
 from robot_md.init_phases.install_backend import (
     PackageMatch,
+    is_externally_managed_env,
     match_packages_for_devices,
 )
 
@@ -42,3 +45,19 @@ def test_match_dedups_by_package():
     matches = match_packages_for_devices(devices)
     so_matches = [m for m in matches if m.package == "so-arm101-actuator"]
     assert len(so_matches) == 1
+
+
+def test_pep668_detected_when_marker_file_exists(tmp_path):
+    """A Python install with an EXTERNALLY-MANAGED marker is detected."""
+    marker = tmp_path / "EXTERNALLY-MANAGED"
+    marker.write_text("")
+
+    with patch("sysconfig.get_path", return_value=str(tmp_path)), \
+         patch("sys.prefix", "/usr"), patch("sys.base_prefix", "/usr"):
+        assert is_externally_managed_env() is True
+
+
+def test_pep668_not_detected_in_venv():
+    """A venv (sys.prefix != base_prefix) is never externally-managed."""
+    with patch("sys.prefix", "/tmp/venv"), patch("sys.base_prefix", "/usr"):
+        assert is_externally_managed_env() is False
