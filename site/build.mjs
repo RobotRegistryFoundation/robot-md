@@ -43,10 +43,27 @@ async function walk(dir) {
   return files;
 }
 
+async function walkAll(dir) {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const e of entries) {
+    const p = path.join(dir, e.name);
+    if (e.isDirectory()) {
+      if (e.name === '_build' || e.name === 'partials') continue;
+      files.push(...await walkAll(p));
+    } else if (e.isFile()) {
+      files.push(p);
+    }
+  }
+  return files;
+}
+
 async function main() {
   await fs.rm(OUT, { recursive: true, force: true });
-  const files = await walk(SITE);
-  for (const src of files) {
+
+  // HTML files: expand includes
+  const htmlFiles = await walk(SITE);
+  for (const src of htmlFiles) {
     const rel = path.relative(SITE, src);
     const dst = path.join(OUT, rel);
     await fs.mkdir(path.dirname(dst), { recursive: true });
@@ -54,14 +71,20 @@ async function main() {
     const expanded = await expand(raw);
     await fs.writeFile(dst, expanded);
   }
-  // Copy non-HTML assets (css/, js/, scripts/, images, _redirects, _headers, robots.txt, sitemap.xml, _stats.json)
-  for (const sub of ['css', 'js', 'scripts']) {
-    await fs.cp(path.join(SITE, sub), path.join(OUT, sub), { recursive: true });
+
+  // Non-HTML assets: copy as-is, excluding meta files not meant for deploy
+  const SKIP_FILES = new Set(['build.mjs', 'README.md', 'hook']);
+  const allFiles = await walkAll(SITE);
+  for (const src of allFiles) {
+    const rel = path.relative(SITE, src);
+    if (rel.endsWith('.html')) continue;  // handled above
+    if (SKIP_FILES.has(rel)) continue;     // top-level meta files
+    const dst = path.join(OUT, rel);
+    await fs.mkdir(path.dirname(dst), { recursive: true });
+    await fs.copyFile(src, dst);
   }
-  for (const f of ['_redirects', '_headers', 'robots.txt', 'sitemap.xml', '_stats.json']) {
-    try { await fs.copyFile(path.join(SITE, f), path.join(OUT, f)); } catch {}
-  }
-  console.log(`Built ${files.length} HTML files to ${OUT}`);
+
+  console.log(`Built ${htmlFiles.length} HTML files + ${allFiles.length - htmlFiles.length - SKIP_FILES.size} assets to ${OUT}`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
