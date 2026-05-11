@@ -13,6 +13,9 @@ clobbering. Requires sudo for the actual filesystem + systemd writes.
 
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+
 
 SYSTEMD_UNIT_TEMPLATE = """\
 [Unit]
@@ -68,3 +71,20 @@ bearers:
     token: "REPLACE-WITH-MINTED-TOKEN"
     rrn: "RRN-XXXXXXXXXX"
 """
+
+
+def already_installed() -> bool:
+    """True when /opt/robot-md-gateway/.venv has the gateway binary AND
+    systemd reports the unit active. Either alone returns False — we want
+    both for confidence."""
+    venv_binary = Path("/opt/robot-md-gateway/.venv/bin/robot-md-gateway")
+    if not venv_binary.exists():
+        return False
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", "robot-md-gateway"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+    return result.returncode == 0 and result.stdout.strip() == "active"

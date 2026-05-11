@@ -1,4 +1,7 @@
+from unittest.mock import patch
+
 from robot_md.install_gateway import (
+    already_installed,
     render_default_bearers,
     render_env_file,
     render_systemd_unit,
@@ -36,3 +39,18 @@ def test_render_default_bearers_yaml_minimal():
     text = render_default_bearers()
     assert "bearers:" in text
     assert "REPLACE-WITH-MINTED-TOKEN" in text
+
+
+def test_already_installed_detection():
+    """venv binary present AND systemctl reports active → True."""
+    with patch("pathlib.Path.exists", return_value=True), \
+         patch("robot_md.install_gateway.subprocess.run") as run_mock:
+        run_mock.return_value.returncode = 0
+        run_mock.return_value.stdout = "active\n"
+        assert already_installed() is True
+
+
+def test_not_installed_when_venv_missing():
+    """venv binary missing → False without invoking systemctl."""
+    with patch("pathlib.Path.exists", return_value=False):
+        assert already_installed() is False
