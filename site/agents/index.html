@@ -2,347 +2,54 @@
 <html lang="en">
 
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Agent Surfaces — ROBOT.md</title>
-  <meta name="description"
-    content="Run ROBOT.md from any AI agent surface. Claude Code, Gemini CLI, OpenAI Codex, ChatGPT, and Amazon Q — one MCP server, every surface.">
-  <meta name="theme-color" content="#F4EFE6">
-
-  <meta property="og:title" content="Agent Surfaces — ROBOT.md">
-  <meta property="og:description"
-    content="Install robot-md-mcp once per surface and talk to your robot from Claude Code, Gemini CLI, Codex, ChatGPT, or Amazon Q.">
-  <meta property="og:url" content="https://robotmd.dev/agents/">
-  <meta property="og:type" content="website">
-  <meta name="twitter:card" content="summary_large_image">
-
-  <link rel="canonical" href="https://robotmd.dev/agents/">
-
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
-    rel="stylesheet">
-
-  <link rel="stylesheet" href="/css/design.css">
-
-  <style>
-    /* ---- surface cards grid (shared with homepage, duplicated here for standalone page) ---- */
-    .surface-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 0;
-      border: 1px solid var(--rule);
-      overflow: hidden;
-      margin-top: 28px;
-    }
-    @media (max-width: 1000px) {
-      .surface-grid { grid-template-columns: repeat(3, 1fr) }
-    }
-    @media (max-width: 600px) {
-      .surface-grid { grid-template-columns: 1fr }
-    }
-
-    .surface-card {
-      padding: 24px 22px;
-      border-right: 1px solid var(--rule);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      background: var(--paper);
-      transition: background .12s;
-    }
-    .surface-card:last-child { border-right: none }
-    .surface-card:hover { background: var(--paper-2) }
-
-    .surface-card .surf-name {
-      font-family: var(--sans);
-      font-weight: 600;
-      font-size: 15px;
-      color: var(--ink);
-      margin: 0;
-    }
-
-    .surface-card .surf-desc {
-      font-size: 13px;
-      color: var(--ink-3);
-      line-height: 1.55;
-      margin: 0;
-    }
-
-    .surface-card .surf-status {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      padding: 2px 7px;
-      border-radius: 2px;
-      width: fit-content;
-    }
-    .surf-status.live    { background: var(--ok);        color: var(--paper) }
-    .surf-status.wip     { background: var(--paper-3);   color: var(--ink-2); border: 1px solid var(--rule) }
-    .surf-status.prerel  { background: var(--accent-wash); color: var(--accent-ink); border: 1px solid var(--accent) }
-
-    .surface-card pre.surf-cmd {
-      margin: 0;
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--accent-ink);
-      background: var(--paper-2);
-      padding: 8px 10px;
-      border-radius: 2px;
-      overflow-x: auto;
-      white-space: pre;
-      border: 1px solid var(--rule);
-      line-height: 1.55;
-    }
-
-    .surface-card .surf-link {
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: .06em;
-      color: var(--accent);
-      border-bottom: none;
-      margin-top: auto;
-    }
-    .surface-card .surf-link:hover { color: var(--accent-ink) }
-
-    @media (max-width: 1000px) {
-      .surface-card:nth-child(3) { border-right: none }
-      .surface-card:nth-child(-n+3) { border-bottom: 1px solid var(--rule) }
-    }
-    @media (max-width: 600px) {
-      .surface-card { border-right: none; border-bottom: 1px solid var(--rule) }
-      .surface-card:last-child { border-bottom: none }
-    }
-
-    /* ---- "Don't see your surface?" block ---- */
-    .request-block {
-      margin-top: 48px;
-      padding: 24px 28px;
-      border: 1px solid var(--rule);
-      background: var(--paper-2);
-      display: flex;
-      gap: 24px;
-      align-items: flex-start;
-      flex-wrap: wrap;
-    }
-    .request-block .req-label {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: .15em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 6px;
-    }
-    .request-block .req-title {
-      font-family: var(--sans);
-      font-weight: 600;
-      font-size: 16px;
-      color: var(--ink);
-      margin: 0 0 8px;
-    }
-    .request-block .req-body {
-      font-size: 14px;
-      color: var(--ink-3);
-      line-height: 1.6;
-      margin: 0;
-    }
-    .request-block .req-cta {
-      font-family: var(--mono);
-      font-size: 12px;
-      letter-spacing: .1em;
-      text-transform: uppercase;
-      padding: 9px 20px;
-      border: 1px solid var(--rule);
-      color: var(--ink);
-      white-space: nowrap;
-      margin-top: 16px;
-      display: inline-block;
-      transition: background .12s, color .12s;
-    }
-    .request-block .req-cta:hover { background: var(--ink); color: var(--paper); border-color: var(--ink) }
-  </style>
+<!--#include partials/head.html-->
 </head>
 
 <body>
 
-  <!-- ===== SITE NAV ===== -->
-  <header class="site-nav" role="banner">
-    <div class="wrap site-nav-inner">
-      <a class="wordmark" href="/" aria-label="ROBOT.md home">
-        ROBOT<span class="dot">.</span><span class="md">md</span>
-      </a>
-      <nav aria-label="Site navigation">
-        <a href="https://docs.robotmd.dev/spec/">Spec</a>
-        <a href="/agents/" class="current" aria-current="page">Agents</a>
-        <a href="https://docs.robotmd.dev/mcp/">MCP</a>
-        <a href="/registry/">Registry</a>
-        <a href="https://docs.robotmd.dev/compliance/">Compliance</a>
-        <a href="/managed-agents/">Managed Agents</a>
-        <a href="/robots">Robots</a>
-        <a href="https://github.com/RobotRegistryFoundation/robot-md" aria-label="GitHub repository">GitHub</a>
-      </nav>
-    </div>
+<!--#include partials/nav.html-->
+
+<main class="wrap">
+  <header class="page-eyebrow">
+    <p class="sec-eyebrow">§ Surfaces</p>
+    <h1>Agent surfaces</h1>
+    <p class="lede">ROBOT.md works with any MCP-aware agent. Five surfaces are tested and shipped.</p>
   </header>
 
-  <!-- ===== PAGE HEADER ===== -->
-  <header class="page-header">
-    <div class="wrap">
-      <div class="page-eyebrow">
-        <span>Agent surfaces</span>
-        <span class="rule-line" aria-hidden="true"></span>
-        <span>5 surfaces · 3 live · 2 pre-release</span>
-      </div>
-      <h1 class="page-heading">
-        Run robot-md from <span style="font-family:var(--serif);font-weight:400;font-style:italic;color:var(--ink-3)">any</span> AI agent surface.
-      </h1>
-      <p class="page-lede">
-        One MCP server — <code style="font-family:var(--mono);font-size:15px;background:var(--paper-2);padding:2px 7px;border-radius:2px;">robot-md-mcp</code> — runs behind every surface.
-        Install once per agent, then ask your robot anything in plain language.
-      </p>
-    </div>
-  </header>
+  <table class="surface-directory" role="presentation">
+    <tbody>
+      <tr>
+        <td><strong>Claude Code</strong></td>
+        <td><code>claude mcp add robot-md</code></td>
+        <td><a href="/agents/claude-code/">Primary →</a></td>
+      </tr>
+      <tr>
+        <td>Gemini CLI</td>
+        <td><code>gemini --mcp robot-md</code></td>
+        <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
+      </tr>
+      <tr>
+        <td>Codex</td>
+        <td><code>codex tools add robot-md</code></td>
+        <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
+      </tr>
+      <tr>
+        <td>ChatGPT Custom GPT</td>
+        <td>Web Browsing + Knowledge file</td>
+        <td><span class="badge">via web</span></td>
+      </tr>
+      <tr>
+        <td>Amazon Q</td>
+        <td><code>q mcp add robot-md</code></td>
+        <td><a href="https://docs.robotmd.dev/mcp/">Docs →</a></td>
+      </tr>
+    </tbody>
+  </table>
+</main>
 
-  <!-- ===== SURFACE CARDS ===== -->
-  <section class="sec" id="surfaces">
-    <div class="wrap">
+<!--#include partials/cta-band.html-->
 
-      <div class="sec-eyebrow">
-        <span>§ 01 — Surfaces</span>
-        <span class="rule-line" aria-hidden="true"></span>
-      </div>
-      <h2 class="sec-title">Five surfaces. One manifest file.</h2>
-      <p class="sec-lede" style="max-width:640px;">
-        Purpose-built for Anthropic surfaces; open to any MCP-aware agent.
-        Each surface page has a full install walkthrough, a capabilities table,
-        and worked examples.
-      </p>
-
-      <div class="surface-grid">
-
-        <!-- Claude Code -->
-        <div class="surface-card">
-          <div class="surf-status live">● Live</div>
-          <p class="surf-name">Claude Code</p>
-          <p class="surf-desc">The primary surface. Native MCP stdio — read capabilities, validate, run compliance commands from any Claude session.</p>
-          <pre class="surf-cmd">pip install robot-md
-robot-md init
-claude</pre>
-          <a class="surf-link" href="/agents/claude-code/">Full guide →</a>
-        </div>
-
-        <!-- Gemini CLI -->
-        <div class="surface-card">
-          <div class="surf-status live">● Live</div>
-          <p class="surf-name">Gemini CLI</p>
-          <p class="surf-desc">Google Gemini CLI via MCP. Add one config line and your robot manifest is readable from every Gemini session.</p>
-          <pre class="surf-cmd">gemini mcp add robot-md \
-  npx -- --yes \
-  robot-md-mcp ./ROBOT.md</pre>
-          <a class="surf-link" href="/agents/gemini/">Full guide →</a>
-        </div>
-
-        <!-- OpenAI Codex -->
-        <div class="surface-card">
-          <div class="surf-status live">● Live</div>
-          <p class="surf-name">OpenAI Codex</p>
-          <p class="surf-desc">Codex CLI via MCP stdio. Requires <code style="font-family:var(--mono);font-size:10.5px;background:rgba(0,0,0,.06);padding:1px 4px;border-radius:2px;">--dangerously-bypass</code> to unlock tool calls in the Codex sandbox.</p>
-          <pre class="surf-cmd">codex --mcp-server \
-  "npx --yes robot-md-mcp \
-  ./ROBOT.md" \
-  --dangerously-bypass</pre>
-          <a class="surf-link" href="/agents/codex/">Full guide →</a>
-        </div>
-
-        <!-- ChatGPT -->
-        <div class="surface-card">
-          <div class="surf-status prerel">○ Pre-release</div>
-          <p class="surf-name">ChatGPT</p>
-          <p class="surf-desc">OpenAPI bridge via <code style="font-family:var(--mono);font-size:10.5px;background:rgba(0,0,0,.06);padding:1px 4px;border-radius:2px;">robot-md-http</code>. Expose your manifest as a Custom GPT Action endpoint.</p>
-          <pre class="surf-cmd">npx -y robot-md-http
-# OpenAPI bridge for
-# Custom GPT Actions</pre>
-          <a class="surf-link" href="/agents/chatgpt/">Full guide →</a>
-        </div>
-
-        <!-- Amazon Q -->
-        <div class="surface-card">
-          <div class="surf-status wip">◌ Pre-release</div>
-          <p class="surf-name">Amazon Q</p>
-          <p class="surf-desc">Q CLI MCP support is currently x86-only. aarch64 (RPi) support is tracked upstream. Falls back to the OpenAPI bridge today.</p>
-          <pre class="surf-cmd"># MCP: pending aarch64
-# Use robot-md-http
-# as fallback today</pre>
-          <a class="surf-link" href="/agents/q/">Full guide →</a>
-        </div>
-
-      </div>
-
-      <!-- Don't see your surface? -->
-      <div class="request-block">
-        <div style="flex:1;min-width:200px;">
-          <div class="req-label">Requests</div>
-          <p class="req-title">Don't see your surface?</p>
-          <p class="req-body">
-            New agent surface adapters are tracked as GitHub issues.
-            If you need robot-md on a surface not listed here — an IDE extension,
-            a custom orchestrator, or a new CLI — open a request and we'll add it
-            to the roadmap.
-          </p>
-          <a class="req-cta"
-             href="https://github.com/RobotRegistryFoundation/robot-md/issues/new?labels=surface-request&title=Surface+request%3A+">
-            Request a surface →
-          </a>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ===== HOW IT WORKS ===== -->
-  <section class="sec" id="how">
-    <div class="wrap">
-      <div class="sec-eyebrow">
-        <span>§ 02 — Architecture</span>
-        <span class="rule-line" aria-hidden="true"></span>
-      </div>
-      <h2 class="sec-title">One server, every surface.</h2>
-      <p style="font-size:15px;color:var(--ink-2);line-height:1.65;max-width:640px;margin-bottom:24px;">
-        Every surface above runs the same <code style="font-family:var(--mono);font-size:13px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">robot-md-mcp</code> stdio server.
-        The server reads your <code style="font-family:var(--mono);font-size:13px;background:var(--paper-2);padding:1px 5px;border-radius:2px;">ROBOT.md</code> at startup and exposes
-        capabilities, safety metadata, and compliance fields as MCP resources and tools.
-        Surface-specific wiring is a one-line config change per agent — the manifest file
-        and the MCP server stay identical.
-      </p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;">
-        <a href="https://docs.robotmd.dev/mcp/"
-           style="font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:9px 20px;background:var(--ink);color:var(--paper);border:1px solid var(--ink);border-bottom:1px solid var(--ink);transition:background .12s;">
-          MCP server docs →
-        </a>
-        <a href="https://docs.robotmd.dev/spec/"
-           style="font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;padding:9px 20px;border:1px solid var(--rule);color:var(--ink);border-bottom:1px solid var(--rule);transition:background .12s,color .12s;">
-          ROBOT.md spec →
-        </a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== FOOTER ===== -->
-  <footer class="wrap foot">
-    <div>ROBOT.md · © 2026 Craig Merry · <a href="https://www.craigmerry.com">craigmerry.com</a></div>
-    <div>
-      <a href="/">Home</a> ·
-      <a href="https://docs.robotmd.dev/spec/">Spec</a> ·
-      <a href="/registry/">Registry</a> ·
-      <a href="https://docs.robotmd.dev/compliance/">Compliance</a> ·
-      <a href="/robots">Robots</a> ·
-      <a href="/status">Status</a> ·
-      <a href="/report.html">Report issue</a> ·
-      <a href="https://github.com/RobotRegistryFoundation/robot-md">GitHub</a>
-    </div>
-  </footer>
+<!--#include partials/footer.html-->
 
 </body>
-
 </html>

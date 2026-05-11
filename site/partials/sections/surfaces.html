@@ -1,0 +1,65 @@
+  <section class="sec" id="surfaces">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ 02 — Surface map</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">One file. Every surface.</h2>
+      <p class="sec-lede">
+        Purpose-built for Anthropic, open to any MCP-aware agent.
+        Install once per surface, then ask in plain English.
+      </p>
+
+      <div class="surface-grid" style="margin-top: 28px;">
+
+        <div class="surface-card">
+          <div class="surf-status live">● Live</div>
+          <div class="surf-name">Claude Code</div>
+          <pre class="surf-cmd">pip install robot-md
+robot-md init
+claude</pre>
+          <a class="surf-link" href="/agents/claude-code/">Full install guide →</a>
+        </div>
+
+        <div class="surface-card">
+          <div class="surf-status live">● Live</div>
+          <div class="surf-name">Gemini CLI</div>
+          <pre class="surf-cmd">gemini mcp add robot-md \
+  npx -- --yes robot-md-mcp \
+  ./ROBOT.md</pre>
+          <a class="surf-link" href="/agents/gemini/">Full install guide →</a>
+        </div>
+
+        <div class="surface-card">
+          <div class="surf-status live">● Live</div>
+          <div class="surf-name">OpenAI Codex</div>
+          <pre class="surf-cmd">codex mcp add robot-md \
+  -- npx --yes \
+  robot-md-mcp ./ROBOT.md</pre>
+          <a class="surf-link" href="/agents/codex/">Full install guide →</a>
+        </div>
+
+        <div class="surface-card">
+          <div class="surf-status wip">○ Pre-release</div>
+          <div class="surf-name">ChatGPT</div>
+          <pre class="surf-cmd">npx -y robot-md-http
+# OpenAPI bridge for
+# Custom GPT Actions</pre>
+          <a class="surf-link" href="/agents/chatgpt/">Full install guide →</a>
+        </div>
+
+        <div class="surface-card">
+          <div class="surf-status wip">◌ Pre-release</div>
+          <div class="surf-name">Amazon Q</div>
+          <pre class="surf-cmd"># MCP: pending aarch64
+# robot-md-http bridge
+# available today</pre>
+          <a class="surf-link" href="/agents/q/">Full install guide →</a>
+        </div>
+
+      </div>
+
+    </div>
+  </section>

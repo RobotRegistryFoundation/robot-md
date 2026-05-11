@@ -1,0 +1,36 @@
+/*
+ * ROBOT.md design tokens — single source of truth.
+ * Mirrored into robot-md-docs/docs/stylesheets/tokens.css.
+ * Drift is gated by robot-md-docs/.github/workflows/token-drift.yml.
+ */
+:root {
+  /* PALETTE */
+  --paper:        #F4EFE6;
+  --paper-2:      #ECE5D6;
+  --paper-3:      #DFD5BF;
+  --ink:          #111110;
+  --ink-2:        #2A2825;
+  --ink-3:        #5A574F;
+  --ink-4:        #8A8578;
+  --rule:         #1D1C1A;
+  --accent:       #B34A2A;
+  --accent-ink:   #5A1F0E;
+  --accent-wash:  #EBD9C9;
+  --ok:           #2F6B3E;
+  --danger:       #9B2D20;
+
+  /* TYPE */
+  --sans:  'Inter Tight', system-ui, -apple-system, Helvetica, Arial, sans-serif;
+  --mono:  'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --serif: 'Fraunces', Georgia, serif;
+
+  /* SCALE */
+  --maxw: 1240px;
+  --space-1: 4px;  --space-2: 8px;  --space-3: 16px;
+  --space-4: 24px; --space-5: 32px; --space-6: 48px;
+  --space-7: 64px; --space-8: 96px;
+  --radius-sm: 4px; --radius: 8px; --radius-lg: 12px;
+
+  /* MOTION */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+}

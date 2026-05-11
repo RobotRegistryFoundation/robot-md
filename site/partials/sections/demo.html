@@ -1,0 +1,85 @@
+  <section class="sec" id="demo">
+    <div class="wrap">
+
+      <div class="sec-eyebrow">
+        <span>§ 01 — The closed loop</span>
+        <span class="rule-line" aria-hidden="true"></span>
+      </div>
+
+      <h2 class="sec-title">ROBOT.md → MCP → Claude Code → robot moves.</h2>
+      <p class="sec-lede">
+        The full loop — manifest declaration to physical action — in one
+        conversation. No axis conventions to learn.
+      </p>
+
+      <div class="demo-grid" style="margin-top: 32px;">
+
+        <!-- Left: terminal walkthrough -->
+        <div class="demo-terminal" aria-label="Demo terminal showing robot-md init flow">
+          <div class="demo-terminal-head">
+            <div class="bulbs" aria-hidden="true"><i></i><i></i><i></i></div>
+            <span class="label">~/bob · robot-md · MCP session</span>
+          </div>
+          <div class="demo-terminal-body">
+            <div class="dt-line prompt"><span class="p">$</span><span class="cmd">pip install robot-md &amp;&amp; robot-md init</span></div>
+            <div class="dt-line out">  <span class="ok">✓</span> <span class="k">ROBOT.md</span> + <span class="k">CLAUDE.md</span> written — preset <span class="v">so-arm101</span></div>
+            <div class="dt-line out">  <span class="ok">✓</span> registered — <span class="v">RRN-<span data-stat="example-rrn">000000000003</span></span></div>
+            <div class="dt-line out">  <span class="ok">✓</span> calibrated — zero pose recorded via IK<br></div>
+
+            <div class="dt-line prompt"><span class="p">$</span><span class="cmd">claude</span></div>
+            <div class="dt-line out">  <span class="ok">✓</span> <span class="v">robot-md-mcp</span> connected · 6 resources · 3 tools loaded<br></div>
+
+            <div class="dt-line user"><span class="speaker">You:</span>pick the red lego and place it in the bowl</div>
+            <div class="dt-line agent"><span class="speaker">Claude:</span>Scanning workspace… found <span class="v">red 2×4 lego</span> at (0.31, −0.12, 0.04)</div>
+            <div class="dt-line out">  <span class="mute">→</span> IK solved · executing pick …</div>
+            <div class="dt-line banner">  ✓ placed in bowl<span class="dt-cursor" aria-hidden="true"></span></div>
+          </div>
+        </div>
+
+        <!-- Right: video / screencast placeholder -->
+        <figure class="demo-media" aria-label="Video demo placeholder — bob arm picking">
+          <!-- VIDEO PLACEHOLDER
+               Replace this <figure> with:
+                 <video autoplay muted loop playsinline poster="demo-bob.jpg">
+                   <source src="demo-bob.webm" type="video/webm">
+                 </video>
+               OR embed an asciinema player (update CSP frame-src).
+               See open question #3 in docs/superpowers/notes/2026-05-01-site-ia-review.md
+          -->
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"/>
+            <polygon points="10 8 16 12 10 16 10 8"/>
+          </svg>
+          <div class="caption">30-second screencast placeholder<br>bob arm · pick and place</div>
+        </figure>
+
+      </div>
+
+      <!-- Closed-loop flow diagram -->
+      <div class="loop-flow" aria-label="Closed-loop flow: ROBOT.md to robot action" role="list">
+        <div class="loop-step" role="listitem">
+          <div class="n">Step 1</div>
+          <div class="name">ROBOT.md</div>
+          <div class="detail">YAML frontmatter + prose body declares what the robot is and what it can safely do</div>
+        </div>
+        <div class="loop-step" role="listitem">
+          <div class="n">Step 2</div>
+          <div class="name">robot-md-mcp</div>
+          <div class="detail">MCP server exposes 6 resources + 3 tools to any connected agent</div>
+        </div>
+        <div class="loop-step" role="listitem">
+          <div class="n">Step 3</div>
+          <div class="name">Claude Code</div>
+          <div class="detail">Reads manifest, reasons over capabilities and safety gates, plans the action</div>
+        </div>
+        <div class="loop-step" role="listitem">
+          <div class="n">Step 4</div>
+          <div class="name">Robot moves</div>
+          <div class="detail">Driver executes; E-stop and HiTL gates enforced per §8 AUTHORIZE before servo bus</div>
+        </div>
+      </div>
+
+      <a class="cta-arrow" href="/cookbook/">30-sec walkthrough →</a>
+
+    </div>
+  </section>

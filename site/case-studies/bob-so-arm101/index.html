@@ -192,6 +192,31 @@
       color: var(--ink-2);
     }
     .gap-callout strong { color: var(--accent-ink) }
+
+    /* ============================================================
+       Case-study deepen blocks — hardware spec + lessons
+       ============================================================ */
+    .hw-spec {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      gap: 8px 24px;
+      margin: 16px 0;
+      max-width: 560px;
+    }
+    .hw-spec dt {
+      font-family: var(--mono);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--ink-3);
+      padding-top: 2px;
+    }
+    .hw-spec dd { margin: 0 }
+    .lessons {
+      margin: 16px 0;
+      padding-left: 20px;
+    }
+    .lessons li { margin: 12px 0; max-width: 70ch }
   </style>
 </head>
 
@@ -241,6 +266,17 @@
   <!-- ===== CASE STUDY BODY ===== -->
   <main>
     <div class="wrap case-body">
+
+      <!-- HARDWARE -->
+      <section id="hardware">
+        <h2>Hardware</h2>
+        <dl class="hw-spec">
+          <dt>Compute</dt><dd>Raspberry Pi 5 (8 GB)</dd>
+          <dt>Vision</dt><dd>OAK-D (Luxonis)</dd>
+          <dt>Arm</dt><dd>SO-ARM101 (5-DOF, FeeTech servo bus)</dd>
+          <dt>Registry ID</dt><dd><code>RRN-000000000002</code></dd>
+        </dl>
+      </section>
 
       <!-- PROBLEM -->
       <section id="problem">
@@ -381,6 +417,29 @@ curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/run-b
         </p>
       </section>
 
+      <!-- WHAT BROKE -->
+      <section id="lessons">
+        <h2>What broke and what we learned</h2>
+        <ul class="lessons">
+          <li>
+            <strong>Wrist flex stalled at high angle.</strong> The SO-ARM101 wrist motor
+            brown-outs near maximum flex. Cap the IK solver at 0.85× joint limit to avoid
+            stall-and-fault cycles.
+          </li>
+          <li>
+            <strong>OAK-D factory extrinsic didn't fit the mount.</strong> The shipped
+            extrinsic calibration doesn't account for non-standard mounting orientations.
+            Recalibrate per camera mount; don't reuse the factory file for wall or
+            off-axis installations.
+          </li>
+          <li>
+            <strong>feetech-servo-sdk 1.0.0 <code>PacketHandler()</code> factory is broken.</strong>
+            Bypass it. All servo call sites use <code>scservo_sdk.sms_sts(ph)</code>
+            directly instead of going through the <code>feetech-servo-sdk</code> factory.
+          </li>
+        </ul>
+      </section>
+
       <!-- REPRODUCIBILITY -->
       <section id="reproducibility">
         <h2>Reproducibility</h2>
@@ -406,7 +465,7 @@ curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/run-b
           </li>
           <li>
             Pre-sign INVOKE envelopes with your operator key (see
-            <a href="/spec/">spec</a> for envelope canonicalization rules).
+            <a href="https://docs.robotmd.dev/spec/">spec</a> for envelope canonicalization rules).
           </li>
           <li>
             Dispatch envelopes through the gateway; collect outcome telemetry; build cert +
