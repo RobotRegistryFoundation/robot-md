@@ -70,7 +70,7 @@
       border-radius: 2px;
     }
 
-    /* Beat headings */
+    /* Step headings (CSS class names .beat-* preserved; only user-visible labels say "Step") */
     .beat-num {
       font-family: var(--mono);
       font-size: 12px;
@@ -159,7 +159,7 @@
 
   <main>
 
-    <!-- BEAT 1: HERO -->
+    <!-- STEP1: HERO -->
     <section class="ck-hero">
       <div class="wrap">
         <p class="ck-eta">≈ 10 min</p>
@@ -173,10 +173,10 @@
       </div>
     </section>
 
-    <!-- BEAT 2: INSTALL -->
+    <!-- STEP2: INSTALL -->
     <section id="install">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 02 — Install</p>
+        <p class="beat-num">Step 02 — Install</p>
         <h2 class="beat-h">Two installs and you're wired.</h2>
 
         <p>Recommended: install the Claude Code plugin, which bundles the CLI, the MCP bridge, and the gateway.</p>
@@ -197,10 +197,10 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
       </div>
     </section>
 
-    <!-- BEAT 3: AUTHOR -->
+    <!-- STEP3: AUTHOR -->
     <section id="author">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 03 — Author</p>
+        <p class="beat-num">Step 03 — Author</p>
         <h2 class="beat-h">One command, one manifest.</h2>
 
         <p>Generate a starter <code>ROBOT.md</code> from bare init:</p>
@@ -223,10 +223,10 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
       </div>
     </section>
 
-    <!-- BEAT 4: TALK TO CLAUDE -->
+    <!-- STEP4: TALK TO CLAUDE -->
     <section id="talk-to-claude">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 04 — Talk to Claude</p>
+        <p class="beat-num">Step 04 — Talk to Claude</p>
         <h2 class="beat-h">Open Claude Code and ask.</h2>
 
         <p>
@@ -247,10 +247,10 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
       </div>
     </section>
 
-    <!-- BEAT 5: REGISTER -->
+    <!-- STEP5: REGISTER -->
     <section id="register">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 05 — Register</p>
+        <p class="beat-num">Step 05 — Register</p>
         <h2 class="beat-h">Mint an RRN.</h2>
 
         <p>
@@ -263,15 +263,15 @@ claude mcp add robot-md npx -y robot-md-mcp ./ROBOT.md</pre>
 
         <p>
           You'll see your robot live at <code>https://robotregistryfoundation.org/r/&lt;RRN&gt;</code>. The RRN is
-          the public identifier the audit bundle (beat 7) cryptographically binds to.
+          the public identifier the audit bundle (step 7) cryptographically binds to.
         </p>
       </div>
     </section>
 
-    <!-- BEAT 6: DISCOVER -->
+    <!-- STEP6: DISCOVER -->
     <section id="discover">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 06 — Discover</p>
+        <p class="beat-num">Step 06 — Discover</p>
         <h2 class="beat-h">Find a driver from the public catalog.</h2>
 
         <p>
@@ -297,7 +297,7 @@ robot-md actuator search "feetech bus servo"</pre>
         <p>
           The catalog is mirrored from RRF's <code>/v2/packages</code> every 10 minutes — fresh entries
           appear there shortly after the publisher mints. If your search returns nothing, the catalog is
-          still small as the ecosystem bootstraps; see beat 7 to verify what <em>is</em> there.
+          still small as the ecosystem bootstraps; see step 7 to verify what <em>is</em> there.
         </p>
 
         <aside class="gap-callout">
@@ -310,10 +310,10 @@ robot-md actuator search "feetech bus servo"</pre>
       </div>
     </section>
 
-    <!-- BEAT 7: VERIFY -->
+    <!-- STEP7: VERIFY -->
     <section id="verify">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 07 — Verify</p>
+        <p class="beat-num">Step 07 — Verify</p>
         <h2 class="beat-h">Regulator-grade catalog evidence.</h2>
 
         <p>
@@ -354,10 +354,10 @@ robot-md actuator search "feetech bus servo"</pre>
       </div>
     </section>
 
-    <!-- BEAT 8: CASE-STUDIES BRIDGE -->
+    <!-- STEP8: CASE-STUDIES BRIDGE -->
     <section id="case-studies-bridge">
       <div class="wrap beat-body">
-        <p class="beat-num">Beat 08 — See it in the wild</p>
+        <p class="beat-num">Step 08 — See it in the wild</p>
         <h2 class="beat-h">Case studies live separately.</h2>
 
         <p>
