@@ -9,6 +9,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.10.0] - 2026-05-11
+
+### Added
+- `robot-md trial` subcommand family for capturing pick-and-place trial evidence:
+  - `trial start --property <name>` writes `~/.robot-md/trials/<id>/start.json` with cold-install wall-clock anchor.
+  - `trial iteration --trial <id> --capture-pre` records perceive + joint state via the gateway.
+  - `trial iteration --trial <id> --capture-post-and-verdict` computes the verdict (centroid ∈ bowl bbox AND |depth_delta| ≤ 80mm).
+  - `trial iteration --trial <id> --reset-confirmed` stamps operator reset confirmation.
+  - `trial abort --trial <id>` aborts a trial; further iterations are refused.
+  - `trial finalize --trial <id>` rolls 10 iterations into `evidence.json` with the 10-min cold-install wall-clock verdict block.
+- Skill `using-robot-md` gains a "Pick-place trial protocol" section guiding the agent through `oak-d perceive` + `so-arm101 move` sequencing.
+
+### Notes
+- Trial commands assume the gateway is reachable at `ROBOT_MD_GATEWAY_URL` (default `http://127.0.0.1:8080`) with `ROBOT_MD_GATEWAY_BEARER`. Phase E (#69) tracks the envelope-shape gap before Bob runs the physical trial.
+
+---
+
 ## [1.5.1] - 2026-05-01
 
 ### Notes
