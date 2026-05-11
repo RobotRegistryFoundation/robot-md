@@ -1775,6 +1775,26 @@ def install_skill_cmd(
         out_console.print(f"[green]✓[/green] installed {p}")
 
 
+@app.command("install-gateway")
+def install_gateway_cmd(
+    manifest: Path = typer.Option(
+        Path("/etc/robot-md-gateway/ROBOT.md"),
+        "--manifest", "-m",
+        help="Path to the ROBOT.md the gateway will enforce against.",
+    ),
+    yes: bool = typer.Option(
+        False, "--yes", "-y",
+        help="Skip the sudo confirmation prompt.",
+    ),
+) -> None:
+    """Scaffold the robot-md-gateway systemd service on a fresh host (sudo)."""
+    from robot_md.install_gateway import install_gateway as _install_gateway
+
+    rc = _install_gateway(manifest_path=str(manifest), yes=yes)
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
 @app.command()
 def invoke(
     manifest: Path = typer.Argument(..., help="Path to ROBOT.md being actuated against."),
