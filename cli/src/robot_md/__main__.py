@@ -351,6 +351,13 @@ def register(
     firmware_version: str | None = typer.Option(None, "--firmware-version"),
     rcan_version: str | None = typer.Option(None, "--rcan-version"),
     dry_run: bool = typer.Option(False, "--dry-run", help="Sign + print body, don't POST."),
+    export_to: Path | None = typer.Option(
+        None,
+        "--export-to",
+        help="Also write the minted <rrn>.signing.json and <rrn>.apikey to this "
+        "directory (in addition to ~/.robot-md/keys/). Lets a subagent harness "
+        "with an isolated HOME persist credentials before teardown.",
+    ),
 ) -> None:
     """Mint an RRN on Robot Registry Foundation with signed POST (RCAN 3.0).
 
@@ -370,6 +377,7 @@ def register(
         firmware_version=firmware_version,
         rcan_version=rcan_version,
         dry_run=dry_run,
+        export_to=export_to,
     )
     if rc != 0:
         raise typer.Exit(code=rc)

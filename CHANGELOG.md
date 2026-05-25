@@ -9,6 +9,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
+## [1.10.5] - 2026-05-25
+
+### Added
+
+- **`register --export-to <path>`.** Writes copies of the minted
+  `<rrn>.signing.json` and `<rrn>.apikey` to a caller-supplied directory
+  in addition to `~/.robot-md/keys/`. Lets a subagent harness with an
+  isolated `HOME` persist credentials to the caller's filesystem before
+  teardown — the structural fix for the silent operator/RRF drift caught
+  during Spec B Phase E orientation (closes #79).
+
+  Files preserve their canonical names (`<rrn>.signing.json`,
+  `<rrn>.apikey`) so the natural restore path is `cp <export-dir>/* ~/.robot-md/keys/`.
+  Atomic write + mode 0o600, matching the in-place writers.
+
+  Fails loud (exit 4) if the export write fails after the RRF mint
+  succeeded: prints a recovery message naming the minted RRN and the
+  HOME path. Silently swallowing the failure would re-introduce the
+  drift bug. With `--dry-run`, surfaces a warning and skips the export
+  (nothing was minted).
+
+---
+
 ## [1.10.4] - 2026-05-11
 
 ### Fixed
