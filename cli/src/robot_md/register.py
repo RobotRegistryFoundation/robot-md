@@ -587,8 +587,7 @@ def cli_register(
 
     if dry_run and export_to is not None:
         print(
-            "warning: --export-to has no effect under --dry-run "
-            "(no credentials will be minted).",
+            "warning: --export-to has no effect under --dry-run (no credentials will be minted).",
             file=sys.stderr,
         )
 
