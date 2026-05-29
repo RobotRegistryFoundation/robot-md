@@ -501,3 +501,82 @@ def test_invoke_command_operator_key_requires_kid(tmp_path, monkeypatch):
         ],
     )
     assert res.exit_code != 0
+
+
+# --------------------------------------------------- sign-manifest (Slice 1)
+
+_MANIFEST = (
+    "---\nmetadata:\n  robot_name: bob\n  manufacturer: acme\n  model: so-arm101\n"
+    "  rrn: RRN-000000000011\nmanifest_spec_version: '1.0'\n---\n# robot\n\nbody.\n"
+)
+
+
+def test_sign_manifest_operator_key_mode(tmp_path):
+    from robot_md.manifest_sig import verify_manifest_text
+
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(_MANIFEST)
+    op_priv = _write_operator_pem(tmp_path / "op.pem")
+    res = runner.invoke(
+        app,
+        [
+            "sign-manifest", str(manifest),
+            "--operator-key", str(tmp_path / "op.pem"),
+            "--kid", "bob-operator-2026",
+        ],
+    )
+    assert res.exit_code == 0, res.output
+    ok, kid = verify_manifest_text(manifest.read_text(), op_priv.public_key())
+    assert ok
+    assert kid == "bob-operator-2026"
+
+
+def test_sign_manifest_self_signs_with_robot_keystore(tmp_path, monkeypatch):
+    """No --operator-key: self-sign with the robot's keystore key, advertising
+    the robot's pq_kid (the kid `robot-md register` binds as the operator
+    authority)."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+    from robot_md.manifest_sig import verify_manifest_text
+    from robot_md.signing import generate_keypair, save_keypair
+
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(_MANIFEST)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    kp = generate_keypair()
+    save_keypair("RRN-000000000011", kp)
+
+    res = runner.invoke(app, ["sign-manifest", str(manifest)])
+    assert res.exit_code == 0, res.output
+    # Footer verifies against the robot's Ed25519 key and advertises its pq_kid.
+    robot_pub = Ed25519PublicKey.from_public_bytes(kp.ed25519_pub)
+    ok, kid = verify_manifest_text(manifest.read_text(), robot_pub)
+    assert ok
+    assert kid == kp.pq_kid
+
+
+def test_sign_manifest_self_sign_no_keystore_errors(tmp_path, monkeypatch):
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(_MANIFEST)
+    monkeypatch.setenv("HOME", str(tmp_path))  # empty keystore
+    res = runner.invoke(app, ["sign-manifest", str(manifest)])
+    assert res.exit_code != 0
+
+
+def test_sign_manifest_out_flag_leaves_source_untouched(tmp_path):
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(_MANIFEST)
+    _write_operator_pem(tmp_path / "op.pem")
+    out = tmp_path / "signed.md"
+    res = runner.invoke(
+        app,
+        [
+            "sign-manifest", str(manifest),
+            "--operator-key", str(tmp_path / "op.pem"),
+            "--kid", "k",
+            "--out", str(out),
+        ],
+    )
+    assert res.exit_code == 0, res.output
+    assert "ROBOT-MD-SIG" in out.read_text()
+    assert "ROBOT-MD-SIG" not in manifest.read_text()
