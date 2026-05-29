@@ -347,3 +347,157 @@ def test_invoke_command_emits_signed_envelope_against_mock(tmp_path, monkeypatch
         assert "envelope_signature" in _MockHandler.last_envelope
     finally:
         httpd.shutdown()
+
+
+# --------------------------------------------------- operator-key signing (Slice 1)
+
+
+def _write_operator_pem(path, priv=None):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    priv = priv or Ed25519PrivateKey.generate()
+    path.write_bytes(
+        priv.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    return priv
+
+
+def test_build_envelope_includes_actuator_name_when_set():
+    env = build_envelope(
+        ruri="rcan://x/s", tool_name="t", tool_args={}, manifest_path="/p",
+        actuator_name="so-arm101",
+    )
+    assert env["actuator_name"] == "so-arm101"
+
+
+def test_build_envelope_omits_actuator_name_when_none():
+    env = build_envelope(ruri="rcan://x/s", tool_name="t", tool_args={}, manifest_path="/p")
+    assert "actuator_name" not in env
+
+
+def test_sign_envelope_with_ed25519_verifies():
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+
+    from robot_md.invoke import sign_envelope_with_ed25519
+
+    priv = ed25519.Ed25519PrivateKey.generate()
+    env = build_envelope(
+        ruri="rcan://x/s", tool_name="read_state", tool_args={}, manifest_path="/p",
+        actuator_name="so-arm101",
+    )
+    signed = sign_envelope_with_ed25519(env, priv, kid="bob-operator-2026")
+    assert signed["envelope_signature"]["kid"] == "bob-operator-2026"
+    pre = canonical_json(signed, exclude="envelope_signature")
+    priv.public_key().verify(base64.b64decode(signed["envelope_signature"]["sig"]), pre)
+
+
+def test_load_operator_ed25519_roundtrips(tmp_path):
+    from robot_md.invoke import load_operator_ed25519
+
+    priv = _write_operator_pem(tmp_path / "op.pem")
+    loaded = load_operator_ed25519(tmp_path / "op.pem")
+    assert (
+        loaded.public_key().public_bytes_raw()
+        == priv.public_key().public_bytes_raw()
+    )
+
+
+def test_load_operator_ed25519_rejects_non_ed25519(tmp_path):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    from robot_md.invoke import load_operator_ed25519
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem = tmp_path / "ec.pem"
+    pem.write_bytes(
+        key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+    )
+    with pytest.raises(ValueError, match="Ed25519"):
+        load_operator_ed25519(pem)
+
+
+def test_invoke_command_operator_key_signs_with_operator_and_autofills_ruri(tmp_path, monkeypatch):
+    """`robot-md invoke --operator-key --kid` signs with the operator key (not a
+    robot keystore), advertises the operator kid, sets actuator_name, and
+    auto-constructs ruri when the manifest omits it."""
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(
+        "---\n"
+        "metadata:\n"
+        "  robot_name: bob-spec-b-pick-place\n"
+        "  manufacturer: bob-spec-b-pick-place\n"
+        "  model: so-arm101\n"
+        "  rrn: RRN-000000000011\n"
+        "manifest_spec_version: '1.0'\n"
+        "---\n# robot\n"
+    )
+    bearers = tmp_path / "bearers.yaml"
+    bearers.write_text("- token: tok-actuate\n  tier: actuate\n  caller: cli-test\n")
+    op_priv = _write_operator_pem(tmp_path / "operator.pem")
+    monkeypatch.setenv("HOME", str(tmp_path))  # no stray robot keystore
+
+    _MockHandler.last_envelope = None
+    httpd, _ = _start_mock_gateway()
+    try:
+        port = httpd.server_address[1]
+        res = runner.invoke(
+            app,
+            [
+                "invoke", str(manifest),
+                "--tool", "read_state",
+                "--scope", "READ",
+                "--actuator", "so-arm101",
+                "--operator-key", str(tmp_path / "operator.pem"),
+                "--kid", "bob-operator-2026",
+                "--gateway", f"http://127.0.0.1:{port}",
+                "--bearer-from-bearers", str(bearers),
+            ],
+        )
+        assert res.exit_code == 0, res.output
+        env = _MockHandler.last_envelope
+        assert env is not None
+        assert env["actuator_name"] == "so-arm101"
+        # ruri auto-filled from manufacturer/model/robot_name
+        assert env["ruri"] == (
+            "rcan://robotregistryfoundation.org/bob-spec-b-pick-place"
+            "/so-arm101/bob-spec-b-pick-place"
+        )
+        # advertised kid is the operator kid, and the sig verifies against the operator key
+        assert env["envelope_signature"]["kid"] == "bob-operator-2026"
+        pre = canonical_json(env, exclude="envelope_signature")
+        op_priv.public_key().verify(
+            base64.b64decode(env["envelope_signature"]["sig"]), pre
+        )
+    finally:
+        httpd.shutdown()
+
+
+def test_invoke_command_operator_key_requires_kid(tmp_path, monkeypatch):
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(
+        "---\nmetadata:\n  robot_name: r\n  manufacturer: m\n  model: x\n"
+        "  rrn: RRN-000000000011\nmanifest_spec_version: '1.0'\n---\n# r\n"
+    )
+    _write_operator_pem(tmp_path / "op.pem")
+    monkeypatch.setenv("HOME", str(tmp_path))
+    res = runner.invoke(
+        app,
+        [
+            "invoke", str(manifest),
+            "--tool", "read_state",
+            "--operator-key", str(tmp_path / "op.pem"),
+            "--bearer", "tok",
+            "--gateway", "http://127.0.0.1:1",
+        ],
+    )
+    assert res.exit_code != 0
