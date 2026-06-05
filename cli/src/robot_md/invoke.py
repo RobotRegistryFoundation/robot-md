@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import secrets
 import time
 import urllib.error
@@ -25,7 +26,7 @@ import yaml
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from rcan.audit_bundle import canonical_json
 
-from robot_md.signing import SigningKeypair
+from robot_md.signing import SigningKeypair, load_keypair
 
 
 def build_envelope(
@@ -134,6 +135,88 @@ def invoke_envelope(
     except urllib.error.HTTPError as e:
         body_text = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"gateway returned {e.code}: {body_text}") from e
+
+
+def rrn_from_ruri(ruri: str) -> str:
+    """Extract the RRN-* prefix from an rcan://RRN-.../... URI."""
+    if not ruri.startswith("rcan://"):
+        raise RuntimeError(f"ROBOT_MD_RURI must start with rcan:// — got {ruri!r}")
+    rest = ruri[len("rcan://") :]
+    rrn = rest.split("/", 1)[0]
+    if not rrn.startswith("RRN-"):
+        raise RuntimeError(f"ROBOT_MD_RURI host must be an RRN-* identifier — got {rrn!r}")
+    return rrn
+
+
+def gateway_invoke(actuator: str, tool: str, args: dict, *, scope: str | None = None) -> dict:
+    """Build, sign, and POST a full RCAN InvokeEnvelope to the gateway.
+
+    The single client used by `trial`, `commission`, `teach`, and
+    `calibrate-vision` to route hardware ops through the gateway (audited,
+    RCAN-signed, e-stoppable) rather than touching the serial bus directly.
+
+    Required env vars (set once by the operator):
+
+        ROBOT_MD_RURI           e.g. rcan://RRN-000000000002/skill
+        ROBOT_MD_SCOPE          default scope when `scope` arg is None
+                                ("read" if unset)
+        ROBOT_MD_MANIFEST_PATH  absolute path to the signed ROBOT.md the gateway
+                                verifies against
+        ROBOT_MD_GATEWAY_URL    default http://127.0.0.1:8080
+        ROBOT_MD_GATEWAY_BEARER bearer token for the required tier
+
+    Args:
+        actuator: multi-actuator routing name (e.g. "so-arm101", "oak-d").
+        tool: tool_name the actuator dispatches (move/read_state/perceive/
+              commission_probe/raw_tick_move/set_torque/paced_move/...).
+        args: tool_args dict.
+        scope: RCAN scope override; falls back to ROBOT_MD_SCOPE, then "read".
+               Commission/teach/calibrate motion pass scope="actuate" (or the
+               COMMISSION scope once the gateway supports it).
+
+    Envelope shape matches `robot_md_gateway.receiver.InvokeEnvelope` plus
+    `nonce`/`timestamp_ms`. Signed Ed25519 with the operator keypair at
+    `~/.robot-md/keys/<rrn>.signing.json` (the kid is the operator's pq_kid;
+    the gateway resolves it via RRFResolver and verifies before dispatch).
+    """
+    ruri = os.environ.get("ROBOT_MD_RURI")
+    if not ruri:
+        raise RuntimeError(
+            "ROBOT_MD_RURI is required to invoke the gateway. Set it to this "
+            "robot's rcan:// RRN registration URI."
+        )
+    manifest_path = os.environ.get("ROBOT_MD_MANIFEST_PATH")
+    if not manifest_path:
+        raise RuntimeError(
+            "ROBOT_MD_MANIFEST_PATH is required. Set it to the absolute path of "
+            "the signed ROBOT.md the gateway should verify against."
+        )
+    if scope is None:
+        scope = os.environ.get("ROBOT_MD_SCOPE", "read")
+
+    rrn = rrn_from_ruri(ruri)
+    keypair = load_keypair(rrn)
+    if keypair is None:
+        raise RuntimeError(
+            f"no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — "
+            "run `robot-md register` first."
+        )
+
+    envelope = build_envelope(
+        ruri=ruri,
+        tool_name=tool,
+        tool_args=args,
+        manifest_path=manifest_path,
+        scope=scope,
+    )
+    # Multi-actuator routing field (gateway >= 0.5.0a3). Added pre-signing so
+    # it's covered by the signature.
+    envelope["actuator_name"] = actuator
+    envelope = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
+
+    gateway_url = os.environ.get("ROBOT_MD_GATEWAY_URL", "http://127.0.0.1:8080")
+    bearer = os.environ.get("ROBOT_MD_GATEWAY_BEARER", "")
+    return invoke_envelope(envelope=envelope, gateway_url=gateway_url, bearer=bearer)
 
 
 def fetch_last_audit_entry(

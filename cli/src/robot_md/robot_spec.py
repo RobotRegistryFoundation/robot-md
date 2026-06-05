@@ -65,6 +65,31 @@ class SolverCamera:
 
 
 @dataclass(frozen=True)
+class VisionMapRef:
+    """Typed view of physics.solver.vision_map — the teach-free pixel/xyz→joint map
+    reference written by `robot-md calibrate-vision`. Heavy coeffs live at `path`."""
+    path: str
+    kind: str  # "arc" | "pixel" | "xyz"
+    source_camera: str | None = None
+    n_samples: int | None = None
+    fit_rms_rad: dict | None = None
+    loo_worst_rad: float | None = None
+    fitted_at: str | None = None
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "VisionMapRef":
+        return cls(
+            path=d.get("path", ""),
+            kind=d.get("kind", "arc"),
+            source_camera=d.get("source_camera"),
+            n_samples=d.get("n_samples"),
+            fit_rms_rad=d.get("fit_rms_rad"),
+            loo_worst_rad=d.get("loo_worst_rad"),
+            fitted_at=d.get("fitted_at"),
+        )
+
+
+@dataclass(frozen=True)
 class PoseDef:
     joints: dict[str, int]
     description: str | None
@@ -136,6 +161,7 @@ class PhysicsBlock:
     cameras: tuple[SolverCamera, ...]
     poses: dict[str, PoseDef]
     workspace: Workspace | None
+    vision_map: VisionMapRef | None = None
 
 
 @dataclass(frozen=True)
@@ -331,6 +357,11 @@ class RobotSpec:
                 cameras=cams,
                 poses=poses,
                 workspace=workspace,
+                vision_map=(
+                    VisionMapRef.from_dict(solver["vision_map"])
+                    if isinstance(solver.get("vision_map"), dict)
+                    else None
+                ),
             ),
             drivers=tuple(drivers),
             safety=SafetyBlock(
