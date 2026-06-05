@@ -4,13 +4,16 @@ Designed to be the first thing an operator runs when something is broken. No
 side-effects: doctor never writes files, never modifies servo state, never
 hits the registry's mutating endpoints.
 
-Checks fall into five buckets:
+Checks fall into these buckets:
 
   1. Install     — CLI installed, Python version, required deps importable.
   2. Manifest    — ROBOT.md in cwd (or --path) parses + validates against schema.
   3. Network     — RRF registry reachable; if --path has `rrn`, entry exists.
   4. Drivers     — each declared driver probed (serial port readable, host reachable).
-  5. Keystore    — ~/.robot-md/keys/ permissions + counts.
+  5. Calibration — extrinsic provenance (warn on preset-default).
+  6. Commission  — passive reality-check of declared joint travel (gripper close<open,
+                   endpoints commissioned vs preset_default). NO motion.
+  7. Keystore    — ~/.robot-md/keys/ permissions + counts.
 
 Output: a rich Table. Exit code 0 if all checks pass or only warn, 1 on any fail
 (unless --strict, which also exits 1 on warn).
@@ -356,7 +359,90 @@ def check_calibration(fm: dict | None) -> list[CheckResult]:
     return out
 
 
-# ----------------------------------------------------------------- 6. keystore
+# ------------------------------------------------------------- 6. commission
+
+
+def check_joint_ranges(fm: dict | None) -> list[CheckResult]:
+    """§ 7: Commission — passive reality-check of declared joint travel (NO motion).
+
+    Neither `validate` (schema) nor the rest of `doctor` (drivers respond) checks that the
+    declared tick ranges actually move the hardware the right way. This surfaces, with zero
+    motion, the two gaps that `robot-md commission` exists to close:
+
+      * the silent gripper bug — `close_steps >= open_steps`, i.e. "close" is not a narrower
+        (lower) tick than "open", so the jaws may never shut;
+      * joints whose endpoints were never reality-checked (`preset_default` / missing
+        `min_steps`/`max_steps`).
+    """
+    out: list[CheckResult] = []
+    if fm is None:
+        return out
+    physics = fm.get("physics") or {}
+
+    # Gripper: "close" must be a NARROWER (lower) tick than "open".
+    gripper = (physics.get("solver") or {}).get("gripper") or {}
+    open_steps, close_steps = gripper.get("open_steps"), gripper.get("close_steps")
+    if open_steps is not None and close_steps is not None:
+        if close_steps >= open_steps:
+            out.append(
+                _warn(
+                    "gripper travel",
+                    "commission",
+                    f"close_steps {close_steps} >= open_steps {open_steps} — 'close' not "
+                    f"narrower than 'open'; jaws won't shut — run `robot-md commission --write`.",
+                )
+            )
+        else:
+            out.append(
+                _pass("gripper travel", "commission", f"close {close_steps} < open {open_steps}")
+            )
+
+    # Per-joint endpoints: commissioned vs preset_default / missing, and inverted/degenerate.
+    kinematics = physics.get("kinematics") or []
+    if kinematics:
+        uncommissioned = []
+        inverted = []
+        for entry in kinematics:
+            jid = entry.get("id", "?")
+            lo, hi = entry.get("min_steps"), entry.get("max_steps")
+            has_endpoints = lo is not None and hi is not None
+            if has_endpoints:
+                # min_steps >= max_steps (or non-numeric) is invalid travel; the actuator
+                # silently skips it to default, so surface it here.
+                try:
+                    if float(lo) >= float(hi):
+                        inverted.append(jid)
+                except (TypeError, ValueError):
+                    inverted.append(jid)
+            if not has_endpoints or entry.get("endpoint_source") in (None, "preset_default"):
+                uncommissioned.append(jid)
+        if inverted:
+            out.append(
+                _warn(
+                    "joint endpoints inverted",
+                    "commission",
+                    f"{len(inverted)} joint(s) have min_steps >= max_steps "
+                    f"({', '.join(inverted)}) — invalid travel; re-run `robot-md commission`.",
+                )
+            )
+        if uncommissioned:
+            out.append(
+                _warn(
+                    "joint endpoints",
+                    "commission",
+                    f"{len(uncommissioned)} joint(s) not reality-checked "
+                    f"({', '.join(uncommissioned)}) — run `robot-md commission` for true travel.",
+                )
+            )
+        elif not inverted:
+            out.append(
+                _pass("joint endpoints", "commission", f"all {len(kinematics)} joints commissioned")
+            )
+
+    return out
+
+
+# ----------------------------------------------------------------- 7. keystore
 
 
 def check_keystore() -> list[CheckResult]:
@@ -412,6 +498,7 @@ def run_all(path: Path | None = None) -> list[CheckResult]:
     results.extend(check_network(fm))
     results.extend(check_drivers(fm))
     results.extend(check_calibration(fm))
+    results.extend(check_joint_ranges(fm))
     results.extend(check_keystore())
     return results
 

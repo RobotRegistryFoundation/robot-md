@@ -1433,9 +1433,11 @@ def doctor(
 ) -> None:
     """Diagnose the local environment + manifest.
 
-    Runs five buckets of checks: install (CLI + deps), manifest (parse + schema),
+    Runs buckets of checks: install (CLI + deps), manifest (parse + schema),
     network (registry reachable + RRN resolvable), drivers (serial/TCP probe per
-    declared driver), and keystore (API key file permissions).
+    declared driver), calibration (extrinsic provenance), commission (passive
+    joint-travel reality-check: gripper close<open + commissioned endpoints), and
+    keystore (API key file permissions).
 
     Never writes files, never mutates servos, never hits registry write
     endpoints. Safe to run anywhere, anytime.
