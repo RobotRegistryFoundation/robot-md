@@ -2376,6 +2376,12 @@ def commission(
         "--no-deploy",
         help="With --write: sign the working copy but skip the gateway deploy.",
     ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Skip the clear-workspace confirmation before probing motion (for automation).",
+    ),
 ) -> None:
     """Reality-check declared joint travel by probing the hardware through the gateway.
 
@@ -2383,11 +2389,14 @@ def commission(
     commission-tier bearer), restoring each joint after every probe. Set ROBOT_MD_RURI,
     ROBOT_MD_GATEWAY_BEARER, and the operator signing env (ROBOT_MD_OPERATOR_KEY_PATH +
     ROBOT_MD_OPERATOR_KID) first. --write also re-signs + deploys the manifest (cutover).
+    Probing sweeps each joint through ~its full declared range — clear the workspace and
+    keep a hand on the e-stop; the command confirms before any motion unless --yes.
     """
     from robot_md.commission import cli_commission
 
     rc = cli_commission(
-        str(path), self_test=self_test, write=write, dry_run=dry_run, no_deploy=no_deploy
+        str(path), self_test=self_test, write=write, dry_run=dry_run,
+        no_deploy=no_deploy, yes=yes,
     )
     if rc != 0:
         raise typer.Exit(code=rc)

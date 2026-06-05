@@ -175,7 +175,9 @@ def rrn_from_ruri(ruri: str) -> str:
     return rrn
 
 
-def gateway_invoke(actuator: str, tool: str, args: dict, *, scope: str | None = None) -> dict:
+def gateway_invoke(
+    actuator: str, tool: str, args: dict, *, scope: str | None = None, timeout: float = 10.0
+) -> dict:
     """Build, sign, and POST a full RCAN InvokeEnvelope to the gateway.
 
     The single client used by `trial`, `commission`, `teach`, and
@@ -241,6 +243,13 @@ def gateway_invoke(actuator: str, tool: str, args: dict, *, scope: str | None = 
     # (~/.robot-md/keys/<rrn>.signing.json, kid = pq_kid).
     op_key_path = os.environ.get("ROBOT_MD_OPERATOR_KEY_PATH")
     op_kid = os.environ.get("ROBOT_MD_OPERATOR_KID")
+    # Fail loud on a half-set operator identity — silently falling back to the robot pq_kid
+    # (which RRF doesn't resolve) would surface only as a cryptic downstream 403.
+    if bool(op_key_path) != bool(op_kid):
+        raise RuntimeError(
+            "partial operator-key config: set BOTH ROBOT_MD_OPERATOR_KEY_PATH and "
+            "ROBOT_MD_OPERATOR_KID, or neither."
+        )
     if op_key_path and op_kid:
         envelope = sign_envelope_with_pem(envelope, key_path=op_key_path, kid=op_kid)
     else:
@@ -255,7 +264,9 @@ def gateway_invoke(actuator: str, tool: str, args: dict, *, scope: str | None = 
 
     gateway_url = os.environ.get("ROBOT_MD_GATEWAY_URL", "http://127.0.0.1:8080")
     bearer = os.environ.get("ROBOT_MD_GATEWAY_BEARER", "")
-    return invoke_envelope(envelope=envelope, gateway_url=gateway_url, bearer=bearer)
+    return invoke_envelope(
+        envelope=envelope, gateway_url=gateway_url, bearer=bearer, timeout=timeout
+    )
 
 
 def fetch_last_audit_entry(

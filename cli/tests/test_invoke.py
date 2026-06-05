@@ -361,6 +361,19 @@ def test_gateway_invoke_falls_back_to_robot_keypair_when_operator_env_unset(tmp_
         httpd.shutdown()
 
 
+def test_gateway_invoke_partial_operator_env_raises(monkeypatch):
+    """Setting exactly one of the operator-key env vars must fail loud, not silently fall
+    back to the robot pq_kid (which RRF doesn't resolve -> cryptic downstream 403)."""
+    monkeypatch.setenv("ROBOT_MD_RURI", "rcan://RRN-000000000002/skill")
+    monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", "/x/ROBOT.md")
+    monkeypatch.setenv("ROBOT_MD_OPERATOR_KEY_PATH", "/some/operator.pem")
+    monkeypatch.delenv("ROBOT_MD_OPERATOR_KID", raising=False)
+    from robot_md.invoke import gateway_invoke
+
+    with pytest.raises(RuntimeError, match="partial operator-key config"):
+        gateway_invoke("so-arm101", "read_state", {}, scope="read")
+
+
 def test_invoke_command_help_shows_required_args():
     res = runner.invoke(
         app,

@@ -87,6 +87,13 @@ def _operator_key_from_env() -> tuple[ed25519.Ed25519PrivateKey, str] | None:
     """
     key_path = os.environ.get("ROBOT_MD_OPERATOR_KEY_PATH")
     kid = os.environ.get("ROBOT_MD_OPERATOR_KID")
+    # Fail loud on a half-set identity — signing the footer with the robot pq_kid (which RRF
+    # doesn't resolve) would only surface as a 403 on the NEXT gateway op, cause decoupled.
+    if bool(key_path) != bool(kid):
+        raise RuntimeError(
+            "partial operator-key config: set BOTH ROBOT_MD_OPERATOR_KEY_PATH and "
+            "ROBOT_MD_OPERATOR_KID, or neither."
+        )
     if not (key_path and kid):
         return None
     from cryptography.hazmat.primitives import serialization

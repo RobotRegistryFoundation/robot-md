@@ -2,13 +2,14 @@
 robot-md-gateway verifier accepts. Hardware-free."""
 from __future__ import annotations
 
+import pytest
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from robot_md import provenance, signing
-
 # The actual gateway verifier — the contract we must satisfy.
 from robot_md_gateway.manifest_provenance import verify_manifest
+
+from robot_md import provenance, signing
 
 SAMPLE = """---
 rcan_version: "1.0"
@@ -106,11 +107,8 @@ def test_missing_keypair_raises(tmp_path, monkeypatch):
     monkeypatch.setattr(provenance, "load_keypair", lambda rrn: None)
     working = tmp_path / "ROBOT.md"
     working.write_text(SAMPLE)
-    try:
+    with pytest.raises(RuntimeError, match="no signing keypair"):
         provenance.resign_and_deploy(working, rrn="RRN-x")
-        assert False, "expected RuntimeError"
-    except RuntimeError as e:
-        assert "no signing keypair" in str(e)
 
 
 def _operator_pem(tmp_path):
@@ -170,3 +168,13 @@ def test_resign_and_deploy_uses_operator_key_from_env(tmp_path, monkeypatch):
     assert verify_manifest(working, resolver=resolver).accepted
     assert verify_manifest(gateway, resolver=resolver).accepted
     assert working.read_text() == gateway.read_text()
+
+
+def test_resign_partial_operator_env_raises(tmp_path, monkeypatch):
+    """Half-set operator env -> fail loud, not silent footer-sign with the robot pq_kid."""
+    monkeypatch.setenv("ROBOT_MD_OPERATOR_KID", "bob-operator-2026")
+    monkeypatch.delenv("ROBOT_MD_OPERATOR_KEY_PATH", raising=False)
+    working = tmp_path / "ROBOT.md"
+    working.write_text(SAMPLE)
+    with pytest.raises(RuntimeError, match="partial operator-key config"):
+        provenance.resign_and_deploy(working, rrn="RRN-x", deploy=False)
