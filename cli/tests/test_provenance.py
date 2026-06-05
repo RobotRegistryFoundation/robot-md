@@ -101,6 +101,8 @@ def test_resign_no_deploy(tmp_path, monkeypatch):
 
 
 def test_missing_keypair_raises(tmp_path, monkeypatch):
+    monkeypatch.delenv("ROBOT_MD_OPERATOR_KEY_PATH", raising=False)
+    monkeypatch.delenv("ROBOT_MD_OPERATOR_KID", raising=False)
     monkeypatch.setattr(provenance, "load_keypair", lambda rrn: None)
     working = tmp_path / "ROBOT.md"
     working.write_text(SAMPLE)
@@ -109,3 +111,62 @@ def test_missing_keypair_raises(tmp_path, monkeypatch):
         assert False, "expected RuntimeError"
     except RuntimeError as e:
         assert "no signing keypair" in str(e)
+
+
+def _operator_pem(tmp_path):
+    """Generate an Ed25519 operator key: returns (pem_path, raw_pub_bytes)."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    priv = Ed25519PrivateKey.generate()
+    pem = priv.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    p = tmp_path / "operator.priv.pem"
+    p.write_bytes(pem)
+    raw_pub = priv.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
+    return p, raw_pub
+
+
+def test_footer_signed_with_operator_pem_verifies_against_gateway(tmp_path):
+    """sign_manifest_footer must accept a raw operator Ed25519 key + explicit kid and
+    sign the SAME core bytes — the footer must verify against the real gateway verifier."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    key_path, raw_pub = _operator_pem(tmp_path)
+    from cryptography.hazmat.primitives import serialization as _ser
+
+    priv = _ser.load_pem_private_key(key_path.read_bytes(), password=None)
+    assert isinstance(priv, Ed25519PrivateKey)
+    signed = provenance.sign_manifest_footer(SAMPLE, priv_key=priv, kid="bob-operator-2026")
+    p = tmp_path / "ROBOT.md"
+    p.write_text(signed)
+    res = verify_manifest(p, resolver=_StubResolver("bob-operator-2026", raw_pub))
+    assert res.accepted, res.reason
+    assert res.kid == "bob-operator-2026"
+
+
+def test_resign_and_deploy_uses_operator_key_from_env(tmp_path, monkeypatch):
+    """When ROBOT_MD_OPERATOR_KEY_PATH/KID are set, resign_and_deploy footer-signs with
+    that operator key/kid (the RRF-registered identity) and does NOT need a robot keypair."""
+    key_path, raw_pub = _operator_pem(tmp_path)
+    # The robot keypair is absent — the operator path must not fall back to it.
+    monkeypatch.setattr(provenance, "load_keypair", lambda rrn: None)
+    monkeypatch.setenv("ROBOT_MD_OPERATOR_KEY_PATH", str(key_path))
+    monkeypatch.setenv("ROBOT_MD_OPERATOR_KID", "bob-operator-2026")
+    working = tmp_path / "ROBOT.md"
+    working.write_text(SAMPLE)
+    gateway = tmp_path / "etc" / "ROBOT.md"
+    gateway.parent.mkdir(parents=True)
+    gateway.write_text("old enforced manifest\n")
+
+    res = provenance.resign_and_deploy(working, rrn="RRN-000000000011", deploy_path=gateway)
+    assert res["signed"] and res["deployed"]
+    assert res["kid"] == "bob-operator-2026"
+    resolver = _StubResolver("bob-operator-2026", raw_pub)
+    assert verify_manifest(working, resolver=resolver).accepted
+    assert verify_manifest(gateway, resolver=resolver).accepted
+    assert working.read_text() == gateway.read_text()

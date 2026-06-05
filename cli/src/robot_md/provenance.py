@@ -46,17 +46,56 @@ def strip_footer(text: str) -> str:
     return core.rstrip("\n")
 
 
-def sign_manifest_footer(text: str, keypair, *, kid: str | None = None) -> str:
+def sign_manifest_footer(
+    text: str,
+    keypair=None,
+    *,
+    kid: str | None = None,
+    priv_key: ed25519.Ed25519PrivateKey | None = None,
+) -> str:
     """Re-sign `text` (a manifest, with or without an existing footer) and return the
-    full signed document. `kid` defaults to the keypair's pq_kid, which RRF resolves
-    to the matching Ed25519 public-key PEM (same kid the envelope signer advertises)."""
-    if kid is None:
-        kid = keypair.pq_kid
+    full signed document.
+
+    Two signing identities, ONE core-byte computation (the part the verifier pins):
+      * `priv_key` — a raw Ed25519 private key (the registered OPERATOR key); `kid`
+        is required and advertised verbatim. Used when RRF resolves an operator kid
+        rather than the robot's own pq_kid.
+      * `keypair` — a SigningKeypair (the robot keypair); `kid` defaults to its pq_kid.
+    """
     core = strip_footer(text)
-    sec = ed25519.Ed25519PrivateKey.from_private_bytes(keypair.ed25519_sec)
+    if priv_key is not None:
+        if kid is None:
+            raise ValueError("sign_manifest_footer: kid is required when signing with priv_key")
+        sec = priv_key
+    else:
+        if keypair is None:
+            raise ValueError("sign_manifest_footer: pass a keypair or a priv_key")
+        if kid is None:
+            kid = keypair.pq_kid
+        sec = ed25519.Ed25519PrivateKey.from_private_bytes(keypair.ed25519_sec)
     sig = sec.sign(core.encode("utf-8"))
     sig_b64 = base64.b64encode(sig).decode()
     return f"{core}\n<!-- ROBOT-MD-SIG kid={kid} sig={sig_b64} -->\n"
+
+
+def _operator_key_from_env() -> tuple[ed25519.Ed25519PrivateKey, str] | None:
+    """Load (priv_key, kid) from ROBOT_MD_OPERATOR_KEY_PATH + ROBOT_MD_OPERATOR_KID.
+
+    Returns None when either is unset — the caller then uses the robot keypair. RRF
+    /v2/keys is keyed by operator kids, so on robots whose registered signer is the
+    operator (not the robot), this is the footer-signing identity the gateway resolves.
+    """
+    key_path = os.environ.get("ROBOT_MD_OPERATOR_KEY_PATH")
+    kid = os.environ.get("ROBOT_MD_OPERATOR_KID")
+    if not (key_path and kid):
+        return None
+    from cryptography.hazmat.primitives import serialization
+
+    with open(key_path, "rb") as fh:
+        priv = serialization.load_pem_private_key(fh.read(), password=None)
+    if not isinstance(priv, ed25519.Ed25519PrivateKey):
+        raise RuntimeError(f"ROBOT_MD_OPERATOR_KEY_PATH {key_path!r} is not an Ed25519 private key")
+    return priv, kid
 
 
 def resign_and_deploy(
@@ -83,24 +122,32 @@ def resign_and_deploy(
     manifest_path = Path(manifest_path)
     text = manifest_path.read_text()
 
-    if rrn is None:
-        ruri = os.environ.get("ROBOT_MD_RURI")
-        if not ruri:
+    op = _operator_key_from_env()
+    if op is not None:
+        priv, kid_used = op
+        signed = sign_manifest_footer(text, priv_key=priv, kid=kid_used)
+    else:
+        if rrn is None:
+            ruri = os.environ.get("ROBOT_MD_RURI")
+            if not ruri:
+                raise RuntimeError(
+                    "resign_and_deploy needs an identity: pass rrn= or set ROBOT_MD_RURI, "
+                    "or set ROBOT_MD_OPERATOR_KEY_PATH + ROBOT_MD_OPERATOR_KID."
+                )
+            rrn = rrn_from_ruri(ruri)
+        keypair = load_keypair(rrn)
+        if keypair is None:
             raise RuntimeError(
-                "resign_and_deploy needs an identity: pass rrn= or set ROBOT_MD_RURI."
+                f"no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — run "
+                "`robot-md register` first, or set ROBOT_MD_OPERATOR_KEY_PATH + "
+                "ROBOT_MD_OPERATOR_KID to sign with a registered operator key."
             )
-        rrn = rrn_from_ruri(ruri)
-    keypair = load_keypair(rrn)
-    if keypair is None:
-        raise RuntimeError(
-            f"no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — "
-            "run `robot-md register` first."
-        )
+        signed = sign_manifest_footer(text, keypair)
+        kid_used = keypair.pq_kid
 
-    signed = sign_manifest_footer(text, keypair)
     manifest_path.write_text(signed)
 
-    result = {"signed": True, "kid": keypair.pq_kid, "deployed": False,
+    result = {"signed": True, "kid": kid_used, "deployed": False,
               "deploy_path": None, "backup": None}
     if not deploy:
         return result

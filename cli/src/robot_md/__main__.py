@@ -2352,6 +2352,48 @@ def publish_discovery(
 
 
 @app.command()
+def commission(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    self_test: bool = typer.Option(
+        False,
+        "--self-test",
+        help="Probe each joint toward its declared min & max via the gateway "
+        "(scope=COMMISSION), classify reach/stall, restore after each. No write.",
+    ),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Run --self-test, then write commissioned endpoints + gripper floor back to "
+        "the manifest, re-sign, deploy to the gateway, and run doctor.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Plan the probes (joints, targets, directions) without touching hardware.",
+    ),
+    no_deploy: bool = typer.Option(
+        False,
+        "--no-deploy",
+        help="With --write: sign the working copy but skip the gateway deploy.",
+    ),
+) -> None:
+    """Reality-check declared joint travel by probing the hardware through the gateway.
+
+    Routes commission_probe / raw_tick_move through robot-md-gateway (scope=COMMISSION,
+    commission-tier bearer), restoring each joint after every probe. Set ROBOT_MD_RURI,
+    ROBOT_MD_GATEWAY_BEARER, and the operator signing env (ROBOT_MD_OPERATOR_KEY_PATH +
+    ROBOT_MD_OPERATOR_KID) first. --write also re-signs + deploys the manifest (cutover).
+    """
+    from robot_md.commission import cli_commission
+
+    rc = cli_commission(
+        str(path), self_test=self_test, write=write, dry_run=dry_run, no_deploy=no_deploy
+    )
+    if rc != 0:
+        raise typer.Exit(code=rc)
+
+
+@app.command()
 def calibrate(
     path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
     zero: bool = typer.Option(
