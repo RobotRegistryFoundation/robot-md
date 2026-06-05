@@ -108,12 +108,12 @@
               "min_steps": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "Commissioned encoder reading at this joint's true physical/mechanical minimum, discovered by `robot-md commission --write` (the reality-check loop). Anchors the rad↔tick map to measured travel instead of an assumed zero."
+                "description": "Commissioned LOWER tick bound of this joint's true travel, discovered by `robot-md commission --write` (the reality-check loop). CONTRACT: min_steps < max_steps NUMERICALLY (the lower of the two tick readings). `encoder_sign` carries orientation — with +1 this lower bound sits at min_rad, with -1 (reversed servo) it sits at max_rad. The rad↔tick resolver REQUIRES min_steps < max_steps and silently skips a joint to its shipped default if violated, so `commission --write` MUST emit the numerically-lower reading here (not 'the tick at the min_rad end')."
               },
               "max_steps": {
                 "type": "integer",
                 "minimum": 0,
-                "description": "Commissioned encoder reading at this joint's true physical/mechanical maximum, discovered by `robot-md commission --write`."
+                "description": "Commissioned UPPER tick bound (numerically > min_steps), discovered by `robot-md commission --write`. See min_steps for the encoder_sign correspondence and the min<max requirement."
               },
               "endpoint_source": {
                 "type": ["string", "null"],
