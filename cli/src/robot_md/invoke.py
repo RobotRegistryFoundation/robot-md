@@ -83,6 +83,33 @@ def sign_envelope(
     return out
 
 
+def sign_envelope_with_pem(envelope: dict[str, Any], *, key_path: str, kid: str) -> dict[str, Any]:
+    """Sign an envelope with an Ed25519 private-key PEM file, advertising `kid`.
+
+    Same pre-image as `sign_envelope` (`canonical_json(env, exclude="envelope_signature")`,
+    cert/envelope.py:57) but loads a raw operator key from disk rather than a
+    `SigningKeypair`. Used when `ROBOT_MD_OPERATOR_KEY_PATH`/`ROBOT_MD_OPERATOR_KID`
+    select an operator identity that RRF `/v2/keys` actually resolves (the robot's own
+    `pq_kid` is not registered there — RRF is keyed by operator kids).
+    """
+    from cryptography.hazmat.primitives import serialization
+
+    with open(key_path, "rb") as fh:
+        priv = serialization.load_pem_private_key(fh.read(), password=None)
+    if not isinstance(priv, ed25519.Ed25519PrivateKey):
+        raise RuntimeError(
+            f"ROBOT_MD_OPERATOR_KEY_PATH {key_path!r} is not an Ed25519 private key"
+        )
+    out = dict(envelope)
+    out["envelope_signature"] = {"kid": kid, "sig": ""}
+    pre = canonical_json(out, exclude="envelope_signature")
+    out["envelope_signature"] = {
+        "kid": kid,
+        "sig": base64.b64encode(priv.sign(pre)).decode(),
+    }
+    return out
+
+
 def load_bearer_for_tier(yaml_path: Path, tier: str) -> str:
     """Load the first bearer token matching `tier` from a gateway bearers.yaml.
 
@@ -195,12 +222,6 @@ def gateway_invoke(actuator: str, tool: str, args: dict, *, scope: str | None = 
         scope = os.environ.get("ROBOT_MD_SCOPE", "read")
 
     rrn = rrn_from_ruri(ruri)
-    keypair = load_keypair(rrn)
-    if keypair is None:
-        raise RuntimeError(
-            f"no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — "
-            "run `robot-md register` first."
-        )
 
     envelope = build_envelope(
         ruri=ruri,
@@ -212,7 +233,25 @@ def gateway_invoke(actuator: str, tool: str, args: dict, *, scope: str | None = 
     # Multi-actuator routing field (gateway >= 0.5.0a3). Added pre-signing so
     # it's covered by the signature.
     envelope["actuator_name"] = actuator
-    envelope = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
+
+    # Signing identity. RRF `/v2/keys` is keyed by OPERATOR kids, not the robot's own
+    # `pq_kid` — so deployments where the operator (not the robot) is the registered
+    # signer set ROBOT_MD_OPERATOR_KEY_PATH + ROBOT_MD_OPERATOR_KID to sign with the
+    # operator's Ed25519 key. Absent both, fall back to the robot keypair convention
+    # (~/.robot-md/keys/<rrn>.signing.json, kid = pq_kid).
+    op_key_path = os.environ.get("ROBOT_MD_OPERATOR_KEY_PATH")
+    op_kid = os.environ.get("ROBOT_MD_OPERATOR_KID")
+    if op_key_path and op_kid:
+        envelope = sign_envelope_with_pem(envelope, key_path=op_key_path, kid=op_kid)
+    else:
+        keypair = load_keypair(rrn)
+        if keypair is None:
+            raise RuntimeError(
+                f"no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — run "
+                "`robot-md register` first, or set ROBOT_MD_OPERATOR_KEY_PATH + "
+                "ROBOT_MD_OPERATOR_KID to sign with a registered operator key."
+            )
+        envelope = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
 
     gateway_url = os.environ.get("ROBOT_MD_GATEWAY_URL", "http://127.0.0.1:8080")
     bearer = os.environ.get("ROBOT_MD_GATEWAY_BEARER", "")

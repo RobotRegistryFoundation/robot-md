@@ -281,6 +281,86 @@ def test_invoke_envelope_raises_on_4xx():
         httpd.shutdown()
 
 
+def test_gateway_invoke_signs_operator_kid_when_env_set(tmp_path, monkeypatch):
+    """On Bob the RRF registers OPERATOR kids, not the robot's pq_kid. gateway_invoke
+    must sign with a configured operator key/kid (ROBOT_MD_OPERATOR_KEY_PATH/KID) and
+    NOT require a ~/.robot-md/keys/<rrn>.signing.json robot keypair at all."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    priv = Ed25519PrivateKey.generate()
+    pem = priv.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    key_path = tmp_path / "operator.priv.pem"
+    key_path.write_bytes(pem)
+
+    _MockHandler.last_envelope = None
+    httpd, _ = _start_mock_gateway()
+    try:
+        port = httpd.server_address[1]
+        # HOME points at an empty dir → there is NO robot keypair; the operator path
+        # must not fall back to load_keypair().
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("ROBOT_MD_RURI", "rcan://RRN-000000000002/skill")
+        monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", "/etc/robot-md-gateway/ROBOT.md")
+        monkeypatch.setenv("ROBOT_MD_GATEWAY_URL", f"http://127.0.0.1:{port}")
+        monkeypatch.setenv("ROBOT_MD_GATEWAY_BEARER", "tok-commission")
+        monkeypatch.setenv("ROBOT_MD_OPERATOR_KEY_PATH", str(key_path))
+        monkeypatch.setenv("ROBOT_MD_OPERATOR_KID", "bob-operator-2026")
+
+        from robot_md.invoke import gateway_invoke
+
+        gateway_invoke(
+            "so-arm101", "commission_probe", {"joint_id": "gripper"}, scope="COMMISSION"
+        )
+
+        env = _MockHandler.last_envelope
+        assert env is not None
+        assert env["envelope_signature"]["kid"] == "bob-operator-2026"
+        assert env["actuator_name"] == "so-arm101"
+        assert env["scope"] == "COMMISSION"
+        # Signature verifies against the operator pubkey over the exclude pre-image.
+        pub = priv.public_key()
+        sig = base64.b64decode(env["envelope_signature"]["sig"])
+        pre = canonical_json(env, exclude="envelope_signature")
+        pub.verify(sig, pre)  # raises InvalidSignature on mismatch
+    finally:
+        httpd.shutdown()
+
+
+def test_gateway_invoke_falls_back_to_robot_keypair_when_operator_env_unset(tmp_path, monkeypatch):
+    """Without the operator env, the existing behavior (sign with the robot keypair's
+    pq_kid from ~/.robot-md/keys/<rrn>.signing.json) is preserved."""
+    from robot_md.signing import generate_keypair, save_keypair
+
+    _MockHandler.last_envelope = None
+    httpd, _ = _start_mock_gateway()
+    try:
+        port = httpd.server_address[1]
+        monkeypatch.setenv("HOME", str(tmp_path))
+        kp = generate_keypair()
+        save_keypair("RRN-000000000002", kp)
+        monkeypatch.setenv("ROBOT_MD_RURI", "rcan://RRN-000000000002/skill")
+        monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", "/x/ROBOT.md")
+        monkeypatch.setenv("ROBOT_MD_GATEWAY_URL", f"http://127.0.0.1:{port}")
+        monkeypatch.setenv("ROBOT_MD_GATEWAY_BEARER", "tok")
+        monkeypatch.delenv("ROBOT_MD_OPERATOR_KEY_PATH", raising=False)
+        monkeypatch.delenv("ROBOT_MD_OPERATOR_KID", raising=False)
+
+        from robot_md.invoke import gateway_invoke
+
+        gateway_invoke("so-arm101", "read_state", {}, scope="read")
+
+        env = _MockHandler.last_envelope
+        assert env is not None
+        assert env["envelope_signature"]["kid"] == kp.pq_kid
+    finally:
+        httpd.shutdown()
+
+
 def test_invoke_command_help_shows_required_args():
     res = runner.invoke(
         app,
