@@ -13,6 +13,7 @@ Hardware truth (proven live on Bob 2026-06-05):
     (the grasp-stall tick on a held object, ~1200) — which an empty commission must
     PRESERVE, never overwrite.
 """
+
 from __future__ import annotations
 
 import json
@@ -103,11 +104,16 @@ def probe_targets(fm: dict) -> list[dict]:
             close_s, open_s = gripper_solver.get("close_steps"), gripper_solver.get("open_steps")
             if close_s is None or open_s is None:
                 continue
-            out.append({
-                "joint_id": jid, "motor_id": motor_id,
-                "target_min": int(close_s), "target_max": int(open_s), "is_gripper": True,
-                "start_fallback": int(zero) if zero is not None else None,
-            })
+            out.append(
+                {
+                    "joint_id": jid,
+                    "motor_id": motor_id,
+                    "target_min": int(close_s),
+                    "target_max": int(open_s),
+                    "is_gripper": True,
+                    "start_fallback": int(zero) if zero is not None else None,
+                }
+            )
             continue
         bounds = _JOINT_RAD_BOUNDS.get(jid)
         if bounds is None or zero is None:
@@ -115,11 +121,16 @@ def probe_targets(fm: dict) -> list[dict]:
         min_rad, max_rad = bounds
         tmin = max(0, min(4095, round(zero + min_rad * _TICKS_PER_RAD)))
         tmax = max(0, min(4095, round(zero + max_rad * _TICKS_PER_RAD)))
-        out.append({
-            "joint_id": jid, "motor_id": motor_id,
-            "target_min": tmin, "target_max": tmax, "is_gripper": False,
-            "start_fallback": int(zero),
-        })
+        out.append(
+            {
+                "joint_id": jid,
+                "motor_id": motor_id,
+                "target_min": tmin,
+                "target_max": tmax,
+                "is_gripper": False,
+                "start_fallback": int(zero),
+            }
+        )
     return out
 
 
@@ -128,8 +139,12 @@ def _probe(motor_id: int, joint_id: str, direction: int, target_ticks: int) -> d
     resp = gateway_invoke(
         ACTUATOR,
         "commission_probe",
-        {"joint_id": joint_id, "motor_id": motor_id, "direction": direction,
-         "target_ticks": int(target_ticks)},
+        {
+            "joint_id": joint_id,
+            "motor_id": motor_id,
+            "direction": direction,
+            "target_ticks": int(target_ticks),
+        },
         scope="COMMISSION",
         timeout=_PROBE_TIMEOUT_S,
     )
@@ -140,8 +155,11 @@ def _restore(motor_id: int, start_tick: int) -> None:
     """Gateway-mediated raw_tick_move back to start — commission_probe leaves the joint
     at the stall, so this is MANDATORY after every probe."""
     gateway_invoke(
-        ACTUATOR, "raw_tick_move", {"motor_id": motor_id, "ticks": int(start_tick)},
-        scope="COMMISSION", timeout=_PROBE_TIMEOUT_S,
+        ACTUATOR,
+        "raw_tick_move",
+        {"motor_id": motor_id, "ticks": int(start_tick)},
+        scope="COMMISSION",
+        timeout=_PROBE_TIMEOUT_S,
     )
 
 
@@ -177,14 +195,23 @@ def probe_joint(plan: dict) -> dict:
     # would silently revert the joint to its shipped preset — a no-op commission. FAIL it so
     # cli_commission's any_fail gate blocks --write BEFORE resign/deploy.
     if min_present is not None and max_present is not None and min_present == max_present:
-        checks.append(CheckResult(
-            f"commission {jid}", "commission", "fail",
-            f"degenerate travel: min and max probes both ended at {min_present} — equal "
-            "endpoints can't be commissioned (resolver requires min<max). Re-probe / check joint.",
-        ))
+        checks.append(
+            CheckResult(
+                f"commission {jid}",
+                "commission",
+                "fail",
+                f"degenerate travel: min and max probes both ended at {min_present} — equal "
+                "endpoints can't be commissioned (resolver requires min<max). "
+                "Re-probe / check joint.",
+            )
+        )
     return {
-        "joint_id": jid, "is_gripper": plan["is_gripper"], "checks": checks,
-        "min_present": min_present, "max_present": max_present, "min_aborted": min_aborted,
+        "joint_id": jid,
+        "is_gripper": plan["is_gripper"],
+        "checks": checks,
+        "min_present": min_present,
+        "max_present": max_present,
+        "min_aborted": min_aborted,
     }
 
 
@@ -214,7 +241,7 @@ def write_commissioned_to_manifest(
     if end < 0:
         raise RuntimeError(f"{path}: missing closing '---' frontmatter marker")
     fm_text = text[3:end].lstrip("\n")
-    body_text = text[end + 4:]
+    body_text = text[end + 4 :]
 
     yaml = YAML()
     yaml.preserve_quotes = True
@@ -272,7 +299,7 @@ def _endpoints_from_probes(probed: list[dict], fm: dict) -> tuple[dict, dict]:
         joint_endpoints[p["joint_id"]] = {"min_steps": lo, "max_steps": hi}
         if p["is_gripper"]:
             gripper = {
-                "open_steps": hi,                       # open-probe present
+                "open_steps": hi,  # open-probe present
                 "close_steps": gripper_solver.get("close_steps"),  # PRESERVE grasp tick
             }
             # close_steps_empty is the FORCE-margin reference and is only valid when the
@@ -290,9 +317,12 @@ def _write_evidence(probed: list[dict]) -> Path | None:
         stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         path = COMMISSION_DIR / f"{stamp}.json"
         payload = [
-            {"joint_id": p["joint_id"], "min_present": p["min_present"],
-             "max_present": p["max_present"],
-             "checks": [{"status": c.status, "detail": c.detail} for c in p["checks"]]}
+            {
+                "joint_id": p["joint_id"],
+                "min_present": p["min_present"],
+                "max_present": p["max_present"],
+                "checks": [{"status": c.status, "detail": c.detail} for c in p["checks"]],
+            }
             for p in probed
         ]
         path.write_text(json.dumps({"captured_at": stamp, "joints": payload}, indent=2))
@@ -302,8 +332,13 @@ def _write_evidence(probed: list[dict]) -> Path | None:
 
 
 def cli_commission(
-    manifest_path: str, *, self_test: bool = False, write: bool = False,
-    dry_run: bool = False, no_deploy: bool = False, yes: bool = False,
+    manifest_path: str,
+    *,
+    self_test: bool = False,
+    write: bool = False,
+    dry_run: bool = False,
+    no_deploy: bool = False,
+    yes: bool = False,
 ) -> int:
     """Entry point. Exit codes: 0 ok | 2 manifest/arg/abort | 3 gateway/probe/deploy failure."""
     from robot_md.doctor import exit_code, run_all
@@ -323,34 +358,45 @@ def cli_commission(
 
     plans = probe_targets(fm)
     if not plans:
-        print("commission: no probable joints (need physics.kinematics with servo_id + "
-              "zero_pose_steps, and solver.gripper for the gripper)")
+        print(
+            "commission: no probable joints (need physics.kinematics with servo_id + "
+            "zero_pose_steps, and solver.gripper for the gripper)"
+        )
         return 2
 
     # Surface joints that have a servo_id but were SKIPPED (no rad bounds / missing
     # zero_pose_steps / partial solver.gripper) — otherwise they vanish silently and only
     # doctor catches them later, under --write.
     planned_ids = {p["joint_id"] for p in plans}
-    skipped = [j.get("id") for j in (fm.get("physics") or {}).get("kinematics") or []
-               if j.get("servo_id") is not None and j.get("id") not in planned_ids]
+    skipped = [
+        j.get("id")
+        for j in (fm.get("physics") or {}).get("kinematics") or []
+        if j.get("servo_id") is not None and j.get("id") not in planned_ids
+    ]
     for sid in skipped:
-        print(f"  ⚠ commission {sid}: SKIPPED — no rad bounds / missing zero_pose_steps or "
-              "solver.gripper config; not probed")
+        print(
+            f"  ⚠ commission {sid}: SKIPPED — no rad bounds / missing zero_pose_steps or "
+            "solver.gripper config; not probed"
+        )
 
     if dry_run:
         print("commission plan (dry-run, no motion):")
         for p in plans:
             kind = "gripper(ticks)" if p["is_gripper"] else "joint"
-            print(f"  {p['joint_id']:<14} motor {p['motor_id']}  {kind}  "
-                  f"probe→{p['target_min']} (dir -1) then →{p['target_max']} (dir +1)")
+            print(
+                f"  {p['joint_id']:<14} motor {p['motor_id']}  {kind}  "
+                f"probe→{p['target_min']} (dir -1) then →{p['target_max']} (dir +1)"
+            )
         return 0
 
     # This drives each joint through ~its full declared range via the gateway — LARGE motions.
     # Require an explicit clear-workspace acknowledgement before any motion (--yes for automation).
     if not yes:
-        print("\ncommission will SWEEP each joint toward its declared min & max through the "
-              "gateway — these\nare large motions. Clear the workspace and keep a hand on the "
-              "e-stop.")
+        print(
+            "\ncommission will SWEEP each joint toward its declared min & max through the "
+            "gateway — these\nare large motions. Clear the workspace and keep a hand on the "
+            "e-stop."
+        )
         try:
             ans = input("Proceed with commissioning motion? [y/N] ").strip().lower()
         except EOFError:
@@ -364,8 +410,9 @@ def cli_commission(
         for p in plans:
             probed.append(probe_joint(p))
     except Exception as exc:
-        print(f"commission: gateway/probe failure (a joint may be displaced — check the "
-              f"arm): {exc}")
+        print(
+            f"commission: gateway/probe failure (a joint may be displaced — check the arm): {exc}"
+        )
         return 3
 
     # Report.
@@ -383,8 +430,10 @@ def cli_commission(
         return 3 if any_fail else 0
 
     if any_fail:
-        print("commission: refusing to --write with a FAIL probe (no-move / degenerate "
-              "travel — fix the joint and re-probe first)")
+        print(
+            "commission: refusing to --write with a FAIL probe (no-move / degenerate "
+            "travel — fix the joint and re-probe first)"
+        )
         return 3
 
     # The write→resign→deploy tail is wrapped: a deploy to the root-owned /etc manifest
@@ -394,15 +443,20 @@ def cli_commission(
     joint_endpoints, gripper = _endpoints_from_probes(probed, fm)
     try:
         from robot_md.provenance import resign_and_deploy
+
         n = write_commissioned_to_manifest(manifest_path, joint_endpoints, gripper)
         res = resign_and_deploy(Path(manifest_path), deploy=not no_deploy)
     except RuntimeError as exc:
-        print(f"commission: write/deploy FAILED — the live gateway was NOT updated: {exc}\n"
-              "  (re-run with privileges to the gateway manifest, or --no-deploy then deploy "
-              "the re-signed working copy manually.)")
+        print(
+            f"commission: write/deploy FAILED — the live gateway was NOT updated: {exc}\n"
+            "  (re-run with privileges to the gateway manifest, or --no-deploy then deploy "
+            "the re-signed working copy manually.)"
+        )
         return 3
-    print(f"commission: wrote {n} joint endpoint(s) + gripper to {manifest_path}; re-signed "
-          f"(kid {res['kid']}), deployed={res['deployed']} → {res.get('deploy_path')}")
+    print(
+        f"commission: wrote {n} joint endpoint(s) + gripper to {manifest_path}; re-signed "
+        f"(kid {res['kid']}), deployed={res['deployed']} → {res.get('deploy_path')}"
+    )
 
     # Scope the exit to the commission bucket — an unrelated doctor check (e.g. RRF network
     # reachability on the Pi) must not make a successful commission exit nonzero.

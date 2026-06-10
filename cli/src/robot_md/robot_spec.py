@@ -68,6 +68,7 @@ class SolverCamera:
 class VisionMapRef:
     """Typed view of physics.solver.vision_map — the teach-free pixel/xyz→joint map
     reference written by `robot-md calibrate-vision`. Heavy coeffs live at `path`."""
+
     path: str
     kind: str  # "arc" | "pixel" | "xyz"
     source_camera: str | None = None
@@ -77,7 +78,7 @@ class VisionMapRef:
     fitted_at: str | None = None
 
     @classmethod
-    def from_dict(cls, d: dict) -> "VisionMapRef":
+    def from_dict(cls, d: dict) -> VisionMapRef:
         return cls(
             path=d.get("path", ""),
             kind=d.get("kind", "arc"),

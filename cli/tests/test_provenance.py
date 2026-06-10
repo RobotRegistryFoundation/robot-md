@@ -1,5 +1,6 @@
 """Cross-repo provenance test: the robot-md signer must produce a footer the
 robot-md-gateway verifier accepts. Hardware-free."""
+
 from __future__ import annotations
 
 import pytest

@@ -86,12 +86,18 @@ class Perception:
         stereo.depth.link(xout_depth.input)
 
         self._pipe = dai.Device(pipeline).__enter__()
-        self._rgb_q = self._pipe.getOutputQueue("rgb", maxSize=4, blocking=False)
-        self._depth_q = self._pipe.getOutputQueue("depth", maxSize=4, blocking=False)
+        try:
+            self._rgb_q = self._pipe.getOutputQueue("rgb", maxSize=4, blocking=False)
+            self._depth_q = self._pipe.getOutputQueue("depth", maxSize=4, blocking=False)
 
-        calib = self._pipe.readCalibration()
-        mat = calib.getCameraIntrinsics(dai.CameraBoardSocket.CAM_A, self._rgb_w, self._rgb_h)
-        self.K = np.array(mat, dtype=np.float64)
+            calib = self._pipe.readCalibration()
+            mat = calib.getCameraIntrinsics(dai.CameraBoardSocket.CAM_A, self._rgb_w, self._rgb_h)
+            self.K = np.array(mat, dtype=np.float64)
+        except Exception:
+            # Release the exclusive XLink device handle — a half-opened Device
+            # otherwise stays claimed until process exit and later opens fail.
+            self.close()
+            raise
 
     def close(self) -> None:
         if self._pipe is not None:

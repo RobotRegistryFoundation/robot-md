@@ -4,6 +4,7 @@ Classifier fixtures are REAL commission_probe telemetry captured live on Bob
 (2026-06-05, hil_commission_probe_proof): the shoulder_pan clean reach and the
 gripper close-discovery stall.
 """
+
 from __future__ import annotations
 
 from robot_md.commission import classify_probe
@@ -95,8 +96,14 @@ def test_probe_targets_gripper_uses_solver_ticks():
 
 # ----------------------------------------------------------------- probe loop + restore
 def _telem(start, present, *, reached=True, aborted=False, moved=True):
-    return {"start_tick": start, "commanded_tick": present, "present_tick": present,
-            "moved": moved, "reached": reached, "aborted_on_stall": aborted}
+    return {
+        "start_tick": start,
+        "commanded_tick": present,
+        "present_tick": present,
+        "moved": moved,
+        "reached": reached,
+        "aborted_on_stall": aborted,
+    }
 
 
 class _FakeGateway:
@@ -119,8 +126,14 @@ def test_probe_joint_restores_to_start_after_each(monkeypatch):
     # distinct min/max presents (non-degenerate) so the joint is a clean PASS
     fake = _FakeGateway([_telem(2429, 700), _telem(700, 3300)])
     monkeypatch.setattr(commission, "gateway_invoke", fake)
-    plan = {"joint_id": "shoulder_pan", "motor_id": 1,
-            "target_min": 666, "target_max": 3274, "is_gripper": False, "start_fallback": 1970}
+    plan = {
+        "joint_id": "shoulder_pan",
+        "motor_id": 1,
+        "target_min": 666,
+        "target_max": 3274,
+        "is_gripper": False,
+        "start_fallback": 1970,
+    }
     res = commission.probe_joint(plan)
     tools = [c[0] for c in fake.calls]
     assert tools == ["commission_probe", "raw_tick_move", "commission_probe", "raw_tick_move"]
@@ -143,8 +156,14 @@ def test_probe_joint_restores_on_exception(monkeypatch):
         return {"telemetry": {"present_tick": args["ticks"]}}
 
     monkeypatch.setattr(commission, "gateway_invoke", boom)
-    plan = {"joint_id": "x", "motor_id": 1, "target_min": 1, "target_max": 2,
-            "is_gripper": False, "start_fallback": 1970}
+    plan = {
+        "joint_id": "x",
+        "motor_id": 1,
+        "target_min": 1,
+        "target_max": 2,
+        "is_gripper": False,
+        "start_fallback": 1970,
+    }
     with pytest.raises(RuntimeError, match="boom"):
         commission.probe_joint(plan)
     # the finally restored to the start_tick captured from probe 1
@@ -164,8 +183,14 @@ def test_probe_joint_restores_to_fallback_when_first_probe_raises(monkeypatch):
         return {"telemetry": {"present_tick": args["ticks"]}}
 
     monkeypatch.setattr(commission, "gateway_invoke", boom)
-    plan = {"joint_id": "shoulder_lift", "motor_id": 2, "target_min": 100, "target_max": 4000,
-            "is_gripper": False, "start_fallback": 2230}
+    plan = {
+        "joint_id": "shoulder_lift",
+        "motor_id": 2,
+        "target_min": 100,
+        "target_max": 4000,
+        "is_gripper": False,
+        "start_fallback": 2230,
+    }
     with pytest.raises(RuntimeError, match="timeout"):
         commission.probe_joint(plan)
     restores = [a["ticks"] for t, a in calls if t == "raw_tick_move"]
@@ -176,8 +201,14 @@ def test_probe_joint_equal_endpoints_fails(monkeypatch):
     """#1: equal min/max presents → a FAIL check (resolver needs strict min<max)."""
     fake = _FakeGateway([_telem(2048, 2048), _telem(2048, 2048)])
     monkeypatch.setattr(commission, "gateway_invoke", fake)
-    plan = {"joint_id": "wrist_roll", "motor_id": 5, "target_min": 100, "target_max": 4000,
-            "is_gripper": False, "start_fallback": 2048}
+    plan = {
+        "joint_id": "wrist_roll",
+        "motor_id": 5,
+        "target_min": 100,
+        "target_max": 4000,
+        "is_gripper": False,
+        "start_fallback": 2048,
+    }
     res = commission.probe_joint(plan)
     assert any(c.status == "fail" and "degenerate" in c.detail for c in res["checks"])
 
@@ -185,13 +216,29 @@ def test_probe_joint_equal_endpoints_fails(monkeypatch):
 def test_gripper_floor_only_recorded_when_close_probe_stalls():
     """#6: close_steps_empty is recorded only if the close-probe actually stalled."""
     # stalled close-probe → floor recorded
-    probed_stall = [{"joint_id": "gripper", "is_gripper": True,
-                     "min_present": 1455, "max_present": 1697, "min_aborted": True, "checks": []}]
+    probed_stall = [
+        {
+            "joint_id": "gripper",
+            "is_gripper": True,
+            "min_present": 1455,
+            "max_present": 1697,
+            "min_aborted": True,
+            "checks": [],
+        }
+    ]
     _, g = commission._endpoints_from_probes(probed_stall, _FM)
     assert g["close_steps_empty"] == 1455
     # close-probe REACHED (no stall) → floor NOT recorded (would collapse the force margin)
-    probed_reach = [{"joint_id": "gripper", "is_gripper": True,
-                     "min_present": 1200, "max_present": 1697, "min_aborted": False, "checks": []}]
+    probed_reach = [
+        {
+            "joint_id": "gripper",
+            "is_gripper": True,
+            "min_present": 1200,
+            "max_present": 1697,
+            "min_aborted": False,
+            "checks": [],
+        }
+    ]
     _, g2 = commission._endpoints_from_probes(probed_reach, _FM)
     assert "close_steps_empty" not in g2
     assert g2["close_steps"] == 1200  # still preserved
@@ -266,8 +313,8 @@ def test_write_gripper_sets_floor_and_PRESERVES_close_steps(tmp_path):
     )
     fm = _load_fm(p)
     g = fm["physics"]["solver"]["gripper"]
-    assert g["close_steps_empty"] == 1455      # the empty-jaw floor we measured
-    assert g["close_steps"] == 1200            # PRESERVED grasp tick — the landmine
+    assert g["close_steps_empty"] == 1455  # the empty-jaw floor we measured
+    assert g["close_steps"] == 1200  # PRESERVED grasp tick — the landmine
     assert g["open_steps"] == 1697
     gk = {j["id"]: j for j in fm["physics"]["kinematics"]}["gripper"]
     assert gk["min_steps"] == 1455 and gk["max_steps"] == 1697  # doctor-green for gripper
@@ -280,15 +327,21 @@ def test_write_preserves_comments_and_body(tmp_path):
         p, {"shoulder_pan": {"min_steps": 666, "max_steps": 3274}}, {}
     )
     text = p.read_text()
-    assert "bob-calibrated anchor" in text       # inline frontmatter comment preserved
+    assert "bob-calibrated anchor" in text  # inline frontmatter comment preserved
     assert "Prose body that must survive verbatim." in text  # body verbatim
 
 
 def test_endpoints_from_probes_gripper_mapping():
-    probed = [{
-        "joint_id": "gripper", "is_gripper": True,
-        "min_present": 1455, "max_present": 1697, "min_aborted": True, "checks": [],
-    }]
+    probed = [
+        {
+            "joint_id": "gripper",
+            "is_gripper": True,
+            "min_present": 1455,
+            "max_present": 1697,
+            "min_aborted": True,
+            "checks": [],
+        }
+    ]
     je, g = commission._endpoints_from_probes(probed, _FM)
     assert je["gripper"] == {"min_steps": 1455, "max_steps": 1697}
     assert g["close_steps_empty"] == 1455
@@ -304,10 +357,14 @@ class _Stub:
 
 def _orch_gw():
     # shoulder_pan: min 700 / max 3300 (PASS); gripper: min 1455 stall / max 1697 (reach)
-    return _FakeGateway([
-        _telem(2000, 700), _telem(700, 3300),
-        _telem(1539, 1455, reached=False, aborted=True), _telem(1455, 1697),
-    ])
+    return _FakeGateway(
+        [
+            _telem(2000, 700),
+            _telem(700, 3300),
+            _telem(1539, 1455, reached=False, aborted=True),
+            _telem(1455, 1697),
+        ]
+    )
 
 
 def test_cli_commission_self_test_never_writes(monkeypatch):
@@ -315,8 +372,9 @@ def test_cli_commission_self_test_never_writes(monkeypatch):
     monkeypatch.setattr(commission, "gateway_invoke", _orch_gw())
     monkeypatch.setattr(commission, "_write_evidence", lambda probed: None)
     calls = []
-    monkeypatch.setattr(commission, "write_commissioned_to_manifest",
-                        lambda *a, **k: calls.append("write") or 0)
+    monkeypatch.setattr(
+        commission, "write_commissioned_to_manifest", lambda *a, **k: calls.append("write") or 0
+    )
     rc = commission.cli_commission("ROBOT.md", self_test=True, yes=True)
     assert rc == 0
     assert "write" not in calls
@@ -330,11 +388,17 @@ def test_cli_commission_write_calls_write_resign_doctor_in_order(monkeypatch):
     monkeypatch.setattr(commission, "gateway_invoke", _orch_gw())
     monkeypatch.setattr(commission, "_write_evidence", lambda probed: None)
     order = []
-    monkeypatch.setattr(commission, "write_commissioned_to_manifest",
-                        lambda *a, **k: order.append("write") or 1)
-    monkeypatch.setattr(prov, "resign_and_deploy",
-                        lambda p, deploy=True: order.append("resign")
-                        or {"kid": "bob-operator-2026", "deployed": True, "deploy_path": "/etc/x"})
+    monkeypatch.setattr(
+        commission, "write_commissioned_to_manifest", lambda *a, **k: order.append("write") or 1
+    )
+    monkeypatch.setattr(
+        prov,
+        "resign_and_deploy",
+        lambda p, deploy=True: (
+            order.append("resign")
+            or {"kid": "bob-operator-2026", "deployed": True, "deploy_path": "/etc/x"}
+        ),
+    )
     monkeypatch.setattr(doc, "run_all", lambda p: order.append("doctor") or [])
     monkeypatch.setattr(doc, "exit_code", lambda r, strict: 0)
     rc = commission.cli_commission("ROBOT.md", write=True, yes=True)
@@ -380,12 +444,19 @@ def test_cli_commission_exit_scoped_to_commission_bucket(monkeypatch):
     monkeypatch.setattr(commission, "gateway_invoke", _orch_gw())
     monkeypatch.setattr(commission, "_write_evidence", lambda probed: None)
     monkeypatch.setattr(commission, "write_commissioned_to_manifest", lambda *a, **k: 2)
-    monkeypatch.setattr(prov, "resign_and_deploy",
-                        lambda p, deploy=True: {"kid": "k", "deployed": True, "deploy_path": "/x"})
-    monkeypatch.setattr(doc, "run_all", lambda p: [
-        CheckResult("all joints commissioned", "commission", "pass", "ok"),
-        CheckResult("RRF reachable", "network", "fail", "RRF unreachable"),
-    ])
+    monkeypatch.setattr(
+        prov,
+        "resign_and_deploy",
+        lambda p, deploy=True: {"kid": "k", "deployed": True, "deploy_path": "/x"},
+    )
+    monkeypatch.setattr(
+        doc,
+        "run_all",
+        lambda p: [
+            CheckResult("all joints commissioned", "commission", "pass", "ok"),
+            CheckResult("RRF reachable", "network", "fail", "RRF unreachable"),
+        ],
+    )
     rc = commission.cli_commission("ROBOT.md", write=True, yes=True)
     assert rc == 0  # commission bucket all-pass; the network FAIL is out of scope
 

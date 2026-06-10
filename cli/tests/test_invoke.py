@@ -313,9 +313,7 @@ def test_gateway_invoke_signs_operator_kid_when_env_set(tmp_path, monkeypatch):
 
         from robot_md.invoke import gateway_invoke
 
-        gateway_invoke(
-            "so-arm101", "commission_probe", {"joint_id": "gripper"}, scope="COMMISSION"
-        )
+        gateway_invoke("so-arm101", "commission_probe", {"joint_id": "gripper"}, scope="COMMISSION")
 
         env = _MockHandler.last_envelope
         assert env is not None

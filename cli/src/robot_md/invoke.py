@@ -94,12 +94,15 @@ def sign_envelope_with_pem(envelope: dict[str, Any], *, key_path: str, kid: str)
     """
     from cryptography.hazmat.primitives import serialization
 
-    with open(key_path, "rb") as fh:
-        priv = serialization.load_pem_private_key(fh.read(), password=None)
-    if not isinstance(priv, ed25519.Ed25519PrivateKey):
+    try:
+        with open(key_path, "rb") as fh:
+            priv = serialization.load_pem_private_key(fh.read(), password=None)
+    except (OSError, ValueError) as e:
         raise RuntimeError(
-            f"ROBOT_MD_OPERATOR_KEY_PATH {key_path!r} is not an Ed25519 private key"
-        )
+            f"cannot load operator key PEM at ROBOT_MD_OPERATOR_KEY_PATH {key_path!r}: {e}"
+        ) from e
+    if not isinstance(priv, ed25519.Ed25519PrivateKey):
+        raise RuntimeError(f"ROBOT_MD_OPERATOR_KEY_PATH {key_path!r} is not an Ed25519 private key")
     out = dict(envelope)
     out["envelope_signature"] = {"kid": kid, "sig": ""}
     pre = canonical_json(out, exclude="envelope_signature")

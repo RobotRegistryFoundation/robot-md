@@ -2395,8 +2395,12 @@ def commission(
     from robot_md.commission import cli_commission
 
     rc = cli_commission(
-        str(path), self_test=self_test, write=write, dry_run=dry_run,
-        no_deploy=no_deploy, yes=yes,
+        str(path),
+        self_test=self_test,
+        write=write,
+        dry_run=dry_run,
+        no_deploy=no_deploy,
+        yes=yes,
     )
     if rc != 0:
         raise typer.Exit(code=rc)
