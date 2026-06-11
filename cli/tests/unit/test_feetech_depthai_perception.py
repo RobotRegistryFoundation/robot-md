@@ -14,7 +14,7 @@ def _spec(fixtures_dir):
 
 
 def _install_fakes(monkeypatch):
-    """Stand-in for depthai, just enough for perception tests."""
+    """Stand-in for depthai (v2 API), just enough for perception tests."""
     import numpy as np
 
     fake_dai = MagicMock()
@@ -26,15 +26,7 @@ def _install_fakes(monkeypatch):
         [0.0, 860.0, 360.0],
         [0.0, 0.0, 1.0],
     ]
-    fake_cal_device = MagicMock()
-    fake_cal_device.readCalibration.return_value = fake_cal
-    fake_dai.Device.return_value.__enter__.return_value = fake_cal_device
-    fake_dai.Device.return_value.__exit__.return_value = False
-    fake_dai.CameraBoardSocket.CAM_A = "CAM_A"
-    fake_dai.CameraBoardSocket.CAM_B = "CAM_B"
-    fake_dai.CameraBoardSocket.CAM_C = "CAM_C"
 
-    # Pipeline context manager
     fake_rgb_msg = MagicMock()
     fake_rgb_msg.getCvFrame.return_value = np.zeros((720, 1280, 3), dtype=np.uint8)
     fake_depth_msg = MagicMock()
@@ -45,39 +37,25 @@ def _install_fakes(monkeypatch):
     fake_depth_q = MagicMock()
     fake_depth_q.get.return_value = fake_depth_msg
 
+    # v2: Device(pipeline) is the context manager; output queues hang off the
+    # device by stream name, not off the pipeline nodes.
+    fake_device = MagicMock()
+    fake_device.readCalibration.return_value = fake_cal
+    fake_device.getOutputQueue.side_effect = lambda name, **kw: {
+        "rgb": fake_rgb_q,
+        "depth": fake_depth_q,
+    }[name]
+    fake_dai.Device.return_value.__enter__.return_value = fake_device
+    fake_dai.Device.return_value.__exit__.return_value = False
+    fake_dai.CameraBoardSocket.CAM_A = "CAM_A"
+    fake_dai.CameraBoardSocket.CAM_B = "CAM_B"
+    fake_dai.CameraBoardSocket.CAM_C = "CAM_C"
+
+    # v2 pipeline: open() makes 6 create() calls (ColorCamera, XLinkOut(rgb),
+    # MonoCamera x2, StereoDepth, XLinkOut(depth)); the default MagicMock per
+    # call handles the set*/link wiring.
     fake_pipe = MagicMock()
-    fake_pipe.__enter__.return_value = fake_pipe
-    fake_pipe.__exit__.return_value = False
-    fake_pipe.start.return_value = None
-
-    fake_rgb_cam = MagicMock()
-    fake_rgb_cam_out = MagicMock()
-    fake_rgb_cam_out.createOutputQueue.return_value = fake_rgb_q
-    fake_rgb_cam.requestOutput.return_value = fake_rgb_cam_out
-    fake_rgb_cam.build.return_value = fake_rgb_cam
-
-    fake_cam_left = MagicMock()
-    fake_cam_left.build.return_value = fake_cam_left
-    fake_cam_right = MagicMock()
-    fake_cam_right.build.return_value = fake_cam_right
-    fake_cam_left_out = MagicMock()
-    fake_cam_right_out = MagicMock()
-    fake_cam_left.requestOutput.return_value = fake_cam_left_out
-    fake_cam_right.requestOutput.return_value = fake_cam_right_out
-
-    fake_stereo = MagicMock()
-    fake_stereo_depth = MagicMock()
-    fake_stereo_depth.createOutputQueue.return_value = fake_depth_q
-    fake_stereo.depth = fake_stereo_depth
-
-    fake_pipe.create.side_effect = [fake_rgb_cam, fake_cam_left, fake_cam_right, fake_stereo]
-
     fake_dai.Pipeline.return_value = fake_pipe
-    fake_dai.node = MagicMock()
-    fake_dai.node.Camera = MagicMock()
-    fake_dai.node.StereoDepth = MagicMock()
-    fake_dai.node.StereoDepth.PresetMode.FAST_ACCURACY = "FAST_ACCURACY"
-    fake_dai.ImgFrame.Type.NV12 = "NV12"
 
     monkeypatch.setitem(sys.modules, "depthai", fake_dai)
     return fake_dai
