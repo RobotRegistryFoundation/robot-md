@@ -1865,7 +1865,20 @@ def invoke(
     kid: str | None = typer.Option(
         None,
         "--kid",
-        help="Override envelope signing kid (defaults to keypair's pq_kid).",
+        help="Envelope signing kid. Required with --operator-key (the operator kid "
+        "registered at RRF /v2/keys); otherwise defaults to the robot keypair's pq_kid.",
+    ),
+    operator_key: Path | None = typer.Option(
+        None,
+        "--operator-key",
+        help="Sign with this Ed25519 operator private-key PEM instead of the robot "
+        "keystore. The gateway resolves --kid at RRF /v2/keys, so use --kid too.",
+    ),
+    actuator: str | None = typer.Option(
+        None,
+        "--actuator",
+        help="actuator_name for a multi-actuator gateway (e.g. 'so-arm101'). Required "
+        "when the gateway is configured with more than one actuator.",
     ),
     print_bundle_entry: bool = typer.Option(
         False,
@@ -1896,9 +1909,12 @@ def invoke(
         fetch_last_audit_entry,
         invoke_envelope,
         load_bearer_for_tier,
+        load_operator_ed25519,
         sign_envelope,
+        sign_envelope_with_ed25519,
     )
     from robot_md.parser import parse_file
+    from robot_md.ruri import construct_ruri
     from robot_md.signing import load_keypair
 
     if bearer is None and bearer_from_bearers is None:
@@ -1913,13 +1929,17 @@ def invoke(
     parsed = parse_file(manifest)
     metadata = parsed.frontmatter.get("metadata") or {}
     rrn = metadata.get("rrn")
-    ruri = metadata.get("ruri")
-    if not rrn or not ruri:
+    # ruri: prefer the declared value; otherwise derive it deterministically
+    # (same construction as `robot-md register`), so a manifest that predates
+    # the ruri field still actuates instead of erroring.
+    try:
+        ruri = construct_ruri(parsed.frontmatter)
+    except ValueError as e:
         err_console.print(
-            f"[red]✗[/red] {manifest} must declare metadata.rrn and metadata.ruri "
-            "(run `robot-md register` first)"
+            f"[red]✗[/red] {manifest}: cannot determine metadata.ruri ({e}); "
+            "set metadata.ruri or run `robot-md register`"
         )
-        raise typer.Exit(code=FILE_ERROR)
+        raise typer.Exit(code=FILE_ERROR) from None
 
     try:
         tool_args = _json.loads(args)
@@ -1938,17 +1958,38 @@ def invoke(
         tool_args=tool_args,
         manifest_path=str(manifest.resolve()),
         scope=scope,
+        actuator_name=actuator,
     )
 
     if sign:
-        kp = load_keypair(rrn)
-        if kp is None:
-            err_console.print(
-                f"[red]✗[/red] no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — "
-                "run `robot-md register` first, or pass --no-sign"
-            )
-            raise typer.Exit(code=FILE_ERROR)
-        envelope = sign_envelope(envelope, kp, kid=kid or kp.pq_kid)
+        if operator_key is not None:
+            if not kid:
+                err_console.print(
+                    "[red]✗[/red] --operator-key requires --kid <operator-kid> "
+                    "(the kid registered at RRF /v2/keys)"
+                )
+                raise typer.Exit(code=FILE_ERROR)
+            try:
+                op_priv = load_operator_ed25519(operator_key)
+            except (ValueError, OSError) as e:
+                err_console.print(f"[red]✗[/red] {e}")
+                raise typer.Exit(code=FILE_ERROR) from None
+            envelope = sign_envelope_with_ed25519(envelope, op_priv, kid=kid)
+        else:
+            if not rrn:
+                err_console.print(
+                    f"[red]✗[/red] {manifest} has no metadata.rrn for keystore signing; "
+                    "pass --operator-key <pem> --kid <kid>, or run `robot-md register`"
+                )
+                raise typer.Exit(code=FILE_ERROR)
+            kp = load_keypair(rrn)
+            if kp is None:
+                err_console.print(
+                    f"[red]✗[/red] no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — "
+                    "run `robot-md register` first, or pass --no-sign / --operator-key"
+                )
+                raise typer.Exit(code=FILE_ERROR)
+            envelope = sign_envelope(envelope, kp, kid=kid or kp.pq_kid)
 
     if bearer_from_bearers is not None:
         try:
@@ -1972,6 +2013,103 @@ def invoke(
             out_console.print(_json.dumps(entry, indent=2))
         except RuntimeError as e:
             err_console.print(f"[yellow]![/yellow] could not fetch audit entry: {e}")
+
+
+@app.command("sign-manifest")
+def sign_manifest(
+    manifest: Path = typer.Argument(..., help="Path to the ROBOT.md to sign."),
+    operator_key: Path | None = typer.Option(
+        None,
+        "--operator-key",
+        help="Ed25519 operator private-key PEM to sign with. Omit to self-sign with "
+        "the robot's own keystore key (~/.robot-md/keys/<rrn>.signing.json).",
+    ),
+    kid: str | None = typer.Option(
+        None,
+        "--kid",
+        help="Kid to advertise (must resolve at RRF /v2/keys/<kid>). Required with "
+        "--operator-key; defaults to the robot keypair's pq_kid when self-signing.",
+    ),
+    out: Path | None = typer.Option(
+        None, "--out", help="Write the signed manifest here instead of in place."
+    ),
+) -> None:
+    """Sign a ROBOT.md with the ROBOT-MD-SIG provenance footer the gateway requires.
+
+    robot-md-gateway only actuates against a manifest carrying this footer (it
+    verifies the signature against RRF /v2/keys/<kid>). Two modes:
+
+    \b
+      # self-sign with the robot's own key (registered as its operator-envelope
+      # authority by `robot-md register` — the turnkey default):
+      robot-md sign-manifest ROBOT.md
+      # or sign with a separate operator key:
+      robot-md sign-manifest ROBOT.md \\
+          --operator-key ~/.opencastor-ops-keys/bob-operator.priv.pem \\
+          --kid bob-operator-2026
+
+    Re-running replaces any existing footer; the signature covers the manifest
+    body, so re-sign after editing the manifest.
+    """
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+
+    from robot_md.invoke import load_operator_ed25519
+    from robot_md.manifest_sig import signed_manifest_text, verify_manifest_text
+    from robot_md.parser import parse_file
+    from robot_md.signing import load_keypair
+
+    if operator_key is not None:
+        if not kid:
+            err_console.print(
+                "[red]✗[/red] --operator-key requires --kid <operator-kid> "
+                "(the kid registered at RRF /v2/keys)"
+            )
+            raise typer.Exit(code=FILE_ERROR)
+        try:
+            priv = load_operator_ed25519(operator_key)
+        except (ValueError, OSError) as e:
+            err_console.print(f"[red]✗[/red] {e}")
+            raise typer.Exit(code=FILE_ERROR) from None
+        sign_kid = kid
+    else:
+        # Self-authorization: the robot's own keypair is registered as its
+        # operator-envelope authority during `robot-md register`, so it can sign
+        # its own manifest provenance.
+        parsed = parse_file(manifest)
+        rrn = (parsed.frontmatter.get("metadata") or {}).get("rrn")
+        if not rrn:
+            err_console.print(
+                f"[red]✗[/red] {manifest} has no metadata.rrn to self-sign with; "
+                "pass --operator-key <pem> --kid <kid>, or run `robot-md register`"
+            )
+            raise typer.Exit(code=FILE_ERROR)
+        kp = load_keypair(rrn)
+        if kp is None:
+            err_console.print(
+                f"[red]✗[/red] no keypair at ~/.robot-md/keys/{rrn}.signing.json — "
+                "run `robot-md register` first, or pass --operator-key"
+            )
+            raise typer.Exit(code=FILE_ERROR)
+        priv = ed25519.Ed25519PrivateKey.from_private_bytes(kp.ed25519_sec)
+        sign_kid = kid or kp.pq_kid
+
+    try:
+        text = manifest.read_text()
+    except OSError as e:
+        err_console.print(f"[red]✗[/red] cannot read {manifest}: {e}")
+        raise typer.Exit(code=FILE_ERROR) from None
+
+    signed = signed_manifest_text(text, priv, kid=sign_kid)
+    ok, info = verify_manifest_text(signed, priv.public_key())
+    if not ok:
+        err_console.print(
+            f"[red]✗[/red] internal error: produced footer failed self-verify ({info})"
+        )
+        raise typer.Exit(code=FILE_ERROR)
+
+    dest = out or manifest
+    dest.write_text(signed)
+    out_console.print(f"[green]✓[/green] signed {dest} (kid={sign_kid})")
 
 
 # ---------------------------------------------------------------- actuator
