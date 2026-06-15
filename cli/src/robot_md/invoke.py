@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import secrets
 import time
 import urllib.error
@@ -25,7 +26,7 @@ import yaml
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from rcan.audit_bundle import canonical_json
 
-from robot_md.signing import SigningKeypair
+from robot_md.signing import SigningKeypair, load_keypair
 
 
 def build_envelope(
@@ -82,6 +83,36 @@ def sign_envelope(
     return out
 
 
+def sign_envelope_with_pem(envelope: dict[str, Any], *, key_path: str, kid: str) -> dict[str, Any]:
+    """Sign an envelope with an Ed25519 private-key PEM file, advertising `kid`.
+
+    Same pre-image as `sign_envelope` (`canonical_json(env, exclude="envelope_signature")`,
+    cert/envelope.py:57) but loads a raw operator key from disk rather than a
+    `SigningKeypair`. Used when `ROBOT_MD_OPERATOR_KEY_PATH`/`ROBOT_MD_OPERATOR_KID`
+    select an operator identity that RRF `/v2/keys` actually resolves (the robot's own
+    `pq_kid` is not registered there — RRF is keyed by operator kids).
+    """
+    from cryptography.hazmat.primitives import serialization
+
+    try:
+        with open(key_path, "rb") as fh:
+            priv = serialization.load_pem_private_key(fh.read(), password=None)
+    except (OSError, ValueError) as e:
+        raise RuntimeError(
+            f"cannot load operator key PEM at ROBOT_MD_OPERATOR_KEY_PATH {key_path!r}: {e}"
+        ) from e
+    if not isinstance(priv, ed25519.Ed25519PrivateKey):
+        raise RuntimeError(f"ROBOT_MD_OPERATOR_KEY_PATH {key_path!r} is not an Ed25519 private key")
+    out = dict(envelope)
+    out["envelope_signature"] = {"kid": kid, "sig": ""}
+    pre = canonical_json(out, exclude="envelope_signature")
+    out["envelope_signature"] = {
+        "kid": kid,
+        "sig": base64.b64encode(priv.sign(pre)).decode(),
+    }
+    return out
+
+
 def load_bearer_for_tier(yaml_path: Path, tier: str) -> str:
     """Load the first bearer token matching `tier` from a gateway bearers.yaml.
 
@@ -134,6 +165,111 @@ def invoke_envelope(
     except urllib.error.HTTPError as e:
         body_text = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"gateway returned {e.code}: {body_text}") from e
+
+
+def rrn_from_ruri(ruri: str) -> str:
+    """Extract the RRN-* prefix from an rcan://RRN-.../... URI."""
+    if not ruri.startswith("rcan://"):
+        raise RuntimeError(f"ROBOT_MD_RURI must start with rcan:// — got {ruri!r}")
+    rest = ruri[len("rcan://") :]
+    rrn = rest.split("/", 1)[0]
+    if not rrn.startswith("RRN-"):
+        raise RuntimeError(f"ROBOT_MD_RURI host must be an RRN-* identifier — got {rrn!r}")
+    return rrn
+
+
+def gateway_invoke(
+    actuator: str, tool: str, args: dict, *, scope: str | None = None, timeout: float = 10.0
+) -> dict:
+    """Build, sign, and POST a full RCAN InvokeEnvelope to the gateway.
+
+    The single client used by `trial`, `commission`, `teach`, and
+    `calibrate-vision` to route hardware ops through the gateway (audited,
+    RCAN-signed, e-stoppable) rather than touching the serial bus directly.
+
+    Required env vars (set once by the operator):
+
+        ROBOT_MD_RURI           e.g. rcan://RRN-000000000002/skill
+        ROBOT_MD_SCOPE          default scope when `scope` arg is None
+                                ("read" if unset)
+        ROBOT_MD_MANIFEST_PATH  absolute path to the signed ROBOT.md the gateway
+                                verifies against
+        ROBOT_MD_GATEWAY_URL    default http://127.0.0.1:8080
+        ROBOT_MD_GATEWAY_BEARER bearer token for the required tier
+
+    Args:
+        actuator: multi-actuator routing name (e.g. "so-arm101", "oak-d").
+        tool: tool_name the actuator dispatches (move/read_state/perceive/
+              commission_probe/raw_tick_move/set_torque/paced_move/...).
+        args: tool_args dict.
+        scope: RCAN scope override; falls back to ROBOT_MD_SCOPE, then "read".
+               Commission/teach/calibrate motion pass scope="actuate" (or the
+               COMMISSION scope once the gateway supports it).
+
+    Envelope shape matches `robot_md_gateway.receiver.InvokeEnvelope` plus
+    `nonce`/`timestamp_ms`. Signed Ed25519 with the operator keypair at
+    `~/.robot-md/keys/<rrn>.signing.json` (the kid is the operator's pq_kid;
+    the gateway resolves it via RRFResolver and verifies before dispatch).
+    """
+    ruri = os.environ.get("ROBOT_MD_RURI")
+    if not ruri:
+        raise RuntimeError(
+            "ROBOT_MD_RURI is required to invoke the gateway. Set it to this "
+            "robot's rcan:// RRN registration URI."
+        )
+    manifest_path = os.environ.get("ROBOT_MD_MANIFEST_PATH")
+    if not manifest_path:
+        raise RuntimeError(
+            "ROBOT_MD_MANIFEST_PATH is required. Set it to the absolute path of "
+            "the signed ROBOT.md the gateway should verify against."
+        )
+    if scope is None:
+        scope = os.environ.get("ROBOT_MD_SCOPE", "read")
+
+    rrn = rrn_from_ruri(ruri)
+
+    envelope = build_envelope(
+        ruri=ruri,
+        tool_name=tool,
+        tool_args=args,
+        manifest_path=manifest_path,
+        scope=scope,
+    )
+    # Multi-actuator routing field (gateway >= 0.5.0a3). Added pre-signing so
+    # it's covered by the signature.
+    envelope["actuator_name"] = actuator
+
+    # Signing identity. RRF `/v2/keys` is keyed by OPERATOR kids, not the robot's own
+    # `pq_kid` — so deployments where the operator (not the robot) is the registered
+    # signer set ROBOT_MD_OPERATOR_KEY_PATH + ROBOT_MD_OPERATOR_KID to sign with the
+    # operator's Ed25519 key. Absent both, fall back to the robot keypair convention
+    # (~/.robot-md/keys/<rrn>.signing.json, kid = pq_kid).
+    op_key_path = os.environ.get("ROBOT_MD_OPERATOR_KEY_PATH")
+    op_kid = os.environ.get("ROBOT_MD_OPERATOR_KID")
+    # Fail loud on a half-set operator identity — silently falling back to the robot pq_kid
+    # (which RRF doesn't resolve) would surface only as a cryptic downstream 403.
+    if bool(op_key_path) != bool(op_kid):
+        raise RuntimeError(
+            "partial operator-key config: set BOTH ROBOT_MD_OPERATOR_KEY_PATH and "
+            "ROBOT_MD_OPERATOR_KID, or neither."
+        )
+    if op_key_path and op_kid:
+        envelope = sign_envelope_with_pem(envelope, key_path=op_key_path, kid=op_kid)
+    else:
+        keypair = load_keypair(rrn)
+        if keypair is None:
+            raise RuntimeError(
+                f"no signing keypair at ~/.robot-md/keys/{rrn}.signing.json — run "
+                "`robot-md register` first, or set ROBOT_MD_OPERATOR_KEY_PATH + "
+                "ROBOT_MD_OPERATOR_KID to sign with a registered operator key."
+            )
+        envelope = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
+
+    gateway_url = os.environ.get("ROBOT_MD_GATEWAY_URL", "http://127.0.0.1:8080")
+    bearer = os.environ.get("ROBOT_MD_GATEWAY_BEARER", "")
+    return invoke_envelope(
+        envelope=envelope, gateway_url=gateway_url, bearer=bearer, timeout=timeout
+    )
 
 
 def fetch_last_audit_entry(

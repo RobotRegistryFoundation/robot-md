@@ -1433,9 +1433,11 @@ def doctor(
 ) -> None:
     """Diagnose the local environment + manifest.
 
-    Runs five buckets of checks: install (CLI + deps), manifest (parse + schema),
+    Runs buckets of checks: install (CLI + deps), manifest (parse + schema),
     network (registry reachable + RRN resolvable), drivers (serial/TCP probe per
-    declared driver), and keystore (API key file permissions).
+    declared driver), calibration (extrinsic provenance), commission (passive
+    joint-travel reality-check: gripper close<open + commissioned endpoints), and
+    keystore (API key file permissions).
 
     Never writes files, never mutates servos, never hits registry write
     endpoints. Safe to run anywhere, anytime.
@@ -2347,6 +2349,61 @@ def publish_discovery(
     out_console.print(f"  serve it at: {url.rsplit('/', 1)[0]}/.well-known/robot-md.json")
     if doc.get("rrn"):
         out_console.print(f"  rrn: {doc['rrn']}  resolver: {doc.get('public_resolver')}")
+
+
+@app.command()
+def commission(
+    path: Path = typer.Argument(..., help="Path to a ROBOT.md file."),
+    self_test: bool = typer.Option(
+        False,
+        "--self-test",
+        help="Probe each joint toward its declared min & max via the gateway "
+        "(scope=COMMISSION), classify reach/stall, restore after each. No write.",
+    ),
+    write: bool = typer.Option(
+        False,
+        "--write",
+        help="Run --self-test, then write commissioned endpoints + gripper floor back to "
+        "the manifest, re-sign, deploy to the gateway, and run doctor.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Plan the probes (joints, targets, directions) without touching hardware.",
+    ),
+    no_deploy: bool = typer.Option(
+        False,
+        "--no-deploy",
+        help="With --write: sign the working copy but skip the gateway deploy.",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        "-y",
+        help="Skip the clear-workspace confirmation before probing motion (for automation).",
+    ),
+) -> None:
+    """Reality-check declared joint travel by probing the hardware through the gateway.
+
+    Routes commission_probe / raw_tick_move through robot-md-gateway (scope=COMMISSION,
+    commission-tier bearer), restoring each joint after every probe. Set ROBOT_MD_RURI,
+    ROBOT_MD_GATEWAY_BEARER, and the operator signing env (ROBOT_MD_OPERATOR_KEY_PATH +
+    ROBOT_MD_OPERATOR_KID) first. --write also re-signs + deploys the manifest (cutover).
+    Probing sweeps each joint through ~its full declared range — clear the workspace and
+    keep a hand on the e-stop; the command confirms before any motion unless --yes.
+    """
+    from robot_md.commission import cli_commission
+
+    rc = cli_commission(
+        str(path),
+        self_test=self_test,
+        write=write,
+        dry_run=dry_run,
+        no_deploy=no_deploy,
+        yes=yes,
+    )
+    if rc != 0:
+        raise typer.Exit(code=rc)
 
 
 @app.command()
