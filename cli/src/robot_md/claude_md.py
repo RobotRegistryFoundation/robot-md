@@ -23,45 +23,35 @@ from robot_md.robot_spec import RobotSpec
 
 _TEMPLATE_INLINE = """# CLAUDE.md — {{ROBOT_NAME}}
 
-> **Agent context file.** Drop this in the root of your robot's project (same directory as `ROBOT.md`) and Claude Code will read it at the start of every session.
+> **Agent context file — small, stable, intent → resource routing table.** The authoritative state lives in `ROBOT.md` (schema-validated YAML) and is reachable on-demand through `robot-md-mcp` resources at `robot-md://{{ROBOT_NAME}}/<slice>`. Prefer the narrowest slice that answers the intent; `/frontmatter` is the escape hatch, not the default.
 >
-> Template from [robot-md](https://github.com/RobotRegistryFoundation/robot-md) — customize everywhere you see `{{...}}` or `TODO`.
-
-This project is a **robot workspace**. The file `ROBOT.md` in this directory is the authoritative declaration of what the robot is and what it can do (identity, physics, drivers, capabilities, safety gates). Consult it before answering any question about the robot.
+> Template from [robot-md](https://github.com/RobotRegistryFoundation/robot-md). Why-is-it-shaped-this-way questions live in that repo's `spec/` + `docs/design/` — see the last row below.
 
 ## Recognizing robot-related intent
 
-When the operator asks any of the following, **you should act** — not ask clarifying questions first:
+When the operator asks any of the following, **act** — don't ask clarifying questions first:
 
-| Operator intent (examples) | What to do |
+| Operator intent | Route |
 |---|---|
-| "What can this robot do?" / "What are its capabilities?" | Read `robot-md://{{ROBOT_NAME}}/capabilities` (MCP) or run `robot-md render ROBOT.md` and extract `capabilities[]`. |
-| "What are its safety gates?" / "What's dangerous?" | Read `robot-md://{{ROBOT_NAME}}/safety` (MCP) or `robot-md render ROBOT.md` and extract `safety.hitl_gates`, `safety.estop`. |
-| "Something's wrong" / "It's not responding" / "Why is X broken" | Run `robot-md doctor --path ROBOT.md`. Report each non-pass check. |
-| "Is the manifest valid?" / "Did I break something?" | Run `robot-md validate ROBOT.md`. |
-| "Pose the arm at zero" / "Calibrate" | `robot-md calibrate --zero ROBOT.md`. Relay the interactive prompts to the operator. |
-| "Publish my robot" / "Give it a public URL" | `robot-md publish-discovery ROBOT.md --url <URL>` writes `.well-known/robot-md.json`. |
-| "Pick up the X" / any physical motion | Call `mcp__robot-md-{{ROBOT_NAME}}__execute_capability` (dry-run first). Check `safety.hitl_gates` for the cap's scope; if a gate with `require_auth: true` matches, request explicit operator approval before re-running without dry-run. |
-
-## Tooling available in this workspace
-
-```bash
-robot-md --help              # full verb list
-robot-md doctor              # diagnose install + manifest + drivers
-robot-md validate ROBOT.md   # schema conformance
-robot-md render ROBOT.md     # frontmatter → pure YAML (for parsing)
-robot-md context ROBOT.md    # Claude-ready context block (if no MCP)
-robot-md publish-discovery ROBOT.md --url <url>   # emit .well-known/robot-md.json
-```
-
-If `robot-md-mcp` is registered in this session (check with `/mcp`), prefer the MCP resources over shelling out — they stay in sync with the file on disk automatically:
-
-- `robot-md://{{ROBOT_NAME}}/frontmatter` — full parsed YAML
-- `robot-md://{{ROBOT_NAME}}/capabilities` — capabilities list
-- `robot-md://{{ROBOT_NAME}}/safety` — safety block
-- `robot-md://{{ROBOT_NAME}}/body` — prose
-
-MCP tools (also available): `validate`, `render`, `estop`, `estop_clear`, `execute_capability`, `execute_task`.
+| "What can this robot do?" / "What are its capabilities?" | resource `robot-md://{{ROBOT_NAME}}/capabilities` |
+| "What are its safety gates?" / "What's dangerous?" | resource `robot-md://{{ROBOT_NAME}}/safety` |
+| "Brief me on this robot" / "Give me the full context" | resource `robot-md://{{ROBOT_NAME}}/context` (on-demand only — this CLAUDE.md is the eager entry; don't auto-fetch `/context` at session start) |
+| "What's its name / RRN?" | resource `robot-md://{{ROBOT_NAME}}/identity` |
+| "What drivers? What port? What baud?" | resource `robot-md://{{ROBOT_NAME}}/drivers` |
+| "What's the workspace? IK provider? DoF?" | resource `robot-md://{{ROBOT_NAME}}/physics` |
+| "Servo_id of <joint>?" / joint limits / DH params | resource `robot-md://{{ROBOT_NAME}}/kinematics` |
+| "Camera extrinsic / intrinsic?" / "Is the OAK-D calibrated?" | resource `robot-md://{{ROBOT_NAME}}/cameras` |
+| "What joints does the `ready` pose set?" | resource `robot-md://{{ROBOT_NAME}}/poses` |
+| "What HSV range detects `red_lego`?" / declared visual targets | resource `robot-md://{{ROBOT_NAME}}/vision` |
+| "Read the prose body / README" | resource `robot-md://{{ROBOT_NAME}}/body` |
+| "Read the raw YAML" — fallback when no narrow slice fits | resource `robot-md://{{ROBOT_NAME}}/frontmatter` (escape hatch) |
+| "Is the manifest valid? Did I break it?" | tool `validate` (or `robot-md validate ROBOT.md` from the shell) |
+| "Give me the canonical YAML" | tool `render` (or `robot-md render ROBOT.md`) |
+| "Quick-check the robot" / "Something's wrong" | tool `doctor_summary` (manifest-only) or `robot-md doctor` (live: probes drivers + network) |
+| "Pose the arm at zero" / "Calibrate" | `robot-md calibrate --zero ROBOT.md` — relay the interactive prompts to the operator |
+| "Publish my robot" / "Give it a public URL" | `robot-md publish-discovery ROBOT.md --url <URL>` — writes `.well-known/robot-md.json` |
+| "Pick up the X" / any physical motion | tool `execute_capability` (dry-run first). Check `safety.hitl_gates` for the cap's scope; if a gate with `require_auth: true` matches, request explicit operator approval before re-running without dry-run. Software E-stop via tool `estop`; clear via `estop_clear`. Multi-step plans via tool `execute_task`. |
+| "Why is the manifest shaped this way?" / "What does the spec say?" | Browse [RobotRegistryFoundation/robot-md](https://github.com/RobotRegistryFoundation/robot-md) — see `spec/`, `docs/design/`. Not loaded into this session; one-hop reference only. |
 
 ## Safety posture
 
