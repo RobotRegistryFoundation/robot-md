@@ -623,3 +623,116 @@ def test_cli_register_proceeds_silently_when_preflight_fails(tmp_path, monkeypat
     assert rc == 0
     # No "Next RRN:" line should have been printed.
     assert "Next RRN:" not in capsys.readouterr().err
+
+
+# ---- --export-to (closes #79) -------------------------------------------
+
+
+def test_cli_register_export_to_copies_keypair_and_apikey(tmp_path, monkeypatch, capsys):
+    """When export_to is set, register writes copies of the minted keypair
+    and apikey to that directory in addition to the normal $HOME write.
+    Lets a subagent harness with isolated HOME persist credentials to the
+    caller's filesystem before teardown (closes robot-md#79).
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "isolated"))
+    path = _write(tmp_path)
+    export_dir = tmp_path / "operator-keys"
+
+    def fake_post(endpoint, body, timeout=15.0):
+        from robot_md.register import MintResult
+
+        return MintResult(
+            rrn="RRN-000000000099", registered_at="x", record_url="u", raw={"api_key": "k"}
+        )
+
+    with (
+        patch("robot_md.register.peek_next_rrn", lambda *_a, **_kw: None),
+        patch("robot_md.register.post_to_rrf", fake_post),
+        patch("robot_md.register.post_envelope_authority", lambda *_a, **_kw: {}),
+    ):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT, export_to=export_dir)
+
+    assert rc == 0
+
+    # HOME copies still exist (normal behavior unchanged).
+    home_keys = tmp_path / "isolated" / ".robot-md" / "keys"
+    assert (home_keys / "RRN-000000000099.signing.json").exists()
+    assert (home_keys / "RRN-000000000099.apikey").exists()
+
+    # Export copies exist with same filenames so `cp export/* ~/.robot-md/keys/`
+    # is the natural restore path.
+    exported_signing = export_dir / "RRN-000000000099.signing.json"
+    exported_apikey = export_dir / "RRN-000000000099.apikey"
+    assert exported_signing.exists()
+    assert exported_apikey.exists()
+
+    # Content matches between HOME and exported copies.
+    assert exported_signing.read_text() == (home_keys / "RRN-000000000099.signing.json").read_text()
+    assert exported_apikey.read_text() == (home_keys / "RRN-000000000099.apikey").read_text()
+
+    # Exported files are mode 0o600 (private — same as HOME copies).
+    import stat as _stat
+
+    assert _stat.S_IMODE(exported_signing.stat().st_mode) == 0o600
+    assert _stat.S_IMODE(exported_apikey.stat().st_mode) == 0o600
+
+    # Operator sees a single confirmation line on stderr.
+    err = capsys.readouterr().err
+    assert "Exported keypair + apikey to" in err
+    assert str(export_dir) in err
+
+
+def test_cli_register_export_to_fails_loud_when_path_unwritable(tmp_path, monkeypatch, capsys):
+    """If the --export-to write fails after RRF mint succeeded, return
+    non-zero with a recovery message that names the minted RRN and the HOME
+    path. Silent fallback would re-introduce the original drift bug.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "isolated"))
+    path = _write(tmp_path)
+
+    # Parent of export_to is a regular file → mkdir(parents=True) will fail
+    # with NotADirectoryError. Robust across uid (chmod-based blocking can
+    # be bypassed by root in CI).
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory")
+    export_dir = blocker / "sub"
+
+    def fake_post(endpoint, body, timeout=15.0):
+        from robot_md.register import MintResult
+
+        return MintResult(
+            rrn="RRN-000000000099", registered_at="x", record_url="u", raw={"api_key": "k"}
+        )
+
+    with (
+        patch("robot_md.register.peek_next_rrn", lambda *_a, **_kw: None),
+        patch("robot_md.register.post_to_rrf", fake_post),
+    ):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT, export_to=export_dir)
+
+    assert rc != 0
+    err = capsys.readouterr().err
+    # Recovery message must surface enough for the operator to act.
+    assert "RRN-000000000099" in err
+    assert "--export-to" in err
+    # The HOME path is named so the operator can recover from inside the
+    # subagent before teardown.
+    assert ".robot-md/keys" in err
+
+
+def test_cli_register_dry_run_warns_when_export_to_set(tmp_path, monkeypatch, capsys):
+    """--dry-run returns before any persistence. If --export-to is also
+    set, warn explicitly so the harness author knows nothing will be
+    written.
+    """
+    monkeypatch.setenv("HOME", str(tmp_path / "isolated"))
+    path = _write(tmp_path)
+    export_dir = tmp_path / "operator-keys"
+
+    rc = cli_register(path, endpoint=DEFAULT_ENDPOINT, dry_run=True, export_to=export_dir)
+
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "--export-to" in err and "--dry-run" in err
+    # Nothing was actually exported.
+    assert not export_dir.exists()

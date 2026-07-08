@@ -532,6 +532,34 @@ def _write_apikey(rrn: str, api_key: str) -> Path:
     return path
 
 
+def _export_credentials(export_dir: Path, rrn: str) -> None:
+    """Copy the just-written keypair + apikey from $HOME's keystore into
+    ``export_dir`` (mode 0o700) using the same atomic-write discipline as
+    the in-place writers. Filenames are preserved so the operator can
+    ``cp export_dir/* ~/.robot-md/keys/`` verbatim to restore.
+
+    Raises ``OSError`` (or subclass) on any failure — caller decides what
+    to surface to the operator.
+    """
+    export_dir.mkdir(parents=True, exist_ok=True)
+    with suppress(OSError):
+        os.chmod(export_dir, 0o700)
+    keystore = _keystore_dir()
+    for filename in (f"{rrn}.signing.json", f"{rrn}.apikey"):
+        src = keystore / filename
+        if not src.exists():
+            # apikey may legitimately be missing if RRF returned no api_key
+            # in raw (older deployments); the signing.json must always exist.
+            if filename.endswith(".apikey"):
+                continue
+            raise FileNotFoundError(f"expected {src} after mint, not found")
+        dst = export_dir / filename
+        tmp = dst.with_suffix(dst.suffix + ".tmp")
+        tmp.write_bytes(src.read_bytes())
+        os.chmod(tmp, 0o600)
+        tmp.replace(dst)
+
+
 def cli_register(
     manifest_path: Path | str,
     *,
@@ -542,12 +570,26 @@ def cli_register(
     firmware_version: str | None = None,
     rcan_version: str | None = None,
     dry_run: bool = False,
+    export_to: Path | str | None = None,
 ) -> int:
-    """Register a ROBOT.md with RRF, signing the POST body (v0.9.1)."""
+    """Register a ROBOT.md with RRF, signing the POST body (v0.9.1).
+
+    When ``export_to`` is set, copies of the minted ``<rrn>.signing.json``
+    and ``<rrn>.apikey`` are written to that directory in addition to the
+    normal ``$HOME/.robot-md/keys/`` write. Lets a subagent harness with
+    isolated ``HOME`` persist credentials to the caller's filesystem
+    before teardown (closes robot-md#79).
+    """
     path = Path(manifest_path)
     if not path.exists():
         print(f"error: {path} does not exist", file=sys.stderr)
         return 2
+
+    if dry_run and export_to is not None:
+        print(
+            "warning: --export-to has no effect under --dry-run (no credentials will be minted).",
+            file=sys.stderr,
+        )
 
     parsed = parse_file(path)
     meta = parsed.frontmatter.get("metadata") or {}
@@ -614,6 +656,26 @@ def cli_register(
     api_key = result.raw.get("api_key")
     if api_key:
         _write_apikey(result.rrn, api_key)
+
+    # 4.25. If --export-to set, copy the minted material to the caller's
+    # filesystem (outside any subagent-isolated $HOME). Fail loud on error:
+    # the RRN is already minted on RRF, so a silent fallback would re-create
+    # the original drift bug (closes #79).
+    if export_to is not None:
+        export_dir = Path(export_to)
+        try:
+            _export_credentials(export_dir, result.rrn)
+        except OSError as e:
+            home_keys = _keystore_dir() / f"{result.rrn}.*"
+            print(
+                f"error: --export-to write failed: {e}\n"
+                f"  Credentials WERE minted on RRF (RRN={result.rrn}).\n"
+                f"  Recover from {home_keys} inside the subagent before it\n"
+                f"  terminates, or revoke {result.rrn} on RRF.",
+                file=sys.stderr,
+            )
+            return 4
+        print(f"  Exported keypair + apikey to {export_dir}", file=sys.stderr)
 
     # 4.5. Bind pq_kid → operator-envelope authority so the gateway's
     # /v2/keys/<pq_kid> resolver can verify envelope signatures from this
