@@ -54,40 +54,44 @@ class Perception:
         except Exception as e:
             raise RuntimeError(f"depthai (or numpy) not available: {e}") from e
 
-        # Read calibration (exclusive device access) first.
-        with dai.Device() as cal_dev:
-            mat = cal_dev.readCalibration().getCameraIntrinsics(
-                dai.CameraBoardSocket.CAM_A,
-                self._rgb_w,
-                self._rgb_h,
-            )
+        # depthai v2 pipeline. Mirrors the proven oak_d_actuator.Camera path
+        # (ColorCamera preview + MonoCamera pair -> StereoDepth -> Device), with
+        # two additions so depth back-projects correctly: depth is aligned to
+        # the RGB socket and resized to the RGB resolution, so depth[v, u]
+        # indexes the same world point as rgb[v, u] and shares K.
+        # (robot-md 1.10.3 shipped a depthai-v3 pipeline here; this Pi runs
+        # depthai 2.x — the whole ecosystem's pinned version.)
+        pipeline = dai.Pipeline()
+
+        cam_rgb = pipeline.create(dai.node.ColorCamera)
+        cam_rgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
+        cam_rgb.setPreviewSize(self._rgb_w, self._rgb_h)
+        cam_rgb.setInterleaved(False)
+        xout_rgb = pipeline.create(dai.node.XLinkOut)
+        xout_rgb.setStreamName("rgb")
+        cam_rgb.preview.link(xout_rgb.input)
+
+        mono_l = pipeline.create(dai.node.MonoCamera)
+        mono_l.setBoardSocket(dai.CameraBoardSocket.CAM_B)
+        mono_r = pipeline.create(dai.node.MonoCamera)
+        mono_r.setBoardSocket(dai.CameraBoardSocket.CAM_C)
+
+        stereo = pipeline.create(dai.node.StereoDepth)
+        stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
+        stereo.setOutputSize(self._rgb_w, self._rgb_h)
+        mono_l.out.link(stereo.left)
+        mono_r.out.link(stereo.right)
+        xout_depth = pipeline.create(dai.node.XLinkOut)
+        xout_depth.setStreamName("depth")
+        stereo.depth.link(xout_depth.input)
+
+        self._pipe = dai.Device(pipeline).__enter__()
+        self._rgb_q = self._pipe.getOutputQueue("rgb", maxSize=4, blocking=False)
+        self._depth_q = self._pipe.getOutputQueue("depth", maxSize=4, blocking=False)
+
+        calib = self._pipe.readCalibration()
+        mat = calib.getCameraIntrinsics(dai.CameraBoardSocket.CAM_A, self._rgb_w, self._rgb_h)
         self.K = np.array(mat, dtype=np.float64)
-
-        pipe = dai.Pipeline()
-        pipe.__enter__()
-        try:
-            rgb_cam = pipe.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_A)
-            rgb_out = rgb_cam.requestOutput(size=RGB_SIZE, type=dai.ImgFrame.Type.NV12)
-            self._rgb_q = rgb_out.createOutputQueue()
-
-            left = pipe.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_B)
-            right = pipe.create(dai.node.Camera).build(dai.CameraBoardSocket.CAM_C)
-            left_out = left.requestOutput(size=DEPTH_SIZE, type=dai.ImgFrame.Type.NV12)
-            right_out = right.requestOutput(size=DEPTH_SIZE, type=dai.ImgFrame.Type.NV12)
-
-            stereo = pipe.create(dai.node.StereoDepth)
-            stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
-            stereo.setOutputSize(self._rgb_w, self._rgb_h)
-            stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.FAST_ACCURACY)
-            left_out.link(stereo.left)
-            right_out.link(stereo.right)
-            self._depth_q = stereo.depth.createOutputQueue()
-
-            pipe.start()
-            self._pipe = pipe
-        except Exception:
-            pipe.__exit__(None, None, None)
-            raise
 
     def close(self) -> None:
         if self._pipe is not None:
