@@ -51,6 +51,19 @@ def _write(tmp_path: Path, content: str = BOB_MIN) -> Path:
     return p
 
 
+@pytest.fixture(autouse=True)
+def _no_live_rrf(monkeypatch):
+    """cli_register's preflight peek (step 1.5) and envelope-authority bind
+    (step 4.5) hit the real RRF endpoint unless a test patches them — a real
+    peek hangs CI runners (TimeoutError) and a real authority POST writes junk
+    records to the public registry. Default both to inert fakes; tests that
+    exercise them re-patch explicitly (which overrides this fixture)."""
+    monkeypatch.setattr("robot_md.register.peek_next_rrn", lambda *a, **kw: None)
+    monkeypatch.setattr(
+        "robot_md.register.post_envelope_authority", lambda *a, **kw: {"status": "ok"}
+    )
+
+
 # ---- _extract_mint_fields (current API) ---------------------------------
 
 
@@ -302,6 +315,36 @@ def test_cli_register_succeeds_when_envelope_authority_post_fails(tmp_path, monk
     with (
         patch("robot_md.register.post_to_rrf", fake_post),
         patch("robot_md.register.post_envelope_authority", fake_authority_post_fails),
+    ):
+        rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
+
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "envelope" in err.lower() or "authority" in err.lower()
+
+
+def test_cli_register_succeeds_when_envelope_authority_post_times_out(
+    tmp_path, monkeypatch, capsys
+):
+    """A socket-level failure (TimeoutError/URLError are OSErrors, not
+    RuntimeErrors) must be just as non-fatal as an HTTP-level one — this is
+    exactly how the unmocked authority POST killed register on CI runners."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    path = _write(tmp_path)
+
+    def fake_post(endpoint, body, timeout=15.0):
+        from robot_md.register import MintResult
+
+        return MintResult(
+            rrn="RRN-000000000099", registered_at="x", record_url="u", raw={"api_key": "k"}
+        )
+
+    def fake_authority_post_hangs(endpoint, body, timeout=15.0):
+        raise TimeoutError("The read operation timed out")
+
+    with (
+        patch("robot_md.register.post_to_rrf", fake_post),
+        patch("robot_md.register.post_envelope_authority", fake_authority_post_hangs),
     ):
         rc = cli_register(path, endpoint=DEFAULT_ENDPOINT)
 

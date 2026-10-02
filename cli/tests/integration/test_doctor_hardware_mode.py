@@ -12,6 +12,12 @@ from robot_md.__main__ import app
 from robot_md.init_phases import PhaseResult
 
 
+@pytest.fixture(autouse=True)
+def _no_registry_probe(monkeypatch):
+    # doctor's network check GETs the live registry; nothing here is about it.
+    monkeypatch.setattr("robot_md.doctor.check_network", lambda fm: [])
+
+
 def _stub_phase(name):
     def _inner(*a, **kw):
         return PhaseResult(phase=name, status="skipped", message="", detail={})
