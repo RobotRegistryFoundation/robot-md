@@ -173,6 +173,29 @@ def actuator_search_by_rpn(rpn: str) -> str:
     return f"{rpn}\n{body}"
 
 
+_TEMPLATE_MARKERS = ("{{", "{%")
+
+
+class UnfilledPlaceholderError(ValueError):
+    """Package metadata still carries template syntax from `actuator init`.
+
+    Publishing it would register the literal placeholder strings in the public
+    RRF catalog (robot-md#56: robot-md-example-actuator went out with
+    hardware_tags ['{{ hardware_tag_1 }}', '{{ hardware_tag_2 }}']).
+    """
+
+
+def _placeholder_fields(meta: dict) -> list[str]:
+    bad: list[str] = []
+    for key in ("name", "version", "description", "repository_url"):
+        if any(m in str(meta.get(key) or "") for m in _TEMPLATE_MARKERS):
+            bad.append(key)
+    for key in ("hardware_tags", "manifest_signals"):
+        if any(any(m in v for m in _TEMPLATE_MARKERS) for v in meta.get(key) or []):
+            bad.append(key)
+    return bad
+
+
 def detect_package_metadata(pkg_dir: Path) -> dict:
     """Scan a scaffolded actuator package and return metadata for publish.
 
@@ -181,7 +204,8 @@ def detect_package_metadata(pkg_dir: Path) -> dict:
       - src/<snake>/skills/*.SKILL.md frontmatter for hardware_tags + manifest_signals
       - claude-plugin/.claude-plugin/plugin.json existence flag
 
-    Raises FileNotFoundError if pyproject.toml is missing.
+    Raises FileNotFoundError if pyproject.toml is missing, and
+    UnfilledPlaceholderError if a published field still holds template syntax.
     """
     pyproject = pkg_dir / "pyproject.toml"
     if not pyproject.is_file():
@@ -215,7 +239,7 @@ def detect_package_metadata(pkg_dir: Path) -> dict:
                     k_dst.extend(str(x) for x in v)
 
     plugin_marker = pkg_dir / "claude-plugin" / ".claude-plugin" / "plugin.json"
-    return {
+    meta = {
         "name": project.get("name", pkg_dir.name),
         "version": project.get("version", "0.0.0"),
         "description": project.get("description", ""),
@@ -225,6 +249,14 @@ def detect_package_metadata(pkg_dir: Path) -> dict:
         "has_plugin_layout": plugin_marker.is_file(),
         "skill_files": skill_files,
     }
+    bad = _placeholder_fields(meta)
+    if bad:
+        raise UnfilledPlaceholderError(
+            f"{pkg_dir.name}: {', '.join(bad)} still contain template placeholders "
+            f"('{{{{ ... }}}}'). Fill them in pyproject.toml and "
+            f"src/{snake}/skills/*.SKILL.md before publishing."
+        )
+    return meta
 
 
 def build_registry_entry(
