@@ -24,7 +24,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [1.10.5] - 2026-05-25
+## [1.10.5] - 2026-10-02
 
 ### Added
 
@@ -42,8 +42,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   Fails loud (exit 4) if the export write fails after the RRF mint
   succeeded: prints a recovery message naming the minted RRN and the
   HOME path. Silently swallowing the failure would re-introduce the
-  drift bug. With `--dry-run`, surfaces a warning and skips the export
-  (nothing was minted).
+  drift bug. The export runs after the authority bind and the RRN
+  write-back, so a failed export still leaves the manifest carrying its
+  RRN (otherwise the next `register` would mint a second one). Exported
+  files are created 0o600, never at umask mode. With `--dry-run`, surfaces
+  a warning and skips the export (nothing was minted).
 
 ---
 

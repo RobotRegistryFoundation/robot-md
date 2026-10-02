@@ -555,8 +555,13 @@ def _export_credentials(export_dir: Path, rrn: str) -> None:
             raise FileNotFoundError(f"expected {src} after mint, not found")
         dst = export_dir / filename
         tmp = dst.with_suffix(dst.suffix + ".tmp")
-        tmp.write_bytes(src.read_bytes())
-        os.chmod(tmp, 0o600)
+        with suppress(FileNotFoundError):
+            tmp.unlink()
+        # Created 0o600, not chmod'ed after: export_dir may be a pre-existing
+        # shared directory, so the secret is never readable at umask mode.
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "wb") as f:
+            f.write(src.read_bytes())
         tmp.replace(dst)
 
 
@@ -657,26 +662,6 @@ def cli_register(
     if api_key:
         _write_apikey(result.rrn, api_key)
 
-    # 4.25. If --export-to set, copy the minted material to the caller's
-    # filesystem (outside any subagent-isolated $HOME). Fail loud on error:
-    # the RRN is already minted on RRF, so a silent fallback would re-create
-    # the original drift bug (closes #79).
-    if export_to is not None:
-        export_dir = Path(export_to)
-        try:
-            _export_credentials(export_dir, result.rrn)
-        except OSError as e:
-            home_keys = _keystore_dir() / f"{result.rrn}.*"
-            print(
-                f"error: --export-to write failed: {e}\n"
-                f"  Credentials WERE minted on RRF (RRN={result.rrn}).\n"
-                f"  Recover from {home_keys} inside the subagent before it\n"
-                f"  terminates, or revoke {result.rrn} on RRF.",
-                file=sys.stderr,
-            )
-            return 4
-        print(f"  Exported keypair + apikey to {export_dir}", file=sys.stderr)
-
     # 4.5. Bind pq_kid → operator-envelope authority so the gateway's
     # /v2/keys/<pq_kid> resolver can verify envelope signatures from this
     # robot. Non-fatal: if the authorities POST fails, the manifest is
@@ -713,6 +698,28 @@ def cli_register(
         write_rrn_to_manifest(path, result.rrn, result.record_url)
     except RuntimeError as e:
         print(f"  warning: could not update manifest: {e}", file=sys.stderr)
+
+    # 5.5. If --export-to set, copy the minted material to the caller's
+    # filesystem (outside any subagent-isolated $HOME). Runs AFTER the
+    # authority bind and the manifest write-back: a failed export must not
+    # leave the manifest without its RRN, or the next `register` mints a
+    # second one and the drift this flag exists to fix comes back (#79).
+    # Fail loud on error: the RRN is already minted on RRF.
+    if export_to is not None:
+        export_dir = Path(export_to)
+        try:
+            _export_credentials(export_dir, result.rrn)
+        except OSError as e:
+            home_keys = _keystore_dir() / f"{result.rrn}.*"
+            print(
+                f"error: --export-to write failed: {e}\n"
+                f"  Credentials WERE minted on RRF (RRN={result.rrn}).\n"
+                f"  Recover from {home_keys} inside the subagent before it\n"
+                f"  terminates, or revoke {result.rrn} on RRF.",
+                file=sys.stderr,
+            )
+            return 4
+        print(f"  Exported keypair + apikey to {export_dir}", file=sys.stderr)
 
     # 6. Friendly output.
     print(

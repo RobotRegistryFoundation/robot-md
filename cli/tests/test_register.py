@@ -750,10 +750,14 @@ def test_cli_register_export_to_fails_loud_when_path_unwritable(tmp_path, monkey
     with (
         patch("robot_md.register.peek_next_rrn", lambda *_a, **_kw: None),
         patch("robot_md.register.post_to_rrf", fake_post),
+        patch("robot_md.register.post_envelope_authority", lambda *_a, **_kw: {}),
     ):
         rc = cli_register(path, endpoint=DEFAULT_ENDPOINT, export_to=export_dir)
 
     assert rc != 0
+    # The RRN was still written back to the manifest. Without it, the next
+    # `register` mints a SECOND RRN: the drift #79 exists to prevent.
+    assert "RRN-000000000099" in path.read_text()
     err = capsys.readouterr().err
     # Recovery message must surface enough for the operator to act.
     assert "RRN-000000000099" in err
