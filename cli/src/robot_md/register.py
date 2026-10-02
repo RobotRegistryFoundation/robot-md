@@ -636,7 +636,9 @@ def cli_register(
                 },
             ),
         )
-    except RuntimeError as e:
+    except (RuntimeError, OSError) as e:
+        # OSError covers socket-level failures (TimeoutError, URLError) that
+        # would otherwise escape and fail a register whose mint already succeeded.
         print(
             f"  warning: could not register envelope-authority kid for {result.rrn}: {e}\n"
             f"  gateway envelope verification will 404 until this is retried "

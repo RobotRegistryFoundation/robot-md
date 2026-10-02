@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import ipaddress
 import os
+import socket
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -35,6 +37,9 @@ if importlib.util.find_spec("scservo_sdk") is None:
 def pytest_configure(config):
     config.addinivalue_line("markers", "hardware: requires physical robot hardware; opt-in")
     config.addinivalue_line("markers", "integration: integration test (local subprocess OK)")
+    config.addinivalue_line(
+        "markers", "live_network: may reach non-loopback hosts (opt-in; never prod RRF)"
+    )
 
 
 def pytest_addoption(parser):
@@ -65,3 +70,74 @@ def fixtures_dir() -> Path:
 @pytest.fixture
 def examples_dir() -> Path:
     return Path(__file__).parent.parent.parent / "examples"
+
+
+# ---- no live network (#100) ------------------------------------------------
+#
+# A test that forgot to patch one RRF call used to reach the real
+# robotregistryfoundation.org: it hung CI runners and, when the network
+# worked, wrote junk authority records to the PUBLIC registry on every local
+# run. Patching each call site is not enough (new steps get added to
+# cli_register and the old tests keep passing), so the suite refuses
+# non-loopback hosts outright and FAILS the test that tried. Loopback and
+# unix sockets are fine (local servers, subprocess fixtures).
+_LOOPBACK_NAMES = {"localhost", "localhost.localdomain", "ip6-localhost"}
+
+
+def _is_loopback(host) -> bool:
+    if host is None:
+        return True
+    if isinstance(host, bytes):
+        host = host.decode()
+    host = str(host).strip("[]").split("%")[0]
+    if host in _LOOPBACK_NAMES or host == "":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+@pytest.fixture(autouse=True)
+def _no_live_network(request, monkeypatch):
+    if request.node.get_closest_marker("live_network"):
+        yield
+        return
+    attempts: list[str] = []
+    real_getaddrinfo = socket.getaddrinfo
+    real_connect = socket.socket.connect
+    real_connect_ex = socket.socket.connect_ex
+
+    def _refuse(where: str):
+        attempts.append(where)
+        return OSError(f"live network blocked in tests (#100): {where}")
+
+    def guarded_getaddrinfo(host, port, *args, **kwargs):
+        if not _is_loopback(host):
+            raise _refuse(f"getaddrinfo({host!r}, {port!r})")
+        return real_getaddrinfo(host, port, *args, **kwargs)
+
+    def _check(address):
+        if isinstance(address, tuple) and not _is_loopback(address[0]):
+            raise _refuse(f"connect({address[0]!r}, {address[1]!r})")
+
+    def guarded_connect(self, address):
+        _check(address)
+        return real_connect(self, address)
+
+    def guarded_connect_ex(self, address):
+        _check(address)
+        return real_connect_ex(self, address)
+
+    monkeypatch.setattr(socket, "getaddrinfo", guarded_getaddrinfo)
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+    yield
+    if attempts:
+        # Raised OSErrors are often swallowed by code that degrades
+        # gracefully, so the test could pass; fail it here instead.
+        pytest.fail(
+            "test reached for the live network; patch the call or mark it "
+            "@pytest.mark.live_network:\n  " + "\n  ".join(attempts),
+            pytrace=False,
+        )
