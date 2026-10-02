@@ -18,6 +18,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   comment and TODO prose in the body; `publish` (including `--dry-run`) exits
   1 naming the fields when any published field still holds `{{` or `{%`, which
   also catches packages scaffolded by older versions. Closes #56.
+- **Pin `mcp<2`.** mcp 2.0 removed `mcp.server.fastmcp` (renamed to
+  `MCPServer`), and `mcp>=1.0` let a fresh install resolve 2.x, so
+  `robot_md.mcp.server` failed to import on every new install of 1.10.4.
 
 ---
 
