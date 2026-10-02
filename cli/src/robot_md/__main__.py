@@ -2142,6 +2142,7 @@ def actuator_publish_cmd(
     import subprocess
 
     from robot_md.actuator import (
+        UnfilledPlaceholderError,
         _build_register_body,
         _build_version_body,
         actuator_publish_first_time,
@@ -2174,6 +2175,9 @@ def actuator_publish_cmd(
         meta = detect_package_metadata(package_dir.resolve())
     except FileNotFoundError as e:
         typer.secho(f"Could not read package: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(FILE_ERROR) from e
+    except UnfilledPlaceholderError as e:
+        typer.secho(f"Refusing to publish: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(FILE_ERROR) from e
 
     cached_rpn, _ = load_published_rpn(meta["name"])

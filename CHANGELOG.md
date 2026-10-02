@@ -7,6 +7,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`actuator init` no longer scaffolds template placeholders, and `actuator
+  publish` refuses them.** The SKILL.md template left `{{ hardware_tag_1 }}`,
+  `{{ signal_1 }}` and `{% for %}` blocks in place, and `publish` registered
+  them at RRF as literal tags (robot-md-example-actuator v0.1.0 went out with
+  `hardware_tags: ['{{ hardware_tag_1 }}', '{{ hardware_tag_2 }}']`). The
+  scaffold now writes empty `hardware_tags` / `manifest_signals` with a TODO
+  comment and TODO prose in the body; `publish` (including `--dry-run`) exits
+  1 naming the fields when any published field still holds `{{` or `{%`, which
+  also catches packages scaffolded by older versions. Closes #56.
+
 ---
 
 ## [1.10.4] - 2026-05-11
