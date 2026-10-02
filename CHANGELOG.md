@@ -7,21 +7,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Fixed
-
-- **`actuator init` no longer scaffolds template placeholders, and `actuator
-  publish` refuses them.** The SKILL.md template left `{{ hardware_tag_1 }}`,
-  `{{ signal_1 }}` and `{% for %}` blocks in place, and `publish` registered
-  them at RRF as literal tags (robot-md-example-actuator v0.1.0 went out with
-  `hardware_tags: ['{{ hardware_tag_1 }}', '{{ hardware_tag_2 }}']`). The
-  scaffold now writes empty `hardware_tags` / `manifest_signals` with a TODO
-  comment and TODO prose in the body; `publish` (including `--dry-run`) exits
-  1 naming the fields when any published field still holds `{{` or `{%`, which
-  also catches packages scaffolded by older versions. Closes #56.
-- **Pin `mcp<2`.** mcp 2.0 removed `mcp.server.fastmcp` (renamed to
-  `MCPServer`), and `mcp>=1.0` let a fresh install resolve 2.x, so
-  `robot_md.mcp.server` failed to import on every new install of 1.10.4.
-
 ---
 
 ## [1.10.5] - 2026-10-02
@@ -47,6 +32,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   RRN (otherwise the next `register` would mint a second one). Exported
   files are created 0o600, never at umask mode. With `--dry-run`, surfaces
   a warning and skips the export (nothing was minted).
+
+### Fixed
+
+- **`actuator init` no longer scaffolds template placeholders, and `actuator
+  publish` refuses them.** The SKILL.md template left `{{ hardware_tag_1 }}`,
+  `{{ signal_1 }}` and `{% for %}` blocks in place, and `publish` registered
+  them at RRF as literal tags (robot-md-example-actuator v0.1.0 went out with
+  `hardware_tags: ['{{ hardware_tag_1 }}', '{{ hardware_tag_2 }}']`). The
+  scaffold now writes empty `hardware_tags` / `manifest_signals` with a TODO
+  comment and TODO prose in the body; `publish` (including `--dry-run`) exits
+  1 naming the fields when any published field still holds `{{` or `{%`, which
+  also catches packages scaffolded by older versions. Closes #56.
+- **Pin `mcp<2`.** mcp 2.0 removed `mcp.server.fastmcp` (renamed to
+  `MCPServer`), and `mcp>=1.0` let a fresh install resolve 2.x, so
+  `robot_md.mcp.server` failed to import on every new install of 1.10.4.
+- **`register` survives a socket timeout on the authority bind.** Step 4.5
+  now catches `OSError` as well as `RuntimeError`, so a timed-out
+  `/v2/authorities/register` POST is the documented non-fatal warning, not
+  a failed register whose mint already succeeded. The test suite now
+  refuses non-loopback hosts, so no test can reach production RRF
+  (#100).
 
 ---
 
