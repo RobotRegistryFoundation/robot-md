@@ -7,6 +7,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.10.5] - 2026-10-02
+
+### Added
+
+- **`register --export-to <path>`.** Writes copies of the minted
+  `<rrn>.signing.json` and `<rrn>.apikey` to a caller-supplied directory
+  in addition to `~/.robot-md/keys/`. Lets a subagent harness with an
+  isolated `HOME` persist credentials to the caller's filesystem before
+  teardown — the structural fix for the silent operator/RRF drift caught
+  during Spec B Phase E orientation (closes #79).
+
+  Files preserve their canonical names (`<rrn>.signing.json`,
+  `<rrn>.apikey`) so the natural restore path is `cp <export-dir>/* ~/.robot-md/keys/`.
+  Atomic write + mode 0o600, matching the in-place writers.
+
+  Fails loud (exit 4) if the export write fails after the RRF mint
+  succeeded: prints a recovery message naming the minted RRN and the
+  HOME path. Silently swallowing the failure would re-introduce the
+  drift bug. The export runs after the authority bind and the RRN
+  write-back, so a failed export still leaves the manifest carrying its
+  RRN (otherwise the next `register` would mint a second one). Exported
+  files are created 0o600, never at umask mode. With `--dry-run`, surfaces
+  a warning and skips the export (nothing was minted).
+
 ### Fixed
 
 - **`actuator init` no longer scaffolds template placeholders, and `actuator
@@ -21,6 +47,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Pin `mcp<2`.** mcp 2.0 removed `mcp.server.fastmcp` (renamed to
   `MCPServer`), and `mcp>=1.0` let a fresh install resolve 2.x, so
   `robot_md.mcp.server` failed to import on every new install of 1.10.4.
+- **`register` survives a socket timeout on the authority bind.** Step 4.5
+  now catches `OSError` as well as `RuntimeError`, so a timed-out
+  `/v2/authorities/register` POST is the documented non-fatal warning, not
+  a failed register whose mint already succeeded. The test suite now
+  refuses non-loopback hosts, so no test can reach production RRF
+  (#100).
 
 ---
 
