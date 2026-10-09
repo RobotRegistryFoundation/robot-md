@@ -92,6 +92,21 @@ jobs:
           fi
           echo "✓ All three schema copies match"
 
+  readme-sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify cli/README.md matches README.md
+        run: |
+          # PyPI's long description is cli/README.md (hatchling refuses a readme
+          # outside cli/). It must stay a byte-for-byte copy of README.md.
+          if ! cmp -s README.md cli/README.md; then
+            echo "::error::cli/README.md has drifted from README.md. Run: scripts/sync-readme.sh"
+            diff -u README.md cli/README.md || true
+            exit 1
+          fi
+          echo "✓ cli/README.md matches README.md"
+
   skill-sync-check:
     runs-on: ubuntu-latest
     steps:

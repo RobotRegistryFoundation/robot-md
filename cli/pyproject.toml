@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "robot-md"
 version = "1.10.5"
 description = "ROBOT.md — a single self-describing file so Claude can safely operate your robot."
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "craigm26", email = "craigm26@gmail.com" }]
