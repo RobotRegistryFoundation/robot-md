@@ -227,8 +227,8 @@
           <div class="rrn-label">RMN — Robot Model Number</div>
           <div class="rrn-value">RMN-000000000004</div>
           <div class="rrn-desc">
-            Identifies a robot model (e.g., SO-ARM101 v2). Required field in ROBOT.md
-            for EU AI Act compliance (the model number is the anchor for §26 EU Register filings).
+            Identifies a robot model (e.g., SO-ARM101 v2). Required in ROBOT.md before
+            emitting a §26 EU-register packet, which RRF files per model.
           </div>
         </div>
       </div>
@@ -300,7 +300,7 @@
           <tr>
             <td>§23</td>
             <td>/v2/safety-benchmark</td>
-            <td>Safety benchmark (ISO 42001 self-assessment)</td>
+            <td>Safety benchmark (synthetic timing of software safety paths)</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
@@ -312,13 +312,13 @@
           <tr>
             <td>§25</td>
             <td>/v2/incident-report</td>
-            <td>Incident report Art. 72</td>
+            <td>Incident report (post-market monitoring, Art. 72; reporting to authorities under Art. 73 is the provider's step)</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§26</td>
             <td>/v2/eu-register</td>
-            <td>EU Register Art. 49 filing</td>
+            <td>EU-register packet (Art. 49 fields), filed with RRF only</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
