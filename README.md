@@ -25,10 +25,10 @@ This repo is the **declaration layer** — the file format + Python CLI. Everyth
 | **Registry** | [Robot Registry Foundation](https://robotregistryfoundation.org) | Permanent RRN identities. Public resolver at `/r/<rrn>`. Like ICANN for robots. |
 | **Productized runtime (Layer 4)** | [OpenCastor](https://github.com/craigm26/OpenCastor) | Open-source productized RCAN runtime. Gateway-as-kernel + drivers + fleet + cloud bridge + UI. Most fully-documented RCAN runtime; not "the" reference (RCAN is implementation-independent). |
 
-<!-- BEGIN: ecosystem authority disclaimer (canonical, derived from spec §10) -->
+<!-- BEGIN: ecosystem authority disclaimer (canonical; revised 2026-10-08 from spec §10 after EV-03; keep identical in robot-md, robot-md-gateway and OpenCastor) -->
 > **Where safety is meant to be enforced.**
 >
-> Physical limits are meant to be enforced at Layer 3 (`robot-md-gateway` and the actuator driver it calls) or Layer 4 (a runtime that embeds it, e.g., OpenCastor). Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it. Layer 3 is not a certified safety function, and hostile-input testing in simulation (October 2026) found motions it does not yet bound.
+> Physical limits are meant to be enforced at Layer 3 (`robot-md-gateway` and the actuator driver it calls), and only for commands that pass through it. OpenCastor (Layer 4) does not embed the gateway yet, so actuators it drives directly are not covered. Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it. Layer 3 is not a certified safety function, and hostile-input testing in simulation (October 2026) found motions it does not yet bound.
 <!-- END: ecosystem authority disclaimer -->
 
 ## The 60-second pitch

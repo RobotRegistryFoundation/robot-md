@@ -228,7 +228,7 @@
           <div class="rrn-value">RMN-000000000004</div>
           <div class="rrn-desc">
             Identifies a robot model (e.g., SO-ARM101 v2). Required in ROBOT.md before
-            emitting a §26 EU-register packet, which RRF files per model.
+            emitting a §26 EU-register packet; the CLI files that packet with RRF, one per model.
           </div>
         </div>
       </div>
@@ -293,31 +293,31 @@
         <tbody>
           <tr>
             <td>§22</td>
-            <td>/v2/fria</td>
+            <td>/v2/robots/&lt;rrn&gt;/fria</td>
             <td>FRIA — Fundamental Rights Impact Assessment</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§23</td>
-            <td>/v2/safety-benchmark</td>
+            <td>/v2/robots/&lt;rrn&gt;/safety-benchmark</td>
             <td>Safety benchmark (synthetic timing of software safety paths)</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§24</td>
-            <td>/v2/ifu</td>
+            <td>/v2/robots/&lt;rrn&gt;/ifu</td>
             <td>IFU Art. 13(3) — Instructions for Use</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§25</td>
-            <td>/v2/incident-report</td>
+            <td>/v2/robots/&lt;rrn&gt;/incident-report</td>
             <td>Incident report (post-market monitoring, Art. 72; reporting to authorities under Art. 73 is the provider's step)</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
           <tr>
             <td>§26</td>
-            <td>/v2/eu-register</td>
+            <td>/v2/models/&lt;rmn&gt;/eu-register</td>
             <td>EU-register packet (Art. 49 fields), filed with RRF only</td>
             <td><span class="ep-live">● Live</span></td>
           </tr>
