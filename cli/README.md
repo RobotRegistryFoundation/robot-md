@@ -18,17 +18,17 @@ This repo is the **declaration layer** — the file format + Python CLI. Everyth
 |---|---|---|
 | **Declaration** ← *this* | [ROBOT.md](https://github.com/RobotRegistryFoundation/robot-md) | The file a robot ships at its root. YAML frontmatter + markdown prose. Declares identity, capabilities, safety gates. **Spec + `robot-md` Python CLI** (`init`, `validate`, `render`, `calibrate`, `register`, `autodetect`). |
 | **Agent bridge** | [robot-md-mcp](https://github.com/RobotRegistryFoundation/robot-md-mcp) | MCP server that exposes a `ROBOT.md` to Claude Code, Claude Desktop, Cursor, Zed, Gemini CLI — any MCP-aware agent. One `claude mcp add` away. |
-| **Gateway / Enforcement (Layer 3)** | [robot-md-gateway](https://github.com/RobotRegistryFoundation/robot-md-gateway) | Designed to be the only path between agent intent and any actuator; that holds only when the deployment enforces it (the gateway's service account owns the device), and by default another local process can still reach the servos. Receives signed RCAN INVOKE envelopes, verifies manifest provenance, applies tier policy + tool allowlist, dispatches to drivers, signs an audit-bundle entry per action. (Renamed from `robot-md-dispatcher` 2026-05.) |
+| **Gateway / Enforcement (Layer 3)** | [robot-md-gateway](https://github.com/RobotRegistryFoundation/robot-md-gateway) | Mandatory exclusive path between agent intent and any actuator. Receives signed RCAN INVOKE envelopes, verifies manifest provenance, applies tier policy + tool allowlist, dispatches to drivers, signs an audit-bundle entry per action. (Renamed from `robot-md-dispatcher` 2026-05.) |
 | **Wire protocol** | [RCAN](https://rcan.dev/spec/) | How robots, gateways, and planners talk. Signed envelopes, LoA enforcement, PQC crypto. Think HTTP for robots. |
-| **Python SDK** | [rcan-py](https://github.com/RobotRegistryFoundation/rcan-py) | `pip install rcan` — `RCANMessage`, `RobotURI`, `ConfidenceGate`, `HiTLGate`, `AuditChain`. |
-| **TypeScript SDK** | [rcan-ts](https://github.com/RobotRegistryFoundation/rcan-ts) | `npm install rcan-ts` — same API surface for Node + browser. |
+| **Python SDK** | [rcan-py](https://github.com/continuonai/rcan-py) | `pip install rcan` — `RCANMessage`, `RobotURI`, `ConfidenceGate`, `HiTLGate`, `AuditChain`. |
+| **TypeScript SDK** | [rcan-ts](https://github.com/continuonai/rcan-ts) | `npm install rcan-ts` — same API surface for Node + browser. |
 | **Registry** | [Robot Registry Foundation](https://robotregistryfoundation.org) | Permanent RRN identities. Public resolver at `/r/<rrn>`. Like ICANN for robots. |
 | **Productized runtime (Layer 4)** | [OpenCastor](https://github.com/craigm26/OpenCastor) | Open-source productized RCAN runtime. Gateway-as-kernel + drivers + fleet + cloud bridge + UI. Most fully-documented RCAN runtime; not "the" reference (RCAN is implementation-independent). |
 
-<!-- BEGIN: ecosystem authority disclaimer (canonical; revised 2026-10-08 from spec §10 after EV-03; keep identical in robot-md, robot-md-gateway and OpenCastor) -->
-> **Where safety is meant to be enforced.**
+<!-- BEGIN: ecosystem authority disclaimer (canonical, derived from spec §10) -->
+> **Where safety is actually enforced.**
 >
-> Physical limits are meant to be enforced at Layer 3 (`robot-md-gateway` and the actuator driver it calls), and only for commands that pass through it. OpenCastor (Layer 4) does not embed the gateway yet, so actuators it drives directly are not covered. Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it. Layer 3 is not a certified safety function, and hostile-input testing in simulation (October 2026) found motions it does not yet bound.
+> Physical safety is enforced at Layer 3 (`robot-md-gateway`) or Layer 4 (a runtime that embeds it, e.g., OpenCastor). Declaration alone (Layer 1) does not enforce safety. Agent host alone (Layer 2) is not the safety boundary. If a deployment lacks Layer 3, no safety claim attaches to it.
 <!-- END: ecosystem authority disclaimer -->
 
 ## The 60-second pitch
