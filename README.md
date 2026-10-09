@@ -6,7 +6,7 @@
 > **Peer runtime:** `robot-md` and [`opencastor`](https://github.com/craigm26/OpenCastor) are first-class peer RCAN 3.x runtimes against a single `ROBOT.md` — see [PEER_RUNTIMES.md](https://github.com/craigm26/opencastor-ops/blob/master/PEER_RUNTIMES.md) for the side-by-side comparison.
 
 [![PyPI](https://img.shields.io/pypi/v/robot-md.svg)](https://pypi.org/project/robot-md/)
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/RobotRegistryFoundation/robot-md/blob/main/LICENSE)
 [![Spec](https://img.shields.io/badge/spec-live%20matrix-green.svg)](https://rcan.dev/compatibility)
 [![RCAN](https://img.shields.io/badge/RCAN-protocol-blue.svg)](https://rcan.dev/compatibility)
 
@@ -74,7 +74,7 @@ Now Claude — in Code, Desktop, or Mobile — knows your robot.
 
 ## Why it works
 
-- **Machine-readable**: frontmatter validates against a [JSON Schema](schema/v1/robot.schema.json). Runtime tools consume it directly.
+- **Machine-readable**: frontmatter validates against a [JSON Schema](https://github.com/RobotRegistryFoundation/robot-md/blob/main/schema/v1/robot.schema.json). Runtime tools consume it directly.
 - **LLM-readable**: the prose body tells Claude *why* — which actions are dangerous, which need HITL, how the robot's capabilities map to real-world tasks.
 - **One file**: no more drift between config, manifest, and README.
 
@@ -170,7 +170,7 @@ contact email me@acme.com. Then add the robot-md MCP server to this
 session.
 ```
 
-Claude will use its `Bash` tool to run the same one-liner from Option A, show you the result, and wire up the MCP server for you. See the full walkthrough (including what to paste for custom robots, how to calibrate interactively, and what Claude is allowed to do) in **[`docs/getting-started-claude-code.md`](docs/getting-started-claude-code.md)**.
+Claude will use its `Bash` tool to run the same one-liner from Option A, show you the result, and wire up the MCP server for you. See the full walkthrough (including what to paste for custom robots, how to calibrate interactively, and what Claude is allowed to do) in **[`docs/getting-started-claude-code.md`](https://github.com/RobotRegistryFoundation/robot-md/blob/main/docs/getting-started-claude-code.md)**.
 
 ---
 
@@ -211,8 +211,8 @@ Beyond the initial setup, the rest of the package is designed so that **Claude C
 | Surface | Status | Mechanism |
 |---|---|---|
 | **Claude Code** (CLI) | ✅ shipped | `claude mcp add robot-md -- npx -y robot-md-mcp ./ROBOT.md` — printed automatically by `robot-md init` |
-| **Claude Desktop** (macOS / Windows) | ✅ shipped | One command: `robot-md install-desktop ROBOT.md` merges into `claude_desktop_config.json`. Full MCP — resources + tools + slash commands (`/brief-me`, `/check-safety`, `/explain-capability`, `/manifest-status`). See [`integrations/claude-desktop/`](integrations/claude-desktop/). |
-| **Claude Mobile** (iOS / Android) | ✅ shipped (URL-fetch) | Host `ROBOT.md` + `.well-known/robot-md.json` at any public HTTPS URL, paste into the chat. `robot-md publish-discovery` generates the discovery doc. See [`integrations/claude-mobile/`](integrations/claude-mobile/). |
+| **Claude Desktop** (macOS / Windows) | ✅ shipped | One command: `robot-md install-desktop ROBOT.md` merges into `claude_desktop_config.json`. Full MCP — resources + tools + slash commands (`/brief-me`, `/check-safety`, `/explain-capability`, `/manifest-status`). See [`integrations/claude-desktop/`](https://github.com/RobotRegistryFoundation/robot-md/tree/main/integrations/claude-desktop). |
+| **Claude Mobile** (iOS / Android) | ✅ shipped (URL-fetch) | Host `ROBOT.md` + `.well-known/robot-md.json` at any public HTTPS URL, paste into the chat. `robot-md publish-discovery` generates the discovery doc. See [`integrations/claude-mobile/`](https://github.com/RobotRegistryFoundation/robot-md/tree/main/integrations/claude-mobile). |
 | **OpenAI** (Codex CLI, ChatGPT Desktop) | ✅ shipped | Same MCP server — register `npx -y robot-md-mcp /path/to/ROBOT.md` in the tool's MCP config |
 | **Google Gemini CLI** | ✅ shipped | Same MCP server — add to `~/.gemini/settings.json` under `mcpServers` |
 | **Cursor / Zed / Cline / Continue.dev / any MCP-aware harness** | ✅ shipped | Same MCP server — register the `npx` command in the tool's MCP settings |
@@ -234,11 +234,11 @@ Each layer is independent. Use ROBOT.md without OpenCastor (just for Claude cont
 
 ## Spec + docs
 
-- **[Format spec v1](spec/robot-md-v1.md)** — the authoritative definition of what goes in a ROBOT.md.
-- **[Rationale](spec/rationale.md)** — design decisions + why.
-- **[JSON Schema](schema/v1/robot.schema.json)** — draft 2020-12.
-- **[Examples](examples/)** — 4 worked ROBOT.md files (Bob, so-arm101, TurtleBot 4, minimal).
-- **[v0.2 design (draft)](spec/v0.2-design.md)** — signing, registry ingestion, tamper-evidence. Design only; no code yet. Feedback welcome.
+- **[Format spec v1](https://github.com/RobotRegistryFoundation/robot-md/blob/main/spec/robot-md-v1.md)** — the authoritative definition of what goes in a ROBOT.md.
+- **[Rationale](https://github.com/RobotRegistryFoundation/robot-md/blob/main/spec/rationale.md)** — design decisions + why.
+- **[JSON Schema](https://github.com/RobotRegistryFoundation/robot-md/blob/main/schema/v1/robot.schema.json)** — draft 2020-12.
+- **[Examples](https://github.com/RobotRegistryFoundation/robot-md/tree/main/examples)** — 4 worked ROBOT.md files (Bob, so-arm101, TurtleBot 4, minimal).
+- **[v0.2 design (draft)](https://github.com/RobotRegistryFoundation/robot-md/blob/main/spec/v0.2-design.md)** — signing, registry ingestion, tamper-evidence. Design only; no code yet. Feedback welcome.
 
 ## Scope
 
@@ -261,11 +261,11 @@ This repo is spec + tooling only. A hard line.
 
 - Open an issue to propose a spec change; breaking changes require a design doc.
 - Small, focused PRs welcome.
-- See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full guide (tests, lint, commit style).
+- See [`CONTRIBUTING.md`](https://github.com/RobotRegistryFoundation/robot-md/blob/main/CONTRIBUTING.md) for the full guide (tests, lint, commit style).
 
 ## License
 
-Apache 2.0 — see [`LICENSE`](LICENSE).
+Apache 2.0 — see [`LICENSE`](https://github.com/RobotRegistryFoundation/robot-md/blob/main/LICENSE).
 
 ## Links
 

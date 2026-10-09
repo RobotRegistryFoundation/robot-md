@@ -17,6 +17,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `README.md`; `scripts/sync-readme.sh` refreshes it and a new CI job,
   `readme-sync-check`, fails when the two drift. PyPI's long description is
   unchanged.
+- **README links are absolute.** The twelve repository-relative links in
+  `README.md` (the LICENSE badge, the schema, spec, docs, examples and
+  integrations) now point at github.com, so they resolve from `cli/README.md`
+  and on PyPI, where relative links never worked.
 - `ruff check` (RUF036): `None` moved to the end of a type union in
   `mcp/resource_subscribers.py`.
 
