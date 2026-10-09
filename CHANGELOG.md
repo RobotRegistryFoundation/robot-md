@@ -20,7 +20,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **README links are absolute.** The twelve repository-relative links in
   `README.md` (the LICENSE badge, the schema, spec, docs, examples and
   integrations) now point at github.com, so they resolve from `cli/README.md`
-  and on PyPI, where relative links never worked.
+  and on PyPI, where relative links never worked. The v0.2 design note links
+  to the `spec/` folder, because the forbidden-phrase lint refuses any URL
+  containing `/spec/v<major>.<minor>`.
 - `ruff check` (RUF036): `None` moved to the end of a type union in
   `mcp/resource_subscribers.py`.
 

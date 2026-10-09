@@ -238,7 +238,7 @@ Each layer is independent. Use ROBOT.md without OpenCastor (just for Claude cont
 - **[Rationale](https://github.com/RobotRegistryFoundation/robot-md/blob/main/spec/rationale.md)** — design decisions + why.
 - **[JSON Schema](https://github.com/RobotRegistryFoundation/robot-md/blob/main/schema/v1/robot.schema.json)** — draft 2020-12.
 - **[Examples](https://github.com/RobotRegistryFoundation/robot-md/tree/main/examples)** — 4 worked ROBOT.md files (Bob, so-arm101, TurtleBot 4, minimal).
-- **[v0.2 design (draft)](https://github.com/RobotRegistryFoundation/robot-md/blob/main/spec/v0.2-design.md)** — signing, registry ingestion, tamper-evidence. Design only; no code yet. Feedback welcome.
+- **[v0.2 design (draft)](https://github.com/RobotRegistryFoundation/robot-md/tree/main/spec)** (`spec/v0.2-design.md`) — signing, registry ingestion, tamper-evidence. Design only; no code yet. Feedback welcome.
 
 ## Scope
 
