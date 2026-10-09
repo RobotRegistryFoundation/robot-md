@@ -216,9 +216,18 @@ USB_DB: dict[tuple[str, str], dict[str, str]] = {
 # --------------------------------------------------------------------------- #
 # Known non-camera V4L2 device-name prefixes. Conservative: false positives
 # (hiding a real camera) are worse than false negatives (showing a probe
-# node). Each entry MUST be documented with provenance.
+# node). Each entry MUST be documented with provenance. The prefix matches
+# `str.startswith` semantics — bare names like "pispbe" match "pispbe-input"
+# and "pispbe-tdn-input" alike.
 V4L2_KNOWN_NON_CAMERA_PREFIXES = (
-    "pispbe-",  # Raspberry Pi ISP back-end probe nodes (provenance: Pi 5 + IMX708)
+    "pispbe",  # Raspberry Pi ISP back-end nodes (Pi 5 + IMX708). Covers both
+    # the "pispbe" bare model and "pispbe-input" / "pispbe-tdn-input" etc.
+    "pisp-fe",  # Raspberry Pi ISP front-end nodes (Pi 5).
+    "rpi-hevc-dec",  # Pi HEVC hardware decoder (not a camera).
+    "rpi-hevc-enc",  # Pi HEVC hardware encoder (not a camera).
+    "rpi-mfc",  # Pi multi-format codec (not a camera).
+    "bcm2835-codec",  # BCM2835/2837/2711 codec (not a camera).
+    "bcm2835-isp",  # BCM2835/2837/2711 ISP nodes.
 )
 
 # --------------------------------------------------------------------------- #
