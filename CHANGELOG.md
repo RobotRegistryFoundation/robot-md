@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.10.6] - 2026-10-09
+
 ### Fixed
 
 - **`pip install robot-md` from source, and the release build, failed.**
