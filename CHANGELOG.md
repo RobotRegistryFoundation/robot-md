@@ -7,6 +7,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`pip install robot-md` from source, and the release build, failed.**
+  hatchling 1.32 refuses a readme outside the project directory, and
+  `cli/pyproject.toml` pointed at `../README.md`, so every CI install and
+  `python -m build` stopped with "Readme path must be within the project
+  directory". The package now ships `cli/README.md`, a byte-for-byte copy of
+  `README.md`; `scripts/sync-readme.sh` refreshes it and a new CI job,
+  `readme-sync-check`, fails when the two drift. PyPI's long description is
+  unchanged.
+- **README links are absolute.** The twelve repository-relative links in
+  `README.md` (the LICENSE badge, the schema, spec, docs, examples and
+  integrations) now point at github.com, so they resolve from `cli/README.md`
+  and on PyPI, where relative links never worked. The v0.2 design note links
+  to the `spec/` folder, because the forbidden-phrase lint refuses any URL
+  containing `/spec/v<major>.<minor>`.
+- `ruff check` (RUF036): `None` moved to the end of a type union in
+  `mcp/resource_subscribers.py`.
+
 ---
 
 ## [1.10.5] - 2026-10-02
