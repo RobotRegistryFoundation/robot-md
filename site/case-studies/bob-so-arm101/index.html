@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Bob — SO-ARM101 (Track 3 PROVISIONAL) — case study — ROBOT.md</title>
   <meta name="description"
-    content="End-to-end walkthrough: SO-ARM101 on Raspberry Pi 5, 5 cert IDs covering bypass-denial, gated motion, replay defense, and 6-joint range-of-motion fidelity. All countersigned by rrf-root. Curl-verifiable.">
+    content="End-to-end walkthrough: SO-ARM101 on Raspberry Pi 5, 5 signed evidence records covering bypass-denial, gated motion, replay defense, and 6-joint range-of-motion fidelity. All countersigned by rrf-root. Curl-verifiable.">
   <meta name="theme-color" content="#F4EFE6">
 
   <meta property="og:title" content="Bob — SO-ARM101 (Track 3 PROVISIONAL) — case study">
-  <meta property="og:description" content="5 cert IDs. 2 run-bundles. All RRF-countersigned, all curl-verifiable.">
+  <meta property="og:description" content="5 evidence records. 2 run-bundles. All RRF-countersigned, all curl-verifiable.">
   <meta property="og:url" content="https://robotmd.dev/case-studies/bob-so-arm101/">
   <meta property="og:type" content="article">
   <meta name="twitter:card" content="summary_large_image">
@@ -272,7 +272,7 @@
       <section id="problem">
         <h2>Problem</h2>
         <p>
-          On 2026-05-09 the RobotRegistryFoundation registry was reset, invalidating every cert ID,
+          On 2026-05-09 the RobotRegistryFoundation registry was reset, invalidating every evidence record,
           transparency-log entry, and run-bundle previously issued. Re-establishing public, verifiable
           evidence required rebuilding from zero against real (non-stub) hardware before any claim
           could carry weight.
@@ -290,10 +290,10 @@
             dispatch on Bob (Raspberry Pi 5 + SO-ARM101 over <code>/dev/ttyACM0</code>).
           </li>
           <li>
-            <strong>Phase 2 — re-issue cert envelope.</strong> Re-run the prior cert-intake suite
+            <strong>Phase 2 — re-issue the evidence.</strong> Re-run the prior cert-intake suite
             (<code>GW-001</code>, <code>GATED-MOTION-100</code>, <code>REPLAY-10</code>) post-reset,
             and add <code>MOTION-FIDELITY-100</code> against real hardware on the gravity-neutral
-            <code>shoulder_pan</code> joint. 4 cert IDs minted at log indices 1–4.
+            <code>shoulder_pan</code> joint. 4 evidence records logged at indices 1–4.
           </li>
           <li>
             <strong>Phase 3 — range-of-motion breadth.</strong> Calibrate Bob's actual reachable
@@ -301,7 +301,7 @@
             floor ~−0.241 rad, wrist_flex ceiling ~+0.462 rad, wrist_roll ceiling ~+1.537 rad).
             Ship <code>so-arm101-actuator</code> v0.2.1 with Bob-calibrated <code>SAFE_RANGE_RAD</code>
             + <code>SO_ARM101_MOVE_TOLERANCE_RAD</code> env override. Run <code>FULL-SWEEP-100</code>
-            at tolerance 0.07 rad. 5th cert minted at log index 5.
+            at tolerance 0.07 rad. 5th evidence record logged at index 5.
           </li>
         </ol>
       </section>
@@ -310,8 +310,12 @@
       <section id="evidence">
         <h2>Evidence</h2>
         <p>
-          All five cert IDs and both run-bundles are countersigned by <code>rrf-root</code> in the
-          public transparency log. Each row below includes a copy-pasteable verification command.
+          All five evidence records and both run-bundles are countersigned by <code>rrf-root</code> in
+          RRF's public transparency log. Each evidence record is one test result (property, iterations,
+          pass/fail) signed by the rig key and the witness key and then logged by RRF. RRF's intake
+          endpoint is called <code>cert-intake</code> and its IDs start with <code>cert_</code>, but these
+          are self-run test results, not certifications: the witness is Craig, who also runs RRF.
+          Each row below includes a copy-pasteable verification command.
         </p>
 
         <table class="evidence-table">
@@ -320,7 +324,7 @@
               <th>Property</th>
               <th>Iterations</th>
               <th>Outcome</th>
-              <th>Cert ID</th>
+              <th>Evidence ID</th>
               <th>Log idx</th>
             </tr>
           </thead>
@@ -403,7 +407,7 @@ curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/run-b
 
         <p>
           <strong>Path to NORMATIVE:</strong> add <code>SF-001</code> evidence against physical
-          ESTOP, then re-issue this declaration as NORMATIVE citing all six cert IDs.
+          ESTOP, then re-issue this declaration as NORMATIVE citing all six evidence IDs.
         </p>
       </section>
 
@@ -458,7 +462,7 @@ curl -sS -A "case-study-verify/1.0" https://robotregistryfoundation.org/v2/run-b
             <a href="https://docs.robotmd.dev/spec/">spec</a> for envelope canonicalization rules).
           </li>
           <li>
-            Dispatch envelopes through the gateway; collect outcome telemetry; build cert +
+            Dispatch envelopes through the gateway; collect outcome telemetry; build evidence +
             run-bundle bodies; POST to <code>/v2/cert-intake</code> and
             <code>/v2/run-bundles</code>.
           </li>

@@ -82,7 +82,7 @@
 <header class="page">
   <div class="kicker">§ The registry</div>
   <h1>Registered robots</h1>
-  <p class="lede">Every robot below was minted on rcan.dev with <code style="font-family:var(--mono);background:var(--paper-2);padding:1px 6px">robot-md register</code>. Data refreshes on page load.</p>
+  <p class="lede">Every robot below was minted on rcan.dev with <code style="font-family:var(--mono);background:var(--paper-2);padding:1px 6px">robot-md register</code>. Data refreshes on page load. Each card shows the record's verification tier: tiers record who vouched for a record and with what evidence, and none of them is a safety certification.</p>
 </header>
 
 <div id="summary" class="summary" aria-live="polite">
@@ -117,6 +117,12 @@
       .replace(/'/g, "&#39;");
   }
 
+  // Tier values are part of the registry format and stay as they are. The labels say
+  // what the registry does: owners request upgrades with an evidence URL, and nothing
+  // reviews the evidence. None of the tiers is a certification or an accreditation.
+  const TIER_LABELS = { certified: "owner evidence", accredited: "owner evidence, unreviewed" };
+  function tierLabel(t) { return TIER_LABELS[t] || t; }
+
   function fmtDate(iso) {
     if (!iso) return "";
     try {
@@ -141,7 +147,7 @@
         <h2>${name}</h2>
         <div class="model">${model}</div>
         <div class="desc">${desc}</div>
-        <span class="tier ${tier}">${tier}</span>
+        <span class="tier ${tier}">${escape(tierLabel(tier))}</span>
         <div class="meta">
           <span>registered ${registered}</span>
           <span class="arrow">→</span>
@@ -180,7 +186,7 @@
         tiers[t] = (tiers[t] || 0) + 1;
       });
       const tierStr = Object.entries(tiers)
-        .map(([t, n]) => `${n} ${t}`).join(" · ");
+        .map(([t, n]) => `${n} ${escape(tierLabel(t))}`).join(" · ");
 
       summary.innerHTML = `
         <span><b>${display.length}</b> robots shown</span>

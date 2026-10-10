@@ -15,7 +15,7 @@
       <ul class="layer-list">
         <li><strong>Layer 1 — Declaration:</strong> ROBOT.md, robot-md CLI, robot-md-mcp (Advisory).</li>
         <li><strong>Layer 2 — Agent runtime:</strong> Claude Code, Codex, Gemini, any MCP host.</li>
-        <li><strong>Layer 3 — Gateway / Enforcement:</strong> robot-md-gateway. Mandatory exclusive path.</li>
+        <li><strong>Layer 3 — Gateway / Enforcement:</strong> robot-md-gateway, designed to be the only path from an agent to the actuators. That holds only when the deployment enforces it (the gateway's service account owns the device); by default another local process can still reach the servos.</li>
         <li><strong>Layer 4 — Robot-facing runtime:</strong> OpenCastor and other RCAN runtimes.</li>
         <li><strong>Layer 5 — Protocol:</strong> RCAN spec + SDKs.</li>
         <li><strong>Layer 6 — Registry:</strong> Robot Registry Foundation.</li>
