@@ -56,12 +56,18 @@ feetech = [
 # Optional: OAK-D camera for `robot-md autodetect`'s camera probe
 # and gripper-silhouette extrinsic calibration.
 vision = [
-    "depthai>=3.0",
+    # Autodetect reads the device's calibration through `dai.Device()`, which
+    # DepthAI v2 and v3 both provide. Allowing v2 here lets this extra install
+    # alongside `feetech-depthai` and `hardware`, which need v2.
+    "depthai>=2.30",
 ]
 # Optional: feetech_depthai backend for Feetech servo bus + OAK-D perception.
 feetech-depthai = [
     "pyserial>=3.5",
-    "depthai>=2.24",
+    # The backend's perception uses the DepthAI v2 API (XLinkOut,
+    # Device(pipeline), getOutputQueue), none of which exists in v3. Without the
+    # cap, a fresh install resolves v3 and the camera fails to open.
+    "depthai>=2.30,<3",
     "opencv-python>=4.8",
     "numpy>=1.24",
     "feetech-servo-sdk>=1.0",
@@ -82,7 +88,7 @@ feetech-depthai = [
 hardware = [
     "lerobot>=0.5,<0.8",
     "pyrealsense2>=2.55",
-    "depthai>=2.24",
+    "depthai>=2.30,<3",   # the feetech_depthai backend needs the v2 API
     "feetech-servo-sdk>=1.0",
     "pyserial>=3.5",
     "opencv-python>=4.8",

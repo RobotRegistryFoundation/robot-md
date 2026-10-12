@@ -7,6 +7,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`robot-md commission --self-test`, and a commission bucket in `doctor`.**
+  `doctor` now reports gripper travel and whether each joint's endpoints were
+  commissioned or are still the preset defaults. An uncommissioned manifest
+  gets a warning, so `doctor --strict` exits non-zero until the robot is
+  commissioned.
+
+### Fixed
+
+- **The `feetech_depthai` backend opens an OAK-D on DepthAI v2.** Perception was
+  written against the v3 API and failed with `no_backend` on v2 rigs.
+
+### Changed
+
+- **DepthAI is pinned to v2 where the v2 API is used.** `feetech-depthai` and
+  `hardware` require `depthai>=2.30,<3`; DepthAI 3.x removed the pipeline API
+  the backend uses, and an unpinned install resolved 3.11. `vision` now accepts
+  `depthai>=2.30`, so it installs alongside them.
+
 ## [1.10.6] - 2026-10-09
 
 ### Fixed
