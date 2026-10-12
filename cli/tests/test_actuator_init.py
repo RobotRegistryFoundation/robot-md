@@ -54,16 +54,23 @@ def test_scaffold_plugin_json_has_correct_metadata(tmp_path):
     assert plugin["version"] == "0.1.0"
 
 
-def test_scaffold_skill_md_substitutes_only_name(tmp_path):
-    """Other Jinja-style placeholders are left literal for Claude to fill."""
+def test_scaffold_skill_md_has_no_template_syntax(tmp_path):
+    """robot-md#56: the scaffold used to leave `{{ hardware_tag_1 }}` and
+    `{% for %}` blocks in SKILL.md, and publish shipped them to the catalog.
+    It now emits empty lists + TODO prose: nothing that parses as data."""
+    import frontmatter
+
     pkg = scaffold_actuator_package("beta", tmp_path, author="x@y")
-    skill_text = (pkg / "src" / "beta" / "skills" / "using-beta.SKILL.md").read_text()
-    # `{{ name }}` substituted to `beta`.
-    assert "name: using-beta" in skill_text
-    # Other placeholders preserved.
-    assert "{{ description }}" not in skill_text  # description IS substituted
-    assert "{{ hardware_tag_1 }}" in skill_text  # hardware_tag is NOT substituted
-    assert "{{ capability.tool_name }}" in skill_text
+    for skill in (
+        pkg / "src" / "beta" / "skills" / "using-beta.SKILL.md",
+        pkg / "claude-plugin" / "skills" / "using-beta" / "SKILL.md",
+    ):
+        text = skill.read_text()
+        assert "name: using-beta" in text
+        assert "{{" not in text and "{%" not in text
+        meta = frontmatter.loads(text).metadata
+        assert meta["hardware_tags"] == []
+        assert meta["manifest_signals"] == []
 
 
 def test_scaffold_refuses_to_overwrite(tmp_path):

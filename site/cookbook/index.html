@@ -167,7 +167,7 @@
         <p class="lede">
           Install <code>robot-md</code>, author a <code>ROBOT.md</code>, register with RRF, discover an actuator from the
           public catalog, and verify its RCAN-signed registry record. The runtime is Claude Code + the model;
-          the gateway is deterministic plumbing; safety is enforced at Layer 3. No new code; everything below
+          the gateway is deterministic plumbing; safety limits belong at Layer 3. No new code; everything below
           uses published tools.
         </p>
       </div>
@@ -387,10 +387,10 @@ robot-md actuator search "feetech bus servo"</pre>
     <section id="authority">
       <div class="wrap">
         <div class="authority">
-          <h4>Where safety is actually enforced</h4>
+          <h4>Where safety is meant to be enforced</h4>
           <p>
             <code>ROBOT.md</code> is a declaration. Claude Code and <code>robot-md-mcp</code> are
-            <strong>advisory</strong> — they cannot physically move a robot. Physical safety is enforced at Layer 3
+            <strong>advisory</strong> — they cannot physically move a robot. Physical limits are meant to be enforced at Layer 3
             by <code>robot-md-gateway</code>, which validates every dispatch against the manifest, applies the tier
             policy, and signs the audit chain. The cookbook walkthrough exercises Layers 1–2 (declaration + advisory) and Layer 5 (registry/identity); Layer 3 enforcement and the run-bundle artifact are demonstrated end-to-end in <a href="/case-studies/">case studies</a>.
           </p>
