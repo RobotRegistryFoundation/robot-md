@@ -608,8 +608,10 @@ class _FakeKeypair:
     ed25519_sec = bytes(range(32))
 
 
-def _stub_signing(monkeypatch, trial_mod):
-    monkeypatch.setattr(trial_mod, "load_keypair", lambda rrn: _FakeKeypair())
+def _stub_signing(monkeypatch, trial_mod=None):
+    # gateway_invoke logic now lives in robot_md.invoke (trial._gateway_invoke is an
+    # alias), so load_keypair/invoke_envelope resolve in the invoke module namespace.
+    monkeypatch.setattr("robot_md.invoke.load_keypair", lambda rrn: _FakeKeypair())
 
 
 def test_gateway_invoke_builds_full_envelope(monkeypatch):
@@ -629,7 +631,7 @@ def test_gateway_invoke_builds_full_envelope(monkeypatch):
         captured["bearer"] = bearer
         return {"telemetry": {"found": True}}
 
-    monkeypatch.setattr(trial_mod, "invoke_envelope", _fake_invoke)
+    monkeypatch.setattr("robot_md.invoke.invoke_envelope", _fake_invoke)
 
     result = trial_mod._gateway_invoke("oak-d", "perceive", {"query": "red_blob"})
 
@@ -656,8 +658,7 @@ def test_gateway_invoke_respects_scope_env(monkeypatch):
     _stub_signing(monkeypatch, trial_mod)
     captured: dict = {}
     monkeypatch.setattr(
-        trial_mod,
-        "invoke_envelope",
+        "robot_md.invoke.invoke_envelope",
         lambda *, envelope, gateway_url, bearer, timeout=10.0: (
             captured.update(envelope=envelope) or {"ok": True}
         ),
@@ -679,7 +680,7 @@ def test_gateway_invoke_msg_id_unique_per_call(monkeypatch):
         seen.append(envelope["msg_id"])
         return {"ok": True}
 
-    monkeypatch.setattr(trial_mod, "invoke_envelope", _capture)
+    monkeypatch.setattr("robot_md.invoke.invoke_envelope", _capture)
 
     trial_mod._gateway_invoke("oak-d", "perceive", {})
     trial_mod._gateway_invoke("oak-d", "perceive", {})
@@ -711,7 +712,7 @@ def test_gateway_invoke_missing_keypair_raises(monkeypatch):
     from robot_md import trial as trial_mod
 
     _set_envelope_env(monkeypatch)
-    monkeypatch.setattr(trial_mod, "load_keypair", lambda rrn: None)
+    monkeypatch.setattr("robot_md.invoke.load_keypair", lambda rrn: None)
 
     with pytest.raises(RuntimeError, match="no signing keypair"):
         trial_mod._gateway_invoke("oak-d", "perceive", {})

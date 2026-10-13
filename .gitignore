@@ -29,6 +29,9 @@ Thumbs.db
 # Wrangler local cache
 .wrangler/
 
+# DepthAI runtime cache / crash dumps (written relative to cwd)
+.cache/
+
 .worktrees/
 
 # Node / TypeScript
