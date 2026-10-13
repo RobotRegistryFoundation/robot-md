@@ -122,10 +122,13 @@ def test_inverted_arm_endpoints_warn_even_when_marked_commissioned():
     assert all(r.bucket == "commission" for r in results)
 
 
-def test_run_all_wires_in_commission_bucket():
+def test_run_all_wires_in_commission_bucket(monkeypatch):
     # Regression guard: the check must actually be invoked by run_all, not just defined.
     bob = Path(__file__).parent.parent.parent / "examples" / "bob.ROBOT.md"
     if not bob.exists():
         pytest.skip("examples/bob.ROBOT.md not in this tree")
+    # bob's manifest names a live registry endpoint; this test is about the
+    # commission bucket, so keep the network check offline (#100).
+    monkeypatch.setattr(doctor, "check_network", lambda fm: [])
     results = doctor.run_all(bob)
     assert any(r.bucket == "commission" for r in results)
