@@ -32,7 +32,7 @@ _DEFAULT_SOCKET_PATH: Path | None = (
 )
 
 
-_OnChange = Callable[[], None | Awaitable[None]]
+_OnChange = Callable[[], Awaitable[None] | None]
 
 
 async def _maybe_await(result: Any) -> None:

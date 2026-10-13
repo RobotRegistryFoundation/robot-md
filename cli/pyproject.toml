@@ -4,9 +4,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "robot-md"
-version = "1.10.4"
+version = "1.10.6"
 description = "ROBOT.md — a single self-describing file so Claude can safely operate your robot."
-readme = "../README.md"
+readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "craigm26", email = "craigm26@gmail.com" }]
@@ -30,7 +30,7 @@ dependencies = [
     "typer>=0.9,<0.17",
     "ruamel.yaml>=0.18",
     "numpy>=1.24",
-    "mcp>=1.0",
+    "mcp>=1.0,<2",  # 2.x removed mcp.server.fastmcp; port before lifting
     "anthropic>=0.30",
     "fastapi>=0.110",
     "jinja2>=3.1",

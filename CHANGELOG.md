@@ -7,6 +7,74 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.10.6] - 2026-10-09
+
+### Fixed
+
+- **`pip install robot-md` from source, and the release build, failed.**
+  hatchling 1.32 refuses a readme outside the project directory, and
+  `cli/pyproject.toml` pointed at `../README.md`, so every CI install and
+  `python -m build` stopped with "Readme path must be within the project
+  directory". The package now ships `cli/README.md`, a byte-for-byte copy of
+  `README.md`; `scripts/sync-readme.sh` refreshes it and a new CI job,
+  `readme-sync-check`, fails when the two drift. PyPI's long description is
+  unchanged.
+- **README links are absolute.** The twelve repository-relative links in
+  `README.md` (the LICENSE badge, the schema, spec, docs, examples and
+  integrations) now point at github.com, so they resolve from `cli/README.md`
+  and on PyPI, where relative links never worked. The v0.2 design note links
+  to the `spec/` folder, because the forbidden-phrase lint refuses any URL
+  containing `/spec/v<major>.<minor>`.
+- `ruff check` (RUF036): `None` moved to the end of a type union in
+  `mcp/resource_subscribers.py`.
+
+---
+
+## [1.10.5] - 2026-10-02
+
+### Added
+
+- **`register --export-to <path>`.** Writes copies of the minted
+  `<rrn>.signing.json` and `<rrn>.apikey` to a caller-supplied directory
+  in addition to `~/.robot-md/keys/`. Lets a subagent harness with an
+  isolated `HOME` persist credentials to the caller's filesystem before
+  teardown — the structural fix for the silent operator/RRF drift caught
+  during Spec B Phase E orientation (closes #79).
+
+  Files preserve their canonical names (`<rrn>.signing.json`,
+  `<rrn>.apikey`) so the natural restore path is `cp <export-dir>/* ~/.robot-md/keys/`.
+  Atomic write + mode 0o600, matching the in-place writers.
+
+  Fails loud (exit 4) if the export write fails after the RRF mint
+  succeeded: prints a recovery message naming the minted RRN and the
+  HOME path. Silently swallowing the failure would re-introduce the
+  drift bug. The export runs after the authority bind and the RRN
+  write-back, so a failed export still leaves the manifest carrying its
+  RRN (otherwise the next `register` would mint a second one). Exported
+  files are created 0o600, never at umask mode. With `--dry-run`, surfaces
+  a warning and skips the export (nothing was minted).
+
+### Fixed
+
+- **`actuator init` no longer scaffolds template placeholders, and `actuator
+  publish` refuses them.** The SKILL.md template left `{{ hardware_tag_1 }}`,
+  `{{ signal_1 }}` and `{% for %}` blocks in place, and `publish` registered
+  them at RRF as literal tags (robot-md-example-actuator v0.1.0 went out with
+  `hardware_tags: ['{{ hardware_tag_1 }}', '{{ hardware_tag_2 }}']`). The
+  scaffold now writes empty `hardware_tags` / `manifest_signals` with a TODO
+  comment and TODO prose in the body; `publish` (including `--dry-run`) exits
+  1 naming the fields when any published field still holds `{{` or `{%`, which
+  also catches packages scaffolded by older versions. Closes #56.
+- **Pin `mcp<2`.** mcp 2.0 removed `mcp.server.fastmcp` (renamed to
+  `MCPServer`), and `mcp>=1.0` let a fresh install resolve 2.x, so
+  `robot_md.mcp.server` failed to import on every new install of 1.10.4.
+- **`register` survives a socket timeout on the authority bind.** Step 4.5
+  now catches `OSError` as well as `RuntimeError`, so a timed-out
+  `/v2/authorities/register` POST is the documented non-fatal warning, not
+  a failed register whose mint already succeeded. The test suite now
+  refuses non-loopback hosts, so no test can reach production RRF
+  (#100).
+
 ---
 
 ## [1.10.4] - 2026-05-11

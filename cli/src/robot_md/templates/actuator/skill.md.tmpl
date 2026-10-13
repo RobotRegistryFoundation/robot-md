@@ -1,8 +1,13 @@
 ---
 name: using-{{ name }}
-description: When operating <hardware-class> via robot-md-gateway, this skill teaches Claude how to use the {{ name }} actuator. Triggers on actuating <hardware-class>.
-hardware_tags: ["{{ hardware_tag_1 }}", "{{ hardware_tag_2 }}"]
-manifest_signals: ["{{ signal_1 }}"]
+description: When operating TODO-hardware-class via robot-md-gateway, this skill teaches Claude how to use the {{ name }} actuator. Triggers on actuating TODO-hardware-class.
+# TODO before `robot-md actuator publish`: fill these. They are published to
+# the RRF catalog and used to match this actuator to robots, e.g.
+#   hardware_tags: [arm, feetech]
+#   manifest_signals: [SO-ARM101]
+# `publish` refuses a package that still carries template placeholders.
+hardware_tags: []
+manifest_signals: []
 ---
 
 # {{ name }}
@@ -11,14 +16,10 @@ manifest_signals: ["{{ signal_1 }}"]
 {{ description }}
 
 ## Capabilities exposed
-{% for capability in capabilities %}
-- `{{ capability.tool_name }}` — {{ capability.description }}
-{% endfor %}
+TODO: one bullet per tool, e.g. - `arm.move` — move the arm to a joint target.
 
 ## Safety boundaries
-{{ safety_notes }}
+TODO: what this actuator must never do, and what stops it.
 
 ## Prompts that should call this actuator
-{% for prompt in prompts %}
-- "{{ prompt }}"
-{% endfor %}
+TODO: two or three example requests, e.g. - "pick up the red block"

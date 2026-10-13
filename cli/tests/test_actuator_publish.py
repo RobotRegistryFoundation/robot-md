@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from robot_md.__main__ import app
 from robot_md.actuator import (
+    UnfilledPlaceholderError,
     actuator_publish_first_time,
     actuator_publish_version_update,
     build_registry_entry,
@@ -76,6 +77,29 @@ def test_detect_metadata_finds_plugin_layout(tmp_path):
     pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=True)
     meta = detect_package_metadata(pkg)
     assert meta["has_plugin_layout"] is True
+
+
+def test_detect_metadata_refuses_unfilled_placeholders(tmp_path):
+    """robot-md#56: publish must not register template syntax at RRF."""
+    pkg = _scaffold_minimal_actuator(tmp_path, with_plugin=False)
+    skill = next((pkg / "src" / "my_actuator" / "skills").glob("*.SKILL.md"))
+    skill.write_text(
+        skill.read_text().replace(
+            "hardware_tags: [arm, feetech]",
+            'hardware_tags: ["{{ hardware_tag_1 }}", "{{ hardware_tag_2 }}"]',
+        )
+    )
+    with pytest.raises(UnfilledPlaceholderError, match="hardware_tags"):
+        detect_package_metadata(pkg)
+
+
+def test_freshly_scaffolded_package_publishes_empty_tags_not_placeholders(tmp_path):
+    from robot_md.actuator import scaffold_actuator_package
+
+    pkg = scaffold_actuator_package("fresh-one", tmp_path, author="x@y", description="d")
+    meta = detect_package_metadata(pkg)
+    assert meta["hardware_tags"] == []
+    assert meta["manifest_signals"] == []
 
 
 def test_detect_metadata_raises_on_missing_pyproject(tmp_path):

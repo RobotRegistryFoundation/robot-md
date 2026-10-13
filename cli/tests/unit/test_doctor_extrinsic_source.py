@@ -4,9 +4,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from robot_md.doctor import run_all
+
+
+@pytest.fixture(autouse=True)
+def _no_registry_probe(monkeypatch):
+    # doctor's network check GETs the live registry; nothing here is about it.
+    monkeypatch.setattr("robot_md.doctor.check_network", lambda fm: [])
 
 
 def _write(tmp_path: Path, source: str | None, *, include_camera: bool = True) -> Path:

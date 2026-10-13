@@ -69,7 +69,7 @@ jobs:
           MANIFEST_VERSION=$(cat cli/src/robot_md/schemas/v1/version.txt | tr -d '[:space:]')
           echo "MANIFEST_VERSION=$MANIFEST_VERSION" >> "$GITHUB_ENV"
       - name: Emit cli_version envelope
-        uses: continuonai/rcan-spec/.github/actions/emit-version-tuple@v3.2.3
+        uses: RobotRegistryFoundation/rcan-spec/.github/actions/emit-version-tuple@v3.2.3
         with:
           project: robot-md
           ran: ${{ secrets.ROBOT_MD_RAN }}
@@ -82,7 +82,7 @@ jobs:
           ed25519_kid: ${{ secrets.ROBOT_MD_KID }}
           release_tag: ${{ github.ref_name }}
       - name: Emit manifest_spec_version envelope
-        uses: continuonai/rcan-spec/.github/actions/emit-version-tuple@v3.2.3
+        uses: RobotRegistryFoundation/rcan-spec/.github/actions/emit-version-tuple@v3.2.3
         with:
           project: robot-md
           ran: ${{ secrets.ROBOT_MD_RAN }}
