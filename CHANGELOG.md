@@ -18,7 +18,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   registry to ICANN.** It says what the registry provides: permanent RRN
   identities and a public resolver at `/r/<rrn>`. The forbidden-phrase lint
   workflow gains a repo-local step that fails on that comparison and on the
-  EU AI Act compliance-artifacts wording for RCAN §22–26, so neither returns.
+  EU AI Act compliance-artifacts wording for RCAN §22–26, which this repo has
+  never used, so neither can appear here.
 
 ## [1.10.6] - 2026-10-09
 
