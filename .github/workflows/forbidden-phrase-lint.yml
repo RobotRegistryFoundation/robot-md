@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - 'docs/**'
+      - 'site/**'
+      - 'spec/**'
+      - 'examples/**'
       - 'README.md'
       - 'SECURITY.md'
       - 'CHANGELOG.md'
