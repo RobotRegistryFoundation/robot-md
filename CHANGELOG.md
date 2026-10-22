@@ -7,6 +7,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+
+- **PyPI lists `robot-md` as Alpha.** The `Development Status` classifier in
+  `cli/pyproject.toml` goes from `5 - Production/Stable` to `3 - Alpha`.
+  `robot-md` depends on `robot-md-gateway`, which has only been published as
+  alpha pre-releases, and on `rcan`, which PyPI lists as Alpha; and it has
+  only been run on the maintainer's own hardware.
+
 ## [1.10.6] - 2026-10-09
 
 ### Fixed
