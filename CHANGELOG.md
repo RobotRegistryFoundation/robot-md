@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [1.10.7] - 2026-10-22
+
 ### Changed
 
 - **PyPI lists `robot-md` as Alpha.** The `Development Status` classifier in
