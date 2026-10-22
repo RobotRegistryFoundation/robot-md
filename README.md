@@ -22,7 +22,7 @@ This repo is the **declaration layer** — the file format + Python CLI. Everyth
 | **Wire protocol** | [RCAN](https://rcan.dev/spec/) | How robots, gateways, and planners talk. Signed envelopes, LoA enforcement, PQC crypto. Think HTTP for robots. |
 | **Python SDK** | [rcan-py](https://github.com/RobotRegistryFoundation/rcan-py) | `pip install rcan` — `RCANMessage`, `RobotURI`, `ConfidenceGate`, `HiTLGate`, `AuditChain`. |
 | **TypeScript SDK** | [rcan-ts](https://github.com/RobotRegistryFoundation/rcan-ts) | `npm install rcan-ts` — same API surface for Node + browser. |
-| **Registry** | [Robot Registry Foundation](https://robotregistryfoundation.org) | Permanent RRN identities. Public resolver at `/r/<rrn>`. Like ICANN for robots. |
+| **Registry** | [Robot Registry Foundation](https://robotregistryfoundation.org) | Permanent RRN identities. Public resolver at `/r/<rrn>`. |
 | **Productized runtime (Layer 4)** | [OpenCastor](https://github.com/craigm26/OpenCastor) | Open-source productized RCAN runtime. Gateway-as-kernel + drivers + fleet + cloud bridge + UI. Most fully-documented RCAN runtime; not "the" reference (RCAN is implementation-independent). |
 
 <!-- BEGIN: ecosystem authority disclaimer (canonical; revised 2026-10-08 from spec §10 after EV-03; keep identical in robot-md, robot-md-gateway and OpenCastor) -->

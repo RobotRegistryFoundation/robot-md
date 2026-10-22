@@ -14,6 +14,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `robot-md` depends on `robot-md-gateway`, which has only been published as
   alpha pre-releases, and on `rcan`, which PyPI lists as Alpha; and it has
   only been run on the maintainer's own hardware.
+- **README: the registry row of the stack table no longer compares the
+  registry to ICANN.** It says what the registry provides: permanent RRN
+  identities and a public resolver at `/r/<rrn>`. The forbidden-phrase lint
+  workflow gains a repo-local step that fails on that comparison and on the
+  EU AI Act compliance-artifacts wording for RCAN §22–26, so neither returns.
 
 ## [1.10.6] - 2026-10-09
 

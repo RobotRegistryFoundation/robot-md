@@ -22,6 +22,47 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
         with:
           python-version: "3.12"
+      - name: Repo-local phrases
+        # Refused here on top of the shared dictionary (plan item C4): likening
+        # the registry to ICANN, and calling RCAN §22–26 output EU AI Act
+        # compliance artifacts. The shared dictionary lives in
+        # craigm26/opencastor-ops; once these patterns are there, drop this step.
+        # Runs before the fetch, so it needs no token. Scans every tracked text
+        # file except this workflow, which has to spell the patterns out.
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+          import subprocess
+          import sys
+
+          PATTERNS = [
+              re.compile(r"\bICANN\s+(?:for|of)\s+robot", re.I),
+              re.compile(r"EU\s+AI\s+Act\s+§\s*22\s*[-‐‑‒–—]\s*§?\s*26\s+compliance\s+artifact", re.I),
+          ]
+          SELF = ".github/workflows/forbidden-phrase-lint.yml"
+
+          files = subprocess.run(
+              ["git", "ls-files", "-z"], check=True, capture_output=True
+          ).stdout.decode().split("\0")
+          hits = 0
+          for path in filter(None, files):
+              if path == SELF:
+                  continue
+              with open(path, "rb") as fh:
+                  data = fh.read()
+              if b"\0" in data[:8192]:
+                  continue  # binary
+              for lineno, line in enumerate(data.decode("utf-8", "replace").splitlines(), 1):
+                  for pat in PATTERNS:
+                      m = pat.search(line)
+                      if m:
+                          hits += 1
+                          print(f"::error file={path},line={lineno}::refused phrase: {m.group(0)!r}")
+          if hits:
+              sys.exit(1)
+          print("no repo-local refused phrases")
+          PY
       - name: Fetch lint + dictionary from opencastor-ops
         env:
           AUTH_TOKEN: ${{ secrets.OPENCASTOR_OPS_READ_TOKEN }}
