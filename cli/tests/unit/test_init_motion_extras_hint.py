@@ -49,6 +49,13 @@ def test_hint_suppressed_for_nonmotion_capabilities(capsys):
     assert "pip install" not in out
 
 
+def test_hint_says_motion_needs_the_gateway(capsys):
+    """The MCP motion tools are robot-md-gateway clients and refuse without one."""
+    out = _run_hint(["arm.pick"], capsys)
+    assert "robot-md install-gateway" in out
+    assert "refuse" in out
+
+
 def test_hint_mentions_mcp_reconnect(capsys):
     """Operators need to know about the /mcp Reconnect step."""
     out = _run_hint(["arm.pick"], capsys)

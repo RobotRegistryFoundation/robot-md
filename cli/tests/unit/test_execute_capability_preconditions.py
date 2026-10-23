@@ -53,22 +53,20 @@ def _manifest_without_contract(tmp_path: Path) -> Path:
     return p
 
 
-def test_execute_capability_blocks_when_pose_missing(tmp_path):
+def test_execute_capability_blocks_when_pose_missing(tmp_path, gateway_env):
     """Contract declares pose_taught but manifest has no poses.ready → blocked."""
     ctx = load_context(_manifest_with_contract(tmp_path))
     # Stub backend so the capability/backend-implemented checks pass.
     ctx.backend = MagicMock()
     ctx.backend.capabilities.return_value = frozenset({"arm.pick"})
 
-    result = execute_capability_tool(
-        ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None
-    )
+    result = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True)
     assert result["status"] == "blocked"
     assert result["error"]["reason"] == "precondition"
     assert any("pose 'ready' not taught" in p["message"] for p in result["error"]["preconditions"])
 
 
-def test_execute_capability_passes_when_contract_absent(tmp_path):
+def test_execute_capability_passes_when_contract_absent(tmp_path, gateway_env):
     """No capability_contracts block → existing behaviour unchanged (no gate)."""
     from robot_md.backends.base import ExecutionResult
 
@@ -83,10 +81,9 @@ def test_execute_capability_passes_when_contract_absent(tmp_path):
         error=None,
     )
     # Safety.hitl_gates will match nothing for "arm.pick" unless declared.
-    result = execute_capability_tool(
-        ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None
-    )
-    assert result["status"] == "ok", result
+    result = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True)
+    assert result["status"] == "dry_run", result
+    assert gateway_env.requests == []  # a dry run sends nothing
 
 
 def test_estop_outranks_precondition_for_non_readonly(tmp_path):
@@ -103,14 +100,14 @@ def test_estop_outranks_precondition_for_non_readonly(tmp_path):
     ctx.backend.read_only_capabilities = frozenset()
     ctx.estop.set()
 
-    result = _exec(ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None)
+    result = _exec(ctx, capability="arm.pick", args={}, dry_run=True)
     assert result["status"] == "blocked"
     assert result["error"]["reason"] == "estop_set", (
         f"estop must outrank precondition; got {result['error']}"
     )
 
 
-def test_precondition_bypassed_for_readonly_capability(tmp_path):
+def test_precondition_bypassed_for_readonly_capability(tmp_path, gateway_env):
     """Read-only capabilities (status.report et al) bypass precondition checks —
     observability must survive calibration gaps."""
     from unittest.mock import MagicMock as _MM
@@ -146,5 +143,5 @@ def test_precondition_bypassed_for_readonly_capability(tmp_path):
         events=[],
         error=None,
     )
-    result = _exec(ctx, capability="status.report", args={}, dry_run=False, confirm_token=None)
+    result = _exec(ctx, capability="status.report", args={}, dry_run=False)
     assert result["status"] == "ok", f"read-only cap should bypass precondition, got {result}"

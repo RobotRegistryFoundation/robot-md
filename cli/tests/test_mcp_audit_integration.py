@@ -1,10 +1,11 @@
 """P3: Audit-log integration on the MCP capability gate.
 
 Whenever the MCP server's execute_capability tool returns a result —
-allow, hitl_gate denial, estop block, precondition fail, busy — an
-entry must land in the per-robot hash-chained audit log. This is the
-"every safety-relevant decision is recorded" property an EU AI Act
-notified body would check.
+allow, hitl_gate denial, estop block, precondition fail, busy, a gateway
+refusal — an entry must land in the per-robot hash-chained audit log, so
+every safety-relevant decision this server makes is recorded locally. The
+gateway keeps its own signed record; each local entry carries the
+envelope's msg_id (`gateway_msg_id`) to tie the two together.
 """
 
 from __future__ import annotations
@@ -33,14 +34,7 @@ class _FakeBackend:
         return frozenset({"arm.pick", "arm.place"})
 
     def execute(self, capability, args, *, dry_run, estop):
-        from robot_md.backends.base import ExecutionEvent, ExecutionResult
-
-        return ExecutionResult(
-            status="ok",
-            trajectory=[],
-            events=[ExecutionEvent(kind="plan", data={"cap": capability})],
-            error=None,
-        )
+        raise AssertionError("the MCP server must not execute capabilities in-process")
 
 
 @dataclass
@@ -84,6 +78,8 @@ class _Ctx:
     estop: _Estop
     exec_lock: Lock = field(default_factory=Lock)
     publisher: object = None
+    manifest_path: Path = Path("/robots/bob/ROBOT.md")
+    parsed: object = None
 
 
 @pytest.fixture
@@ -100,12 +96,10 @@ def ctx() -> _Ctx:
     return _Ctx(spec=spec, backend=backend, estop=_Estop())
 
 
-def test_successful_invocation_records_audit_entry(ctx, home):
+def test_successful_invocation_records_audit_entry(ctx, home, gateway_env):
     from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
-    r = execute_capability_tool(
-        ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None
-    )
+    r = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=False)
     assert r["status"] == "ok"
 
     entries = load_entries("RRN-000000000099")
@@ -114,17 +108,30 @@ def test_successful_invocation_records_audit_entry(ctx, home):
     assert e["event"] == "capability_invocation"
     assert e["details"]["capability"] == "arm.pick"
     assert e["details"]["status"] == "ok"
+    assert e["details"]["gateway_msg_id"] == gateway_env.bodies[0]["msg_id"]
 
 
-def test_hitl_gate_denial_records_audit_entry(ctx, home):
-    """Manifest declares hitl_gate require_auth on `arm` scope; invoke without
-    a confirm_token; expect denial AND audit entry with reason=hitl_gate."""
+def test_gateway_refusal_records_audit_entry(ctx, home, gateway_env):
+    from robot_md.mcp.tools.execute_capability import execute_capability_tool
+
+    gateway_env.deny("tool_allowlist", "tool arm.pick not in operator allowlist")
+    r = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=False)
+    assert r["status"] == "denied"
+
+    (e,) = load_entries("RRN-000000000099")
+    assert e["details"]["status"] == "denied"
+    assert e["details"]["reason"] == "gateway_denied"
+    assert e["details"]["deny"] == "tool_allowlist"
+
+
+def test_hitl_gate_denial_records_audit_entry(ctx, home, gateway_env):
+    """Manifest declares hitl_gate require_auth on `arm` scope; expect a
+    refusal (there is no token that opens it) AND an audit entry with
+    reason=hitl_gate."""
     ctx.spec.safety.hitl_gates = [{"scope": "arm", "require_auth": True}]
     from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
-    r = execute_capability_tool(
-        ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None
-    )
+    r = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True)
     assert r["status"] == "blocked"
     assert r["error"]["reason"] == "hitl_gate"
 
@@ -135,13 +142,11 @@ def test_hitl_gate_denial_records_audit_entry(ctx, home):
     assert e["details"]["scope"] == "arm"
 
 
-def test_execute_capability_blocked_by_estop_is_audited(ctx, home):
+def test_execute_capability_blocked_by_estop_is_audited(ctx, home, gateway_env):
     ctx.estop.set()
     from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
-    r = execute_capability_tool(
-        ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None
-    )
+    r = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True)
     assert r["status"] == "blocked"
     assert r["error"]["reason"] == "estop_set"
 
@@ -150,22 +155,22 @@ def test_execute_capability_blocked_by_estop_is_audited(ctx, home):
     assert entries[0]["details"]["reason"] == "estop_set"
 
 
-def test_audit_chain_remains_valid_across_multiple_invocations(ctx, home):
+def test_audit_chain_remains_valid_across_multiple_invocations(ctx, home, gateway_env):
     from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
     # Three invocations: ok, denied, ok
-    execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None)
+    execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True)
     ctx.spec.safety.hitl_gates = [{"scope": "arm", "require_auth": True}]
-    execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None)
+    execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True)
     ctx.spec.safety.hitl_gates = []
-    execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None)
+    execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=True)
 
     result = verify_chain("RRN-000000000099")
     assert result["valid"] is True
     assert result["entries"] == 3
 
 
-def test_no_audit_when_manifest_has_no_rrn(home):
+def test_no_audit_when_manifest_has_no_rrn(home, gateway_env):
     """Unregistered robots can still use the MCP — no audit log written.
 
     EU AI Act compliance binds to RRN; an unregistered manifest has no
@@ -178,16 +183,14 @@ def test_no_audit_when_manifest_has_no_rrn(home):
 
     from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
-    r = execute_capability_tool(
-        ctx_no_rrn, capability="arm.pick", args={}, dry_run=True, confirm_token=None
-    )
+    r = execute_capability_tool(ctx_no_rrn, capability="arm.pick", args={}, dry_run=False)
     assert r["status"] == "ok"
     # No log file should exist anywhere under HOME for any rrn
     audit_dir = home / ".robot-md" / "audit"
     assert not audit_dir.exists() or not any(audit_dir.iterdir())
 
 
-def test_estop_set_records_audit_entry(ctx, home):
+def test_estop_set_records_audit_entry(ctx, home, gateway_env):
     """Setting the software e-stop is a reactive-safety action — must audit."""
     from robot_md.mcp.tools.estop import estop_tool
 
@@ -219,7 +222,7 @@ def test_estop_set_records_audit_entry(ctx, home):
     assert entries[0]["event"] == "estop_set"
 
 
-def test_estop_clear_records_audit_entry(ctx, home):
+def test_estop_clear_records_audit_entry(ctx, home, gateway_env):
     """Clearing the e-stop is also recorded — and denied clears too."""
     import time
 
@@ -238,27 +241,27 @@ def test_estop_clear_records_audit_entry(ctx, home):
             return self._on
 
     ctx.estop = _RealEstop()
-
-    # Manifest declares system HITL gate → clear without token must be denied + audited
-    ctx.spec.safety.hitl_gates = [{"scope": "system", "require_auth": True}]
     from robot_md.mcp.tools.estop import estop_clear_tool
 
-    r1 = estop_clear_tool(ctx, confirm_token=None)
+    # The gateway refuses the clear below the commission tier → denied + audited
+    gateway_env.deny("tier_policy", "scope COMMISSION requires the 'commission' tier")
+    r1 = estop_clear_tool(ctx)
     assert r1["ok"] is False
-    assert r1["error"]["reason"] == "hitl_gate"
+    assert r1["error"]["deny"] == "tier_policy"
 
-    # With token: clear succeeds, also audited
-    r2 = estop_clear_tool(ctx, confirm_token="operator-ack")
+    # The gateway accepts it (a commission credential) → cleared, also audited
+    r2 = estop_clear_tool(ctx)
     assert r2["ok"] is True
 
     entries = load_entries("RRN-000000000099")
     assert len(entries) == 2
     assert entries[0]["event"] == "estop_clear_denied"
-    assert entries[0]["details"]["reason"] == "hitl_gate"
+    assert entries[0]["details"]["reason"] == "gateway_denied"
+    assert entries[0]["details"]["deny"] == "tier_policy"
     assert entries[1]["event"] == "estop_cleared"
 
 
-def test_audit_failure_never_crashes_capability_call(ctx, home, monkeypatch):
+def test_audit_failure_never_crashes_capability_call(ctx, home, monkeypatch, gateway_env):
     """If audit.record_event raises (disk full, etc.), the capability call
     must still complete. Audit integrity is checked separately by `audit verify`."""
 
@@ -272,7 +275,5 @@ def test_audit_failure_never_crashes_capability_call(ctx, home, monkeypatch):
 
     from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
-    r = execute_capability_tool(
-        ctx, capability="arm.pick", args={}, dry_run=True, confirm_token=None
-    )
+    r = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=False)
     assert r["status"] == "ok"  # call succeeded despite audit failure

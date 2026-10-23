@@ -29,7 +29,8 @@ class InvocationLog:
         return [asdict(r) for r in reversed(items)]
 
     def snapshot_errors(self) -> list[dict]:
-        return [r for r in self.snapshot() if r["status"] != "ok"]
+        # A dry run sends nothing and is not an error.
+        return [r for r in self.snapshot() if r["status"] not in ("ok", "dry_run")]
 
     def backfill_from_jsonl(
         self,

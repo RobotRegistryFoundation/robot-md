@@ -10,6 +10,13 @@ from __future__ import annotations
 import pytest
 
 
+@pytest.mark.skip(
+    reason=(
+        "drove the arm through the MCP server in-process, a path that no longer "
+        "exists: robot-md's MCP motion tools send to robot-md-gateway. A hardware "
+        "test of motion belongs with the gateway (robot-md-gateway hil/)."
+    )
+)
 @pytest.mark.hardware
 def test_real_arm_pick_red_lego_after_calibrate(tmp_path, monkeypatch):
     from robot_md.backends.feetech_depthai.perception import Perception
@@ -58,7 +65,6 @@ def test_real_arm_pick_red_lego_after_calibrate(tmp_path, monkeypatch):
             capability="arm.pick",
             args={"target": "red_lego"},
             dry_run=False,
-            confirm_token=None,
         )
         assert result.get("status") == "ok", f"pick failed: {result}"
     finally:
