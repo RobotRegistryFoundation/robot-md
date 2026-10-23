@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock, patch
 
-from robot_md.install_gateway import install_gateway
+from robot_md.install_gateway import install_gateway, render_default_bearers
 
 
 def test_install_gateway_skips_when_already_installed(capsys):
@@ -26,6 +26,12 @@ def test_install_gateway_runs_full_sequence_when_fresh():
         m = MagicMock()
         m.returncode = 0
         m.stdout = ""
+        if cmd[1:3] == ["test", "-e"]:
+            m.returncode = 1  # a fresh host: no config file exists yet
+        elif cmd[1] == "mktemp":
+            m.stdout = "/etc/robot-md-gateway/.install.tmp\n"
+        elif cmd[1] == "cat":
+            m.stdout = render_default_bearers()  # what the install just wrote
         return m
 
     with (

@@ -7,6 +7,47 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **`install-gateway` writes a `bearers.yaml` that works, and never a
+  placeholder.** It wrote one entry holding the public string
+  `REPLACE-WITH-MINTED-TOKEN` and no tier, which robot-md-gateway could not
+  load (`KeyError: 'tier'`); an operator who added a tier by hand and kept the
+  placeholder had a working credential that anyone can read in this source. It
+  now writes two freshly generated tokens (`secrets.token_urlsafe(32)`): an
+  `actuate`-tier one for the agent's client, and a `tier: read`,
+  `role: supervisor` one for the device that sends the gateway's heartbeats
+  (a gateway without supervisor roles reads it as a read-tier credential). It
+  writes no commission token; the file shows how to add the operator's by hand.
+  Before enabling the gateway, `install-gateway` refuses a `bearers.yaml` with a
+  placeholder token, a token shorter than 32 characters, or an entry with no
+  tier, and says which entry, never the token.
+- **`bearers.yaml` is created 0600, never 0644.** `sudo tee` under umask 022
+  created it world-readable, and the later `chown -R` kept that mode, so every
+  local account could read every bearer. Both files are now created through a
+  temporary file in the same directory that gets its owner and mode before any
+  content, and then its name by link(2).
+- **A rerun never overwrites `bearers.yaml` or `gateway.env`.**
+  `already_installed()` is false whenever the unit is not active, and a rerun
+  then rewrote both, dropping hand-added tokens and allowlist entries. An
+  existing file is now left exactly as it is, and link(2) fails rather than
+  replacing a file that appears in the meantime. The unit file is still
+  rewritten.
+- **The rendered systemd unit is hardened.** It adds
+  `AssertPathExists=/etc/robot-md-gateway/bearers.yaml`, an empty
+  `CapabilityBoundingSet=` and `AmbientCapabilities=`,
+  `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`, `RestrictNamespaces=yes`,
+  `SystemCallFilter=@system-service` without `@privileged` (a call outside it
+  fails with EPERM rather than killing the gateway),
+  `SystemCallArchitectures=native`, and `yes` for `LockPersonality`,
+  `RestrictRealtime`, `RestrictSUIDSGID`, `ProtectKernelTunables`,
+  `ProtectKernelModules`, `ProtectKernelLogs`, `ProtectControlGroups`,
+  `ProtectClock` and `ProtectHostname`. `systemd-analyze security
+  --offline` scores it 1.8, from 8.3; robot-md-gateway's own dispatcher unit
+  scores 4.9. `MemoryDenyWriteExecute=` is left off: whether every library the
+  gateway loads runs without writable executable memory has not been tried on
+  a robot.
+
 ### Fixed
 
 - **`install-gateway` allowlists the arm's stop, and its clear at the
