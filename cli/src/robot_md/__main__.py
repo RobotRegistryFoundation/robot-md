@@ -1795,7 +1795,10 @@ def install_gateway_cmd(
         Path("/etc/robot-md-gateway/ROBOT.md"),
         "--manifest",
         "-m",
-        help="Path to the ROBOT.md the gateway will enforce against.",
+        help=(
+            "Path to the ROBOT.md the gateway will enforce. It is copied to "
+            "/etc/robot-md-gateway/ROBOT.md, which is what the gateway reads."
+        ),
         # Don't validate readability — the default lives under
         # /etc/robot-md-gateway/ owned by the gateway user and is unreadable
         # by the operator. install_gateway() handles missing/unreadable
