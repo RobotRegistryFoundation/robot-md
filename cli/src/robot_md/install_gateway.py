@@ -64,13 +64,24 @@ def render_env_file(*, manifest_path: str) -> str:
     (`arm.estop`, the tool so-arm101-actuator declares in `stop_capabilities`)
     next to the motion it allows. A stop missing from it is refused by the
     gateway, and the gateway logs `allowlist_has_no_stop` at startup.
+
+    It carries the arm's clear too (`arm.estop.clear`), and only at the
+    commission tier: `ROBOT_MD_TOOL_MIN_TIER` makes the gateway refuse a lower
+    tier with a signed 403 before the driver checks again. Without the clear on
+    the list, a latched arm could be unlatched only by restarting the gateway,
+    which also throws away the in-memory latch with no record of who resumed
+    it. The gateway refuses the clear while it is itself tripped, because the
+    clear is not a stop, so the order stays: the gateway's clear
+    (`POST /v1/safety/clear`) first, then the arm's.
     """
     return f"""\
 ROBOT_MD_PATH={manifest_path}
 ROBOT_MD_BEARERS_FILE=/etc/robot-md-gateway/bearers.yaml
 ROBOT_MD_LOG_LEVEL=INFO
 # arm.estop is the arm's stop: keep it on this list, the gateway refuses any tool that is not.
-ROBOT_MD_TOOL_ALLOWLIST=mcp__robot__execute_capability,mcp__robot__render,mcp__robot__validate,move,home,read_state,perceive,arm.estop
+# arm.estop.clear unlatches the arm: commission tier only (next line).
+ROBOT_MD_TOOL_ALLOWLIST=mcp__robot__execute_capability,mcp__robot__render,mcp__robot__validate,move,home,read_state,perceive,arm.estop,arm.estop.clear
+ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission
 ROBOT_MD_REQUIRE_ENVELOPE_SIGNATURE=1
 """
 

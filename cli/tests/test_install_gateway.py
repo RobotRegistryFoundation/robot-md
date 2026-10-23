@@ -52,10 +52,30 @@ def test_render_env_file_allowlists_the_arm_stop():
     assert "arm.estop" in _allowlist()
 
 
-def test_render_env_file_allowlists_the_stop_and_not_the_clear():
-    """Only the stop. `arm.estop.clear` makes the arm movable again; allowlisting
-    it is the operator's call, not part of keeping the stop reachable."""
-    assert "arm.estop.clear" not in _allowlist()
+def test_render_env_file_allowlists_the_clear_at_the_commission_tier_only():
+    """`arm.estop.clear` makes the arm movable again. Off the list, a latched arm
+    could be unlatched only by restarting the gateway, with no record of who
+    resumed it; on the list, it is held to the commission tier at the gateway
+    (a signed 403 below it), and the driver checks the tier again."""
+    env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
+    assert "arm.estop.clear" in _allowlist()
+    [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_TOOL_MIN_TIER=")]
+    assert line == "ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission"
+
+
+def test_the_gateway_reads_the_clears_tier_floor_as_commission_only():
+    """Cross-checked with the gateway's own parser of ROBOT_MD_TOOL_MIN_TIER:
+    only the commission tier may invoke the clear."""
+    gw_main = pytest.importorskip("robot_md_gateway.__main__")
+    parse = getattr(gw_main, "_build_tool_tier_requirements_from_env", None)
+    if parse is None:
+        pytest.skip("robot-md-gateway without ROBOT_MD_TOOL_MIN_TIER")
+    env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
+    [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_TOOL_MIN_TIER=")]
+    with patch.dict("os.environ", {"ROBOT_MD_TOOL_MIN_TIER": line.split("=", 1)[1]}):
+        requirements = parse()
+    assert set(requirements["arm.estop.clear"]) == {"commission"}
+    assert "arm.estop" not in requirements
 
 
 def test_the_gateways_own_startup_check_finds_a_stop_in_the_rendered_allowlist():
