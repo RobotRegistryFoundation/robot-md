@@ -7,6 +7,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`install-gateway` allowlists the arm's stop, and its clear at the
+  commission tier only.** The gateway tool allowlist it writes to
+  `/etc/robot-md-gateway/gateway.env` (`ROBOT_MD_TOOL_ALLOWLIST`) carried `move`
+  and `home` but no stop. That allowlist is default-deny, so an `arm.estop` sent
+  through the gateway was refused (403 `tool_allowlist`), and the gateway logged
+  `allowlist_has_no_stop` at startup. The list now ends
+  `...,perceive,arm.estop,arm.estop.clear`. `arm.estop` is the stop
+  so-arm101-actuator declares in `stop_capabilities`, which is how the gateway
+  recognises a stop. `arm.estop.clear` unlatches the arm, so a new line,
+  `ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission`, makes the gateway refuse
+  it below the commission tier with a 403, signed when the gateway has an
+  attestation key, and the driver checks the tier again. Without the clear on the list, a latched arm could be unlatched
+  only by restarting the gateway, which leaves no record of who resumed it.
+  - **Which so-arm101-actuator this works with.** 0.2.2, its latest release on
+    PyPI, declares no `stop_capabilities` and answers `arm.estop` with "unknown
+    capability", a 500 through the gateway. Its `main` from
+    RobotRegistryFoundation/so-arm101-actuator#8 (73d782c) on latches and holds
+    the pose (a software hold, not a hardware e-stop). Before #8, `main`
+    without castor-hal raised `ModuleNotFoundError` before it latched.
+  - `install-gateway` does nothing on a gateway that is already installed and
+    running, so an existing `gateway.env` keeps its old list. Add `arm.estop`,
+    `arm.estop.clear` and the `ROBOT_MD_TOOL_MIN_TIER` line to it by hand, and
+    restart the gateway.
+- **`robot-md invoke` sends a stop under scope `SAFETY`.** `build_envelope`
+  defaulted every envelope's scope to `actuate`, and the gateway's tier gate
+  keys off the scope, so a read-tier `arm.estop` was refused (403
+  `tier_policy`), although so-arm101-actuator gives its stop to the read tier on
+  purpose. A stop tool (`robot_md.invoke.STOP_TOOLS`: `arm.estop`) now defaults
+  to `SAFETY`, anything else still defaults to `actuate`, and `--scope` still
+  wins. A gateway with RobotRegistryFoundation/robot-md-gateway#35 judges a
+  declared stop as `SAFETY` whatever its scope.
+
 ## [1.10.7] - 2026-10-22
 
 ### Changed
