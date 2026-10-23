@@ -63,12 +63,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   it below the commission tier with a signed 403, and the driver checks the
   tier again. Without the clear on the list, a latched arm could be unlatched
   only by restarting the gateway, which leaves no record of who resumed it.
-  - **Which so-arm101-actuator this works with.** 0.2.2, the only release on
+  - **Which so-arm101-actuator this works with.** 0.2.2, its latest release on
     PyPI, declares no `stop_capabilities` and answers `arm.estop` with "unknown
-    capability", a 500 through the gateway. `main` without castor-hal raises
-    `ModuleNotFoundError` before it latches. RobotRegistryFoundation/so-arm101-actuator#8,
-    or `main` with castor-hal installed from its repository, latches and holds
-    the pose (a software hold, not a hardware e-stop).
+    capability", a 500 through the gateway. Its `main` from
+    RobotRegistryFoundation/so-arm101-actuator#8 (73d782c) on latches and holds
+    the pose (a software hold, not a hardware e-stop). Before #8, `main`
+    without castor-hal raised `ModuleNotFoundError` before it latched.
   - `install-gateway` does nothing on a gateway that is already installed and
     running, so an existing `gateway.env` keeps its old list. Add `arm.estop`,
     `arm.estop.clear` and the `ROBOT_MD_TOOL_MIN_TIER` line to it by hand, and
@@ -81,6 +81,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   to `SAFETY`, anything else still defaults to `actuate`, and `--scope` still
   wins. A gateway with RobotRegistryFoundation/robot-md-gateway#35 judges a
   declared stop as `SAFETY` whatever its scope.
+
+## [1.10.7] - 2026-10-22
+
+### Changed
+
+- **PyPI lists `robot-md` as Alpha.** The `Development Status` classifier in
+  `cli/pyproject.toml` goes from `5 - Production/Stable` to `3 - Alpha`.
+  `robot-md` depends on `robot-md-gateway`, which has only been published as
+  alpha pre-releases, and on `rcan`, which PyPI lists as Alpha; and it has
+  only been run on the maintainer's own hardware.
+- **README: the registry row of the stack table no longer compares the
+  registry to ICANN.** It says what the registry provides: permanent RRN
+  identities and a public resolver at `/r/<rrn>`. The forbidden-phrase lint
+  workflow gains a repo-local step that fails on that comparison and on the
+  EU AI Act compliance-artifacts wording for RCAN §22–26.
 
 ## [1.10.6] - 2026-10-09
 
