@@ -783,3 +783,36 @@ def test_a_read_prepared_across_a_stop_is_still_sent(fixtures_dir, gateway_env, 
     result = execute_capability_tool(ctx, capability="status.report", args={}, dry_run=False)
     assert result["status"] == "ok"
     assert [b["tool_name"] for b in gateway_env.bodies] == ["status.report"]
+
+
+async def test_a_second_motion_sent_while_one_is_in_flight_is_refused(fixtures_dir, gateway_env):
+    """In worker threads two motion calls can arrive together. One motion at a
+    time leaves this server: the second is refused (busy), not queued."""
+    import asyncio
+
+    release = threading.Event()
+    original_allowed = gateway_env.allowed
+
+    def _slow_motion(body):
+        if body.get("tool_name") == "arm.pick":
+            release.wait(10)
+        return original_allowed(body)
+
+    gateway_env.allowed = _slow_motion
+    server = build_server(_ctx(fixtures_dir))
+    first = asyncio.create_task(_call(server, "execute_capability", {"capability": "arm.pick"}))
+    try:
+        for _ in range(100):  # wait until the first request is at the gateway
+            if gateway_env.requests:
+                break
+            await asyncio.sleep(0.02)
+        second = await asyncio.wait_for(
+            _call(server, "execute_capability", {"capability": "arm.place"}), timeout=5
+        )
+        assert second["status"] == "blocked"
+        assert second["error"]["reason"] == "busy"
+        assert not first.done()
+    finally:
+        release.set()
+    assert (await first)["status"] == "ok"
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.pick"]

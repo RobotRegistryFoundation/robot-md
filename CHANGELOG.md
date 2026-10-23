@@ -62,9 +62,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     `execute_capability` and `execute_task` are now async and make their HTTP
     call in a worker thread. A motion checks the stop latch again after its
     envelope is signed, just before sending, so a motion prepared while a stop
-    landed is not sent (`estop_set`). `audit.record_event` holds a lock from
-    reading the previous hash to appending, so entries recorded at the same
-    moment by two threads do not fork the chain.
+    landed is not sent (`estop_set`). Two motion calls sent at once no longer
+    run one after the other: the second is refused (`busy`) while the first
+    is in flight. `audit.record_event` holds a lock from reading the previous
+    hash to appending, so entries recorded at the same moment by two threads
+    do not fork the chain.
   - **`estop_clear`** asks the gateway for `arm.estop.clear` under the
     `COMMISSION` scope, which the gateway refuses below the commission tier,
     and releases this server's latch only when the gateway confirms. With the
