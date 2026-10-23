@@ -7,6 +7,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **`install-gateway` allowlists the arm's stop.** The gateway tool allowlist it
+  writes to `/etc/robot-md-gateway/gateway.env` (`ROBOT_MD_TOOL_ALLOWLIST`)
+  carried `move` and `home` but no stop. That allowlist is default-deny, so an
+  `arm.estop` sent through the gateway was refused (403 `tool_allowlist`), and
+  the gateway logged `allowlist_has_no_stop` at startup. The list now ends
+  `...,perceive,arm.estop`. `arm.estop` is the stop so-arm101-actuator declares
+  in `stop_capabilities`, which is how the gateway recognises a stop.
+  `arm.estop.clear` is deliberately left off: it makes the arm movable again.
+  `install-gateway` does nothing on a gateway that is already installed and
+  running, so an existing `gateway.env` keeps its old list. Add `arm.estop` to it
+  by hand and restart the gateway.
+
 ## [1.10.6] - 2026-10-09
 
 ### Fixed

@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from robot_md.install_gateway import (
     _invoking_user,
     already_installed,
@@ -34,6 +36,44 @@ def test_render_env_file_contains_required_keys():
     assert "ROBOT_MD_BEARERS_FILE=/etc/robot-md-gateway/bearers.yaml" in env
     assert "ROBOT_MD_LOG_LEVEL=INFO" in env
     assert "ROBOT_MD_REQUIRE_ENVELOPE_SIGNATURE=1" in env
+
+
+def _allowlist() -> list[str]:
+    env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
+    [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_TOOL_ALLOWLIST=")]
+    return line.split("=", 1)[1].split(",")
+
+
+def test_render_env_file_allowlists_the_arm_stop():
+    """The gateway's tool allowlist is default-deny: a stop missing from it is
+    refused outright (403 `tool_allowlist`), and the gateway logs
+    `allowlist_has_no_stop` at startup. `arm.estop` is the stop so-arm101-actuator
+    declares in `stop_capabilities`, which is what the gateway routes as a stop."""
+    assert "arm.estop" in _allowlist()
+
+
+def test_render_env_file_allowlists_the_stop_and_not_the_clear():
+    """Only the stop. `arm.estop.clear` makes the arm movable again; allowlisting
+    it is the operator's call, not part of keeping the stop reachable."""
+    assert "arm.estop.clear" not in _allowlist()
+
+
+def test_the_gateways_own_startup_check_finds_a_stop_in_the_rendered_allowlist():
+    """Cross-checked with the gateway's own startup audit. The actuator below
+    declares so-arm101-actuator's motion and stop tools (copied from its
+    MOTION_CAPABILITIES and STOP_CAPABILITIES)."""
+    policy = pytest.importorskip("robot_md_gateway.cert.policy")
+    if not hasattr(policy, "audit_allowlist_for_stop"):
+        pytest.skip("robot-md-gateway older than 0.5.0a9")
+
+    class _SoArm101:
+        motion_capabilities = frozenset(
+            {"arm.home", "arm.reach", "arm.reach_point", "arm.move_to", "move", "home", "move_to"}
+        )
+        stop_capabilities = frozenset({"arm.estop"})
+
+    allowlist = policy.ToolAllowlist(allowed_tools=tuple(_allowlist()))
+    assert policy.audit_allowlist_for_stop(allowlist, [("so-arm101", _SoArm101())]) == []
 
 
 def test_render_default_bearers_yaml_minimal():
