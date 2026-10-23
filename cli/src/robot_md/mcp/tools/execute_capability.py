@@ -161,9 +161,10 @@ def execute_capability_tool(
         return _finish(_blocked("busy", "another call from this server is in flight"))
     try:
         # The latch is checked again after the envelope is signed, just before
-        # it is sent. What remains is a stop set during the send itself; the
-        # stop then reaches the gateway after this motion, and the actuator's
-        # stop lane handles that.
+        # it is sent. A stop set during the send itself can reach the gateway
+        # before or after this motion: before, and so-arm101-actuator's latch
+        # refuses the motion; after, and the stop interrupts it (the gateway
+        # runs declared stops on lanes of their own).
         outcome = gateway_client.invoke(
             config,
             tool_name=capability,
