@@ -1,6 +1,9 @@
+import importlib
+from importlib.metadata import version
 from unittest.mock import patch
 
 import pytest
+from packaging.version import Version
 
 from robot_md.install_gateway import (
     _invoking_user,
@@ -56,20 +59,31 @@ def test_render_env_file_allowlists_the_clear_at_the_commission_tier_only():
     """`arm.estop.clear` makes the arm movable again. Off the list, a latched arm
     could be unlatched only by restarting the gateway, with no record of who
     resumed it; on the list, it is held to the commission tier at the gateway
-    (a signed 403 below it), and the driver checks the tier again."""
+    (a 403 below it), and the driver checks the tier again."""
     env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
     assert "arm.estop.clear" in _allowlist()
     [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_TOOL_MIN_TIER=")]
     assert line == "ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission"
 
 
+#: The two cross-checks below call functions robot-md-gateway added in 0.5.0a9.
+#: cli/pyproject.toml still accepts older releases, which lack them, so the
+#: checks skip there. From 0.5.0a9 on, a missing function FAILS: a rename in
+#: the gateway must not turn a cross-check into a silent skip.
+GATEWAY_CROSS_CHECKS_SINCE = "0.5.0a9"
+
+
+def _gateway_module(name: str):
+    installed = version("robot-md-gateway")
+    if Version(installed) < Version(GATEWAY_CROSS_CHECKS_SINCE):
+        pytest.skip(f"robot-md-gateway {installed} predates {GATEWAY_CROSS_CHECKS_SINCE}")
+    return importlib.import_module(name)
+
+
 def test_the_gateway_reads_the_clears_tier_floor_as_commission_only():
     """Cross-checked with the gateway's own parser of ROBOT_MD_TOOL_MIN_TIER:
     only the commission tier may invoke the clear."""
-    gw_main = pytest.importorskip("robot_md_gateway.__main__")
-    parse = getattr(gw_main, "_build_tool_tier_requirements_from_env", None)
-    if parse is None:
-        pytest.skip("robot-md-gateway without ROBOT_MD_TOOL_MIN_TIER")
+    parse = _gateway_module("robot_md_gateway.__main__")._build_tool_tier_requirements_from_env
     env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
     [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_TOOL_MIN_TIER=")]
     with patch.dict("os.environ", {"ROBOT_MD_TOOL_MIN_TIER": line.split("=", 1)[1]}):
@@ -82,9 +96,7 @@ def test_the_gateways_own_startup_check_finds_a_stop_in_the_rendered_allowlist()
     """Cross-checked with the gateway's own startup audit. The actuator below
     declares so-arm101-actuator's motion and stop tools (copied from its
     MOTION_CAPABILITIES and STOP_CAPABILITIES)."""
-    policy = pytest.importorskip("robot_md_gateway.cert.policy")
-    if not hasattr(policy, "audit_allowlist_for_stop"):
-        pytest.skip("robot-md-gateway older than 0.5.0a9")
+    policy = _gateway_module("robot_md_gateway.cert.policy")
 
     class _SoArm101:
         motion_capabilities = frozenset(

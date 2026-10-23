@@ -19,8 +19,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   so-arm101-actuator declares in `stop_capabilities`, which is how the gateway
   recognises a stop. `arm.estop.clear` unlatches the arm, so a new line,
   `ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission`, makes the gateway refuse
-  it below the commission tier with a signed 403, and the driver checks the
-  tier again. Without the clear on the list, a latched arm could be unlatched
+  it below the commission tier with a 403, signed when the gateway has an
+  attestation key, and the driver checks the tier again. Without the clear on the list, a latched arm could be unlatched
   only by restarting the gateway, which leaves no record of who resumed it.
   - **Which so-arm101-actuator this works with.** 0.2.2, its latest release on
     PyPI, declares no `stop_capabilities` and answers `arm.estop` with "unknown
