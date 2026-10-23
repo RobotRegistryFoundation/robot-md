@@ -32,6 +32,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     running, so an existing `gateway.env` keeps its old list. Add `arm.estop`,
     `arm.estop.clear` and the `ROBOT_MD_TOOL_MIN_TIER` line to it by hand, and
     restart the gateway.
+- **`robot-md invoke` sends a stop under scope `SAFETY`.** `build_envelope`
+  defaulted every envelope's scope to `actuate`, and the gateway's tier gate
+  keys off the scope, so a read-tier `arm.estop` was refused (403
+  `tier_policy`), although so-arm101-actuator gives its stop to the read tier on
+  purpose. A stop tool (`robot_md.invoke.STOP_TOOLS`: `arm.estop`) now defaults
+  to `SAFETY`, anything else still defaults to `actuate`, and `--scope` still
+  wins. A gateway with RobotRegistryFoundation/robot-md-gateway#35 judges a
+  declared stop as `SAFETY` whatever its scope.
+
 ## [1.10.6] - 2026-10-09
 
 ### Fixed

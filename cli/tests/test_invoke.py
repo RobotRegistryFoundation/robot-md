@@ -18,7 +18,9 @@ from typer.testing import CliRunner
 
 from robot_md.__main__ import app
 from robot_md.invoke import (
+    STOP_TOOLS,
     build_envelope,
+    default_scope,
     fetch_last_audit_entry,
     invoke_envelope,
     load_bearer_for_tier,
@@ -59,6 +61,35 @@ def test_build_envelope_default_scope_is_actuate():
         manifest_path="/tmp/ROBOT.md",
     )
     assert env["scope"] == "actuate"
+
+
+@pytest.mark.parametrize("tool", sorted(STOP_TOOLS))
+def test_build_envelope_defaults_a_stop_to_the_safety_scope(tool):
+    """A read-tier `arm.estop` under scope `actuate` is a 403 `tier_policy` at a
+    gateway that judges stops by the scope the caller writes."""
+    env = build_envelope(
+        ruri="rcan://RRN-000000000123/arm",
+        tool_name=tool,
+        tool_args={},
+        manifest_path="/tmp/ROBOT.md",
+    )
+    assert env["scope"] == "SAFETY"
+
+
+def test_an_explicit_scope_wins_even_for_a_stop():
+    env = build_envelope(
+        ruri="rcan://RRN-000000000123/arm",
+        tool_name="arm.estop",
+        tool_args={},
+        manifest_path="/tmp/ROBOT.md",
+        scope="actuate",
+    )
+    assert env["scope"] == "actuate"
+
+
+def test_the_clear_is_not_a_stop():
+    assert "arm.estop.clear" not in STOP_TOOLS
+    assert default_scope("arm.estop.clear") == "actuate"
 
 
 def test_build_envelope_unique_msg_ids():
@@ -343,7 +374,44 @@ def test_invoke_command_emits_signed_envelope_against_mock(tmp_path, monkeypatch
         assert _MockHandler.last_envelope is not None
         assert _MockHandler.last_envelope["tool_name"] == "home_pose"
         assert _MockHandler.last_envelope["tool_args"] == {"speed": 0.3}
+        assert _MockHandler.last_envelope["scope"] == "actuate"
         # Signed by default.
         assert "envelope_signature" in _MockHandler.last_envelope
+    finally:
+        httpd.shutdown()
+
+
+def test_invoke_command_sends_a_stop_under_the_safety_scope(tmp_path):
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text(
+        "---\n"
+        "metadata:\n"
+        "  rrn: RRN-000000000123\n"
+        "  ruri: rcan://RRN-000000000123/arm\n"
+        "manifest_spec_version: '1.0'\n"
+        "---\n"
+        "# robot\n"
+    )
+    _MockHandler.last_envelope = None
+    httpd, _ = _start_mock_gateway()
+    try:
+        port = httpd.server_address[1]
+        res = runner.invoke(
+            app,
+            [
+                "invoke",
+                str(manifest),
+                "--tool",
+                "arm.estop",
+                "--no-sign",
+                "--gateway",
+                f"http://127.0.0.1:{port}",
+                "--bearer",
+                "tok-read",
+            ],
+        )
+        assert res.exit_code == 0, res.output
+        assert _MockHandler.last_envelope["tool_name"] == "arm.estop"
+        assert _MockHandler.last_envelope["scope"] == "SAFETY"
     finally:
         httpd.shutdown()
