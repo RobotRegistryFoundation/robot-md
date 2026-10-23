@@ -103,12 +103,13 @@ def render_env_file(*, manifest_path: str) -> str:
 
     It carries the arm's clear too (`arm.estop.clear`), and only at the
     commission tier: `ROBOT_MD_TOOL_MIN_TIER` makes the gateway refuse a lower
-    tier with a signed 403 before the driver checks again. Without the clear on
-    the list, a latched arm could be unlatched only by restarting the gateway,
-    which also throws away the in-memory latch with no record of who resumed
-    it. The gateway refuses the clear while it is itself tripped, because the
-    clear is not a stop, so the order stays: the gateway's clear
-    (`POST /v1/safety/clear`) first, then the arm's.
+    tier with a 403 before the driver checks again. The 403 is signed only
+    when the gateway has an attestation key, which install-gateway does not
+    configure. Without the clear on the list, a latched arm could be unlatched
+    only by restarting the gateway, which also throws away the in-memory latch
+    with no record of who resumed it. The gateway refuses the clear while it is
+    itself tripped, because the clear is not a stop, so the order stays: the
+    gateway's clear (`POST /v1/safety/clear`) first, then the arm's.
     """
     return f"""\
 ROBOT_MD_PATH={manifest_path}
