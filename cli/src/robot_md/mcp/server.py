@@ -8,10 +8,12 @@ writes to the robot. See `robot_md.gateway_client`.
 
 from __future__ import annotations
 
+import functools
 import json
 import sys
 from pathlib import Path
 
+import anyio.to_thread
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 
@@ -136,23 +138,28 @@ def build_server(ctx: McpContext):
         """Validate the served ROBOT.md against the v1 schema and body rules."""
         return validate_tool(ctx)
 
+    # The four tools that talk to robot-md-gateway are async and do their
+    # blocking HTTP call in a worker thread. FastMCP runs a sync tool on the
+    # event loop itself, so a stop sent while a motion waited for the
+    # gateway's answer would have waited for that answer first.
+
     @server.tool()
-    def estop() -> dict:
+    async def estop() -> dict:
         """Stop the robot through robot-md-gateway.
 
         Sets this server's own latch, so no further motion leaves it, then sends
         the gateway's declared stop (arm.estop by default). The actuator holds
         its pose in software; this is not a hardware e-stop. Returns an error
         when the gateway does not confirm the stop: then the person must use the
-        hardware stop.
+        hardware stop. Runs even while a motion call is waiting on the gateway.
         """
-        result = estop_tool(ctx)
+        result = await anyio.to_thread.run_sync(functools.partial(estop_tool, ctx))
         if not result.get("ok"):
             raise ToolError(json.dumps(result, default=str))
         return result
 
     @server.tool()
-    def estop_clear() -> dict:
+    async def estop_clear() -> dict:
         """Ask robot-md-gateway to clear the stop, at the commission tier.
 
         Clearing a stop makes the robot movable again. The gateway refuses it
@@ -160,13 +167,13 @@ def build_server(ctx: McpContext):
         actuate-tier credential, so the person at the machine clears stops with
         their own. Returns an error unless the gateway confirms the clear.
         """
-        result = estop_clear_tool(ctx)
+        result = await anyio.to_thread.run_sync(functools.partial(estop_clear_tool, ctx))
         if not result.get("ok"):
             raise ToolError(json.dumps(result, default=str))
         return result
 
     @server.tool()
-    def execute_capability(
+    async def execute_capability(
         capability: str,
         args: dict | None = None,
         dry_run: bool = False,
@@ -183,15 +190,18 @@ def build_server(ctx: McpContext):
         """
         from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
-        return execute_capability_tool(
-            ctx,
-            capability=capability,
-            args=dict(args or {}),
-            dry_run=dry_run,
+        return await anyio.to_thread.run_sync(
+            functools.partial(
+                execute_capability_tool,
+                ctx,
+                capability=capability,
+                args=dict(args or {}),
+                dry_run=dry_run,
+            )
         )
 
     @server.tool()
-    def execute_task(
+    async def execute_task(
         prompt: str,
         context: dict | None = None,
         dry_run: bool = False,
@@ -203,11 +213,14 @@ def build_server(ctx: McpContext):
         """
         from robot_md.mcp.tools.execute_task import execute_task_tool
 
-        return execute_task_tool(
-            ctx,
-            prompt=prompt,
-            context=context,
-            dry_run=dry_run,
+        return await anyio.to_thread.run_sync(
+            functools.partial(
+                execute_task_tool,
+                ctx,
+                prompt=prompt,
+                context=context,
+                dry_run=dry_run,
+            )
         )
 
     @server.tool()

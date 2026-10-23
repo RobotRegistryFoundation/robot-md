@@ -103,3 +103,34 @@ def test_record_event_returns_full_entry(home):
     for field in ("id", "timestamp", "rrn", "event", "details", "prev_hash", "entry_hash"):
         assert field in entry
     assert entry["details"]["kind"] == "fria"
+
+
+def test_concurrent_writers_in_one_process_keep_one_chain(home, monkeypatch):
+    """The MCP server's stop and motion tools run in worker threads, so two
+    entries can be recorded at the same moment. Reading the previous hash and
+    appending happen under one lock, so the chain does not fork."""
+    import threading
+    import time
+
+    import robot_md.audit as audit
+
+    original = audit._last_entry_hash
+
+    def _slow_read(rrn):
+        value = original(rrn)
+        time.sleep(0.2)  # widen the window between the read and the append
+        return value
+
+    monkeypatch.setattr(audit, "_last_entry_hash", _slow_read)
+    record_event("RRN-000000000099", event="first")
+    writers = [
+        threading.Thread(target=record_event, args=("RRN-000000000099",), kwargs={"event": f"w{i}"})
+        for i in range(2)
+    ]
+    for t in writers:
+        t.start()
+    for t in writers:
+        t.join()
+    result = verify_chain("RRN-000000000099")
+    assert result["valid"] is True
+    assert result["entries"] == 3

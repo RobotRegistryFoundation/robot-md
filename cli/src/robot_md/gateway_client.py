@@ -47,7 +47,7 @@ import json
 import os
 import urllib.error
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -442,16 +442,26 @@ def invoke(
     tool_name: str,
     tool_args: Mapping[str, Any],
     scope: str,
+    withhold: Callable[[], dict[str, Any] | None] | None = None,
 ) -> dict[str, Any]:
     """Send one envelope to the gateway and report its decision.
 
     Returns {status, error, gateway, envelope}. `status` is "ok" (the gateway
-    ran it), "denied" (the gateway or the actuator refused it) or "error".
-    Never raises and never retries: a request the gateway may already have
-    acted on is not sent twice.
+    ran it), "denied" (the gateway or the actuator refused it), "blocked"
+    (`withhold` stopped it here) or "error". Never raises and never retries: a
+    request the gateway may already have acted on is not sent twice.
+
+    `withhold`, when given, is called after the envelope is built and signed,
+    immediately before it is sent. If it returns an error dict, nothing is
+    sent. The motion tools use it to re-check the stop latch, which a stop in
+    another thread may have set while this envelope was being prepared.
     """
     envelope, note = prepare_envelope(config, tool_name=tool_name, tool_args=tool_args, scope=scope)
     summary = _summary(envelope, note)
+    if withhold is not None:
+        withheld = withhold()
+        if withheld is not None:
+            return {"status": "blocked", "error": withheld, "gateway": None, "envelope": summary}
     url = config.url.rstrip("/") + "/v1/invoke"
     try:
         status_code, body = _post(url, envelope, config.bearer, config.timeout_s)

@@ -79,15 +79,10 @@ def execute_capability_tool(
 
     # This server's own latch, set by `estop`. It only ever withholds: while
     # it is set, no motion leaves this server, whatever the gateway would say.
-    if ctx.estop.is_set() and not is_read:
-        return _finish(
-            _blocked(
-                "estop_set",
-                "this MCP server's stop latch is set, so it sends no motion. It is "
-                "released only when the gateway accepts estop_clear (commission "
-                "tier) or the server restarts.",
-            )
-        )
+    # Checked here and again just before sending: the tools run in worker
+    # threads, so a stop can land in between.
+    if not is_read and (latched := _latch_error(ctx)) is not None:
+        return _finish(_blocked(**latched))
 
     config = gateway_client.config_for_context(ctx)
     if not config.ready:
@@ -165,7 +160,17 @@ def execute_capability_tool(
     if not ctx.exec_lock.acquire(blocking=False):
         return _finish(_blocked("busy", "another call from this server is in flight"))
     try:
-        outcome = gateway_client.invoke(config, tool_name=capability, tool_args=args, scope=scope)
+        # The latch is checked again after the envelope is signed, just before
+        # it is sent. What remains is a stop set during the send itself; the
+        # stop then reaches the gateway after this motion, and the actuator's
+        # stop lane handles that.
+        outcome = gateway_client.invoke(
+            config,
+            tool_name=capability,
+            tool_args=args,
+            scope=scope,
+            withhold=None if is_read else lambda: _latch_error(ctx),
+        )
     finally:
         ctx.exec_lock.release()
     return _finish(
@@ -178,6 +183,20 @@ def execute_capability_tool(
             "envelope": outcome["envelope"],
         }
     )
+
+
+_LATCH_MESSAGE = (
+    "this MCP server's stop latch is set, so it sends no motion. It is released "
+    "only when the gateway accepts estop_clear (commission tier) or the server "
+    "restarts."
+)
+
+
+def _latch_error(ctx: McpContext) -> dict | None:
+    """The refusal ({reason, message}) while this server's stop latch is set."""
+    if ctx.estop.is_set():
+        return {"reason": "estop_set", "message": _LATCH_MESSAGE}
+    return None
 
 
 def _read_only_capabilities(ctx: McpContext) -> frozenset[str]:

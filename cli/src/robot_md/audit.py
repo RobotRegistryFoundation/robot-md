@@ -22,12 +22,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 GENESIS_PREV_HASH = "0" * 64
+
+#: Held from reading the last entry's hash to appending the new entry.
+_WRITE_LOCK = threading.Lock()
 
 
 class AuditChainError(RuntimeError):
@@ -81,23 +85,29 @@ def record_event(
 
     `event` is a short tag (e.g. "submission", "safety_gate_denied",
     "key_rotated"). `details` is an arbitrary JSON-serialisable dict.
-    """
-    prev_hash = _last_entry_hash(rrn)
-    entry_no_hash: dict[str, Any] = {
-        "id": str(uuid.uuid4()),
-        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-        "rrn": rrn,
-        "event": event,
-        "details": details or {},
-        "prev_hash": prev_hash,
-    }
-    entry_hash = hashlib.sha256(_canonical_for_hash(entry_no_hash)).hexdigest()
-    entry = {**entry_no_hash, "entry_hash": entry_hash}
 
-    path = _log_path(rrn)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        f.write(json.dumps(entry) + "\n")
+    Reading the previous hash and appending happen under one lock, so threads
+    in one process (the MCP server's stop and motion tools run in worker
+    threads) cannot fork the chain. Separate processes writing the same log
+    are not serialized by it.
+    """
+    with _WRITE_LOCK:
+        prev_hash = _last_entry_hash(rrn)
+        entry_no_hash: dict[str, Any] = {
+            "id": str(uuid.uuid4()),
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "rrn": rrn,
+            "event": event,
+            "details": details or {},
+            "prev_hash": prev_hash,
+        }
+        entry_hash = hashlib.sha256(_canonical_for_hash(entry_no_hash)).hexdigest()
+        entry = {**entry_no_hash, "entry_hash": entry_hash}
+
+        path = _log_path(rrn)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
     return entry
 
 

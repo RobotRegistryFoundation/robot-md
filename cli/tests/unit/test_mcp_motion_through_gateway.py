@@ -717,3 +717,69 @@ async def test_an_unconfirmed_stop_is_an_mcp_error(fixtures_dir, gateway_env):
     )
     with pytest.raises(ToolError, match="stop_not_confirmed"):
         await server.call_tool("estop", {})
+
+
+async def test_a_stop_is_not_queued_behind_a_motion_in_flight(fixtures_dir, gateway_env):
+    """FastMCP runs a sync tool on the event loop, so a stop sent while a
+    motion waited on the gateway used to wait for that motion's answer. The
+    motion and stop tools run in worker threads: the stop reaches the gateway
+    while the motion is still in flight."""
+    import asyncio
+
+    release = threading.Event()
+    original_allowed = gateway_env.allowed
+
+    def _slow_motion(body):
+        if body.get("tool_name") == "arm.pick":
+            release.wait(10)
+        return original_allowed(body)
+
+    gateway_env.allowed = _slow_motion
+    server = build_server(_ctx(fixtures_dir))
+    motion = asyncio.create_task(_call(server, "execute_capability", {"capability": "arm.pick"}))
+    try:
+        for _ in range(100):  # wait until the motion request is at the gateway
+            if gateway_env.requests:
+                break
+            await asyncio.sleep(0.02)
+        stop = await asyncio.wait_for(_call(server, "estop", {}), timeout=5)
+        assert stop["stop"] == "stopped"
+        assert not motion.done(), "the motion finished first; the test proves nothing"
+        assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.pick", "arm.estop"]
+    finally:
+        release.set()
+    assert (await motion)["status"] == "ok"
+
+
+def test_a_stop_set_while_a_motion_is_prepared_withholds_it(fixtures_dir, gateway_env, monkeypatch):
+    """In worker threads, a stop can land after a motion passed the first
+    latch check. The latch is checked again after the envelope is built and
+    signed, just before the request is sent, so that motion is not sent."""
+    ctx = _ctx(fixtures_dir)
+    original = gateway_client.prepare_envelope
+
+    def _stop_lands_meanwhile(*args, **kwargs):
+        ctx.estop.set()  # what the estop tool does, from another thread
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(gateway_client, "prepare_envelope", _stop_lands_meanwhile)
+    result = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=False)
+    assert result["status"] == "blocked"
+    assert result["error"]["reason"] == "estop_set"
+    assert gateway_env.requests == []
+    _untouched(ctx)
+
+
+def test_a_read_prepared_across_a_stop_is_still_sent(fixtures_dir, gateway_env, monkeypatch):
+    """Reads pass the latch, before and after: the state stays readable."""
+    ctx = _ctx(fixtures_dir, extra_caps=("status.report",))
+    original = gateway_client.prepare_envelope
+
+    def _stop_lands_meanwhile(*args, **kwargs):
+        ctx.estop.set()
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(gateway_client, "prepare_envelope", _stop_lands_meanwhile)
+    result = execute_capability_tool(ctx, capability="status.report", args={}, dry_run=False)
+    assert result["status"] == "ok"
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["status.report"]

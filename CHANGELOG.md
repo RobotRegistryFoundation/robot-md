@@ -56,6 +56,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     MCP tool reports an error, and the message says to use the hardware stop.
     `ok` used to mean only that the in-process flag was set. There is no
     direct-bus fallback, for the reasons in `mcp/tools/estop.py`.
+  - **A stop is not queued behind a motion.** FastMCP runs a sync tool on the
+    event loop itself, so a stop sent while a motion waited for the gateway's
+    answer waited for that answer first. `estop`, `estop_clear`,
+    `execute_capability` and `execute_task` are now async and make their HTTP
+    call in a worker thread. A motion checks the stop latch again after its
+    envelope is signed, just before sending, so a motion prepared while a stop
+    landed is not sent (`estop_set`). `audit.record_event` holds a lock from
+    reading the previous hash to appending, so entries recorded at the same
+    moment by two threads do not fork the chain.
   - **`estop_clear`** asks the gateway for `arm.estop.clear` under the
     `COMMISSION` scope, which the gateway refuses below the commission tier,
     and releases this server's latch only when the gateway confirms. With the

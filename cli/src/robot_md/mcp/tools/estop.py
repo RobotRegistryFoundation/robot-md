@@ -1,7 +1,12 @@
 """MCP tools: estop and estop_clear, both through robot-md-gateway.
 
-`estop` sets this server's own latch first, so no further motion leaves this
-server whatever happens next. Then it sends the gateway's declared stop
+`estop` sets this server's own latch first. From then on this server sends no
+motion: the motion tools check the latch before they prepare a request and
+again just before they send it. (A motion request already being sent can
+still reach the gateway after the stop; so-arm101-actuator's motions consult
+its stop latch first.) The tools run in worker threads, so the stop is not
+queued behind a motion waiting on the gateway. Then `estop` sends the
+gateway's declared stop
 (`arm.estop` for so-arm101-actuator, or $ROBOT_MD_GATEWAY_STOP_TOOL). With
 robot-md-gateway#35 the gateway lets a declared stop through in every safety
 state, and so-arm101-actuator accepts it at every bearer tier; the actuator
