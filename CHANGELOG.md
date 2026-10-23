@@ -22,12 +22,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   it below the commission tier with a signed 403, and the driver checks the
   tier again. Without the clear on the list, a latched arm could be unlatched
   only by restarting the gateway, which leaves no record of who resumed it.
-  - **Which so-arm101-actuator this works with.** 0.2.2, the only release on
+  - **Which so-arm101-actuator this works with.** 0.2.2, its latest release on
     PyPI, declares no `stop_capabilities` and answers `arm.estop` with "unknown
-    capability", a 500 through the gateway. `main` without castor-hal raises
-    `ModuleNotFoundError` before it latches. RobotRegistryFoundation/so-arm101-actuator#8,
-    or `main` with castor-hal installed from its repository, latches and holds
-    the pose (a software hold, not a hardware e-stop).
+    capability", a 500 through the gateway. Its `main` from
+    RobotRegistryFoundation/so-arm101-actuator#8 (73d782c) on latches and holds
+    the pose (a software hold, not a hardware e-stop). Before #8, `main`
+    without castor-hal raised `ModuleNotFoundError` before it latched.
   - `install-gateway` does nothing on a gateway that is already installed and
     running, so an existing `gateway.env` keeps its old list. Add `arm.estop`,
     `arm.estop.clear` and the `ROBOT_MD_TOOL_MIN_TIER` line to it by hand, and
