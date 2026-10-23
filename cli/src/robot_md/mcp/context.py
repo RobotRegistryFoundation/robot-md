@@ -144,8 +144,29 @@ def _install_publisher_fanout(ctx: McpContext) -> None:
     ctx.publisher = _PublisherFanoutWrapper(ctx, ctx.publisher)
 
 
-def load_context(manifest_path: Path) -> McpContext:
-    """Parse + validate manifest, build RobotSpec, resolve backend, open it."""
+#: Opt in to opening the camera inside the MCP server, for `vision_find` and
+#: `discover`'s capture/detect. Off by default: robot-md-gateway's camera
+#: actuator (oak-d-actuator) may hold the camera, and a DepthAI device has one
+#: owner at a time. Set it only where nothing else uses the camera.
+ENV_OPEN_CAMERA = "ROBOT_MD_MCP_OPEN_CAMERA"
+
+
+def load_context(manifest_path: Path, *, open_servo_bus: bool = False) -> McpContext:
+    """Parse + validate manifest, build RobotSpec, resolve the backend.
+
+    The MCP server opens no device by default. Motion goes through
+    robot-md-gateway, which holds the robot's motor port (so-arm101-actuator
+    claims it exclusively at startup), and opening that port here would race
+    the gateway for it. The backend is resolved but not opened, so its
+    capability metadata is available and nothing is held.
+
+    With $ROBOT_MD_MCP_OPEN_CAMERA=1 the server opens the backend's cameras
+    only (`CapabilityBackend.open_perception`), never its motors.
+
+    `open_servo_bus=True` opens the whole backend, motors included. It is for
+    the operator CLI verbs that read the bus with a person at the machine
+    (`robot-md pose teach`). The MCP server never passes it.
+    """
     parsed = parse_file(manifest_path)
     result = validate_parsed(parsed)
     if result.code != VALID:
@@ -170,19 +191,22 @@ def load_context(manifest_path: Path) -> McpContext:
                 "required but missing from ROBOT.md"
             )
         try:
-            backend.open(spec)
+            if open_servo_bus:
+                backend.open(spec)
+            elif os.environ.get(ENV_OPEN_CAMERA) == "1":
+                backend.open_perception(spec)
         except (ImportError, OSError, RuntimeError) as e:
             # Optional hardware dep not installed (ImportError on scservo_sdk
-            # / depthai), declared port not openable (OSError /
+            # / depthai), declared device not openable (OSError /
             # SerialException — pyserial raises SerialException, a subclass
             # of IOError/OSError), or backend's own open-time validation
-            # failed (RuntimeError, e.g. baud-rate setup). Degrade to a
-            # backend-less context so render / validate / read-only tools
-            # still work. execute_capability will return no_backend.
+            # failed (RuntimeError). Degrade to a backend-less context so
+            # render / validate / read-only tools still work. Motion does not
+            # depend on the backend: it goes to robot-md-gateway.
             import logging as _logging
 
             _logging.getLogger("robot_md.mcp").warning(
-                "backend.open failed (%s); running without backend", e
+                "backend open failed (%s); running without an open backend", e
             )
             backend = None
 
@@ -253,14 +277,26 @@ def _start_command_watcher(ctx, cmd_path: Path):
                             log.warning("command_watcher: malformed line: %r", line)
                             continue
                         cmd = obj.get("cmd")
+                        # The dashboard's stop and clear take the same path as
+                        # the MCP tools: the stop goes to robot-md-gateway's
+                        # declared stop, and a clear is asked of the gateway at
+                        # the commission tier. Anyone who can write this file
+                        # can send these, so neither is trusted any further
+                        # than the MCP tools are.
                         if cmd == "estop.set":
-                            ctx.estop.set()
-                            if ctx.publisher:
-                                ctx.publisher.publish("estop.set", {"set": True})
+                            from robot_md.mcp.tools.estop import estop_tool
+
+                            try:
+                                estop_tool(ctx)
+                            except Exception as e:
+                                log.warning("command_watcher: estop failed: %s", e)
                         elif cmd == "estop.clear":
-                            ctx.estop.clear()
-                            if ctx.publisher:
-                                ctx.publisher.publish("estop.cleared", {"set": False})
+                            from robot_md.mcp.tools.estop import estop_clear_tool
+
+                            try:
+                                estop_clear_tool(ctx)
+                            except Exception as e:
+                                log.warning("command_watcher: estop clear failed: %s", e)
                         elif cmd == "snapshot":
                             if ctx.backend is not None:
                                 try:

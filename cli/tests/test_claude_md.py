@@ -86,7 +86,20 @@ def test_render_lists_declared_hitl_gates(tmp_path):
     text = render_claude_md(p)
     assert "`destructive`" in text
     assert "`system`" in text
-    assert "requires explicit authorization" in text
+    assert "requires a person's confirmation from outside this chat" in text
+
+
+def test_render_never_offers_chat_authorization_for_motion(tmp_path):
+    """The generated CLAUDE.md must not tell Claude to treat a reply in chat
+    as authorization for motion, and must route motion through the gateway."""
+    text = render_claude_md(_write(tmp_path, BOB))
+    lowered = text.lower()
+    assert "authorize this specific action" not in lowered
+    assert "request explicit operator approval" not in lowered
+    assert "request explicit authorization" not in lowered
+    assert "robot-md-gateway" in text
+    assert "never authorization for motion" in text
+    assert "hardware stop" in text
 
 
 def test_render_flags_missing_gates(tmp_path):

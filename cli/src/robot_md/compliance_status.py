@@ -593,8 +593,8 @@ def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, An
                     if namespace_ok
                     else (
                         f"capabilities declare {sorted(motion_namespaces_in_caps)} but the "
-                        f"declared driver(s) implement {sorted(backend_namespaces_supplied)} — "
-                        f"every dispatch will return not_implemented"
+                        f"declared driver(s) implement {sorted(backend_namespaces_supplied)}, "
+                        f"so no declared driver can carry them out"
                     )
                 ),
                 "fix": (
@@ -620,8 +620,9 @@ def _check_first_motion_readiness(fm: dict, manifest_path: Path) -> dict[str, An
                             if not registered_protocols
                             else (
                                 f"declared driver protocol(s) {unmatched_protocols} "
-                                f"have no registered backend — every execute_capability "
-                                f"call will return no_backend. Registered protocols: "
+                                f"have no registered backend, so robot-md cannot open "
+                                f"those devices itself (in-process perception, "
+                                f"`pose teach`). Registered protocols: "
                                 f"{sorted(registered_protocols)}"
                             )
                         )

@@ -2544,10 +2544,14 @@ app.add_typer(pose_app, name="pose")
 
 
 def _open_feetech_bus(manifest_path: Path):
-    """Resolve the Feetech servo bus for the manifest. Overridable in tests."""
+    """Resolve the Feetech servo bus for the manifest. Overridable in tests.
+
+    `pose teach` is run by a person at the machine and reads the bus
+    directly, so it asks for the bus explicitly; the MCP server never does.
+    """
     from robot_md.mcp.context import load_context
 
-    ctx = load_context(manifest_path)
+    ctx = load_context(manifest_path, open_servo_bus=True)
     bus = getattr(ctx.backend, "_servo_bus", None)
     if bus is None:
         raise RuntimeError("no feetech servo bus available for this manifest")

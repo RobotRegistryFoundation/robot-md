@@ -112,6 +112,21 @@ async def test_check_safety_content_references_robot_name(server_and_name):
     assert robot_name in text
 
 
+async def test_check_safety_never_offers_chat_authorization(server_and_name):
+    """A reply in chat is not authorization for motion; the prompt must not
+    ask for one, and must say the gateway enforces the limits."""
+    server, _ = server_and_name
+    result = await server.get_prompt("check-safety", {"action": "pick up the glass vial"})
+    text = result.messages[0].content.text
+    lowered = text.lower()
+    assert "authorize this specific action" not in lowered
+    assert "need explicit authorization" not in lowered
+    assert "safe to proceed" not in lowered
+    assert "robot-md-gateway" in text
+    assert "not that confirmation" in text
+    assert "hardware stop" in text
+
+
 async def test_explain_capability_returns_non_empty_content(server_and_name):
     server, _ = server_and_name
     result = await server.get_prompt("explain-capability", {"capability": "arm.pick"})
