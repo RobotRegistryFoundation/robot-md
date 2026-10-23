@@ -11,13 +11,20 @@ from packaging.version import Version
 
 from robot_md.install_gateway import (
     BEARERS_PATH,
+    CONFIG_DIR,
     ENV_PATH,
+    HEALTH_URL,
+    MANIFEST_PATH,
     _invoking_user,
     already_installed,
     bearer_problems,
+    bearer_warnings,
+    env_warnings,
+    probe_gateway,
     render_default_bearers,
     render_env_file,
     render_systemd_unit,
+    secure_existing_file,
     write_new_file,
 )
 
@@ -38,7 +45,14 @@ def test_systemd_unit_content():
         "--host 127.0.0.1 --port 8080 "
         "--bearers /etc/robot-md-gateway/bearers.yaml"
     ) in unit
-    assert "DeviceAllow=/dev/ttyACM0 rw" in unit
+    # The serial ports by class, not one node: ttyACM1, a CH340 or FTDI bridge
+    # (ttyUSB*) and a node that appears after the start all reach the gateway.
+    lines = unit.splitlines()
+    assert "DeviceAllow=char-ttyACM rw" in lines
+    assert "DeviceAllow=char-ttyUSB rw" in lines
+    assert "DeviceAllow=/dev/ttyACM0 rw" not in lines
+    # Stock Raspberry Pi OS: the ports are root:dialout 0660.
+    assert "SupplementaryGroups=dialout" in lines
 
 
 def test_render_env_file_contains_required_keys():
@@ -219,13 +233,98 @@ def test_bearer_problems_names_what_is_wrong(text, expected):
     assert any(expected in p for p in problems), problems
 
 
+TOKEN_A, TOKEN_B = "A" * 43, "B" * 43
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # robot-md-gateway 0.5.0a9 (PyPI) stops with KeyError: 'tier' on this
+        # one, and it is what the gateway's own create-bearers.sh writes.
+        (f'bearers:\n  - token: "{TOKEN_A}"\n    role: supervisor\n', "has no valid tier"),
+        # The next three load in 0.5.0a9 and are refused by robot-md-gateway#35.
+        (
+            f'bearers:\n  - token: "{TOKEN_A}"\n    tier: actuate\n    caller: agent\n'
+            f'  - token: "{TOKEN_A}"\n    tier: read\n    role: supervisor\n',
+            "entry 2 (no caller) uses the same token as entry 1 (agent)",
+        ),
+        (
+            f'bearers:\n  - token: "{TOKEN_A}"\n    tier: actuate\n    role: supervisor\n',
+            "is a supervisor with tier 'actuate'; a supervisor is read tier",
+        ),
+        (
+            f'bearers:\n  - token: "{TOKEN_A}"\n    tier: read\n    role: admin\n',
+            "has role 'admin'; the only role is 'supervisor'",
+        ),
+    ],
+)
+def test_bearer_problems_refuses_what_the_gateway_refuses_or_misreads(text, expected):
+    """The review of #113, note 3: four files the installer passed and a
+    gateway refuses or misreads."""
+    problems = bearer_problems(text)
+    assert any(expected in p for p in problems), problems
+    assert not any(TOKEN_A in p for p in problems)
+
+
+def test_bearer_problems_accepts_a_complete_file():
+    text = (
+        f'bearers:\n  - token: "{TOKEN_A}"\n    tier: actuate\n'
+        f'  - token: "{TOKEN_B}"\n    tier: read\n    role: supervisor\n'
+        f'  - token: "{"C" * 43}"\n    tier: commission\n'
+    )
+    assert bearer_problems(text) == []
+    assert bearer_warnings(text) == []
+
+
 def test_bearer_problems_never_repeats_a_token():
     token = "x" * 20
     problems = bearer_problems(f'bearers:\n  - token: "{token}"\n    tier: read\n')
     assert problems and not any(token in p for p in problems)
 
 
-# --- write_new_file: 0600, atomic, never clobbers (review of #112, Q7 b, c) ---------
+# --- what an upgrade's old files lack (review of #113, note 2) ---------------------
+
+
+def test_bearer_warnings_name_a_missing_supervisor_and_commission_entry():
+    warnings = bearer_warnings(f'bearers:\n  - token: "{TOKEN_A}"\n    tier: actuate\n')
+    assert any("no `role: supervisor` entry" in w for w in warnings)
+    assert any("no commission entry, so nothing can clear a stop" in w for w in warnings)
+
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        (
+            "ROBOT_MD_TOOL_ALLOWLIST=move,home,read_state,perceive\n",
+            "has no arm.estop",
+        ),
+        ("", "has no arm.estop"),
+        (
+            "ROBOT_MD_TOOL_ALLOWLIST=move,arm.estop,arm.estop.clear\n",
+            "allowlists arm.estop.clear without ROBOT_MD_TOOL_MIN_TIER",
+        ),
+        (
+            "ROBOT_MD_TOOL_ALLOWLIST=move,arm.estop,arm.estop.clear\n"
+            "ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:actuate|commission\n",
+            "allowlists arm.estop.clear without ROBOT_MD_TOOL_MIN_TIER",
+        ),
+        (
+            "ROBOT_MD_PATH=/home/craig/ROBOT.md\nROBOT_MD_TOOL_ALLOWLIST=arm.estop\n",
+            "ProtectHome=yes hides",
+        ),
+    ],
+)
+def test_env_warnings_name_what_an_old_gateway_env_lacks(env, expected):
+    assert any(expected in w for w in env_warnings(env)), env_warnings(env)
+
+
+def test_the_rendered_files_raise_no_warning_but_the_missing_commission_entry():
+    assert env_warnings(render_env_file(manifest_path=MANIFEST_PATH)) == []
+    [warning] = bearer_warnings(render_default_bearers())
+    assert "no commission entry" in warning
+
+
+# --- write_new_file and secure_existing_file (review of #113, notes 1 and 4) -------
 
 
 def _me() -> str:
@@ -253,6 +352,23 @@ def test_write_new_file_never_overwrites(tmp_path):
     assert [p.name for p in tmp_path.iterdir()] == ["bearers.yaml"]
 
 
+def test_write_new_file_never_follows_a_symlink_at_the_name(tmp_path):
+    target = tmp_path / "elsewhere"
+    target.write_text("root's precious content\n")
+    (tmp_path / "bearers.yaml").symlink_to(target)
+    path = str(tmp_path / "bearers.yaml")
+    assert write_new_file(path, "SECRET\n", mode="0600", owner=_me(), sudo=()) == "exists"
+    assert target.read_text() == "root's precious content\n"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["bearers.yaml", "elsewhere"]
+
+
+def test_write_new_file_never_writes_into_a_directory_at_the_name(tmp_path):
+    (tmp_path / "bearers.yaml").mkdir()
+    path = str(tmp_path / "bearers.yaml")
+    assert write_new_file(path, "SECRET\n", mode="0600", owner=_me(), sudo=()) == "exists"
+    assert list((tmp_path / "bearers.yaml").iterdir()) == []
+
+
 def test_write_new_file_racing_itself_creates_exactly_one_file(tmp_path):
     from concurrent.futures import ThreadPoolExecutor
 
@@ -278,97 +394,349 @@ def test_write_new_file_leaves_nothing_behind_when_it_fails(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
-# --- install_gateway never clobbers, and stops on a bad bearers.yaml ----------------
+def _helper_functions() -> dict:
+    """The root helper's functions, loaded in this process, for the tests
+    that must watch it work."""
+    from robot_md.install_gateway import _FILE_HELPER
+
+    namespace: dict = {"__name__": "file_helper"}
+    exec(compile(_FILE_HELPER, "file_helper", "exec"), namespace)
+    return namespace
+
+
+def test_the_root_helper_fsyncs_the_file_before_it_links_the_name(tmp_path, monkeypatch):
+    """A power cut after the link must not leave an empty bearers.yaml, which
+    the gateway would refuse to start on (the review of #113, note 4)."""
+    helper = _helper_functions()
+    events: list[str] = []
+    real_fsync, real_link = os.fsync, os.link
+    monkeypatch.setattr(os, "fsync", lambda fd: (events.append("fsync"), real_fsync(fd))[1])
+    monkeypatch.setattr(os, "link", lambda *a, **k: (events.append("link"), real_link(*a, **k))[1])
+    path = str(tmp_path / "bearers.yaml")
+    assert helper["create"](path, _me(), 0o600, b"SECRET\n") == "created"
+    assert events[:2] == ["fsync", "link"]
+    assert events[-1] == "fsync"  # the directory, so the new name is durable too
+
+
+def test_the_root_helper_runs_isolated_from_the_current_directory():
+    """As root, a tempfile.py lying in the operator's cwd must not be imported."""
+    from robot_md import install_gateway as ig
+
+    seen = []
+
+    def run(cmd, **kw):
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="created\n", stderr="")
+
+    ig.write_new_file("/x/y", "z", mode="0600", owner="a:b", run=run)
+    assert seen[0][:4] == ["sudo", "python3", "-I", "-c"]
+
+
+def test_secure_existing_file_tightens_a_loose_file_and_names_what_it_was(tmp_path):
+    path = tmp_path / "bearers.yaml"
+    path.write_text("content\n")
+    path.chmod(0o644)
+    state, detail = secure_existing_file(str(path), owner=_me(), sudo=())
+    assert state == "secured"
+    assert detail == f"0644 {_me()}"
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert path.read_text() == "content\n"
+    assert secure_existing_file(str(path), owner=_me(), sudo=()) == ("ok", "")
+
+
+def test_secure_existing_file_refuses_a_symlink_and_a_directory(tmp_path):
+    target = tmp_path / "elsewhere"
+    target.write_text("x\n")
+    target.chmod(0o644)
+    (tmp_path / "link.yaml").symlink_to(target)
+    (tmp_path / "dir.yaml").mkdir()
+    assert secure_existing_file(str(tmp_path / "link.yaml"), owner=_me(), sudo=()) == (
+        "failed",
+        "it is a symbolic link, not a regular file",
+    )
+    assert secure_existing_file(str(tmp_path / "dir.yaml"), owner=_me(), sudo=()) == (
+        "failed",
+        "it is not a regular file",
+    )
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644  # never followed
+
+
+def test_secure_existing_file_never_takes_over_a_file_with_another_name(tmp_path):
+    other = tmp_path / "elsewhere"
+    other.write_text("x\n")
+    other.chmod(0o644)
+    os.link(other, tmp_path / "bearers.yaml")
+    assert secure_existing_file(str(tmp_path / "bearers.yaml"), owner=_me(), sudo=()) == (
+        "failed",
+        "it has 2 hard links, so it is not changed",
+    )
+    assert stat.S_IMODE(other.stat().st_mode) == 0o644
+
+
+# --- the health probe (review of #113, note 6) --------------------------------------
+
+
+class _Answer:
+    def __init__(self, status):
+        self.status = status
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _urlopen(*answers):
+    """A urlopen that gives each answer in turn: an int is an HTTP status
+    (urllib raises for 4xx and 5xx), an exception is raised."""
+    import urllib.error
+
+    queue = list(answers)
+
+    def urlopen(url, timeout):
+        answer = queue.pop(0)
+        if isinstance(answer, BaseException):
+            raise answer
+        if answer >= 400:
+            raise urllib.error.HTTPError(url, answer, "status", {}, None)
+        return _Answer(answer)
+
+    return urlopen
+
+
+def test_probe_gateway_takes_the_gateways_401_as_up():
+    up, message = probe_gateway(urlopen=_urlopen(401), sleep=lambda s: None)
+    assert up
+    assert "HTTP 401" in message
+
+
+def test_probe_gateway_waits_for_the_port_to_open():
+    import urllib.error
+
+    naps = []
+    refused = urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+    up, _ = probe_gateway(urlopen=_urlopen(refused, refused, 401), sleep=naps.append)
+    assert up
+    assert len(naps) == 2
+
+
+@pytest.mark.parametrize("status", [200, 404, 500])
+def test_probe_gateway_refuses_any_other_answer(status):
+    up, message = probe_gateway(urlopen=_urlopen(status), sleep=lambda s: None)
+    assert not up
+    assert f"HTTP {status}" in message
+
+
+def test_probe_gateway_gives_up_after_its_attempts():
+    import urllib.error
+
+    refused = urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))
+    up, message = probe_gateway(attempts=3, urlopen=_urlopen(*[refused] * 3), sleep=lambda s: None)
+    assert not up
+    assert "after 3 tries" in message
+
+
+def test_the_installed_gateway_answers_the_probe_route_with_401():
+    """The route the probe reads, checked against the gateway robot-md
+    installs alongside (0.5.0a9 from PyPI in CI). The installer used to GET
+    "/", which no gateway serves: a working gateway answered 404."""
+    from fastapi.testclient import TestClient
+
+    receiver = importlib.import_module("robot_md_gateway.receiver")
+
+    class _NoKeys:
+        def resolve_public_key_pem(self, kid):
+            return None
+
+    client = TestClient(receiver.make_app(resolver=_NoKeys()))
+    path = HEALTH_URL.split("8080", 1)[1]
+    assert client.get(path).status_code == 401
+    assert client.get("/").status_code == 404
+
+
+# --- install_gateway against a fake host (review of #113, notes 1, 2, 4, 5) --------
 
 
 class _FakeHost:
     """subprocess.run for install_gateway: records every command, keeps the
-    files it creates in memory, and runs nothing."""
+    files it creates in memory with their mode and owner, and runs nothing."""
 
-    def __init__(self, existing: dict[str, str]):
+    def __init__(self, existing: dict[str, str], *, mode="0600", owner=None, unit_state="disabled"):
         self.files = dict(existing)
+        self.modes = {path: mode for path in existing}
+        self.owners = {path: owner or "robot-md-gateway:robot-md-gateway" for path in existing}
+        self.symlinks: set[str] = set()
+        self.unit_state = unit_state
         self.commands: list[list[str]] = []
-        self.pending: dict[str, str] = {}
 
     def run(self, cmd, **kw):
         self.commands.append(list(cmd))
         args = [c for c in cmd if c != "sudo"]
-        out, code = "", 0
-        if args[:2] == ["test", "-e"]:
-            code = 0 if args[2] in self.files else 1
-        elif args[0] == "mktemp":
-            out = args[1].replace("XXXXXXXX", f"tmp{len(self.commands)}")
-        elif args[0] == "tee" and ".install." in args[1]:
-            self.pending[args[1]] = kw.get("input", "")
-        elif args[0] == "ln":
-            if args[2] in self.files:
-                code = 1
+        out, err, code = "", "", 0
+        if args[:3] == ["python3", "-I", "-c"]:
+            verb, path = args[4], args[5]
+            if verb == "create":
+                if path in self.files or path in self.symlinks:
+                    out = "exists\n"
+                else:
+                    self.files[path] = kw.get("input", "")
+                    self.modes[path], self.owners[path] = args[7], args[6]
+                    out = "created\n"
+            elif path in self.symlinks:
+                err, code = "it is a symbolic link, not a regular file\n", 1
+            elif int(self.modes[path], 8) & 0o077 or self.owners[path] != args[6]:
+                out = f"secured {self.modes[path]} {self.owners[path]}\n"
+                self.modes[path], self.owners[path] = "0600", args[6]
             else:
-                self.files[args[2]] = self.pending.get(args[1], "")
+                out = "ok\n"
+        elif args[:2] == ["systemctl", "is-enabled"]:
+            out = self.unit_state + "\n"
         elif args[0] == "cat":
             code = 0 if args[1] in self.files else 1
             out = self.files.get(args[1], "")
-        return subprocess.CompletedProcess(cmd, code, stdout=out, stderr="")
+        return subprocess.CompletedProcess(cmd, code, stdout=out, stderr=err)
+
+    def ran(self, *words: str) -> list[list[str]]:
+        return [c for c in self.commands if all(w in c for w in words)]
 
 
-def _install(host: _FakeHost, tmp_path) -> int:
+def _install(host: _FakeHost, manifest_path: str) -> int:
     from robot_md import install_gateway as ig
-
-    class _Resp:
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
 
     with (
         patch.object(ig, "already_installed", return_value=False),
         patch.object(ig.subprocess, "run", side_effect=host.run),
-        patch("urllib.request.urlopen", return_value=_Resp()),
+        patch("urllib.request.urlopen", side_effect=_urlopen(401)),
     ):
-        return ig.install_gateway(
-            manifest_path=str(tmp_path / "ROBOT.md"), yes=True, add_user_to_group=False
-        )
+        return ig.install_gateway(manifest_path=manifest_path, yes=True, add_user_to_group=False)
 
 
-def test_a_rerun_never_overwrites_bearers_or_gateway_env(tmp_path):
+COMPLETE_BEARERS = (
+    f'bearers:\n  - token: "{TOKEN_A}"\n    tier: actuate\n'
+    f'  - token: "{TOKEN_B}"\n    tier: read\n    role: supervisor\n'
+    f'  - token: "{"C" * 43}"\n    tier: commission\n'
+)
+
+
+def test_a_rerun_never_rewrites_the_content_of_bearers_or_gateway_env(tmp_path, capsys):
     """The review's Q7 (c): already_installed() is False whenever the unit is
     not active, and a rerun rewrote gateway.env and bearers.yaml."""
-    good = render_default_bearers()
-    host = _FakeHost({BEARERS_PATH: good, ENV_PATH: "ROBOT_MD_TOOL_ALLOWLIST=mine\n"})
-    assert _install(host, tmp_path) == 0
-    assert host.files[BEARERS_PATH] == good
-    assert host.files[ENV_PATH] == "ROBOT_MD_TOOL_ALLOWLIST=mine\n"
-    assert not [c for c in host.commands if c[-1] in (BEARERS_PATH, ENV_PATH) and "tee" in c]
-    assert not [c for c in host.commands if "ln" in c]
+    env = render_env_file(manifest_path=MANIFEST_PATH) + "# edited by hand\n"
+    host = _FakeHost({BEARERS_PATH: COMPLETE_BEARERS, ENV_PATH: env})
+    assert _install(host, MANIFEST_PATH) == 0
+    assert host.files == {BEARERS_PATH: COMPLETE_BEARERS, ENV_PATH: env}
+    out = capsys.readouterr().out
+    assert out.count("exists; its content, owner and mode are unchanged.") == 2
+    assert "warning:" not in out
 
 
-def test_a_fresh_install_creates_both_files_without_writing_to_their_names(tmp_path):
+def test_an_old_install_with_loose_files_gets_them_tightened_and_says_so(tmp_path, capsys):
+    """The review of #113, note 1: older installs made both files 0644, and
+    the later `chown -R` put them in the operator's group."""
+    env = render_env_file(manifest_path=MANIFEST_PATH)
+    host = _FakeHost(
+        {BEARERS_PATH: COMPLETE_BEARERS, ENV_PATH: env}, mode="0644", owner="root:root"
+    )
+    assert _install(host, MANIFEST_PATH) == 0
+    out = capsys.readouterr().out
+    for path in (BEARERS_PATH, ENV_PATH):
+        assert (
+            f"{path} exists; it was 0644 root:root, so it is now 0600 "
+            "robot-md-gateway:robot-md-gateway. Its content is unchanged."
+        ) in out
+        assert (host.modes[path], host.owners[path]) == (
+            "0600",
+            "robot-md-gateway:robot-md-gateway",
+        )
+    assert host.files == {BEARERS_PATH: COMPLETE_BEARERS, ENV_PATH: env}
+
+
+def test_the_config_directory_stays_roots_and_only_opt_is_chowned(tmp_path):
     host = _FakeHost({})
-    assert _install(host, tmp_path) == 0
+    assert _install(host, MANIFEST_PATH) == 0
+    assert host.ran("chown", "root", CONFIG_DIR)
+    assert host.ran("chmod", "go-w", CONFIG_DIR)
+    [recursive] = host.ran("chown", "-R")
+    assert recursive[-1] == "/opt/robot-md-gateway"
+    assert CONFIG_DIR not in recursive
+
+
+def test_a_fresh_install_creates_both_files_0600_through_the_root_helper(tmp_path):
+    host = _FakeHost({})
+    assert _install(host, MANIFEST_PATH) == 0
     assert bearer_problems(host.files[BEARERS_PATH]) == []
     assert "arm.estop" in host.files[ENV_PATH]
-    # Never `tee <name>`: the content goes to a temporary file that already has
-    # its owner and mode, and only then gets the name, by link(2).
+    for path in (BEARERS_PATH, ENV_PATH):
+        assert (host.modes[path], host.owners[path]) == (
+            "0600",
+            "robot-md-gateway:robot-md-gateway",
+        )
+    # Never `tee <name>`, and never a separate command on a temporary name.
     assert not [c for c in host.commands if "tee" in c and c[-1] in (BEARERS_PATH, ENV_PATH)]
-    [link] = [c for c in host.commands if "ln" in c and c[-1] == BEARERS_PATH]
-    tmp = link[-2]
-    order = [c for c in host.commands if tmp in c]
-    assert [c[1] for c in order] == ["chown", "chmod", "tee", "ln", "rm"]
-    assert order[1][-2] == "0600"
-    assert order[0][-2] == "robot-md-gateway:robot-md-gateway"
+    assert not host.ran("mktemp") and not host.ran("ln")
+
+
+def test_the_gateway_reads_the_etc_copy_of_any_manifest(tmp_path):
+    """The review of #113, note 5: with `--manifest ~/ROBOT.md`, the gateway
+    was pointed at a path the unit's ProtectHome=yes hides."""
+    manifest = tmp_path / "ROBOT.md"
+    manifest.write_text("---\n---\n")
+    host = _FakeHost({})
+    assert _install(host, str(manifest)) == 0
+    assert f"ROBOT_MD_PATH={MANIFEST_PATH}\n" in host.files[ENV_PATH]
+    assert host.ran("cp", str(manifest), MANIFEST_PATH)
+
+
+def test_an_upgrade_warns_about_what_its_old_files_lack_and_still_installs(tmp_path, capsys):
+    """The review of #113, note 2: an older install's files, kept as they are,
+    left the upgrade silent."""
+    old_bearers = f'bearers:\n  - token: "{TOKEN_A}"\n    tier: actuate\n    caller: agent\n'
+    old_env = (
+        "ROBOT_MD_PATH=/etc/robot-md-gateway/ROBOT.md\n"
+        "ROBOT_MD_TOOL_ALLOWLIST=mcp__robot__execute_capability,move,home,read_state,perceive\n"
+    )
+    host = _FakeHost({BEARERS_PATH: old_bearers, ENV_PATH: old_env})
+    assert _install(host, MANIFEST_PATH) == 0
+    out = capsys.readouterr().out
+    assert "warning: bearers.yaml has no `role: supervisor` entry" in out
+    assert "warning: bearers.yaml has no commission entry, so nothing can clear a stop" in out
+    assert "warning: gateway.env's ROBOT_MD_TOOL_ALLOWLIST has no arm.estop" in out
+    assert host.ran("systemctl", "enable", "--now")
+    for step in ("sudoedit", "sudo cat", "supervising person's device", "every 3 s", "clear"):
+        assert step in out.split("next steps:", 1)[1]
+
+
+def test_a_refused_bearers_file_disables_an_enabled_unit(tmp_path, capsys):
+    """The review of #113: a unit enabled by an earlier run would load the
+    refused file at the next boot."""
+    host = _FakeHost({BEARERS_PATH: OLD_PLACEHOLDER_FILE}, unit_state="enabled")
+    assert _install(host, MANIFEST_PATH) == 1
+    out = capsys.readouterr().out
+    assert "still has a placeholder token" in out
+    assert "REPLACE-WITH-MINTED-TOKEN" not in out
+    assert host.ran("systemctl", "disable", "robot-md-gateway")
+    assert "disabled robot-md-gateway, so it does not load this file at the next boot." in out
+    assert not host.ran("enable", "--now")
+    assert host.files[BEARERS_PATH] == OLD_PLACEHOLDER_FILE
 
 
 def test_an_existing_placeholder_bearers_file_stops_the_install_before_enabling(tmp_path, capsys):
     host = _FakeHost({BEARERS_PATH: OLD_PLACEHOLDER_FILE})
-    assert _install(host, tmp_path) == 1
+    assert _install(host, MANIFEST_PATH) == 1
     out = capsys.readouterr().out
     assert "still has a placeholder token" in out
-    assert "REPLACE-WITH-MINTED-TOKEN" not in out
-    assert not [c for c in host.commands if "systemctl" in c]
+    assert not host.ran("daemon-reload") and not host.ran("enable", "--now")
+    assert not host.ran("systemctl", "disable", "robot-md-gateway")  # it was not enabled
     assert host.files[BEARERS_PATH] == OLD_PLACEHOLDER_FILE
+
+
+def test_a_symlinked_bearers_file_is_refused(tmp_path, capsys):
+    host = _FakeHost({ENV_PATH: render_env_file(manifest_path=MANIFEST_PATH)})
+    host.symlinks.add(BEARERS_PATH)
+    assert _install(host, MANIFEST_PATH) == 1
+    assert "it is a symbolic link, not a regular file" in capsys.readouterr().out
+    assert not host.ran("enable", "--now")
 
 
 # --- the unit is hardened (review of #112, note 5) ------------------------------------
@@ -391,6 +759,9 @@ def test_the_unit_fails_closed_without_the_bearer_file():
         "SystemCallArchitectures=native",
         "NoNewPrivileges=yes",
         "ProtectSystem=strict",
+        "SupplementaryGroups=dialout",
+        "DeviceAllow=char-ttyACM rw",
+        "DeviceAllow=char-ttyUSB rw",
     ],
 )
 def test_the_unit_is_hardened(directive):
