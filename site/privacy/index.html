@@ -50,13 +50,13 @@
 
   <h2>The short version</h2>
   <ul>
-    <li>The Claude plugin and its MCP server run on your machine. They read your <code>ROBOT.md</code> and talk to your robot. They send nothing to us.</li>
+    <li>The Claude plugin and its MCP server run on your machine. They read your <code>ROBOT.md</code> and talk to your robot. They send nothing to us unless a tool or command you approve submits a record to the registry, as listed below.</li>
     <li>Registering a robot sends a small, public description of the robot to the registry. That record is published openly under CC0. Don't put anything private in it.</li>
     <li>The websites set no cookies and run no advertising trackers. Only rcan.dev counts page views, with cookieless Cloudflare Web Analytics. Nothing is sold.</li>
   </ul>
 
   <h2>What runs locally and stays local</h2>
-  <p>The robot-md plugin for Claude Code and the <code>robot-md mcp</code> server read <code>ROBOT.md</code>, calibration files, camera frames and audit bundles on your machine, and they drive your hardware through robot-md-gateway on <code>127.0.0.1</code>. None of that is sent to the Robot Registry Foundation. Your AI client (Claude Code, for example) handles anything the plugin returns to it under that provider's own privacy terms.</p>
+  <p>The robot-md plugin for Claude Code and the <code>robot-md mcp</code> server read <code>ROBOT.md</code>, calibration files, camera frames and audit bundles on your machine, and they drive your hardware through robot-md-gateway on <code>127.0.0.1</code>. None of that is sent to the Robot Registry Foundation. The one exception is the <code>spatial_eval_submit_to_rrf</code> MCP tool, listed in the table below. Your AI client (Claude Code, for example) handles anything the plugin returns to it under that provider's own privacy terms.</p>
 
   <h2>What leaves your machine, and when</h2>
   <table>
@@ -71,6 +71,11 @@
         <td>Run <code>rotate-key</code>, <code>revoke-key</code>, <code>unregister</code>, <code>verify-tier</code>, <code>request-apikey --submit</code>, <code>compliance status</code>, any <code>emit-*</code> command with <code>--submit</code>, or the registry checks in <code>doctor</code></td>
         <td>robotregistryfoundation.org</td>
         <td>The RRN and the signed request for that command, such as a new public key or a compliance packet you chose to submit.</td>
+      </tr>
+      <tr>
+        <td>Approve the <code>spatial_eval_submit_to_rrf</code> MCP tool</td>
+        <td>robotregistryfoundation.org</td>
+        <td>A signed spatial-eval score for one run: the RRN, run ID, timestamp, probe and execute scores, and their signatures and evidence hash.</td>
       </tr>
       <tr>
         <td>Install or look up an actuator package</td>
