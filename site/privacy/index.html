@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Privacy policy — ROBOT.md</title>
+  <meta name="description" content="What the robot-md software, the robot-md Claude plugin, robotmd.dev and the Robot Registry Foundation registry collect, where it goes, and how long it is kept.">
+  <meta name="theme-color" content="#F4EFE6">
+  <meta property="og:title" content="Privacy policy — ROBOT.md">
+  <meta property="og:url" content="https://robotmd.dev/privacy/">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="https://robotmd.dev/privacy/">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@1,400;1,600&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/design.css?v=2026-05-11c">
+  <link rel="stylesheet" href="/css/apex.css?v=2026-05-11c">
+  <style>
+    .policy { max-width: 760px; padding-top: 48px; padding-bottom: 64px; line-height: 1.65; }
+    .policy h1 { font-size: 36px; margin: 0 0 8px; }
+    .policy h2 { font-size: 22px; margin: 40px 0 12px; }
+    .policy .meta { color: var(--ink-3, #777); font-size: 14px; margin-bottom: 32px; }
+    .policy table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 12px 0; }
+    .policy th, .policy td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--rule, #ddd); }
+    .policy code { font-family: var(--mono, monospace); font-size: 0.92em; }
+  </style>
+</head>
+<body>
+
+  <header class="site-nav" role="banner">
+    <div class="wrap site-nav-inner">
+      <a class="wordmark" href="/" aria-label="ROBOT.md home">
+        ROBOT<span class="dot">.</span><span class="md">md</span>
+      </a>
+<!--#include partials/nav.html-->
+    </div>
+  </header>
+
+<main class="wrap policy">
+  <h1>Privacy policy</h1>
+  <p class="meta">Effective November 12, 2026 · Covers the robot-md CLI, the robot-md Claude plugin and MCP server, robot-md-gateway, robotmd.dev, and the Robot Registry Foundation registry (robotregistryfoundation.org, rcan.dev).</p>
+
+  <p>The robot-md project is run by Craig Merry as the Robot Registry Foundation. This page says what the software and websites collect, where it goes, and how long it stays. It describes the code as it ships today. If the code changes what it collects, this page changes first.</p>
+
+  <h2>The short version</h2>
+  <ul>
+    <li>The Claude plugin and its MCP server run on your machine. They read your <code>ROBOT.md</code> and talk to your robot. They send nothing to us.</li>
+    <li>Registering a robot sends a small, public description of the robot to the registry. That record is published openly under CC0. Don't put anything private in it.</li>
+    <li>The websites set no cookies and run no advertising trackers. Only rcan.dev counts page views, with cookieless Cloudflare Web Analytics. Nothing is sold.</li>
+  </ul>
+
+  <h2>What runs locally and stays local</h2>
+  <p>The robot-md plugin for Claude Code and the <code>robot-md mcp</code> server read <code>ROBOT.md</code>, calibration files, camera frames and audit bundles on your machine, and they drive your hardware through robot-md-gateway on <code>127.0.0.1</code>. None of that is sent to the Robot Registry Foundation. Your AI client (Claude Code, for example) handles anything the plugin returns to it under that provider's own privacy terms.</p>
+
+  <h2>What leaves your machine, and when</h2>
+  <table>
+    <thead><tr><th>When you…</th><th>Sent to</th><th>What is sent</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Run <code>robot-md register</code> or <code>robot-md init --register</code></td>
+        <td>robotregistryfoundation.org</td>
+        <td>Robot name, manufacturer, model, firmware version, RCAN version, the robot's public signing key and key ID, and optionally a robot URI and an owner ID that you supply. The registry assigns a Robot Registration Number (RRN).</td>
+      </tr>
+      <tr>
+        <td>Run <code>rotate-key</code>, <code>revoke-key</code>, <code>verify-tier</code>, <code>compliance-status</code>, <code>submit</code> or the registry checks in <code>doctor</code></td>
+        <td>robotregistryfoundation.org</td>
+        <td>The RRN and the signed request for that command, such as a new public key or a compliance packet you chose to submit.</td>
+      </tr>
+      <tr>
+        <td>Install or look up an actuator package</td>
+        <td>robotmd.dev, robotregistryfoundation.org</td>
+        <td>A request for the public catalog. No robot data.</td>
+      </tr>
+      <tr>
+        <td>Join a waitlist on robotmd.dev</td>
+        <td>robotmd.dev (Cloudflare KV)</td>
+        <td>Your email address, the time, and your browser's user-agent string.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Each of these requests, like any request on the internet, reveals your IP address to Cloudflare, which hosts the services. The <code>--contact-email</code> option of <code>robot-md init</code> is accepted but not currently transmitted anywhere.</p>
+
+  <h2>What is public</h2>
+  <p>Registry records are public by design. Anyone can resolve a robot at <code>rcan.dev/r/&lt;rrn&gt;</code>, and registry data is released under CC0. The record contains what you sent at registration, plus keys and compliance attestations you later submit. Don't register personal names or other private details as robot or manufacturer names.</p>
+
+  <h2>Websites</h2>
+  <p>robotmd.dev, robotregistryfoundation.org and rcan.dev are hosted on Cloudflare. rcan.dev uses Cloudflare Web Analytics, which counts page views without cookies and without fingerprinting individual visitors. robotmd.dev and robotregistryfoundation.org run no analytics scripts. Fonts load from Google Fonts, which receives your IP address when it serves them. The sites set no cookies.</p>
+
+  <h2>How long data is kept</h2>
+  <ul>
+    <li><strong>Registry records</strong> are permanent: the point of an RRN is that it keeps resolving. A key can be revoked, and the revocation is recorded publicly.</li>
+    <li><strong>Waitlist entries</strong> are kept until the waitlist closes or you ask for removal.</li>
+    <li><strong>Rate-limit counters</strong> keyed by IP address expire after one hour.</li>
+    <li><strong>Cloudflare logs and analytics</strong> follow Cloudflare's own retention.</li>
+  </ul>
+
+  <h2>Sharing</h2>
+  <p>We don't sell data or share it with advertisers. Registry data is public, as described above. Otherwise, data is shared only with the infrastructure providers named here (Cloudflare, Google Fonts) or where the law requires it.</p>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>Everything the software sends is triggered by a command you run. If you don't register, nothing about your robot leaves your machine.</li>
+    <li>To be removed from a waitlist, to correct a registry record, or to ask what we hold about you, email <a href="mailto:craigm26@gmail.com">craigm26@gmail.com</a> or open an issue at <a href="https://github.com/RobotRegistryFoundation/robot-md/issues">github.com/RobotRegistryFoundation/robot-md</a>.</li>
+  </ul>
+
+  <h2>Changes</h2>
+  <p>Changes to this page are tracked in the <a href="https://github.com/RobotRegistryFoundation/robot-md/commits/main/site/privacy/index.html">robot-md repository history</a>, and the effective date above moves with them.</p>
+</main>
+
+<!--#include partials/footer.html-->
+
+  <script src="/js/nav-dropdown.js" defer></script>
+</body>
+</html>
