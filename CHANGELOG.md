@@ -7,8 +7,84 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Security
+
+- **`install-gateway` writes a `bearers.yaml` that works, and never a
+  placeholder.** It wrote one entry holding the public string
+  `REPLACE-WITH-MINTED-TOKEN` and no tier, which robot-md-gateway could not
+  load (`KeyError: 'tier'`); an operator who added a tier by hand and kept the
+  placeholder had a working credential that anyone can read in this source. It
+  now writes two freshly generated tokens (`secrets.token_urlsafe(32)`): an
+  `actuate`-tier one for the agent's client, and a `tier: read`,
+  `role: supervisor` one for the device that sends the gateway's heartbeats
+  (a gateway without supervisor roles reads it as a read-tier credential). It
+  writes no commission token; the file shows how to add the operator's by hand.
+- **`install-gateway` refuses a `bearers.yaml` that a gateway would refuse or
+  misread, and then keeps the gateway off.** Before enabling the gateway it
+  refuses: a placeholder token, a token shorter than 32 characters, an entry
+  with no tier (a supervisor's included: robot-md-gateway 0.5.0a9 stops with
+  `KeyError: 'tier'` on one), a role other than `supervisor`, a supervisor with
+  a tier other than read, and a token listed twice. It says which entry, never
+  the token, and disables the unit if an earlier run enabled it, so the file is
+  not loaded at the next boot either.
+- **`bearers.yaml` and `gateway.env` are 0600, owned by the service.** `sudo
+  tee` under umask 022 created them world-readable, and the later
+  `chown -R robot-md-gateway /etc/robot-md-gateway` put them in a group the
+  installer then adds the operator to. Now:
+  - a new file is created by one root process: a temporary file opened with
+    `O_EXCL` in the same directory, given its owner and mode through the
+    descriptor, written, fsynced, and only then given its name by link(2), which
+    never follows or replaces anything already at the name;
+  - an existing file keeps its content; if group or others can read it, or
+    someone other than robot-md-gateway owns it, it becomes 0600
+    robot-md-gateway, and the installer says what it was. A name that is a
+    symlink or not a regular file is refused, and so is a file with another
+    hard link;
+  - `/etc/robot-md-gateway` stays root's: it is left out of `chown -R`, and a
+    rerun takes it back from robot-md-gateway and removes group and other write,
+    so no other account can swap a name in it.
+- **A rerun never rewrites the content of `bearers.yaml` or `gateway.env`.**
+  `already_installed()` is false whenever the unit is not active, and a rerun
+  then rewrote both, dropping hand-added tokens and allowlist entries. The unit
+  file is still rewritten. Since an older install's files are kept, the
+  installer now warns, without stopping, when `bearers.yaml` has no supervisor
+  entry or no commission entry, when `gateway.env`'s allowlist has no
+  `arm.estop`, when it allowlists `arm.estop.clear` without
+  `ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission`, and when its
+  `ROBOT_MD_PATH` is under `/home`. It ends with the next steps, as
+  robot-md-gateway's own `systemd/install.sh` does.
+- **The rendered systemd unit is hardened.** It adds
+  `AssertPathExists=/etc/robot-md-gateway/bearers.yaml`, an empty
+  `CapabilityBoundingSet=` and `AmbientCapabilities=`,
+  `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`, `RestrictNamespaces=yes`,
+  `SystemCallFilter=@system-service` without `@privileged` (a call outside it
+  fails with EPERM rather than killing the gateway),
+  `SystemCallArchitectures=native`, and `yes` for `LockPersonality`,
+  `RestrictRealtime`, `RestrictSUIDSGID`, `ProtectKernelTunables`,
+  `ProtectKernelModules`, `ProtectKernelLogs`, `ProtectControlGroups`,
+  `ProtectClock` and `ProtectHostname`. It also reaches the arm on a stock
+  Raspberry Pi OS: `SupplementaryGroups=dialout`, and `DeviceAllow=char-ttyACM
+  rw` and `char-ttyUSB rw` in place of the single `/dev/ttyACM0`.
+  `systemd-analyze security --offline` scores it 1.9, from 8.3;
+  robot-md-gateway's own dispatcher unit scores 4.9. `MemoryDenyWriteExecute=`
+  is left off: whether every library the gateway loads runs without writable
+  executable memory has not been tried on a robot.
+- **The gateway always reads its manifest from `/etc/robot-md-gateway/ROBOT.md`.**
+  `gateway.env` pointed it at whatever `--manifest` named, and the unit's
+  `ProtectHome=yes` hides `/home`, so `--manifest ~/ROBOT.md` left the gateway
+  unable to read the manifest it enforces. The installer copies it there, as
+  before, and says so when the named file does not exist.
+- **The root helper and the venv step run Python with `-I`,** so a module lying
+  in the operator's current directory is never imported as root.
+
 ### Fixed
 
+- **`install-gateway` no longer reports a working gateway as failed.** Its health
+  probe opened `http://127.0.0.1:8080/`, which no robot-md-gateway serves, so a
+  working gateway answered 404, and the installer printed "health probe failed",
+  exited 1 and skipped adding the operator to the gateway's group. It now asks
+  `/v1/audit/last` without a bearer and expects the gateway's own 401, retrying
+  for up to 15 s while the service starts.
 - **`install-gateway` allowlists the arm's stop, and its clear at the
   commission tier only.** The gateway tool allowlist it writes to
   `/etc/robot-md-gateway/gateway.env` (`ROBOT_MD_TOOL_ALLOWLIST`) carried `move`
