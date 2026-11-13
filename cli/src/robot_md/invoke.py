@@ -27,6 +27,24 @@ from rcan.audit_bundle import canonical_json
 
 from robot_md.signing import SigningKeypair
 
+#: Stop tools: the tools an actuator declares in `stop_capabilities`, which a
+#: robot-md-gateway routes as stops. so-arm101-actuator declares `arm.estop`.
+#: An envelope for one of these defaults to scope SAFETY.
+STOP_TOOLS: frozenset[str] = frozenset({"arm.estop"})
+
+
+def default_scope(tool_name: str) -> str:
+    """The scope an envelope gets when the caller names none: SAFETY for a
+    stop, `actuate` for anything else.
+
+    The gateway's tier gate keys off the scope, and a gateway older than
+    robot-md-gateway#35 refuses a read-tier `arm.estop` under scope `actuate`
+    (403 `tier_policy`), although so-arm101-actuator gives its stop to the read
+    tier on purpose. A gateway with #35 judges a declared stop as SAFETY
+    whatever the scope says; this default makes older gateways agree.
+    """
+    return "SAFETY" if tool_name in STOP_TOOLS else "actuate"
+
 
 def build_envelope(
     *,
@@ -34,13 +52,16 @@ def build_envelope(
     tool_name: str,
     tool_args: dict[str, Any],
     manifest_path: str,
-    scope: str = "actuate",
+    scope: str | None = None,
 ) -> dict[str, Any]:
     """Construct a fresh RCAN INVOKE envelope.
 
     Returned dict shape matches `robot_md_gateway.receiver.InvokeEnvelope`
-    plus `nonce` + `timestamp_ms` for replay protection.
+    plus `nonce` + `timestamp_ms` for replay protection. `scope` defaults to
+    `default_scope(tool_name)`.
     """
+    if scope is None:
+        scope = default_scope(tool_name)
     return {
         "msg_id": str(uuid.uuid4()),
         "type": "rcan/v1/invoke",

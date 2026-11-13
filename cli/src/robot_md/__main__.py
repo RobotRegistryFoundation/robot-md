@@ -1864,7 +1864,11 @@ def invoke(
         "--bearer-from-bearers",
         help="Read bearer for tier 'actuate' from a bearers.yaml file.",
     ),
-    scope: str = typer.Option("actuate", "--scope", help="Envelope scope (default 'actuate')."),
+    scope: str | None = typer.Option(
+        None,
+        "--scope",
+        help="Envelope scope (default 'SAFETY' for a stop such as arm.estop, else 'actuate').",
+    ),
     sign: bool = typer.Option(
         True,
         "--sign/--no-sign",
