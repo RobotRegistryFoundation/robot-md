@@ -30,9 +30,9 @@ PRESETS_DIR = Path(__file__).parent / "presets"
 # Capability prefixes that require the hardware runtime (i.e., a backend
 # that can drive hardware or read sensors). Used by
 # `_emit_motion_extras_hint` to decide whether to print the
-# `pip install 'robot-md[hardware]'` reminder.
+# robot-md-gateway and `pip install 'robot-md[hardware]'` reminder.
 # Keep this in sync with skills/using-robot-md SKILL.md
-# 'Motion intent without motion tools' stanza.
+# 'Motion intent without a gateway' stanza.
 _HARDWARE_RUNTIME_CAPABILITY_PREFIXES = ("arm.", "nav.", "gripper.", "perceive.")
 
 
@@ -54,7 +54,11 @@ def _emit_motion_extras_hint(capabilities: list[str]) -> None:
     if not has_motion:
         return
     print(
-        "\nHardware runtime capabilities declared. To enable runtime control:\n"
+        "\nHardware runtime capabilities declared. Motion goes through\n"
+        "robot-md-gateway, which enforces the robot's limits:\n"
+        "  robot-md install-gateway\n"
+        "Without a configured gateway, the MCP motion tools refuse.\n"
+        "For the hardware backends (servo SDK, cameras):\n"
         "  pip install 'robot-md[hardware]'\n"
         "Then in Claude Code: /mcp → arrow to `robot-md` → Reconnect.",
         file=sys.stderr,

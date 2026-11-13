@@ -132,13 +132,19 @@ Walk me through calibrating the arm's zero pose. I'll pose the arm
 physically when you tell me to.
 ```
 
-Claude runs `robot-md calibrate --zero ROBOT.md`, prompts you to pose the arm, and waits. You pose, hit Enter in the Claude Code prompt, and Claude confirms the encoder readings are recorded into the manifest. Same pattern for `--hand-eye` (print one ArUco marker, place it at a known spot, Claude solves the extrinsic).
+Claude gives you `robot-md calibrate --zero ROBOT.md` to run in a terminal at the robot: calibration opens the servo port directly, so it is yours to run, not Claude's. You pose the arm, press Enter, and the CLI records the encoder readings into the manifest; Claude can then read them back. `--extrinsic` (formerly `--hand-eye`) moves the arm through calibration poses, so the same applies with more reason: you run it, with a hand on the power switch.
 
 ---
 
 ### After init on a TTY with the arm plugged in
 
-Once `robot-md init` finishes (either via the shell or the Claude-Code-driven one-liner), the robot is actuatable right away:
+Once `robot-md init` finishes (either via the shell or the Claude-Code-driven one-liner), install the gateway on the robot. Motion goes only through it, and without it the MCP motion tools refuse. You run this yourself: it installs a service that takes the robot's servo port.
+
+```bash
+robot-md install-gateway
+```
+
+Then, with you at the arm and a hand on a hardware stop (the power switch or plug):
 
 ```bash
 cd ~/your-robot-dir
@@ -151,7 +157,9 @@ Inside Claude Code, say:
 Dry-run pick the red lego and put it in the bowl.
 ```
 
-Claude reads `CLAUDE.md`, calls `mcp__robot-md-<your_robot_name>__execute_capability(arm.pick, dry_run=true)`, shows you the trajectory, and waits for your go-ahead. Say "now actually do it" and Claude re-runs with `dry_run=false`.
+Claude reads `CLAUDE.md`, asks you to confirm you are at the machine with a hand on the hardware stop, and calls `mcp__robot-md-<your_robot_name>__execute_capability(arm.pick, dry_run=true)` to show you the exact envelope it would send to robot-md-gateway; a dry run sends nothing. When you ask for the real thing, the same call without `dry_run` goes to the gateway, which checks it against the credential's tier, its tool allowlist and the actuator's limits, and runs it or refuses it. Claude reports the gateway's answer as given.
+
+Your "yes" in the chat is not what allows the motion: the gateway decides. A capability whose scope your manifest gates with `require_auth: true` needs a confirmation from outside the conversation, which robot-md does not have yet, so the MCP server refuses it.
 
 ### For scripted / CI callers
 
@@ -168,7 +176,9 @@ Manifest-only; no prompts, no MCP or skill install, no hardware touched. Identic
 Claude Code honors your permission mode. In the default *accept edits* mode, it will:
 
 - ✅ Run `pip install robot-md`, `npx robot-md-mcp`, `claude mcp add` — installation + wiring.
-- ✅ Run `robot-md init / register / calibrate / validate / render` — manifest lifecycle.
+- ✅ Run `robot-md init / register / validate / render` — manifest lifecycle.
+- ✅ Call the MCP motion tools, which send to robot-md-gateway, once you have confirmed you are at the machine with a hardware stop in reach.
+- ✋ **Leaves to you:** anything that opens the servo port or starts a service that drives the robot (`robot-md calibrate`, `robot-md install-gateway`), clearing a stop, and starting a test run (`robot-md trial`, Bounded Embodiment runs).
 - ✅ Read and edit files under your project directory.
 - ⚠ **Ask before:** destructive operations (deleting registrations, `robot-md unregister <rrn>`), writing files outside the project, publishing to external registries with non-default endpoints.
 

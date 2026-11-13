@@ -14,7 +14,8 @@ from robot_md.init_phases import PhaseResult
 def _open_feetech_bus(manifest_path: Path):  # test-overridable seam
     from robot_md.mcp.context import load_context
 
-    ctx = load_context(manifest_path)
+    # Interactive init only: a person at the machine poses the arm by hand.
+    ctx = load_context(manifest_path, open_servo_bus=True)
     bus = getattr(ctx.backend, "_servo_bus", None)
     if bus is None:
         raise RuntimeError("no feetech servo bus for manifest")

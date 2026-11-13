@@ -88,7 +88,7 @@ Requires Python 3.10+.
 
 ## Adopt it for your robot (60 seconds)
 
-Two on-ramps, same destination — Claude Code as the planner and the executor, no OpenCastor, no gateway.
+Two on-ramps, same destination — Claude Code as the planner, robot-md-gateway as the bounded layer every motion goes through, no OpenCastor.
 
 ---
 
@@ -120,10 +120,24 @@ claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 > this repo's TS source). If you'd rather keep everything Python, the
 > same CLI is bundled with the pip package — replace the line above
 > with `claude mcp add robot-md -- robot-md-mcp "$(pwd)/ROBOT.md"`.
-> The TS version exposes `render` + `validate`; the Python version
-> (v0.3+) adds `estop`, `execute_capability`, and `execute_task` for
-> in-process actuation via a pluggable backend. See
-> `docs/mcp-server-options.md` for the full comparison.
+> The TS version exposes `render` + `validate`; the Python version adds
+> `estop`, `estop_clear`, `execute_capability`, and `execute_task`, which
+> send every motion and stop to
+> [robot-md-gateway](https://github.com/RobotRegistryFoundation/robot-md-gateway)
+> (`POST /v1/invoke`) and refuse when no gateway is configured. Nothing in
+> the MCP server writes to the robot. See `docs/mcp-server-options.md` for
+> the full comparison.
+
+> **Upgrading from 1.10.x: MCP motion now goes through robot-md-gateway.**
+> `execute_capability`, `execute_task`, `estop` and `estop_clear` no longer
+> open or write the servo bus; they send RCAN INVOKE envelopes to the
+> gateway, and with no configured or reachable gateway the motion tools
+> refuse. The server reads the gateway's address and an actuate-tier bearer
+> from what `robot-md install-gateway` writes under `/etc/robot-md-gateway/`,
+> or from `ROBOT_MD_GATEWAY_URL` and `ROBOT_MD_GATEWAY_BEARER`.
+> `confirm_token` is gone: it was written by the model and never was a
+> person's confirmation. The full list is in the
+> [CHANGELOG](https://github.com/RobotRegistryFoundation/robot-md/blob/main/CHANGELOG.md).
 
 6. (Optional) Drop the agent skill into `~/.claude/skills/` so superpowers-aware harnesses auto-invoke robot-md on the operator's first robot-related message:
 
@@ -151,7 +165,7 @@ While you work, spin up the local dashboard in a second terminal:
 robot-md dashboard serve --manifest ./ROBOT.md
 ```
 
-Opens `http://127.0.0.1:8091` — live servo positions, last OAK-D frame, tool-call log, estop button, validator warnings. Data comes from the MCP server's event log at `~/.robot-md/events.jsonl`, which is also the durable record for later replay and memory-sync features. Localhost-only; no auth.
+Opens `http://127.0.0.1:8091` — live servo positions, last OAK-D frame, tool-call log, estop button (it sends robot-md-gateway's stop), validator warnings. Data comes from the MCP server's event log at `~/.robot-md/events.jsonl`, which is also the durable record for later replay and memory-sync features. Localhost-only; no auth.
 
 Disable the event log entirely with `ROBOT_MD_DASHBOARD_DISABLED=1`.
 
@@ -174,13 +188,13 @@ Claude will use its `Bash` tool to run the same one-liner from Option A, show yo
 
 ---
 
-Both paths end the same way: Claude Code is the planner and the executor. No gateway, no runtime to stand up.
+Both paths end the same way: Claude Code plans, and every motion it asks for goes to robot-md-gateway, which decides and enforces the limits, with a person at the machine. Without a gateway the MCP motion tools refuse; the person installs one on the robot with `robot-md install-gateway`.
 
 `robot-md autodetect` scans PCI + USB + `/dev/tty*` and emits a draft that validates against the v1 schema but deliberately marks identity fields (`robot_name`, `physics.type`, `dof`) as TODO — the operator is the authority on what the robot *is*.
 
 **Want a public identity?** `robot-md register ROBOT.md` (shipping in v0.2) posts to the Robot Registry Foundation, writes the assigned `RRN-XXXXXXXXXXXX` into your manifest, and anchors your robot's signing key.
 
-**Want fleet-grade orchestration, P66 hardware interlocks, reactive VLA control, or EU AI Act audit?** Add [OpenCastor](https://github.com/craigm26/OpenCastor) when the time comes. Until then, ROBOT.md + Claude Code is all you need.
+**Want fleet-grade orchestration, P66 hardware interlocks, reactive VLA control, or EU AI Act audit?** Add [OpenCastor](https://github.com/craigm26/OpenCastor) when the time comes. Until then, ROBOT.md, robot-md-gateway and Claude Code are all you need.
 
 ## Inspect a ROBOT.md (CLI)
 
@@ -202,7 +216,7 @@ robot-md context examples/bob.ROBOT.md | head -10
 
 Beyond the initial setup, the rest of the package is designed so that **Claude Code and other agent harnesses can recognize when to invoke it**, without the operator naming specific tools. Three surfaces work together:
 
-- **`CLAUDE.md` in the project root** — generate with `robot-md claude-md ROBOT.md`. Teaches Claude which operator intents should dispatch which verb (safety → check HITL gates, "broken" → `doctor`, motion → HITL first). Read at session start.
+- **`CLAUDE.md` in the project root** — generate with `robot-md claude-md ROBOT.md`. Teaches Claude which operator intents should dispatch which verb (safety → check HITL gates, "broken" → `doctor`, motion → robot-md-gateway, with a person at the machine). Read at session start.
 - **MCP server descriptions** — `robot-md-mcp` v0.2+ advertises a server-level `instructions` field plus intent-matchable descriptions on every resource and tool. Any MCP client routes to the right resource by description alone.
 - **Claude Code plugin** at [`RobotRegistryFoundation/robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) — ships the `using-robot-md` skill (intent → action routing, safety protocol, registration flow) and auto-registers the MCP server. Install via `/plugin marketplace add RobotRegistryFoundation/claude-code-plugins` + `/plugin install robot-md`.
 

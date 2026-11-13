@@ -158,15 +158,13 @@ def test_recent_errors_survives_server_restart(fixtures_dir, tmp_path):
     try:
         _handshake(proc_b)
         errors = _read_recent_errors(proc_b, robot_name)
-        # When hardware is available, the undeclared 'arm.throw' call is rejected
-        # by the `not_declared` branch; when no hardware backend resolves (e.g.
-        # in CI without the servo/camera), the request trips the `no_backend`
-        # branch instead. Either is a valid server-A failure that must survive
-        # the restart; both are now published via _publish_result so backfill
-        # reconstructs them identically.
+        # The undeclared 'arm.throw' call is rejected by the `not_declared`
+        # branch, which runs before anything is sent to robot-md-gateway and
+        # does not depend on hardware. It is published via _publish_result, so
+        # backfill must reconstruct it after the restart.
         observed_reasons = {e.get("reason") for e in errors}
-        assert observed_reasons & {"not_declared", "no_backend"}, (
-            f"expected a server-A failure (not_declared or no_backend), got {errors}"
+        assert "not_declared" in observed_reasons, (
+            f"expected the server-A not_declared failure, got {errors}"
         )
     finally:
         proc_b.terminate()

@@ -101,8 +101,8 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
 
     # 1d. Capability namespace alignment with declared drivers. Warn when
     # capabilities[] contains motion namespaces that none of the declared
-    # drivers implement — every dispatch through that namespace would
-    # return not_implemented at runtime. See compliance_status.
+    # drivers implement — no dispatch through that namespace can be
+    # carried out. See compliance_status.
     # MOTION_CAPABILITY_NAMESPACES + BACKEND_NAMESPACES for the canonical
     # set; mirrored here to avoid a circular import.
     motion_namespaces = {"manipulate", "arm", "nav", "navigate", "move"}
@@ -131,7 +131,7 @@ def validate(parsed: ParsedRobotMd) -> ValidationResult:
             warnings.append(
                 f"capability namespace mismatch: capabilities declare "
                 f"{sorted(declared_motion_ns)} but declared driver(s) implement "
-                f"{sorted(supplied_ns)} — execute_capability will return not_implemented"
+                f"{sorted(supplied_ns)}, so no declared driver can carry them out"
             )
 
     # 2. Body-section checks

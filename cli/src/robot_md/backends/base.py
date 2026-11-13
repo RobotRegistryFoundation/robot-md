@@ -47,6 +47,18 @@ class CapabilityBackend(ABC):
     @abstractmethod
     def open(self, spec: RobotSpec) -> None: ...
 
+    def open_perception(self, spec: RobotSpec) -> None:
+        """Open what the read-only perception tools need, and nothing that moves.
+
+        The MCP server calls this instead of `open`. Motion goes through
+        robot-md-gateway, which holds the robot's motor port, so the server
+        must not open it. The default opens nothing: a backend that cannot
+        open its cameras without its motors (LeRobot's `connect()` does both)
+        simply offers no in-process perception. Override only to open sensors
+        that are not on the motion path.
+        """
+        return None
+
     @abstractmethod
     def close(self) -> None: ...
 

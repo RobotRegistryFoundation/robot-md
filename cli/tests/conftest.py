@@ -141,3 +141,58 @@ def _no_live_network(request, monkeypatch):
             "@pytest.mark.live_network:\n  " + "\n  ".join(attempts),
             pytrace=False,
         )
+
+
+# ---- no robot-md-gateway configuration from the host -----------------------
+#
+# The MCP motion tools are clients of robot-md-gateway. They read its URL and
+# bearer from the environment and from /etc/robot-md-gateway, which
+# `robot-md install-gateway` writes. A developer machine with a gateway
+# installed must not lend the suite its URL or bearer, so every test starts
+# with none; a test that wants a gateway sets one up (`gateway_env`).
+_NO_GATEWAY_DIR = Path("/nonexistent-robot-md-tests/robot-md-gateway")
+
+
+@pytest.fixture(autouse=True)
+def _no_host_gateway_config(monkeypatch):
+    from robot_md import gateway_client
+
+    for name in (*gateway_client.ENV_VARS, "ROBOT_MD_MCP_OPEN_CAMERA"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(gateway_client, "INSTALL_GATEWAY_ENV_FILE", _NO_GATEWAY_DIR / "gateway.env")
+    monkeypatch.setattr(
+        gateway_client, "INSTALL_GATEWAY_BEARERS_FILE", _NO_GATEWAY_DIR / "bearers.yaml"
+    )
+
+
+@pytest.fixture
+def fake_gateway():
+    """A recording stand-in for robot-md-gateway's HTTP API on 127.0.0.1."""
+    from tests.fake_gateway import FakeGateway
+
+    gateway = FakeGateway()
+    gateway.start()
+    try:
+        yield gateway
+    finally:
+        gateway.stop()
+
+
+TEST_BEARER = "test-actuate-bearer-not-a-real-token"
+TEST_RURI = "rcan://RRN-000000000099/arm"
+
+
+@pytest.fixture
+def gateway_env(monkeypatch, fake_gateway, tmp_path):
+    """Point the MCP motion tools at `fake_gateway`, with an actuate bearer.
+
+    HOME moves to tmp_path so no signing keypair from the host is found and
+    envelopes go out unsigned unless a test saves a keypair itself.
+    """
+    from robot_md import gateway_client
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv(gateway_client.ENV_URL, fake_gateway.url)
+    monkeypatch.setenv(gateway_client.ENV_BEARER, TEST_BEARER)
+    monkeypatch.setenv(gateway_client.ENV_RURI, TEST_RURI)
+    return fake_gateway

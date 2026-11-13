@@ -17,6 +17,13 @@ import time
 import pytest
 
 
+@pytest.mark.skip(
+    reason=(
+        "drove the arm through the MCP server in-process, a path that no longer "
+        "exists: robot-md's MCP motion tools send to robot-md-gateway. A hardware "
+        "test of motion belongs with the gateway (robot-md-gateway hil/)."
+    )
+)
 @pytest.mark.hardware
 def test_pose_teach_then_home_matches(tmp_path):
     from robot_md.init import non_interactive
@@ -57,7 +64,6 @@ def test_pose_teach_then_home_matches(tmp_path):
         capability="arm.home",
         args={},
         dry_run=False,
-        confirm_token=None,
     )
     assert r["status"] == "ok", f"execute_capability arm.home failed: {r}"
 

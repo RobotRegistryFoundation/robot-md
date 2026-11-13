@@ -1,7 +1,9 @@
 """Integration: discover → vision.find → execute_capability(arm.home) chain, all dry.
 
-Uses a faked perception + servo bus. Validates the plumbing (manifest → context
-→ MCP tools), not the hardware. Gated with @pytest.mark.integration.
+Uses a faked perception + servo bus and a fake robot-md-gateway. Validates the
+plumbing (manifest → context → MCP tools), not the hardware: perception is
+read in-process, motion is an envelope for the gateway, and the servo bus is
+never touched. Gated with @pytest.mark.integration.
 
 Also hosts the v0.6.1 end-to-end pick-red-lego test (no hardware) that
 exercises init + auto-calibrate + arm.pick descriptor → IK → trajectory.
@@ -21,8 +23,7 @@ import yaml
 
 
 @pytest.mark.integration
-async def test_discover_then_vision_find_then_execute(tmp_path):
-    from robot_md.backends.base import ExecutionResult
+async def test_discover_then_vision_find_then_execute(tmp_path, gateway_env):
     from robot_md.init import non_interactive
     from robot_md.mcp.context import load_context
     from robot_md.mcp.tools.discover import discover_tool
@@ -67,12 +68,6 @@ async def test_discover_then_vision_find_then_execute(tmp_path):
         {"arm.home", "arm.pick", "arm.place", "status.report"}
     )
     backend.read_only_capabilities = frozenset({"status.report"})
-    backend.execute.return_value = ExecutionResult(
-        status="ok",
-        trajectory=[{"t": 0.0, "joints": {"shoulder_pan": 1950}}],
-        events=[],
-        error=None,
-    )
     ctx.backend = backend
 
     # --- Step A: discover — capture + detect ---
@@ -95,11 +90,22 @@ async def test_discover_then_vision_find_then_execute(tmp_path):
     assert vf["depth_mm"] == 500
     assert len(vf["camera_xyz_mm"]) == 3
 
-    # --- Step C: execute_capability(arm.home) — dry-run ---
-    exe = execute_capability_tool(
-        ctx, capability="arm.home", args={}, dry_run=True, confirm_token=None
-    )
-    assert exe["status"] == "ok", f"execute_capability blocked: {exe}"
+    # --- Step C: execute_capability(arm.home) — dry-run: the envelope, unsent ---
+    exe = execute_capability_tool(ctx, capability="arm.home", args={}, dry_run=True)
+    assert exe["status"] == "dry_run", f"execute_capability blocked: {exe}"
+    assert exe["dry_run"]["envelope"]["tool_name"] == "arm.home"
+    assert gateway_env.requests == []
+
+    # --- Step D: execute_capability(arm.home) — sent to the gateway ---
+    exe = execute_capability_tool(ctx, capability="arm.home", args={}, dry_run=False)
+    assert exe["status"] == "ok", f"execute_capability failed: {exe}"
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.home"]
+
+    # Nothing in-process moved: the backend never executed, the bus was never written.
+    backend.execute.assert_not_called()
+    bus.write_positions.assert_not_called()
+    bus.torque.assert_not_called()
+    bus.interpolate.assert_not_called()
 
 
 # --------------------------------------------------------------------------- #

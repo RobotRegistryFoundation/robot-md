@@ -16,6 +16,8 @@ pytest.importorskip("scservo_sdk")
 def test_snapshot_publishes_frame_event(tmp_path, fixtures_dir, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("ROBOT_MD_DASHBOARD_DISABLED", raising=False)
+    # The MCP server opens no device unless asked; a frame needs the camera.
+    monkeypatch.setenv("ROBOT_MD_MCP_OPEN_CAMERA", "1")
     from robot_md.mcp.context import load_context
 
     ctx = load_context(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
