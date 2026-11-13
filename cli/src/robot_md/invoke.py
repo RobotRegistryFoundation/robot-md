@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from rcan.audit_bundle import canonical_json
 
@@ -35,13 +36,18 @@ def build_envelope(
     tool_args: dict[str, Any],
     manifest_path: str,
     scope: str = "actuate",
+    actuator_name: str | None = None,
 ) -> dict[str, Any]:
     """Construct a fresh RCAN INVOKE envelope.
 
     Returned dict shape matches `robot_md_gateway.receiver.InvokeEnvelope`
     plus `nonce` + `timestamp_ms` for replay protection.
+
+    `actuator_name` is required by a gateway configured with multiple actuators
+    (it is ignored in single-actuator mode). When set it is included in the
+    signed pre-image, so it must be present before `sign_envelope`.
     """
-    return {
+    envelope: dict[str, Any] = {
         "msg_id": str(uuid.uuid4()),
         "type": "rcan/v1/invoke",
         "ruri": ruri,
@@ -52,6 +58,32 @@ def build_envelope(
         "nonce": secrets.token_hex(16),
         "timestamp_ms": int(time.time() * 1000),
     }
+    if actuator_name is not None:
+        envelope["actuator_name"] = actuator_name
+    return envelope
+
+
+def sign_envelope_with_ed25519(
+    envelope: dict[str, Any],
+    private_key: ed25519.Ed25519PrivateKey,
+    *,
+    kid: str,
+) -> dict[str, Any]:
+    """Sign an envelope with a raw Ed25519 private key; return a signed copy.
+
+    Signature is over `canonical_json(signed_envelope, exclude="envelope_signature")`
+    matching the gateway's `verify_envelope` pre-image (cert/envelope.py:57).
+    This is the operator-authority signing path: the gateway resolves `kid` to a
+    registered Ed25519 public key via RRF `/v2/keys/<kid>`.
+
+    Returns: a new dict (input is not mutated) with `envelope_signature` set.
+    """
+    out = dict(envelope)
+    out["envelope_signature"] = {"kid": kid, "sig": ""}  # placeholder for canon
+    pre = canonical_json(out, exclude="envelope_signature")
+    sig = private_key.sign(pre)
+    out["envelope_signature"] = {"kid": kid, "sig": base64.b64encode(sig).decode()}
+    return out
 
 
 def sign_envelope(
@@ -60,26 +92,30 @@ def sign_envelope(
     *,
     kid: str,
 ) -> dict[str, Any]:
-    """Sign an envelope with Ed25519 and return a copy with envelope_signature attached.
+    """Sign an envelope with the Ed25519 half of a robot `SigningKeypair`.
 
-    Signature is over `canonical_json(signed_envelope, exclude="envelope_signature")`
-    matching the gateway's `verify_envelope` pre-image (cert/envelope.py:57).
-
-    Args:
-        envelope: dict from build_envelope (or compatible)
-        keypair: operator's signing keypair (from ~/.robot-md/keys/<rrn>.signing.json)
-        kid: key id to advertise in the envelope; gateway resolves to a
-             registered Ed25519 public key via RRFResolver.
-
-    Returns: a new dict (input is not mutated) with `envelope_signature` set.
+    Thin wrapper over `sign_envelope_with_ed25519`. NOTE: the advertised `kid`
+    must resolve at RRF `/v2/keys/<kid>`. A robot's own `pq_kid` generally does
+    NOT (the gateway resolves *operator* kids), so production dispatch signs with
+    an operator key — see `load_operator_ed25519` / `--operator-key`.
     """
-    out = dict(envelope)
-    out["envelope_signature"] = {"kid": kid, "sig": ""}  # placeholder for canon
-    pre = canonical_json(out, exclude="envelope_signature")
     sec = ed25519.Ed25519PrivateKey.from_private_bytes(keypair.ed25519_sec)
-    sig = sec.sign(pre)
-    out["envelope_signature"] = {"kid": kid, "sig": base64.b64encode(sig).decode()}
-    return out
+    return sign_envelope_with_ed25519(envelope, sec, kid=kid)
+
+
+def load_operator_ed25519(pem_path: Path) -> ed25519.Ed25519PrivateKey:
+    """Load an operator Ed25519 private key from a PEM file.
+
+    Operator authorities sign with Ed25519 (the half the gateway resolves from
+    RRF `/v2/keys/<kid>`). Raises ValueError if the PEM is not an Ed25519 key.
+    """
+    key = serialization.load_pem_private_key(pem_path.read_bytes(), password=None)
+    if not isinstance(key, ed25519.Ed25519PrivateKey):
+        raise ValueError(
+            f"{pem_path}: operator key must be an Ed25519 private key "
+            f"(got {type(key).__name__})"
+        )
+    return key
 
 
 def load_bearer_for_tier(yaml_path: Path, tier: str) -> str:
