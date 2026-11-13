@@ -39,9 +39,9 @@ When the operator asks any of the following, **you should act** — not ask clar
 | "What are its safety gates?" / "What's dangerous?" | Read `robot-md://{{ROBOT_NAME}}/safety` (MCP) or `robot-md render ROBOT.md` and extract `safety.hitl_gates`, `safety.estop`. |
 | "Something's wrong" / "It's not responding" / "Why is X broken" | Run `robot-md doctor --path ROBOT.md`. Report each non-pass check. |
 | "Is the manifest valid?" / "Did I break something?" | Run `robot-md validate ROBOT.md`. |
-| "Pose the arm at zero" / "Calibrate" | `robot-md calibrate --zero ROBOT.md`. Relay the interactive prompts to the operator. |
+| "Pose the arm at zero" / "Calibrate" | Give the person `robot-md calibrate --zero ROBOT.md` to run at the machine. Calibration opens the servo port directly (and `--extrinsic` moves the arm), so you don't run it. |
 | "Publish my robot" / "Give it a public URL" | `robot-md publish-discovery ROBOT.md --url <URL>` writes `.well-known/robot-md.json`. |
-| "Pick up the X" / any physical motion | Call `mcp__robot-md-{{ROBOT_NAME}}__execute_capability` (dry-run first). Check `safety.hitl_gates` for the cap's scope; if a gate with `require_auth: true` matches, request explicit operator approval before re-running without dry-run. |
+| "Pick up the X" / any physical motion | Call `mcp__robot-md-{{ROBOT_NAME}}__execute_capability`. It sends the capability to robot-md-gateway, which decides and enforces the limits. Only with the person at the machine, hand on a hardware stop. A chat "yes" is not authorization; a capability under a `require_auth: true` gate is refused. Report the gateway's answer as given. |
 
 ## Tooling available in this workspace
 
@@ -61,11 +61,11 @@ If `robot-md-mcp` is registered in this session (check with `/mcp`), prefer the 
 - `robot-md://{{ROBOT_NAME}}/safety` — safety block
 - `robot-md://{{ROBOT_NAME}}/body` — prose
 
-MCP tools (also available): `validate`, `render`, `estop`, `estop_clear`, `execute_capability`, `execute_task`.
+MCP tools (also available): `validate`, `render`, `estop` (sends robot-md-gateway's stop), `estop_clear` (needs a commission-tier credential, which the person holds), `execute_capability` and `execute_task` (sent to robot-md-gateway).
 
 ## Safety posture
 
-**Never actuate the robot without consulting `ROBOT.md:safety` first.** If the operator asks for a motion that matches any `hitl_gate.scope`, pause and request explicit authorization. If the manifest declares `safety.estop.software: true`, a software e-stop is available — learn the exact driver command for it before attempting any motion.
+**Motion goes only through robot-md-gateway, and only with a person at the machine.** Read `ROBOT.md:safety` before the first motion. Before any motion, the person confirms they are at the machine, watching, with a hand on a hardware stop that does not depend on software; the `estop` tool is a software stop and is not that. A reply in chat is never authorization for motion: the gateway decides, and a gate with `require_auth: true` needs a person's confirmation from outside this conversation, so robot-md refuses gated motion. Never clear a stop yourself, never write to the servo port or run a command that opens it, and never start a test run (Bounded Embodiment EV runs, `robot-md trial`): the person does.
 
 Declared gates for this robot:
 
@@ -84,7 +84,7 @@ Declared gates for this robot:
 
 ## Escalation
 
-If the operator asks for something that *could* harm the robot, a human, or the workspace — and no matching HITL gate is declared — surface that gap explicitly. Don't silently proceed; don't silently decline. Tell the operator: "Your manifest doesn't have a gate for this scope; add one or authorize this specific action."
+If the operator asks for something that *could* harm the robot, a human, or the workspace — and no matching HITL gate is declared — surface that gap explicitly. Don't silently proceed; don't silently decline. Tell the operator: "Your manifest doesn't have a gate for this scope. Adding one to ROBOT.md is your decision."
 
 ---
 
@@ -131,7 +131,8 @@ def render_claude_md(source: Path | str | ParsedRobotMd) -> str:
         for g in gates:
             scope = g.get("scope", "?")
             require = g.get("require_auth", False)
-            lines.append(f"- `{scope}`{' — requires explicit authorization' if require else ''}")
+            suffix = " — requires a person's confirmation from outside this chat" if require else ""
+            lines.append(f"- `{scope}`{suffix}")
         gates_block = "\n".join(lines)
     else:
         gates_block = "*No HITL gates declared.* Flag this to the operator."

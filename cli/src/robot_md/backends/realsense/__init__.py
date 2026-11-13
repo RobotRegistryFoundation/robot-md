@@ -27,6 +27,10 @@ class RealsenseBackend(CapabilityBackend):
         config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
         self._pipeline.start(config)
 
+    def open_perception(self, spec: RobotSpec) -> None:
+        """A RealSense is perception only, so this is the whole `open`."""
+        self.open(spec)
+
     def close(self) -> None:
         if self._pipeline is not None:
             self._pipeline.stop()

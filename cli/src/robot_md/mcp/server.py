@@ -1,14 +1,21 @@
-"""robot-md MCP server — stdio, registers render / validate / estop.
+"""robot-md MCP server (stdio).
 
-More tools (`execute_capability`, `execute_task`) are registered in later tasks.
+Manifest tools and resources, read-only perception, and the motion tools.
+The motion tools (`execute_capability`, `execute_task`, `estop`,
+`estop_clear`) are clients of robot-md-gateway: nothing in this process
+writes to the robot. See `robot_md.gateway_client`.
 """
 
 from __future__ import annotations
 
+import functools
+import json
 import sys
 from pathlib import Path
 
+import anyio.to_thread
 from mcp.server.fastmcp import Context
+from mcp.server.fastmcp.exceptions import ToolError
 
 from robot_md.mcp.context import McpContext, load_context
 from robot_md.mcp.tools.doctor_summary import doctor_summary_tool
@@ -131,50 +138,89 @@ def build_server(ctx: McpContext):
         """Validate the served ROBOT.md against the v1 schema and body rules."""
         return validate_tool(ctx)
 
-    @server.tool()
-    def estop() -> dict:
-        """Set the software E-stop for this server session."""
-        return estop_tool(ctx)
+    # The four tools that talk to robot-md-gateway are async and do their
+    # blocking HTTP call in a worker thread. FastMCP runs a sync tool on the
+    # event loop itself, so a stop sent while a motion waited for the
+    # gateway's answer would have waited for that answer first.
 
     @server.tool()
-    def estop_clear(confirm_token: str | None = None) -> dict:
-        """Clear the software E-stop. Gated by the `system` HITL scope by default."""
-        return estop_clear_tool(ctx, confirm_token=confirm_token)
+    async def estop() -> dict:
+        """Stop the robot through robot-md-gateway.
+
+        Sets this server's own latch, so no further motion leaves it, then sends
+        the gateway's declared stop (arm.estop by default). The actuator holds
+        its pose in software; this is not a hardware e-stop. Returns an error
+        when the gateway does not confirm the stop: then the person must use the
+        hardware stop. Runs even while a motion call is waiting on the gateway.
+        """
+        result = await anyio.to_thread.run_sync(functools.partial(estop_tool, ctx))
+        if not result.get("ok"):
+            raise ToolError(json.dumps(result, default=str))
+        return result
 
     @server.tool()
-    def execute_capability(
+    async def estop_clear() -> dict:
+        """Ask robot-md-gateway to clear the stop, at the commission tier.
+
+        Clearing a stop makes the robot movable again. The gateway refuses it
+        below the commission tier, and this server normally holds an
+        actuate-tier credential, so the person at the machine clears stops with
+        their own. Returns an error unless the gateway confirms the clear.
+        """
+        result = await anyio.to_thread.run_sync(functools.partial(estop_clear_tool, ctx))
+        if not result.get("ok"):
+            raise ToolError(json.dumps(result, default=str))
+        return result
+
+    @server.tool()
+    async def execute_capability(
         capability: str,
         args: dict | None = None,
         dry_run: bool = False,
-        confirm_token: str | None = None,
     ) -> dict:
-        """Execute a declared capability against the resolved backend."""
+        """Send one declared capability to robot-md-gateway (POST /v1/invoke).
+
+        The gateway decides and its actuator bounds the motion; this returns the
+        gateway's answer (status ok, denied or error) as given. Nothing in this
+        server writes to the robot. Refuses with no configured gateway, while
+        this server's stop latch is set, and for a capability whose scope
+        ROBOT.md gates with require_auth: that needs a person's confirmation
+        from outside this conversation. dry_run=true returns the envelope that
+        would be sent, and sends nothing.
+        """
         from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
-        return execute_capability_tool(
-            ctx,
-            capability=capability,
-            args=dict(args or {}),
-            dry_run=dry_run,
-            confirm_token=confirm_token,
+        return await anyio.to_thread.run_sync(
+            functools.partial(
+                execute_capability_tool,
+                ctx,
+                capability=capability,
+                args=dict(args or {}),
+                dry_run=dry_run,
+            )
         )
 
     @server.tool()
-    def execute_task(
+    async def execute_task(
         prompt: str,
         context: dict | None = None,
         dry_run: bool = False,
-        confirm_token: str | None = None,
     ) -> dict:
-        """Decompose a natural-language task into capability steps and run them."""
+        """Plan a natural-language task as capability steps; send each to the gateway.
+
+        Each step goes through execute_capability, so robot-md-gateway decides
+        every one. The first step the gateway does not run ends the task.
+        """
         from robot_md.mcp.tools.execute_task import execute_task_tool
 
-        return execute_task_tool(
-            ctx,
-            prompt=prompt,
-            context=context,
-            dry_run=dry_run,
-            confirm_token=confirm_token,
+        return await anyio.to_thread.run_sync(
+            functools.partial(
+                execute_task_tool,
+                ctx,
+                prompt=prompt,
+                context=context,
+                dry_run=dry_run,
+            )
         )
 
     @server.tool()
@@ -208,7 +254,9 @@ def build_server(ctx: McpContext):
     async def discover(steps: list[dict], mcp_ctx: Context | None = None) -> dict:
         """Run the declarative discovery pipeline.
 
-        Supported steps: capture, detect, probe_direction. See
+        Supported steps: capture, detect (camera reads). probe_direction is
+        refused: it moved a joint, and motion goes only through
+        robot-md-gateway. See
         docs/superpowers/specs/2026-04-19-claude-triad-gap-analysis.md §8.
 
         FastMCP injects `mcp_ctx` for progress notifications; direct callers
@@ -447,10 +495,11 @@ def build_server(ctx: McpContext):
 
     @server.prompt(
         name="check-safety",
-        title="Is this action safe?",
+        title="Check an action against the declared gates",
         description=(
             f"Check a proposed action against {_raw_robot_name}'s declared HITL gates "
-            "and safety envelope. Use before issuing any physical motion."
+            "and limits before any physical motion. A preview: robot-md-gateway "
+            "enforces the limits."
         ),
     )
     def _prompt_check_safety(action: str) -> list[dict]:
@@ -459,24 +508,26 @@ def build_server(ctx: McpContext):
                 "role": "user",
                 "content": (
                     f"The operator wants {_raw_robot_name} to do: **{action}**\n\n"
-                    f"Read `robot-md://{robot_name}/safety` and determine:\n\n"
+                    f"Read `robot-md://{robot_name}/safety` and answer only from the "
+                    "declared manifest:\n\n"
                     "1. Does this action's scope match a declared `hitl_gates[]` entry with "
-                    "`require_auth: true`? If yes, name the gate and tell the operator you need "
-                    "explicit authorization before proceeding.\n"
-                    "2. Does the action stay within `payload_kg`, `max_joint_velocity_dps`, and "
-                    "`workspace_bounds_m` (if declared)?\n"
-                    "3. Is `estop.software` available? Confirm the driver command path "
-                    "to trigger it.\n"
-                    "4. If no matching gate exists AND the action is potentially harmful "
-                    "(unknown objects, "
-                    "high velocity, collision risk, workspace-boundary-approaching): "
-                    "**surface the gap to "
-                    "the operator** — say the manifest doesn't declare a gate for this "
-                    "scope and ask "
-                    "whether to add one or to authorize this specific action.\n\n"
-                    'Reply with one of: "✓ safe to proceed", "⚠ authorization required — '
-                    '<gate scope>", or "⚠ gate gap — <explanation>". Do not assume; only answer '
-                    "from the declared manifest."
+                    "`require_auth: true`? If yes, name the gate. robot-md's MCP server "
+                    "refuses gated motion: the confirmation has to come from a person "
+                    "outside this conversation, and a reply in chat is not that "
+                    "confirmation. Never treat one as authorization.\n"
+                    "2. Does the action stay within `payload_kg`, `max_joint_velocity_dps`, "
+                    "and `workspace_bounds_m` (if declared)? This is a preview. The limits are "
+                    "enforced by robot-md-gateway and its actuator, not by this check.\n"
+                    "3. Motion goes only through robot-md-gateway, and only with a person at "
+                    "the machine who can reach a hardware stop that does not depend on "
+                    "software. The `estop` tool is a software stop, not that.\n"
+                    "4. If no gate covers an action that could cause harm (unknown objects, "
+                    "high velocity, collision risk, near the workspace boundary), "
+                    "**surface the gap**: say the manifest declares no gate for this scope, "
+                    "and that adding one to ROBOT.md is the operator's decision.\n\n"
+                    'Reply with one of: "✓ no gate applies; robot-md-gateway decides", '
+                    "\"⚠ gated — <gate scope>: needs a person's confirmation outside this "
+                    'chat", or "⚠ gate gap — <explanation>". Do not assume.'
                 ),
             }
         ]

@@ -3,6 +3,10 @@
 Steps are declarative: [{capture: {}}, {detect: {...}}, {probe_direction: {...}}].
 Per-step failures are reported in the result; the tool never raises.
 
+capture and detect read the camera. probe_direction used to move a joint by
+writing the servo bus from this process; robot-md's MCP server no longer
+writes the bus, so that step now refuses (see `_do_probe`).
+
 v0.8: emits MCP progress notifications via FastMCP Context.report_progress
 (one per step) and discover.step.begin / discover.step.end events on the
 dashboard substrate. Both channels are best-effort — neither can abort a
@@ -120,87 +124,20 @@ def _do_detect(ctx: Any, frame, payload: dict) -> dict:
 
 
 def _do_probe(ctx: Any, payload: dict) -> dict:
-    """Move one joint by delta, image-diff before/after, report px shift + direction.
+    """Refuse. This step moved one joint by `delta` and diffed the image.
 
-    Returns a status dict; never raises. Safety: refuses to write when the bus
-    didn't report a position for the probed joint (closed bus or non-responding
-    servo) — avoids commanding an absolute move anchored at a fabricated 2048.
+    It wrote the servo bus from this process, with no gate, no tier and no
+    stop check. robot-md's MCP server no longer writes the bus: motion goes
+    through robot-md-gateway, which has no probe tool yet. Nothing here
+    touches the bus, whatever the backend holds.
     """
-    import cv2
-    import numpy as np
-
     payload = payload or {}
-    joint = payload.get("joint", "shoulder_pan")
-    delta = int(payload.get("delta", 30))
-
-    backend = getattr(ctx, "backend", None)
-    per = getattr(backend, "_perception", None) if backend is not None else None
-    bus = getattr(backend, "_servo_bus", None) if backend is not None else None
-    if per is None or bus is None:
-        return {"status": "no_hardware"}
-
-    f_before = per.grab_frame()
-    if f_before is None:
-        return {"status": "no_frame_before"}
-
-    try:
-        current = bus.read_positions() if hasattr(bus, "read_positions") else {}
-    except Exception as e:
-        return {"status": "bus_error", "error": str(e)}
-
-    if joint not in current:
-        # Closed bus or non-responding servo. Refuse to write — a fabricated
-        # absolute target could yank the arm.
-        return {"status": "no_position_read", "joint": joint}
-
-    target = dict(current)
-    target[joint] = int(current[joint]) + delta
-
-    f_after = None
-    try:
-        bus.torque(True)
-        bus.write_positions(target)
-        f_after = per.grab_frame()
-    except Exception as e:
-        return {"status": "bus_error", "error": str(e)}
-    finally:
-        # Best-effort return to starting position.
-        import contextlib
-
-        with contextlib.suppress(Exception):
-            bus.write_positions(current)
-
-    if f_after is None:
-        return {"status": "no_frame_after"}
-
-    # Centroid-diff formula: threshold before and after independently, compute
-    # the u-centroid of each white mask, difference gives signed pixel shift.
-    def _u_centroid(bgr) -> float | None:
-        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-        _, th = cv2.threshold(gray, 30, 255, cv2.THRESH_BINARY)
-        col_sum = th.sum(axis=0)
-        total = int(col_sum.sum())
-        if total == 0:
-            return None
-        xs = np.arange(len(col_sum), dtype=np.float64)
-        return float((xs * col_sum).sum() / total)
-
-    c_before = _u_centroid(f_before[0])
-    c_after = _u_centroid(f_after[0])
-    if c_before is None or c_after is None:
-        return {"status": "no_motion_detected"}
-
-    signed = c_after - c_before
-    px_shift = round(abs(signed))
-    if px_shift == 0:
-        return {"status": "no_motion_detected"}
-
-    direction = "positive_delta→image_right" if signed >= 0 else "positive_delta→image_left"
     return {
-        "status": "ok",
-        "joint": joint,
-        "delta": delta,
-        "px_shift": px_shift,
-        "direction": direction,
-        "px_per_step": round(px_shift / max(1, delta), 3),
+        "status": "refused",
+        "joint": payload.get("joint", "shoulder_pan"),
+        "message": (
+            "probe_direction moves a joint, and robot-md's MCP server sends motion "
+            "only through robot-md-gateway, which has no probe tool. Nothing was "
+            "moved. capture and detect still work."
+        ),
     }

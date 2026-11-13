@@ -51,6 +51,28 @@ class FeetechDepthaiBackend(CapabilityBackend):
             except Exception:
                 self._perception = None
 
+    def open_perception(self, spec: RobotSpec) -> None:
+        """Open the OAK-D only. The servo bus stays closed: it is the motion
+        path, and robot-md-gateway owns it."""
+        import yaml
+
+        from robot_md.backends.feetech_depthai.perception import Perception
+
+        self._spec = spec
+        try:
+            self.raw_frontmatter = yaml.safe_load(spec.raw_yaml) or {}
+        except Exception:
+            self.raw_frontmatter = {}
+        self._servo_bus = None
+        self._motion = None
+        self._perception = None
+        if any(d.protocol == "depthai" for d in spec.drivers):
+            try:
+                self._perception = Perception.from_spec(spec)
+                self._perception.open()
+            except Exception:
+                self._perception = None
+
     def close(self) -> None:
         if self._servo_bus is not None:
             with contextlib.suppress(Exception):
