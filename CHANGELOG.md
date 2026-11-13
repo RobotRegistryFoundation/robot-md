@@ -7,6 +7,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-13
+
+Major version because MCP callers break: motion tools now go through
+robot-md-gateway and `confirm_token` is gone (see Changed below). This release
+also carries 1.10.7, which was prepared but never tagged or published.
+
 ### Changed — breaking for current users; read before upgrading
 
 - **MCP motion goes through robot-md-gateway, and through nothing else.**
@@ -217,6 +223,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   declared stop as `SAFETY` whatever its scope.
 
 ## [1.10.7] - 2026-10-22
+
+Never tagged or published; these changes first ship in 2.0.0.
 
 ### Changed
 
