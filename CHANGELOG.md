@@ -112,15 +112,15 @@ the two on 0.5.0a9 and found no case where this release is less strict than
 
 - **`estop_clear` refuses, and sends nothing.** Clearing a stop makes the
   robot movable again, so it is the person's, with their own commission
-  credential: after a gateway trip, `POST /v1/safety/clear`, then
-  `arm.estop.clear` at the commission tier (`robot-md invoke ROBOT.md --tool
-  arm.estop.clear` with their commission bearer). In 2.0.0 it asked the
-  gateway at the commission tier, which a server holding a commission bearer
-  would have passed. This server's own latch is released only when the server
-  restarts (`/mcp` → robot-md → Reconnect): neither so-arm101-actuator nor
-  robot-md-gateway reports the actuator's latch in any read, so it can't tell
-  reliably that the person cleared it. The dashboard's clear button takes the
-  same path and is recorded as refused.
+  credential: after a gateway trip (robot-md-gateway with #35 or later), `POST
+  /v1/safety/clear`, then `arm.estop.clear` at the commission tier (`robot-md
+  invoke ROBOT.md --tool arm.estop.clear` with their commission bearer). In
+  2.0.0 it asked the gateway at the commission tier, which a server holding a
+  commission bearer would have passed. This server's own latch is released
+  only when the server restarts (`/mcp` → robot-md → Reconnect): neither
+  so-arm101-actuator nor robot-md-gateway reports the actuator's latch in any
+  read, so it can't tell reliably that the person cleared it. The dashboard's
+  clear button takes the same path and is recorded as refused.
 - **Motion scope labels:** `MANIPULATE` for `arm.*` and `gripper.*`, `NAVIGATE`
   for `nav.*`, `ACTUATE` otherwise (2.0.0 sent `ACTUATE` for all). For a tool
   its actuator declares as motion, the gateway applies the strictest motion
