@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from robot_md.hotplug.manifest import merge as manifest_merge
 from robot_md.hotplug.matcher import BindProposal
-from robot_md.hotplug.queue import AlreadyResolvedError, EventQueue
+from robot_md.hotplug.queue import AlreadyResolvedError, EventQueue, _safe_iter_records
 
 
 def hotplug_confirm_tool(
@@ -25,20 +24,23 @@ def hotplug_confirm_tool(
     q = _queue or EventQueue()
     manifest_path = _manifest_path or Path.cwd() / "ROBOT.md"
 
-    target = None
-    for line in q.path.read_text().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            r = json.loads(line)
-        except Exception:
-            continue
-        if r.get("kind") == "pending" and r.get("id") == event_id:
-            target = r
-            break
+    records, _ = _safe_iter_records(q.path)
+    target = next(
+        (r for r in records if r.get("kind") == "pending" and r.get("id") == event_id),
+        None,
+    )
     if target is None:
         return {"ok": False, "error": f"event {event_id!r} not found"}
+
+    # Check before any write. A repeated bind used to merge the driver into
+    # ROBOT.md a second time and only then learn from the queue that the
+    # event was already resolved.
+    resolved = next(
+        (r for r in records if r.get("kind") == "resolved" and r.get("ref") == event_id),
+        None,
+    )
+    if resolved is not None:
+        return {"ok": False, "error": "already_resolved", "by": resolved.get("by") or "unknown"}
 
     if decision == "reject":
         try:
