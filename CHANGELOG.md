@@ -7,25 +7,137 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-This is the content of robot-md 2.0.0. The version bump and the release are a
-separate change.
+Fixes to 2.0.0's MCP motion path, from the review of robot-md#114 (which
+2.0.0 shipped as merged). Read "Fixed" first: in 2.0.0, a gate that needs a
+person does not stop MCP motion on robot-md's own presets.
 
-**Before releasing 2.0.0:**
+**Before the next release:**
 
 - [ ] Raise the `robot-md-gateway` floor in `cli/pyproject.toml` to the first
-  release that contains RobotRegistryFoundation/robot-md-gateway#35. TODO: that
-  release doesn't exist yet (the latest is 0.5.0a9, which predates #35), so no
-  version is named here. 2.0.0 must not ship before it is published. On 0.5.0a9
-  the MCP `estop` must pass every gate a motion does, so a manifest-pin
-  mismatch, a missing signing key or a failed key lookup refuses it, and the
-  gateway never stops the arm when heartbeats stop. The MCP server warns at
-  startup when it finds such a gateway (below); it can't refuse to run against
-  one it can't read.
+  release that contains RobotRegistryFoundation/robot-md-gateway#35. TODO: no
+  such release exists yet (the latest is 0.5.0a9, which predates #35), so no
+  version is named here, and the next robot-md release must not ship before it
+  is published. On 0.5.0a9 the MCP `estop` must pass every gate a motion does,
+  so a manifest-pin mismatch, a missing signing key or a failed key lookup
+  refuses it, and the gateway never stops the arm when heartbeats stop. The
+  MCP server now warns at startup when it finds such a gateway (below).
 - [ ] so-arm101-actuator: the stop needs its `main` from
   RobotRegistryFoundation/so-arm101-actuator#8 or later (see the
-  `install-gateway` entry under Fixed); 0.2.2 on PyPI declares no stop.
-- [ ] robot-md-mcp: bump `plugin.json` with the launcher that refuses robot-md
-  older than 2.0.0 (RobotRegistryFoundation/robot-md-mcp#19).
+  `install-gateway` entry under 2.0.0's Fixed); 0.2.2 on PyPI declares no stop.
+- [ ] robot-md-mcp: the plugin launcher (RobotRegistryFoundation/robot-md-mcp#19)
+  refuses robot-md older than 2.0.0. 2.0.0 has the gate bug below, so the floor
+  should become the release that carries these fixes.
+
+### Fixed
+
+- **A gate that needs a person refuses every MCP motion** (`hitl_gate`), dry
+  runs included; reads still go. 2.0.0's `execute_capability` matched a
+  `hitl_gates[]` entry only against the capability's family (`arm`) or name,
+  so the `destructive` and `system` gates (`require_auth: true`) of the
+  so-arm101 preset and `examples/bob.ROBOT.md` refused nothing, and a gated
+  `arm.home` was sent and ran. Now a gate needs a person unless it says
+  `require_auth: false`, and such a gate covers every motion whatever scope it
+  names, except `commission` (`robot_md.motion_gates`). robot-md-gateway reads
+  `destructive` and `system` as motion scopes and, for a tool that moves, a
+  gate on any motion scope as a gate on all of them, because the scope label
+  is caller-written; the capability name is caller-chosen too, so a gate on
+  `arm` or `arm.pick` that `nav.goto` or `arm.move_to` could walk past is not
+  a gate. **So a manifest made from the so-arm101 preset, like bob's, gets no
+  MCP motion at all** until a person's confirmation can reach the gateway from
+  outside the conversation; robot-md has no path for one yet. The plan: the
+  gateway holds a gated request until the pendant signs an approval bound to
+  that exact request, and stops trusting a caller-written `delegation_chain`.
+- **Every way the MCP stop can fail ends in the hardware-stop advice, within
+  2 s.** In 2.0.0 three failures escaped as FastMCP's generic error, with no
+  advice and no audit entry: a signing key that loads and can't sign (no stop
+  was sent at all), a malformed gateway URL, and a gateway that sends its
+  headers and stalls. `estop` and `gateway_client.invoke` no longer raise: a
+  signing failure sends the envelope unsigned (robot-md-gateway#35 never checks
+  a stop's signature), a malformed URL is `gateway_unreachable`, a stall is
+  `gateway_no_answer`, and anything else is `stop_path_error`; each returns
+  `stop: stop_not_confirmed` with "Use the hardware stop at the machine now."
+  The stop waits at most 2 s for the gateway, not the 30 s a motion may take.
+- **An answer that doesn't say whether a call ran is no longer reported as a
+  refusal.** A 200 without `ok: true`, or a 5xx without `actuator_error`, is
+  `gateway_unknown_outcome` ("it may have run; do not resend"); 2.0.0 called
+  both `gateway_rejected`, and a plain 500 can come after the actuator ran.
+- **`status: ok` is no longer the only word on a motion.** A stop that
+  interrupts a move still gets the gateway's 200. The result now carries the
+  actuator's `reached` and `stopped_by_estop`, and `execute_task` stops at a
+  step that didn't reach (`status: not_reached`).
+- **A stop is no longer queued behind other tools.** `vision_find`,
+  `discover`'s capture and detect, and the spatial-eval runs and submission
+  ran on the event loop, so a stop sent during a 3 s camera read waited for
+  it. They now run in worker threads, like the motion tools.
+- **A read is no longer refused `busy` while a motion is in flight.** Only one
+  motion at a time leaves this server; reads such as `status.report` are sent
+  (so-arm101-actuator may still answer its own `busy` while it moves).
+- **The MCP server finds the manifest `install-gateway` pins, and says how to
+  hand it the token.** `install-gateway` keeps `gateway.env` and `bearers.yaml`
+  0600 for the gateway's own user (robot-md#113), so the MCP server can't read
+  them. The manifest path now falls back to `/etc/robot-md-gateway/ROBOT.md`,
+  and the "no bearer" refusal tells the person to set
+  `ROBOT_MD_GATEWAY_BEARER` (the actuate token) in the MCP server's
+  environment, or `ROBOT_MD_BEARERS_FILE` to a file of their own.
+- **The generated `CLAUDE.md` keeps Claude off the servo port.** It named
+  `robot-md doctor --path ROBOT.md`, which opens the port and reads every
+  servo whenever one is plugged in; it now names `--hardware off`. It hands
+  `robot-md pose teach` to the person, says when every motion is refused,
+  defers to the bounded-embodiment plugin, and never has Claude ask for
+  authorization in chat. The getting-started guide hands `robot-md init` to
+  the person: it opens every serial port and the camera, and at a terminal it
+  can move each joint (`ROBOT_MD_SKIP_BUS_PROBE=1` skips only the serial
+  probe).
+- **The bundled `using-robot-md` skill is robot-md-mcp's current text**
+  (RobotRegistryFoundation/robot-md-mcp#19), which says all of the above.
+
+### Changed
+
+- **`estop_clear` refuses, and sends nothing.** Clearing a stop makes the
+  robot movable again, so it is the person's, with their own commission
+  credential: after a gateway trip, `POST /v1/safety/clear`, then
+  `arm.estop.clear` at the commission tier (`robot-md invoke ROBOT.md --tool
+  arm.estop.clear` with their commission bearer). In 2.0.0 it asked the
+  gateway at the commission tier, which a server holding a commission bearer
+  would have passed. This server's own latch is released only when the server
+  restarts (`/mcp` → robot-md → Reconnect): neither so-arm101-actuator nor
+  robot-md-gateway reports the actuator's latch in any read, so it can't tell
+  reliably that the person cleared it. The dashboard's clear button takes the
+  same path and is recorded as refused.
+- **Motion scope labels:** `MANIPULATE` for `arm.*` and `gripper.*`, `NAVIGATE`
+  for `nav.*`, `ACTUATE` otherwise (2.0.0 sent `ACTUATE` for all). For a tool
+  its actuator declares as motion, the gateway applies the strictest motion
+  scope anyway; for any other, the label decides which gateway gates apply.
+- **An older gateway is named at startup.** robot-md-gateway exposes no version
+  that tells releases apart (its OpenAPI version is the constant `0.4.0a1`), so
+  the MCP server reads `GET /openapi.json` once, without the bearer, and when
+  the safety routes of robot-md-gateway#35 are missing it warns on stderr and
+  in every motion and stop result (`warnings`). It doesn't refuse on that
+  basis; a gateway it can't read gets no warning.
+- **`install-gateway` makes the gateway enforce ROBOT.md's gates itself.** The
+  `gateway.env` it writes sets `ROBOT_MD_HITL_FROM_MANIFEST=1`, so the gateway
+  reads the pinned manifest's `safety.hitl_gates` and refuses a gated motion
+  that carries no human `delegation_chain` (`hitl_required`), whichever client
+  sent it: a second layer under the MCP server's refusal. An existing
+  `gateway.env` without it gets a warning (the installer never rewrites one).
+  The gateway still accepts a caller-written `delegation_chain` as a person's
+  approval; replacing that is a gateway follow-up.
+- Two opt-in hardware tests that drove the arm through the removed in-process
+  path, skipped since 2.0.0, are deleted. A person-run pose-teach round trip
+  belongs with the gateway's hardware tests (not written yet).
+
+**Migrating from 2.0.0.** Give the MCP server the gateway's actuate token
+(`ROBOT_MD_GATEWAY_BEARER`) if it reports `gateway_not_configured`. Expect no
+MCP motion on a manifest with a gate that needs a person. Add
+`ROBOT_MD_HITL_FROM_MANIFEST=1` to an existing `/etc/robot-md-gateway/gateway.env`
+and restart the gateway. Clear stops as the person (above), then reconnect
+the MCP server. Read `reached`, not only `status: ok`.
+
+## [2.0.0] - 2026-11-13
+
+Major version because MCP callers break: motion tools now go through
+robot-md-gateway and `confirm_token` is gone (see Changed below). This release
+also carries 1.10.7, which was prepared but never tagged or published.
 
 ### Changed — breaking for current users; read before upgrading
 
@@ -56,91 +168,42 @@ separate change.
     `$ROBOT_MD_RURI`, else `metadata.ruri`. Optional:
     `$ROBOT_MD_GATEWAY_ACTUATOR`, `$ROBOT_MD_GATEWAY_STOP_TOOL` (default
     `arm.estop`), `$ROBOT_MD_GATEWAY_STOP_CLEAR_TOOL` (default
-    `arm.estop.clear`), `$ROBOT_MD_GATEWAY_TIMEOUT_S` (default 30, for
-    motion; a stop waits at most 2 s). A `commission` entry is never read from
-    the bearers file. The bearer never appears in a tool result, and requests
-    ignore HTTP proxy settings. An envelope is signed when
-    `~/.robot-md/keys/<rrn>.signing.json` exists.
-  - **On a gateway that `install-gateway` set up, the person hands the MCP
-    server its token.** `install-gateway` keeps `gateway.env` and
-    `bearers.yaml` 0600 for the gateway's own user, so the MCP server, running
-    as the person's user, can't read them. Set `$ROBOT_MD_GATEWAY_BEARER` (the
-    actuate token) in the MCP server's environment, or `$ROBOT_MD_BEARERS_FILE`
-    to a file of your own holding only the actuate entry. The manifest path
-    falls back to `/etc/robot-md-gateway/ROBOT.md`, the copy the gateway pins,
-    when that exists; the "no bearer" refusal says all of this.
+    `arm.estop.clear`), `$ROBOT_MD_GATEWAY_TIMEOUT_S` (default 30). A
+    `commission` entry is never read from the bearers file. The bearer never
+    appears in a tool result, and requests ignore HTTP proxy settings. An
+    envelope is signed when `~/.robot-md/keys/<rrn>.signing.json` exists.
   - **`confirm_token` is removed** from `execute_capability`, `execute_task`
     and `estop_clear`. A token the model writes is not a person's
-    confirmation.
-  - **While ROBOT.md has a gate that needs a person, the MCP server refuses
-    every motion** (`hitl_gate`), dry runs included; reads still go. A gate
-    needs a person unless it says `require_auth: false`, and such a gate
-    covers every motion whatever scope it names, except `commission`
-    (`robot_md.motion_gates`): robot-md-gateway reads `destructive` and
-    `system` as motion scopes and, for a tool that moves, a gate on any motion
-    scope as a gate on all of them, because the scope label is caller-written;
-    the capability name is caller-chosen too, so a gate on `arm` or `arm.pick`
-    that `nav.goto` or `arm.move_to` could walk past is not a gate. **So on
-    the so-arm101 preset and `examples/bob.ROBOT.md`, which gate `destructive`
-    and `system`, every MCP motion is refused** until a person's confirmation
-    can reach the gateway from outside the conversation; robot-md has no path
-    for one yet. The first version of this change matched a gate only against
-    the capability's family (`arm`), so under those two gates `arm.home` was
-    sent and ran. The client never writes a `delegation_chain`, so a gateway
-    run with `ROBOT_MD_HITL_FROM_MANIFEST=1` (which `install-gateway` now
-    writes) refuses gated motion too.
-  - **Motion scope labels:** `MANIPULATE` for `arm.*` and `gripper.*`,
-    `NAVIGATE` for `nav.*`, `ACTUATE` otherwise; reads go as `OBSERVE`.
+    confirmation. A capability whose scope matches a `hitl_gates[]` entry that
+    requires authorization is now refused (`hitl_gate`): the confirmation has
+    to come from outside the conversation, and robot-md has no such path yet.
+    The client never writes a `delegation_chain` into an envelope, so a
+    gateway run with `ROBOT_MD_HITL_FROM_MANIFEST=1` refuses gated motion
+    too.
   - **`estop`** sets this server's own latch first (it then sends no motion
-    until the server restarts) and sends the gateway's declared stop,
+    until the latch is released) and sends the gateway's declared stop,
     `arm.estop`, which robot-md-gateway lets through in every safety state
-    with robot-md-gateway#35. It waits at most 2 s for the gateway's answer.
-    It returns `ok: true` only when the gateway confirms the stop. Otherwise
-    it returns `stop: stop_not_confirmed`, the MCP tool reports an error, and
-    the message says to use the hardware stop: on every failure, including a
-    malformed gateway URL, a gateway that sends its headers and stalls, and
-    an error nobody planned for. A signing key that loads and can't sign no
-    longer keeps the stop from being sent (it goes unsigned; #35 never checks
-    a stop's signature). `ok` used to mean only that the in-process flag was
-    set. There is no direct-bus fallback, for the reasons in
-    `mcp/tools/estop.py`.
-  - **A stop is not queued behind another call.** FastMCP runs a sync tool on
-    the event loop itself, so a stop sent while another tool ran waited for
-    it. `estop`, `estop_clear`, `execute_capability`, `execute_task`,
-    `vision_find`, `discover`'s capture and detect, and the spatial-eval runs
-    and submission now do their blocking work in a worker thread. A motion
-    checks the stop latch again after its envelope is signed, just before
-    sending, so a motion prepared while a stop landed is not sent
-    (`estop_set`). Two motion calls sent at once no longer run one after the
-    other: the second is refused (`busy`) while the first is in flight; reads
-    such as `status.report` still go. `audit.record_event` holds a lock from
-    reading the previous hash to appending, so entries recorded at the same
-    moment by two threads do not fork the chain.
-  - **`status: ok` means the gateway ran the call, not that the arm arrived.**
-    When the actuator reports them, the result carries `reached` and
-    `stopped_by_estop` (a stop that interrupts a move still gets a 200 with
-    `reached: false`), and `execute_task` stops at a step that didn't reach
-    (`status: not_reached`). An answer that doesn't say whether the call ran
-    (a 200 without `ok: true`, a 5xx without `actuator_error`) is reported as
-    `gateway_unknown_outcome` ("may have run; do not resend"), never as a
-    refusal; 4xx answers are still `gateway_rejected`.
-  - **`estop_clear` is refused, and sends nothing.** Clearing a stop makes the
-    robot movable again, so it is the person's, with their own commission
-    credential: after a gateway trip, `POST /v1/safety/clear`, then
-    `arm.estop.clear` at the commission tier (for example `robot-md invoke ...
-    --tool arm.estop.clear` with their commission bearer). This server never
-    holds that credential. Its own latch is released only when the server
-    restarts (`/mcp` → robot-md → Reconnect): neither so-arm101-actuator nor
-    robot-md-gateway reports the actuator's latch in any read, so the server
-    can't tell reliably that the person cleared it. The refusal says all of
-    this. The first version of this change asked the gateway at the commission
-    tier.
-  - **An older gateway is named at startup.** The gateway exposes no version
-    that tells releases apart (its OpenAPI version is the constant `0.4.0a1`),
-    so the MCP server reads `GET /openapi.json` once, without the bearer, and
-    when the safety routes of robot-md-gateway#35 are missing it warns on
-    stderr and in every motion and stop result (`warnings`). It doesn't refuse
-    on that basis; a gateway it can't read gets no warning.
+    once robot-md-gateway#35 lands. It returns `ok: true` only when the gateway
+    confirms the stop. Otherwise it returns `stop: stop_not_confirmed`, the
+    MCP tool reports an error, and the message says to use the hardware stop.
+    `ok` used to mean only that the in-process flag was set. There is no
+    direct-bus fallback, for the reasons in `mcp/tools/estop.py`.
+  - **A stop is not queued behind a motion.** FastMCP runs a sync tool on the
+    event loop itself, so a stop sent while a motion waited for the gateway's
+    answer waited for that answer first. `estop`, `estop_clear`,
+    `execute_capability` and `execute_task` are now async and make their HTTP
+    call in a worker thread. A motion checks the stop latch again after its
+    envelope is signed, just before sending, so a motion prepared while a stop
+    landed is not sent (`estop_set`). Two motion calls sent at once no longer
+    run one after the other: the second is refused (`busy`) while the first
+    is in flight. `audit.record_event` holds a lock from reading the previous
+    hash to appending, so entries recorded at the same moment by two threads
+    do not fork the chain.
+  - **`estop_clear`** asks the gateway for `arm.estop.clear` under the
+    `COMMISSION` scope, which the gateway refuses below the commission tier,
+    and releases this server's latch only when the gateway confirms. With the
+    actuate-tier bearer the server reads by default, the gateway refuses the
+    clear: the person at the machine clears stops with their own credential.
   - **`execute_capability(dry_run=True)`** returns the envelope that would be
     sent (`status: dry_run`) and sends nothing. It used to return the
     backend's planned trajectory. `recent_errors` does not list dry runs.
@@ -156,38 +219,24 @@ separate change.
     `load_context(..., open_servo_bus=True)` keeps the full open for
     `robot-md pose teach`.
   - **The dashboard's estop and clear buttons** take the same path as the MCP
-    tools: the clear is refused and recorded (`estop_clear_refused`).
+    tools.
   - **The `using-robot-md` skill, the generated `CLAUDE.md`, the
     `check-safety` prompt and `init`'s motion hint** no longer tell Claude to
     move the robot after a "yes" in chat. Motion goes only through the
     gateway, with a person at the machine and a hardware stop within reach;
     Claude never clears a stop; test runs are started by the person. The
-    bundled skill is robot-md-mcp's (RobotRegistryFoundation/robot-md-mcp#19).
-    The generated `CLAUDE.md` says when every motion is refused (a gate that
-    needs a person), names `robot-md doctor --path ROBOT.md --hardware off`
-    (without `--hardware off`, doctor opens the servo port), hands `robot-md
-    pose teach` to the person, and defers to the bounded-embodiment plugin
-    when it is installed. `robot-md init` probes every serial port and opens
-    the camera, so the getting-started guide hands it to the person.
+    skill says how it relates to the bounded-embodiment skill.
   - Two opt-in hardware tests that drove the arm through the removed
-    in-process path are deleted. A person-run version of the pose-teach round
-    trip belongs with the gateway's hardware tests (not written yet).
+    in-process path are skipped, with the reason in the marker.
 
-  **Migrating.** On the robot, the person runs `robot-md install-gateway` and
-  gives the MCP server the actuate token (`ROBOT_MD_GATEWAY_BEARER`), or points
-  the MCP server at an existing gateway with `ROBOT_MD_GATEWAY_URL` and
-  `ROBOT_MD_GATEWAY_BEARER`. The gateway must include
-  robot-md-gateway#35 (see the release checklist above). It boots held: a
-  heartbeat sender on the person's own device (never the agent's host), with
-  the supervisor credential, and the person's commission clear arm it; the MCP
-  server never sends heartbeats. The gateway's `ROBOT_MD_TOOL_ALLOWLIST`
-  decides what the MCP server can run: add the capability names you want it to
-  run (the list `install-gateway` writes has none of the `arm.*` names) and
-  keep `arm.estop` for the stop. A manifest with a gate that needs a person
-  (every preset that declares gates) gets no MCP motion at all for now.
-  Callers that passed `confirm_token` drop it. Code that read `estop`'s `ok`
-  as "flag set" reads `local_latch` instead, and `stop` for the gateway's
-  answer; code that read `status: ok` as arrival reads `reached`.
+  **Migrating.** On the robot, the person runs `robot-md install-gateway`, or
+  points the MCP server at an existing gateway with `ROBOT_MD_GATEWAY_URL` and
+  `ROBOT_MD_GATEWAY_BEARER`. The gateway's `ROBOT_MD_TOOL_ALLOWLIST` decides
+  what the MCP server can run: add the capability names you want it to run
+  (the list `install-gateway` writes has none of the `arm.*` names) and
+  `arm.estop` for the stop. Callers that passed `confirm_token` drop it. Code
+  that read `estop`'s `ok` as "flag set" reads `local_latch` instead, and
+  `stop` for the gateway's answer.
 
 ### Security
 
@@ -258,15 +307,6 @@ separate change.
   before, and says so when the named file does not exist.
 - **The root helper and the venv step run Python with `-I`,** so a module lying
   in the operator's current directory is never imported as root.
-- **`install-gateway` makes the gateway enforce ROBOT.md's gates itself.** The
-  `gateway.env` it writes sets `ROBOT_MD_HITL_FROM_MANIFEST=1`, so the gateway
-  reads the pinned manifest's `safety.hitl_gates` and refuses a gated motion
-  that carries no human `delegation_chain` (`hitl_required`), whichever client
-  sent it. robot-md's MCP server refuses such motion before sending it; this
-  is the second layer under it. An existing `gateway.env` without the variable
-  gets a warning from the installer (it never rewrites the file). The gateway
-  still accepts a caller-written `delegation_chain` as a person's approval;
-  replacing that with an approval the pendant signs is a gateway follow-up.
 
 ### Fixed
 
@@ -309,6 +349,8 @@ separate change.
   declared stop as `SAFETY` whatever its scope.
 
 ## [1.10.7] - 2026-10-22
+
+Never tagged or published; these changes first ship in 2.0.0.
 
 ### Changed
 
