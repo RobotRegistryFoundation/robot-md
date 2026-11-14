@@ -132,7 +132,12 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   per-axis numbers under `safety.envelope`. Move and skill scopes require
   auth. The driver is a new protocol name, `robotd_jsonrpc`, that no
   robot-md backend implements yet. Every number in the preset names its
-  source in a comment, and the unmeasured ones say so.
+  source in a comment, and the unmeasured ones say so. Under this release's
+  gate rule (see Fixed), robot-md's MCP server refuses every microduck
+  capability but `status.report` (`hitl_gate`), `sound.play` included: a gate
+  that needs a person covers everything that isn't a read. robot-md-gateway
+  maps none of `move`, `skill` or `sound`, so its HiTL setting enforces none
+  of them.
 - **MCP tool annotations.** Every tool `robot-md mcp` serves (21 of them)
   now carries a `title` and all four MCP hints: `readOnlyHint`,
   `destructiveHint`, `idempotentHint` and `openWorldHint`. Before this, none

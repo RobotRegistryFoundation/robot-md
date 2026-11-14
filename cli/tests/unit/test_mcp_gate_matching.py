@@ -68,9 +68,10 @@ def test_a_dry_run_of_a_gated_motion_is_refused_too(fixtures_dir, gateway_env):
 
 
 def test_every_shipped_preset_with_gates_refuses_motion():
-    """Every preset that declares a gate declares `destructive`, so robot-md's
-    MCP server refuses all motion on each of them until an out-of-band
-    confirmation exists."""
+    """Every preset that declares a gate declares one that needs a person and
+    covers motion (`destructive`, or on microduck `move` and `skill`), so
+    robot-md's MCP server refuses all motion on each of them until an
+    out-of-band confirmation exists."""
     for path in sorted(PRESETS.glob("*.yaml")):
         data = yaml.safe_load(path.read_text()) or {}
         gates = (data.get("safety") or {}).get("hitl_gates") or []
