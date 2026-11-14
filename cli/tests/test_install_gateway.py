@@ -150,18 +150,26 @@ def test_a_commission_gate_refuses_the_clear_too():
         assert all(g.get("scope") != "commission" for g in gates), preset
 
 
-def test_the_texts_install_gateway_writes_qualify_the_safety_routes():
-    """Every install today gets robot-md-gateway 0.5.0a9, which serves neither
-    /v1/safety route, and a gateway with #35 that requires signatures refuses
-    an unsigned clear. The next steps and the bearers.yaml comment say both."""
+def test_the_texts_install_gateway_writes_name_the_safety_commands():
+    """install-gateway installs robot-md-gateway 0.5.0a10 or later, which starts
+    held and serves both /v1/safety routes, and the gateway.env it writes
+    requires a signed clear. The next steps and the bearers.yaml comment name
+    the gateway's own heartbeat and clear commands, with no version caveat."""
     from robot_md.install_gateway import NEXT_STEPS
 
-    assert "skip 4 and 5" in NEXT_STEPS
-    assert "#35 or later" in NEXT_STEPS
+    assert "robot-md-gateway heartbeat --gateway" in NEXT_STEPS
+    assert "robot-md-gateway clear --gateway" in NEXT_STEPS
     assert "ESTOP_CLEAR" in NEXT_STEPS
+    # The gateway.env install-gateway writes requires signatures, and `clear`
+    # signs only with --key; the unit listens on 127.0.0.1 only.
+    assert "--key" in NEXT_STEPS
+    assert "tailscale serve" in NEXT_STEPS
+    assert "skip 4 and 5" not in NEXT_STEPS
+    assert "#35 or later" not in NEXT_STEPS
     bearers = render_default_bearers()
-    assert "#35 or later" in bearers
+    assert "robot-md-gateway clear" in bearers
     assert "ESTOP_CLEAR" in bearers
+    assert "#35 or later" not in bearers
 
 
 def _allowlist() -> list[str]:
@@ -878,6 +886,26 @@ def test_the_unit_fails_closed_without_the_bearer_file():
 )
 def test_the_unit_is_hardened(directive):
     assert directive in render_systemd_unit().splitlines()
+
+
+@pytest.mark.parametrize(
+    "directive",
+    ["Type=notify", "NotifyAccess=main", "WatchdogSec=5s", "StateDirectory=robot-md-gateway"],
+)
+def test_the_unit_restarts_a_gateway_whose_watchdog_stops(directive):
+    """robot-md-gateway#37: the gateway tells systemd its safety watchdog is
+    ticking, and keeps its clean-shutdown marker in the state directory, so a
+    clean restart does not send every declared stop and latch the arm."""
+    assert directive in render_systemd_unit().splitlines()
+
+
+def test_a_fresh_install_gets_a_gateway_that_tells_systemd_it_is_ready(tmp_path):
+    """Under Type=notify, a gateway before 0.5.0a10 never sends READY=1 and its
+    start fails after 90 s, so the pip step names the floor."""
+    host = _FakeHost({})
+    assert _install(host, MANIFEST_PATH) == 0
+    [pip] = host.ran("/opt/robot-md-gateway/.venv/bin/pip", "install")
+    assert pip[-1] == "robot-md-gateway>=0.5.0a10"
 
 
 def test_the_unit_scores_at_least_as_well_as_the_gateways_own_unit(tmp_path):

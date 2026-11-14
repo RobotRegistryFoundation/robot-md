@@ -34,12 +34,17 @@ ENV_PATH = f"{CONFIG_DIR}/gateway.env"
 #: runs with ProtectHome=yes, so a manifest under /home is invisible to it.
 MANIFEST_PATH = f"{CONFIG_DIR}/ROBOT.md"
 #: The gateway's own route, answered 401 without a bearer by every release that
-#: has it (0.5.0a9, and robot-md-gateway#35): an answer only the gateway gives.
+#: has it (0.5.0a9 and later): an answer only the gateway gives.
 HEALTH_URL = "http://127.0.0.1:8080/v1/audit/last"
 
 #: Shortest token `install-gateway` accepts in bearers.yaml.
 #: `secrets.token_urlsafe(32)`, which it generates, gives 43 characters.
 MIN_TOKEN_CHARS = 32
+
+#: What `install-gateway` pip-installs. The unit below is `Type=notify`, and a
+#: gateway before 0.5.0a10 never sends READY=1, so systemd would give up on its
+#: start after 90 s.
+GATEWAY_REQUIREMENT = "robot-md-gateway>=0.5.0a10"
 
 _EXEC_START = (
     "/opt/robot-md-gateway/.venv/bin/robot-md-gateway serve "
@@ -57,6 +62,18 @@ Wants=network-online.target
 AssertPathExists={BEARERS_PATH}
 
 [Service]
+# The gateway's safety watchdog tells systemd it is ticking (robot-md-gateway
+# 0.5.0a10 and later): READY=1 after its first tick, then WATCHDOG=1 every
+# quarter of WatchdogSec. If it dies or stops ticking, systemd stops the
+# gateway and Restart=on-failure starts it again, held.
+Type=notify
+NotifyAccess=main
+WatchdogSec=5s
+# Where the gateway keeps its clean-shutdown marker ($STATE_DIRECTORY, here
+# /var/lib/robot-md-gateway, writable under ProtectSystem=strict). A start that
+# finds no marker sends every declared stop before it serves anything, so
+# without this line every start would, and so-arm101 would boot latched.
+StateDirectory=robot-md-gateway
 User=robot-md-gateway
 Group=robot-md-gateway
 # On a stock Raspberry Pi OS the serial ports are root:dialout 0660, and nothing
@@ -183,10 +200,9 @@ bearers:
     role: supervisor
     caller: supervisor-default
   # Clearing a stop needs a commission entry: for the arm's clear
-  # (arm.estop.clear) and, on robot-md-gateway with #35 or later, the
-  # gateway's own (POST /v1/safety/clear, a signed ESTOP_CLEAR body where the
-  # gateway requires signatures). Add the operator's by hand, with a token of
-  # its own:
+  # (arm.estop.clear) and the gateway's own (`robot-md-gateway clear`, a
+  # signed ESTOP_CLEAR body to POST /v1/safety/clear). Add the operator's by
+  # hand, with a token of its own:
   #   python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
   # - token: "<that token>"
   #   tier: commission
@@ -567,15 +583,21 @@ next steps:
   2. read the tokens with: sudo cat {BEARERS_PATH}
   3. give the actuate token to the agent's client, and the supervisor token to
      the supervising person's device: never the agent's host, never the robot.
-  4. robot-md-gateway with #35 or later only, which starts held and moves
-     nothing until 4 and 5 are done: from that device, POST
-     /v1/safety/heartbeat at least every 3 s.
-  5. then, as the operator, POST /v1/safety/clear with the commission token,
-     as a signed ESTOP_CLEAR body where the gateway requires signatures (a
-     gateway.env install-gateway writes does). robot-md-gateway's own
-     `heartbeat` and `clear` commands send both (robot-md-gateway#36, not
-     merged yet).
-     On 0.5.0a9 and earlier, skip 4 and 5: neither route exists."""
+  4. the gateway starts held and moves nothing until 4 and 5 are done. It
+     listens on 127.0.0.1 only, so give that device a route to it first (the
+     robot-md-gateway README's `tailscale serve` step), and install
+     robot-md-gateway 0.5.0a10 or later there. Then, from that device:
+       robot-md-gateway heartbeat --gateway <url> --token-file <supervisor token file>
+     It posts /v1/safety/heartbeat every second. Without a heartbeat at
+     least every 3 s, the gateway trips and stops the arm.
+  5. then, as the operator, with the heartbeats running:
+       robot-md-gateway clear --gateway <url> --token-file <commission token file> \\
+         --key ~/.robot-md/keys/<rrn>.signing.json
+     It posts /v1/safety/clear once, as a signed ESTOP_CLEAR: the gateway.env
+     install-gateway writes requires the signature, so without --key the
+     gateway answers 403. A first start finds no clean-shutdown marker and
+     sends every declared stop, so then clear the arm's latch too
+     (arm.estop.clear, at the commission tier)."""
 
 
 def _disable_unit_if_enabled(sudo: list[str]) -> None:
@@ -603,7 +625,7 @@ def install_gateway(
       4. Create /opt/robot-md-gateway and /etc/robot-md-gateway, and keep the
          latter root's: owned by root, writable by nobody else.
       5. sudo python3 -I -m venv /opt/robot-md-gateway/.venv, and pip install
-         robot-md-gateway into it.
+         robot-md-gateway 0.5.0a10 or later into it (`GATEWAY_REQUIREMENT`).
       6. gateway.env and bearers.yaml: create each where absent (0600,
          robot-md-gateway, `write_new_file`). An existing one keeps its
          content; if group or others can read it, or someone else owns it, it
@@ -658,7 +680,7 @@ def install_gateway(
         [*sudo, "chown", "root", CONFIG_DIR],
         [*sudo, "chmod", "go-w", CONFIG_DIR],
         [*sudo, "python3", "-I", "-m", "venv", "/opt/robot-md-gateway/.venv"],
-        [*sudo, "/opt/robot-md-gateway/.venv/bin/pip", "install", "robot-md-gateway"],
+        [*sudo, "/opt/robot-md-gateway/.venv/bin/pip", "install", GATEWAY_REQUIREMENT],
     ]
     for cmd in steps:
         r = subprocess.run(cmd)

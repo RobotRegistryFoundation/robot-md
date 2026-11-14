@@ -60,7 +60,8 @@ def test_the_instructions_give_a_clear_the_gateway_accepts(fixtures_dir, gateway
         "--scope COMMISSION" in text
     )
     assert "ESTOP_CLEAR" in text
-    assert "robot-md-gateway#36" in text
+    assert "--key" in text and "robot-md-gateway 0.5.0a10" in text
+    assert "not merged" not in text
     assert "robot-md-gateway#35 or later" in text
 
 
