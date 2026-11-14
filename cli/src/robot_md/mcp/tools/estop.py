@@ -225,11 +225,13 @@ def estop_tool(ctx: McpContext) -> dict:
 
 def clear_instructions(
     stop_tool: str = gateway_client.DEFAULT_STOP_CLEAR_TOOL,
-    manifest: str = str(gateway_client.INSTALL_GATEWAY_MANIFEST_FILE),
+    manifest: str | None = None,
 ) -> str:
     """How the person clears a stop. `manifest` is the ROBOT.md the gateway
-    pins, the path this server's own requests name; with any other path the
-    gateway refuses the clear (`manifest_pin`)."""
+    pins, the path this server's own requests name (install-gateway's copy by
+    default); with any other path the gateway refuses the clear
+    (`manifest_pin`)."""
+    manifest = manifest or str(gateway_client.INSTALL_GATEWAY_MANIFEST_FILE)
     return (
         "Clearing a stop makes the robot movable again, so it is the person's to do, "
         "at the machine, with their own commission-tier credential; this server never "
@@ -250,7 +252,7 @@ def clear_instructions(
 
 def clear_refusal(
     stop_tool: str = gateway_client.DEFAULT_STOP_CLEAR_TOOL,
-    manifest: str = str(gateway_client.INSTALL_GATEWAY_MANIFEST_FILE),
+    manifest: str | None = None,
 ) -> dict:
     """The refusal `estop_clear` answers with, without this server's latch
     state. The dashboard's clear button shows the same."""
@@ -266,11 +268,11 @@ def clear_refusal(
 def estop_clear_tool(ctx: McpContext) -> dict:
     """Refuse: clearing a stop is the person's. Sends nothing, keeps the latch."""
     stop_clear_tool = gateway_client.DEFAULT_STOP_CLEAR_TOOL
-    manifest = str(gateway_client.INSTALL_GATEWAY_MANIFEST_FILE)
+    manifest = None
     with contextlib.suppress(Exception):
         config = gateway_client.config_for_context(ctx)
         stop_clear_tool = config.stop_clear_tool
-        manifest = config.manifest_path or manifest
+        manifest = config.manifest_path or None
     latched = True
     with contextlib.suppress(Exception):
         latched = bool(ctx.estop.is_set())

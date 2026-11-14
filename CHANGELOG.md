@@ -131,7 +131,8 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   Reconnect): neither so-arm101-actuator nor robot-md-gateway reports the
   actuator's latch in any read, so it can't tell reliably that the person
   cleared it. The dashboard's clear button takes the same path and is recorded
-  as refused.
+  as refused, and the page now shows the refusal and these instructions; it
+  answered `{"ok": true}` and showed nothing.
 - **Motion scope labels:** `MANIPULATE` for `arm.*` and `gripper.*`, `NAVIGATE`
   for `nav.*`, `ACTUATE` otherwise (2.0.0 sent `ACTUATE` for all). For a tool
   its actuator declares as motion, the gateway applies the strictest motion
