@@ -448,6 +448,46 @@ def test_an_actuator_error_says_the_motion_may_have_partly_run(fixtures_dir, gat
 
 
 # --------------------------------------------------------------------------
+# A redirect is followed nowhere
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def elsewhere():
+    """Another listener, where a redirect points."""
+    from tests.fake_gateway import FakeGateway
+
+    other = FakeGateway()
+    other.start()
+    yield other
+    other.stop()
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_a_redirect_is_followed_nowhere(fixtures_dir, gateway_env, elsewhere, status):
+    """A 3xx from the gateway's address carried the request, bearer and all,
+    to wherever it pointed, and that listener's answer came back as the
+    gateway's (2.0.0 did the same). Now the client follows none: a motion or a
+    read is refused (`gateway_redirect`), the stop isn't confirmed and gives
+    the hardware-stop advice, and nothing reaches the other listener."""
+    target = elsewhere.url + "/v1/invoke"
+    ctx = _ctx(fixtures_dir, extra_caps=("status.report",))
+    for capability in ("arm.pick", "status.report"):
+        gateway_env.redirect(target, status=status)
+        r = execute_capability_tool(ctx, capability=capability, args={}, dry_run=False)
+        assert r["status"] == "error", r
+        assert r["error"]["reason"] == "gateway_redirect"
+        assert r["error"]["http_status"] == status
+        assert target in r["error"]["message"]
+    gateway_env.redirect(target, status=status)
+    stop = estop_tool(ctx)
+    _assert_not_confirmed_with_advice(stop)
+    assert stop["error"]["reason"] == "gateway_redirect"
+    assert elsewhere.requests == []
+    assert elsewhere.get_requests == []
+
+
+# --------------------------------------------------------------------------
 # A motion a stop interrupted is not reported as arrival
 # --------------------------------------------------------------------------
 

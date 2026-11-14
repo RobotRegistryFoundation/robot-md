@@ -32,26 +32,32 @@ class FakeGateway:
         self.requests: list[dict[str, Any]] = []
         self.get_requests: list[dict[str, Any]] = []
         self.routes: tuple[str, ...] = PR35_GATEWAY_ROUTES
-        # (status, body, delay before answering, stall after the headers)
-        self._queue: list[tuple[int, dict, float, float]] = []
+        # (status, body, delay before answering, stall after the headers,
+        # extra headers)
+        self._queue: list[tuple[int, dict, float, float, dict[str, str]]] = []
         self._release = threading.Event()
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
     # ------------------------------------------------------------ scripting
 
-    def respond(self, status: int, body: dict) -> None:
+    def respond(self, status: int, body: dict, headers: dict[str, str] | None = None) -> None:
         """Queue one answer. Answers are used in order, one per request."""
-        self._queue.append((status, body, 0.0, 0.0))
+        self._queue.append((status, body, 0.0, 0.0, dict(headers or {})))
+
+    def redirect(self, location: str, status: int = 302) -> None:
+        """Queue a redirect to `location`, as a proxy or a wrong address might
+        send one. robot-md-gateway itself never redirects /v1/invoke."""
+        self.respond(status, {"detail": "moved"}, headers={"Location": location})
 
     def hang(self, seconds: float, status: int = 200, body: dict | None = None) -> None:
         """Queue an answer sent only after `seconds` (released early by stop())."""
-        self._queue.append((status, body if body is not None else {}, seconds, 0.0))
+        self._queue.append((status, body if body is not None else {}, seconds, 0.0, {}))
 
     def stall_after_headers(self, status: int, seconds: float) -> None:
         """Queue an answer whose status line and headers are sent, and whose body
         is not, for `seconds`."""
-        self._queue.append((status, {"detail": "stalled"}, 0.0, seconds))
+        self._queue.append((status, {"detail": "stalled"}, 0.0, seconds, {}))
 
     def deny(self, deny: str, reason: str, **extra: Any) -> None:
         """Queue a signed-deny shaped 403, as the gateway sends one."""
@@ -99,8 +105,9 @@ class FakeGateway:
                     }
                 )
                 delay = stall = 0.0
+                extra: dict[str, str] = {}
                 if gateway._queue:
-                    status, answer, delay, stall = gateway._queue.pop(0)
+                    status, answer, delay, stall, extra = gateway._queue.pop(0)
                     if status == 200 and not answer:
                         answer = gateway.allowed(body if isinstance(body, dict) else {})
                 else:
@@ -111,6 +118,8 @@ class FakeGateway:
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data) + (64 if stall else 0)))
+                for name, value in extra.items():
+                    self.send_header(name, value)
                 self.end_headers()
                 if stall:
                     self.wfile.flush()

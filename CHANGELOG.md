@@ -75,6 +75,11 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   refusal.** A 200 without `ok: true`, or a 5xx without `actuator_error`, is
   `gateway_unknown_outcome` ("it may have run; do not resend"); 2.0.0 called
   both `gateway_rejected`, and a plain 500 can come after the actuator ran.
+- **The gateway client follows no redirect.** A 3xx from the gateway's
+  address re-sent the request, bearer included, to wherever it pointed, and
+  that address's answer came back as the gateway's; 2.0.0 did the same. Now a
+  3xx is refused: a motion or read gets `gateway_redirect`, nothing is sent
+  on, and a stop gets `stop_not_confirmed` with the hardware-stop advice.
 - **`status: ok` is no longer the only word on a motion.** A stop that
   interrupts a move still gets the gateway's 200. The result now carries the
   actuator's `reached` and `stopped_by_estop`, and `execute_task` stops at a

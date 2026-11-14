@@ -46,8 +46,9 @@ $ROBOT_MD_BEARERS_FILE naming a file of their own that holds only the actuate
 entry.
 
 The bearer never appears in a tool result: results say where it came from,
-not what it is. Requests ignore any HTTP proxy in the environment, so the
-bearer only ever goes to the configured gateway address.
+not what it is. Requests ignore any HTTP proxy in the environment and follow
+no redirect (a 3xx is `gateway_redirect`), so the bearer only ever goes to
+the configured gateway address.
 """
 
 from __future__ import annotations
@@ -398,6 +399,16 @@ def prepare_envelope(
     return signed, f"signed (kid {keypair.pq_kid})"
 
 
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    """Follows no redirect. urllib then raises the 3xx as an HTTPError, which
+    `_post` reads like any other answer. urllib's own handler re-sent the
+    request, bearer included, to wherever a 3xx pointed, and that address's
+    answer came back as the gateway's."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 #: One opener for every request, built on first use. Building one loads the CA
 #: bundle for its HTTPS handler, about 15 ms of CPU, and every request used to
 #: build its own: a stop sent while reads were in flight during a motion waited
@@ -412,9 +423,11 @@ def _opener() -> urllib.request.OpenerDirector:
     if _OPENER is None:
         with _OPENER_LOCK:
             if _OPENER is None:
-                # No proxies: the bearer goes to the configured address and
-                # nowhere else.
-                _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                # No proxies and no redirects: the bearer goes to the
+                # configured address and nowhere else.
+                _OPENER = urllib.request.build_opener(
+                    urllib.request.ProxyHandler({}), _NoRedirects()
+                )
     return _OPENER
 
 
@@ -443,6 +456,10 @@ def _post(url: str, body: dict, bearer: str | None, timeout: float) -> tuple[int
         with opener.open(request, timeout=timeout) as resp:
             return resp.status, _parse(resp.read())
     except urllib.error.HTTPError as e:
+        if 300 <= e.code < 400:
+            # A redirect, not followed (`_NoRedirects`). Its body is not the
+            # gateway's answer; where it pointed is all that is kept.
+            return e.code, {"redirect_to": str(e.headers.get("Location") or "")[:200]}
         try:
             raw = e.read()
         except Exception as read_error:
@@ -504,11 +521,12 @@ def interpret(status_code: int, body: Any) -> dict[str, Any]:
     The gateway answers 200 with `ok: true` when it allowed and ran the call,
     403 when a gate or the actuator's own policy refused it, and 500 with
     `actuator_error` when the actuator raised. 401 and the other 4xx answers
-    are request problems: nothing ran. Anything else (a 200 without
-    `ok: true`, a 5xx without `actuator_error`, any other status) says
-    nothing reliable about whether the call ran, so it is reported as an
-    unknown outcome, never as a refusal: a plain 500 can come after the
-    actuator ran.
+    are request problems: nothing ran. A 3xx is a redirect this client
+    didn't follow (`gateway_redirect`): the request went no further.
+    Anything else (a 200 without `ok: true`, a 5xx without `actuator_error`,
+    any other status) says nothing reliable about whether the call ran, so
+    it is reported as an unknown outcome, never as a refusal: a plain 500 can
+    come after the actuator ran.
     """
     detail = body.get("detail") if isinstance(body, dict) else None
     if status_code == 200 and isinstance(body, dict) and body.get("ok") is True:
@@ -551,6 +569,23 @@ def interpret(status_code: int, body: Any) -> dict[str, Any]:
                 ),
             },
             "gateway": detail,
+        }
+    if 300 <= status_code < 400:
+        where = body.get("redirect_to") if isinstance(body, dict) else None
+        return {
+            "status": "error",
+            "error": {
+                "reason": "gateway_redirect",
+                "http_status": status_code,
+                "message": (
+                    f"the gateway's address answered HTTP {status_code}, a redirect"
+                    + (f" to {where}" if where else "")
+                    + ". This client follows none, so the request went no further and the "
+                    "bearer went to no other address. Whatever answered there is not serving "
+                    "robot-md-gateway's /v1/invoke: check ROBOT_MD_GATEWAY_URL."
+                ),
+            },
+            "gateway": None,
         }
     if 400 <= status_code < 500:
         return {
