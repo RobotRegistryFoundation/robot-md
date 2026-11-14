@@ -121,6 +121,33 @@ the two on 0.5.0a9 and found no case where this release is less strict than
 - **The bundled `using-robot-md` skill is robot-md-mcp's current text**
   (RobotRegistryFoundation/robot-md-mcp#19), which says all of the above.
 
+### Added
+
+- **`microduck` preset** (`robot-md init --preset microduck`). Pollen
+  Robotics' bipedal duck robot; this preset is not affiliated with Pollen. It
+  declares the duck's 15 joints and their travel, its closed set of
+  capabilities (`move.walk`, `move.turn`, four `skill.*` names robotd
+  reports, `sound.play`, `status.report`) and the limits a caller keeps to:
+  0.3 m/s and 1.0 rad/s, from Microduck Studio's stick envelope, with the
+  per-axis numbers under `safety.envelope`. Move and skill scopes require
+  auth. The driver is a new protocol name, `robotd_jsonrpc`, that no
+  robot-md backend implements yet. Every number in the preset names its
+  source in a comment, and the unmeasured ones say so.
+- **MCP tool annotations.** Every tool `robot-md mcp` serves (21 of them)
+  now carries a `title` and all four MCP hints: `readOnlyHint`,
+  `destructiveHint`, `idempotentHint` and `openWorldHint`. Before this, none
+  did, so a conservative client had to treat every tool as destructive and
+  open-world. The hints come from what each implementation does, not its
+  name. Eight tools are read-only: `render`, `validate`, `doctor_summary`,
+  `vision_find`, `spatial_eval_dry_run`, `spatial_eval_kit`,
+  `spatial_eval_replay` and `spatial_eval_verify`. `hotplug_review` is not:
+  opening the queue creates the queue file and can append a `daemon_alert`
+  record. `discover` is not either: it publishes to the dashboard event file.
+  The motion tools and `estop_clear` are marked destructive and open-world;
+  `estop` is open-world but not destructive. A new test fails for any tool
+  registered without explicit hints and pins the read-only set. The hints are
+  advisory: robot-md-gateway still decides what moves.
+
 ### Changed
 
 - **`estop_clear` refuses, and sends nothing.** Clearing a stop makes the
@@ -202,6 +229,9 @@ the two on 0.5.0a9 and found no case where this release is less strict than
 - Two opt-in hardware tests that drove the arm through the removed in-process
   path, skipped since 2.0.0, are deleted. A person-run pose-teach round trip
   belongs with the gateway's hardware tests (not written yet).
+- **`mcp` minimum is now 1.10** (was 1.0). 1.10 is the first release whose
+  FastMCP accepts `title` on tools and prompts; the prompts already passed
+  `title`, so the old floor no longer installed a working server.
 
 **Migrating from 2.0.0.** Give the MCP server the gateway's actuate token
 (`ROBOT_MD_GATEWAY_BEARER`) if it reports `gateway_not_configured`. Expect no
