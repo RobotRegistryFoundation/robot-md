@@ -64,6 +64,28 @@ def merge(proposal: BindProposal, *, manifest_path: Path) -> MergeOutcome:
             if "port" in proposal.inferred_fields:
                 new_driver["port"] = proposal.inferred_fields["port"]
 
+            # A driver with this id may already be there: a repeated bind, or
+            # a bind whose queue resolution never landed. Leave the file
+            # byte-identical when it matches; refuse when it does not.
+            existing = next(
+                (d for d in drivers if isinstance(d, dict) and d.get("id") == new_driver["id"]),
+                None,
+            )
+            if existing is not None:
+                if all(existing.get(k) == v for k, v in new_driver.items()):
+                    return MergeOutcome(
+                        success=True,
+                        rrn=proposal.rrn,
+                        driver_id=proposal.driver_id_suggestion,
+                        reason="already_present",
+                    )
+                return MergeOutcome(
+                    success=False,
+                    rrn=proposal.rrn,
+                    driver_id=None,
+                    reason=f"driver_id_conflict: {new_driver['id']!r} already declared differently",
+                )
+
             drivers.append(new_driver)
 
             new_frontmatter = yaml.safe_dump(data, sort_keys=False).rstrip()

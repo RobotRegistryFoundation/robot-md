@@ -24,15 +24,33 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `destructiveHint`, `idempotentHint` and `openWorldHint`. Before this, none
   did, so a conservative client had to treat every tool as destructive and
   open-world. The hints come from what each implementation does, not its
-  name. Eight tools are read-only: `render`, `validate`, `doctor_summary`,
+  name. Nine tools are read-only: `render`, `validate`, `doctor_summary`,
   `vision_find`, `spatial_eval_dry_run`, `spatial_eval_kit`,
-  `spatial_eval_replay` and `spatial_eval_verify`. `hotplug_review` is not:
-  opening the queue creates the queue file and can append a `daemon_alert`
-  record. `discover` is not either: it publishes to the dashboard event file.
+  `spatial_eval_replay`, `spatial_eval_verify` and `hotplug_review` (see
+  Fixed). `discover` is not either: it publishes to the dashboard event file.
   The motion tools and `estop_clear` are marked destructive and open-world;
   `estop` is open-world but not destructive. A new test fails for any tool
   registered without explicit hints and pins the read-only set. The hints are
   advisory: robot-md-gateway still decides what moves.
+
+### Fixed
+
+- **`hotplug_confirm` bind is idempotent.** Repeating a bind on the same
+  event merged the driver into ROBOT.md a second time and only then reported
+  `already_resolved`, so the manifest ended up with the driver twice. The tool
+  now checks whether the event is already resolved before any write, and the
+  manifest merge leaves ROBOT.md byte-identical when a driver with the same
+  id and fields is already declared (a bind whose queue resolution never
+  landed can be retried safely). A driver with the same id but different
+  fields is refused as `driver_id_conflict` instead of being added twice.
+  The tool now carries `idempotentHint: true`.
+- **`hotplug_review` is read-only.** It opened an `EventQueue`, whose
+  constructor creates `~/.robot-md/hotplug-events.jsonl` when missing and
+  appends a `daemon_alert` record when it finds malformed lines. It now reads
+  the file directly: a missing queue reads as empty, and malformed lines are
+  reported as `malformed_lines` in the reply instead of written to the file.
+  The `robot-md://hotplug/pending` resource reads the same way. The tool now
+  carries `readOnlyHint: true` and `idempotentHint: true`.
 
 ### Changed
 

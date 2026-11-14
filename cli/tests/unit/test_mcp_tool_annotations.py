@@ -29,6 +29,9 @@ EXPECTED: dict[str, tuple[bool, bool, bool, bool]] = {
     "spatial_eval_kit": (True, False, True, False),
     "spatial_eval_replay": (True, False, True, False),
     "spatial_eval_verify": (True, False, True, True),
+    # hotplug_review reads the queue file without opening an EventQueue, so
+    # it neither creates the file nor appends an alert on malformed lines.
+    "hotplug_review": (True, False, True, False),
     # motion and the gateway
     "estop": (False, False, True, True),
     "estop_clear": (False, True, True, True),
@@ -42,8 +45,9 @@ EXPECTED: dict[str, tuple[bool, bool, bool, bool]] = {
     "spatial_eval_run_execute": (False, True, False, True),
     "spatial_eval_run_full": (False, True, False, True),
     "spatial_eval_submit_to_rrf": (False, False, False, True),
-    "hotplug_review": (False, False, False, False),
-    "hotplug_confirm": (False, True, False, False),
+    # hotplug_confirm checks for a prior resolution and an already-declared
+    # driver before writing, so a repeated call leaves ROBOT.md byte-identical.
+    "hotplug_confirm": (False, True, True, False),
 }
 
 READ_ONLY_TOOLS = {name for name, hints in EXPECTED.items() if hints[0]}
@@ -91,6 +95,7 @@ def test_read_only_set_is_pinned():
         "spatial_eval_kit",
         "spatial_eval_replay",
         "spatial_eval_verify",
+        "hotplug_review",
     }
     assert pinned == READ_ONLY_TOOLS
 

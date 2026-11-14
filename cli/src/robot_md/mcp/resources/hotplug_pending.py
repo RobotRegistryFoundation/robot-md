@@ -7,27 +7,17 @@ lives in resource_subscribers.py + the FastMCP lifespan hook in server.py.
 
 from __future__ import annotations
 
-import json
-
-from robot_md.hotplug.queue import EventQueue
+from robot_md.hotplug import queue as _queue_mod
+from robot_md.hotplug.queue import EventQueue, _safe_iter_records
 
 URI = "robot-md://hotplug/pending"
 
 
 def build_pending_payload(*, _queue: EventQueue | None = None) -> dict:
-    q = _queue or EventQueue()
-    if not q.path.exists():
-        return {"pending": []}
-
-    records: list[dict] = []
-    for line in q.path.read_text().splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            records.append(json.loads(line))
-        except Exception:
-            continue
+    # Read the file directly: constructing an EventQueue creates the file
+    # when missing and appends a daemon_alert on malformed lines.
+    path = _queue.path if _queue is not None else _queue_mod._DEFAULT_PATH
+    records, _ = _safe_iter_records(path)
 
     resolved_refs = {r["ref"] for r in records if r.get("kind") == "resolved" and r.get("ref")}
 

@@ -597,15 +597,15 @@ def build_server(ctx: McpContext):
 
         return submit_to_rrf_tool(ctx, run_dir=run_dir)
 
-    # Not read-only, despite the name: opening the queue creates
-    # ~/.robot-md/hotplug-events.jsonl if missing and appends a daemon_alert
-    # record whenever it finds malformed lines, on every call.
+    # Read-only: it reads ~/.robot-md/hotplug-events.jsonl directly and never
+    # opens an EventQueue, so a missing queue is not created and malformed
+    # lines are counted in the reply, not appended to the file as an alert.
     @server.tool(
         **_tool_meta(
             "Review pending hot-plug events",
-            read_only=False,
+            read_only=True,
             destructive=False,
-            idempotent=False,
+            idempotent=True,
             open_world=False,
         )
     )
@@ -615,15 +615,16 @@ def build_server(ctx: McpContext):
 
         return hotplug_review_tool()
 
-    # Destructive: bind rewrites ROBOT.md frontmatter with yaml.safe_dump. Not
-    # idempotent: a repeated bind merges the driver again before the queue
-    # reports already_resolved.
+    # Destructive: bind rewrites ROBOT.md frontmatter with yaml.safe_dump.
+    # Idempotent: a repeated call on a resolved event returns already_resolved
+    # before any write, and a bind whose driver is already declared leaves
+    # ROBOT.md byte-identical, so repeating a call changes nothing.
     @server.tool(
         **_tool_meta(
             "Bind or reject a hot-plug event",
             read_only=False,
             destructive=True,
-            idempotent=False,
+            idempotent=True,
             open_world=False,
         )
     )
