@@ -45,10 +45,14 @@ from robot_md.mcp.context import McpContext
 
 #: Capabilities that read and never move, whatever the backend declares. They
 #: still go to the gateway, under the OBSERVE scope, and they pass this
-#: server's own stop latch so the robot's state can be read after a stop. A
-#: capability wrongly listed here still cannot move anything through the
-#: gateway, which refuses a motion tool sent under OBSERVE (`tool_scope`).
-#: The same set gives `robot-md invoke` its OBSERVE default (`READ_TOOLS`).
+#: server's own stop latch so the robot's state can be read after a stop. This
+#: server sends OBSERVE for these and the backend's own read-only capabilities
+#: only (the shipped backends' are all here), never for a motion. The gateway
+#: refuses a tool sent under OBSERVE (`tool_scope`) only when its actuator
+#: declares that tool as motion, and so-arm101-actuator 0.2.2 declares none,
+#: so a motion listed here could run, past this server's stop latch. None is
+#: (see `READ_TOOLS`). The same set gives `robot-md invoke` its OBSERVE
+#: default.
 READ_ONLY_CAPABILITIES = READ_TOOLS
 
 

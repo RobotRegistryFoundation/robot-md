@@ -85,10 +85,14 @@ DEFAULT_TIMEOUT_S = 30.0
 #: person is told to use the hardware stop.
 STOP_TIMEOUT_S = 2.0
 
-#: Envelope scopes. The gateway refuses a motion tool under a scope that is not
-#: an actuation scope (`tool_scope`), so a wrong label here cannot move
-#: anything; it can only be refused. Motion scopes per capability family are
-#: in `robot_md.motion_gates.motion_scope_for`; this is the fallback.
+#: Envelope scopes. The gateway refuses a tool under a scope that is not an
+#: actuation scope (`tool_scope`) only when its actuator declares that tool as
+#: motion. so-arm101-actuator 0.2.2 declares nothing, and its `home` and
+#: `move` sent under OBSERVE ran on robot-md-gateway 0.5.0a9. So robot-md
+#: sends OBSERVE only for reads (`robot_md.invoke.READ_TOOLS` and a backend's
+#: own read-only capabilities), never for a motion, and `READ_TOOLS` names no
+#: shipped actuator's motion tool. Motion scopes per capability family are in
+#: `robot_md.motion_gates.motion_scope_for`; this is the fallback.
 MOTION_SCOPE = "ACTUATE"
 OBSERVE_SCOPE = "OBSERVE"
 #: The scope the gateway itself uses when it sends a stop.

@@ -1,8 +1,9 @@
 """Read-only capabilities pass this server's stop latch; motion does not.
 
 Both go to robot-md-gateway. A read-only capability goes under the OBSERVE
-scope, so the state of a stopped robot can still be read; the gateway refuses
-a motion tool sent under OBSERVE, so the label cannot move anything.
+scope, so the state of a stopped robot can still be read. The gateway refuses
+a tool sent under OBSERVE only when its actuator declares that tool as motion
+(`tool_scope`), so a read-only set must name no motion tool.
 """
 
 from __future__ import annotations

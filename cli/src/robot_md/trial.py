@@ -128,7 +128,15 @@ def _gateway_invoke(actuator: str, tool: str, args: dict) -> dict:
     Required env vars (set once by the operator before `trial start`):
 
         ROBOT_MD_RURI           e.g. rcan://RRN-000000000002/skill
-        ROBOT_MD_SCOPE          "read" (default) or "actuate"
+        ROBOT_MD_SCOPE          "read" (default); the trial only reads
+                                (`perceive`, `read_state`). Don't use
+                                "actuate": the gateway refuses it to the
+                                read-tier bearer below (`tier_policy`), and
+                                to any bearer when it runs with
+                                ROBOT_MD_HITL_FROM_MANIFEST=1, which
+                                install-gateway writes, and the pinned
+                                manifest has a `system` gate, as the
+                                so-arm101 preset does (`hitl_required`).
         ROBOT_MD_MANIFEST_PATH  absolute path to ROBOT.md on this host
         ROBOT_MD_GATEWAY_URL    default http://127.0.0.1:8080
         ROBOT_MD_GATEWAY_BEARER read-tier bearer token

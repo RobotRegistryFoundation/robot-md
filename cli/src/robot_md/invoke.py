@@ -40,8 +40,14 @@ CLEAR_TOOLS: frozenset[str] = frozenset({"arm.estop.clear"})
 #: Read tools: tools that read and move nothing. The MCP server uses this same
 #: set (`execute_capability.READ_ONLY_CAPABILITIES`): it sends them under
 #: OBSERVE and lets them past its stop latch. An envelope for one defaults to
-#: scope OBSERVE here too. A tool listed by mistake still moves nothing: the
-#: gateway refuses a motion tool sent under OBSERVE (`tool_scope`).
+#: scope OBSERVE here too. robot-md never labels a motion OBSERVE itself; only
+#: a person's own `--scope OBSERVE` does. That matters because the gateway
+#: refuses a tool sent under OBSERVE (`tool_scope`) only when its actuator
+#: declares that tool as motion: so-arm101-actuator 0.2.2 declares nothing,
+#: and its `home` and `move` sent under OBSERVE ran on robot-md-gateway
+#: 0.5.0a9. No name here is a motion tool of a shipped actuator:
+#: so-arm101-actuator's are `arm.home`, `arm.reach`, `arm.reach_point`,
+#: `arm.move_to`, `move`, `home` and `move_to`, and oak-d-actuator has none.
 READ_TOOLS: frozenset[str] = frozenset(
     {
         "status.report",
