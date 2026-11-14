@@ -18,6 +18,8 @@ from typer.testing import CliRunner
 
 from robot_md.__main__ import app
 from robot_md.invoke import (
+    CLEAR_TOOLS,
+    READ_TOOLS,
     STOP_TOOLS,
     build_envelope,
     default_scope,
@@ -89,7 +91,33 @@ def test_an_explicit_scope_wins_even_for_a_stop():
 
 def test_the_clear_is_not_a_stop():
     assert "arm.estop.clear" not in STOP_TOOLS
-    assert default_scope("arm.estop.clear") == "actuate"
+    assert "arm.estop.clear" in CLEAR_TOOLS
+
+
+def test_the_clear_defaults_to_the_commission_scope():
+    """Under `actuate`, install-gateway's ROBOT_MD_HITL_FROM_MANIFEST=1 and the
+    so-arm101 preset's `system` gate refuse the person's clear (hitl_required)."""
+    assert default_scope("arm.estop.clear") == "COMMISSION"
+    env = build_envelope(
+        ruri="rcan://RRN-000000000123/arm",
+        tool_name="arm.estop.clear",
+        tool_args={},
+        manifest_path="/etc/robot-md-gateway/ROBOT.md",
+    )
+    assert env["scope"] == "COMMISSION"
+
+
+@pytest.mark.parametrize("tool", sorted(READ_TOOLS))
+def test_a_read_defaults_to_the_observe_scope(tool):
+    assert default_scope(tool) == "OBSERVE"
+
+
+def test_the_reads_are_the_ones_the_mcp_server_treats_as_reads():
+    from robot_md.mcp.tools.execute_capability import READ_ONLY_CAPABILITIES
+
+    assert READ_ONLY_CAPABILITIES == READ_TOOLS
+    assert {"read_state", "status.report", "arm.state"} <= READ_TOOLS
+    assert not READ_TOOLS & (STOP_TOOLS | CLEAR_TOOLS)
 
 
 def test_build_envelope_unique_msg_ids():

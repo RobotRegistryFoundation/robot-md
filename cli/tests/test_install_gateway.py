@@ -3,6 +3,7 @@ import os
 import stat
 import subprocess
 from importlib.metadata import version
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -97,6 +98,56 @@ def test_the_hitl_setting_never_refuses_the_mcp_stop():
     assert STOP_SCOPE == "SAFETY"
     assert policy.requires(STOP_SCOPE, motion=False) is False
     assert policy.requires("MANIPULATE", motion=True) is True
+
+
+_PRESETS = Path(__file__).resolve().parents[1] / "src" / "robot_md" / "presets"
+#: Every shipped preset that declares hitl_gates.
+_GATED_PRESETS = sorted(
+    p.stem
+    for p in _PRESETS.glob("*.yaml")
+    if (yaml.safe_load(p.read_text()).get("safety") or {}).get("hitl_gates")
+)
+
+
+def test_the_gated_presets_include_ones_with_a_system_gate():
+    assert {"so_arm101", "ur5e", "franka_panda"} <= set(_GATED_PRESETS)
+
+
+@pytest.mark.parametrize("preset", _GATED_PRESETS)
+def test_the_hitl_setting_never_refuses_the_persons_clear_or_reads(preset):
+    """With ROBOT_MD_HITL_FROM_MANIFEST=1 the gateway judges a request its
+    actuator doesn't declare as motion by the scope label on it. The person's
+    `robot-md invoke` clear and reads, with no --scope, carry COMMISSION and
+    OBSERVE, which no shipped preset's gates cover. Under `actuate`, the
+    earlier default, a `system` gate refuses the clear (hitl_required), and the
+    arm stays latched. Cross-checked with the gateway's own HiTL policy."""
+    from robot_md.invoke import CLEAR_TOOLS, READ_TOOLS, STOP_TOOLS, default_scope
+
+    gates_module = _gateway_module("robot_md_gateway.cert.gates")
+    gates = yaml.safe_load((_PRESETS / f"{preset}.yaml").read_text())["safety"]["hitl_gates"]
+    policy = gates_module.HiTLPolicy.from_manifest_gates(gates)
+    for tool in sorted(CLEAR_TOOLS | READ_TOOLS | STOP_TOOLS):
+        assert policy.requires(default_scope(tool), motion=False) is False, tool
+    if any(g.get("scope") == "system" and g.get("require_auth") is not False for g in gates):
+        assert policy.requires("actuate", motion=False) is True
+
+
+def test_a_commission_gate_refuses_the_clear_too():
+    """The gap the CHANGELOG names: a manifest that gates `commission` with
+    require_auth: true refuses the person's COMMISSION clear (hitl_required),
+    and robot-md has no way to attach a person's approval. No shipped preset
+    declares one. If the gateway comes to exempt a declared clear, this test
+    fails and the CHANGELOG's note goes."""
+    from robot_md.invoke import default_scope
+
+    gates_module = _gateway_module("robot_md_gateway.cert.gates")
+    policy = gates_module.HiTLPolicy.from_manifest_gates(
+        [{"scope": "commission", "require_auth": True}]
+    )
+    assert policy.requires(default_scope("arm.estop.clear"), motion=False) is True
+    for preset in _GATED_PRESETS:
+        gates = yaml.safe_load((_PRESETS / f"{preset}.yaml").read_text())["safety"]["hitl_gates"]
+        assert all(g.get("scope") != "commission" for g in gates), preset
 
 
 def _allowlist() -> list[str]:

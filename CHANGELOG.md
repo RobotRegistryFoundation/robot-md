@@ -135,10 +135,28 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   `gateway.env` it writes sets `ROBOT_MD_HITL_FROM_MANIFEST=1`, so the gateway
   reads the pinned manifest's `safety.hitl_gates` and refuses a gated motion
   that carries no human `delegation_chain` (`hitl_required`), whichever client
-  sent it: a second layer under the MCP server's refusal. An existing
-  `gateway.env` without it gets a warning (the installer never rewrites one).
-  The gateway still accepts a caller-written `delegation_chain` as a person's
-  approval; replacing that is a gateway follow-up.
+  sent it: a second layer under the MCP server's refusal. It also refuses any
+  other request whose scope label a gate covers, which is why `robot-md
+  invoke`'s defaults changed (below). An existing `gateway.env` without it gets
+  a warning (the installer never rewrites one). The gateway still accepts a
+  caller-written `delegation_chain` as a person's approval; replacing that is
+  a gateway follow-up.
+- **`robot-md invoke` sends the clear as `COMMISSION` and reads as `OBSERVE`
+  when no `--scope` is given.** It sent both as `actuate`. With
+  `ROBOT_MD_HITL_FROM_MANIFEST=1` the gateway judges a request its actuator
+  doesn't declare as motion by that label, and a `system` gate covers ACTUATE,
+  so on every manifest made from the so-arm101, ur5e or franka_panda preset
+  (bob's included) the person's clear of the arm's latch and their reads were
+  refused (`hitl_required`), and the arm stayed latched. The reads are the
+  ones the MCP server treats as reads (`robot_md.invoke.READ_TOOLS`, now
+  shared), plus the actuators' own names (`read_state`, `state`, `perceive`,
+  `read_rgb`, `read_depth`); a motion tool sent under `OBSERVE` is refused
+  (`tool_scope`). **One gap remains:** a manifest that gates `commission`
+  (`require_auth: true`) refuses the person's `COMMISSION` clear too, and
+  robot-md has no way to attach a person's approval. No shipped preset
+  declares one. Whether the gateway should exempt a declared clear from HiTL,
+  since its tier floor already holds the clear to the commission tier, is
+  Craig's call.
 - Two opt-in hardware tests that drove the arm through the removed in-process
   path, skipped since 2.0.0, are deleted. A person-run pose-teach round trip
   belongs with the gateway's hardware tests (not written yet).

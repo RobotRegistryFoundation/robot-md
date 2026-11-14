@@ -40,6 +40,7 @@ import time
 from typing import Any
 
 from robot_md import gateway_client, motion_gates
+from robot_md.invoke import READ_TOOLS
 from robot_md.mcp.context import McpContext
 
 #: Capabilities that read and never move, whatever the backend declares. They
@@ -47,9 +48,8 @@ from robot_md.mcp.context import McpContext
 #: server's own stop latch so the robot's state can be read after a stop. A
 #: capability wrongly listed here still cannot move anything through the
 #: gateway, which refuses a motion tool sent under OBSERVE (`tool_scope`).
-READ_ONLY_CAPABILITIES = frozenset(
-    {"status.report", "vision.describe", "arm.state", "perceive.rgb", "perceive.depth"}
-)
+#: The same set gives `robot-md invoke` its OBSERVE default (`READ_TOOLS`).
+READ_ONLY_CAPABILITIES = READ_TOOLS
 
 
 def execute_capability_tool(

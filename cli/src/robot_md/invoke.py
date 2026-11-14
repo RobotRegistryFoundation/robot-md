@@ -32,18 +32,59 @@ from robot_md.signing import SigningKeypair
 #: An envelope for one of these defaults to scope SAFETY.
 STOP_TOOLS: frozenset[str] = frozenset({"arm.estop"})
 
+#: Clear tools: the tools that release an actuator's stop latch. Not a motion,
+#: and so-arm101-actuator gives `arm.estop.clear` to the commission tier only.
+#: An envelope for one of these defaults to scope COMMISSION.
+CLEAR_TOOLS: frozenset[str] = frozenset({"arm.estop.clear"})
+
+#: Read tools: tools that read and move nothing. The MCP server uses this same
+#: set (`execute_capability.READ_ONLY_CAPABILITIES`): it sends them under
+#: OBSERVE and lets them past its stop latch. An envelope for one defaults to
+#: scope OBSERVE here too. A tool listed by mistake still moves nothing: the
+#: gateway refuses a motion tool sent under OBSERVE (`tool_scope`).
+READ_TOOLS: frozenset[str] = frozenset(
+    {
+        "status.report",
+        "vision.describe",
+        "arm.state",
+        "perceive.rgb",
+        "perceive.depth",
+        # The actuators' own names: so-arm101-actuator's reads, and
+        # oak-d-actuator's camera reads.
+        "read_state",
+        "state",
+        "perceive",
+        "read_rgb",
+        "read_depth",
+    }
+)
+
 
 def default_scope(tool_name: str) -> str:
     """The scope an envelope gets when the caller names none: SAFETY for a
-    stop, `actuate` for anything else.
+    stop, COMMISSION for its clear, OBSERVE for a read, `actuate` for anything
+    else.
 
     The gateway's tier gate keys off the scope, and a gateway older than
     robot-md-gateway#35 refuses a read-tier `arm.estop` under scope `actuate`
     (403 `tier_policy`), although so-arm101-actuator gives its stop to the read
     tier on purpose. A gateway with #35 judges a declared stop as SAFETY
     whatever the scope says; this default makes older gateways agree.
+
+    With `ROBOT_MD_HITL_FROM_MANIFEST=1`, which install-gateway writes, the
+    gateway judges a request its actuator doesn't declare as motion by this
+    label. The so-arm101 preset's `system` gate covers ACTUATE, so the
+    person's clear and reads sent as `actuate` were refused (`hitl_required`).
+    No gate a shipped preset declares covers COMMISSION or OBSERVE. A manifest
+    that gates `commission` itself still refuses the clear.
     """
-    return "SAFETY" if tool_name in STOP_TOOLS else "actuate"
+    if tool_name in STOP_TOOLS:
+        return "SAFETY"
+    if tool_name in CLEAR_TOOLS:
+        return "COMMISSION"
+    if tool_name in READ_TOOLS:
+        return "OBSERVE"
+    return "actuate"
 
 
 def build_envelope(
