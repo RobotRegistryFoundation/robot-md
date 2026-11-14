@@ -11,22 +11,24 @@ Fixes to 2.0.0's MCP motion path, from the review of robot-md#114 (which
 2.0.0 shipped as merged). Read "Fixed" first: in 2.0.0, a gate that needs a
 person does not stop MCP motion on robot-md's own presets.
 
-**Before the next release:**
+**Release checklist. Whether 2.0.1 waits for robot-md-gateway#35 is Craig's
+decision.** The proposal: none of these items blocks 2.0.1. 2.0.0 is already
+on PyPI and already sends MCP motion through robot-md-gateway 0.5.0a9, with
+the gate bug below; this release only tightens that path (robot-md#121
+compares the two on 0.5.0a9).
 
-- [ ] Raise the `robot-md-gateway` floor in `cli/pyproject.toml` to the first
-  release that contains RobotRegistryFoundation/robot-md-gateway#35. TODO: no
-  such release exists yet (the latest is 0.5.0a9, which predates #35), so no
-  version is named here, and the next robot-md release must not ship before it
-  is published. On 0.5.0a9 the MCP `estop` must pass every gate a motion does,
-  so a manifest-pin mismatch, a missing signing key or a failed key lookup
-  refuses it, and the gateway never stops the arm when heartbeats stop. The
-  MCP server now warns at startup when it finds such a gateway (below).
-- [ ] so-arm101-actuator: the stop needs its `main` from
-  RobotRegistryFoundation/so-arm101-actuator#8 or later (see the
-  `install-gateway` entry under 2.0.0's Fixed); 0.2.2 on PyPI declares no stop.
-- [ ] robot-md-mcp: the plugin launcher (RobotRegistryFoundation/robot-md-mcp#19)
-  refuses robot-md older than 2.0.0. 2.0.0 has the gate bug below, so the floor
-  should become the release that carries these fixes.
+- [ ] **First release after robot-md-gateway#35 is published:** raise the
+  `robot-md-gateway` floor in `cli/pyproject.toml` to that release (TODO: no
+  version is named until it exists), and require so-arm101-actuator with
+  RobotRegistryFoundation/so-arm101-actuator#8 (0.2.2 on PyPI declares no
+  stop, so `arm.estop` fails there). Until then, on 0.5.0a9, the MCP `estop`
+  must pass every gate a motion does, so a manifest-pin mismatch, a missing
+  signing key or a failed key lookup refuses it, and the gateway doesn't stop
+  the arm when heartbeats stop. The MCP server warns at startup when it finds
+  such a gateway (below).
+- [ ] **robot-md-mcp:** RobotRegistryFoundation/robot-md-mcp#19 raises the
+  plugin launcher's floor to robot-md 2.0.1, so it refuses 2.0.0 and its gate
+  bug.
 
 ### Fixed
 

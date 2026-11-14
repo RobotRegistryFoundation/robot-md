@@ -79,6 +79,26 @@ def test_the_gateway_reads_the_rendered_hitl_setting_as_on():
         assert read() is True
 
 
+def test_the_hitl_setting_never_refuses_the_mcp_stop():
+    """With ROBOT_MD_HITL_FROM_MANIFEST=1 the gateway applies the pinned
+    manifest's gates. robot-md's MCP stop goes out as arm.estop under scope
+    SAFETY, and so-arm101-actuator declares arm.estop a stop, not a motion
+    (0.2.2 declares neither), so the gateway judges it with motion=False and
+    no gate reaches it. A motion under the same gates is refused.
+    Cross-checked with the gateway's own HiTL policy."""
+    from pathlib import Path
+
+    from robot_md.gateway_client import STOP_SCOPE
+
+    gates_module = _gateway_module("robot_md_gateway.cert.gates")
+    preset = Path(__file__).resolve().parents[1] / "src" / "robot_md" / "presets"
+    gates = yaml.safe_load((preset / "so_arm101.yaml").read_text())["safety"]["hitl_gates"]
+    policy = gates_module.HiTLPolicy.from_manifest_gates(gates)
+    assert STOP_SCOPE == "SAFETY"
+    assert policy.requires(STOP_SCOPE, motion=False) is False
+    assert policy.requires("MANIPULATE", motion=True) is True
+
+
 def _allowlist() -> list[str]:
     env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
     [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_TOOL_ALLOWLIST=")]
