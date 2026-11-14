@@ -46,6 +46,24 @@ def test_estop_clear_sends_nothing_and_keeps_the_latch(fixtures_dir, gateway_env
     assert ctx.estop.is_set()
 
 
+def test_the_instructions_give_a_clear_the_gateway_accepts(fixtures_dir, gateway_env, monkeypatch):
+    """The person's clear names the ROBOT.md the gateway pins (with their own
+    copy's path the gateway answers `manifest_pin`) and the COMMISSION scope
+    (under `actuate`, install-gateway's HiTL setting and a `system` gate refuse
+    it). They also say the gateway's own clear must be signed where signatures
+    are required, and which command builds it."""
+    monkeypatch.setenv(gateway_client.ENV_MANIFEST_PATH, "/etc/robot-md-gateway/ROBOT.md")
+    ctx = load_context(fixtures_dir / MANIFEST)
+    text = estop_clear_tool(ctx)["message"]
+    assert (
+        "robot-md invoke /etc/robot-md-gateway/ROBOT.md --tool arm.estop.clear "
+        "--scope COMMISSION" in text
+    )
+    assert "ESTOP_CLEAR" in text
+    assert "robot-md-gateway#36" in text
+    assert "robot-md-gateway#35 or later" in text
+
+
 def test_estop_clear_refuses_whatever_credential_the_server_holds(
     fixtures_dir, gateway_env, monkeypatch
 ):

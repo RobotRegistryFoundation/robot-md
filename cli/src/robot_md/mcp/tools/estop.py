@@ -223,26 +223,54 @@ def estop_tool(ctx: McpContext) -> dict:
     return result
 
 
-def clear_instructions(stop_tool: str = gateway_client.DEFAULT_STOP_CLEAR_TOOL) -> str:
+def clear_instructions(
+    stop_tool: str = gateway_client.DEFAULT_STOP_CLEAR_TOOL,
+    manifest: str = str(gateway_client.INSTALL_GATEWAY_MANIFEST_FILE),
+) -> str:
+    """How the person clears a stop. `manifest` is the ROBOT.md the gateway
+    pins, the path this server's own requests name; with any other path the
+    gateway refuses the clear (`manifest_pin`)."""
     return (
         "Clearing a stop makes the robot movable again, so it is the person's to do, "
         "at the machine, with their own commission-tier credential; this server never "
-        "holds one and sends nothing. The person: (1) if robot-md-gateway tripped "
-        "(it answers `deny: safety_state`), runs POST /v1/safety/clear with the "
-        "commission bearer while heartbeats are arriving from the supervisor's device; "
-        f"(2) clears the actuator's latch with {stop_tool} at the commission tier, for "
-        f"example `robot-md invoke ROBOT.md --tool {stop_tool} --scope COMMISSION "
-        "--bearer <their commission token>`; (3) reconnects this MCP server (/mcp, "
-        "robot-md, Reconnect), which releases its own latch. Until then this server "
-        "sends no motion."
+        "holds one and sends nothing. The person: (1) if robot-md-gateway tripped (only "
+        "a gateway with robot-md-gateway#35 or later trips; it answers "
+        "`deny: safety_state`), clears it with POST /v1/safety/clear and the commission "
+        "token while heartbeats are arriving from the supervisor's device. Where the "
+        "gateway requires signed envelopes, as install-gateway sets it, that clear must be "
+        "a signed ESTOP_CLEAR, and the token alone is refused; robot-md-gateway's own "
+        "`clear` command builds it (robot-md-gateway#36, not merged yet). "
+        f"(2) clears the actuator's latch with {stop_tool} at the commission tier: "
+        f"`robot-md invoke {manifest} --tool {stop_tool} --scope COMMISSION "
+        "--bearer <their commission token>`, naming the ROBOT.md the gateway pins. "
+        "(3) reconnects this MCP server (/mcp, robot-md, Reconnect), which releases its "
+        "own latch. Until then this server sends no motion."
     )
+
+
+def clear_refusal(
+    stop_tool: str = gateway_client.DEFAULT_STOP_CLEAR_TOOL,
+    manifest: str = str(gateway_client.INSTALL_GATEWAY_MANIFEST_FILE),
+) -> dict:
+    """The refusal `estop_clear` answers with, without this server's latch
+    state. The dashboard's clear button shows the same."""
+    instructions = clear_instructions(stop_tool, manifest)
+    return {
+        "ok": False,
+        "stop": "not_cleared",
+        "error": {"reason": "person_clears_stops", "message": instructions},
+        "message": instructions,
+    }
 
 
 def estop_clear_tool(ctx: McpContext) -> dict:
     """Refuse: clearing a stop is the person's. Sends nothing, keeps the latch."""
     stop_clear_tool = gateway_client.DEFAULT_STOP_CLEAR_TOOL
+    manifest = str(gateway_client.INSTALL_GATEWAY_MANIFEST_FILE)
     with contextlib.suppress(Exception):
-        stop_clear_tool = gateway_client.config_for_context(ctx).stop_clear_tool
+        config = gateway_client.config_for_context(ctx)
+        stop_clear_tool = config.stop_clear_tool
+        manifest = config.manifest_path or manifest
     latched = True
     with contextlib.suppress(Exception):
         latched = bool(ctx.estop.is_set())
@@ -252,11 +280,11 @@ def estop_clear_tool(ctx: McpContext) -> dict:
         details={"reason": "person_clears_stops", "latched": latched},
     )
     _publish(ctx, "estop.clear_refused", {"set": latched})
-    instructions = clear_instructions(stop_clear_tool)
+    refusal = clear_refusal(stop_clear_tool, manifest)
     return {
-        "ok": False,
-        "stop": "not_cleared",
+        "ok": refusal["ok"],
+        "stop": refusal["stop"],
         "local_latch": latched,
-        "error": {"reason": "person_clears_stops", "message": instructions},
-        "message": instructions,
+        "error": refusal["error"],
+        "message": refusal["message"],
     }
