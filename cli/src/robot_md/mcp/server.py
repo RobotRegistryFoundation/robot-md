@@ -16,6 +16,7 @@ from pathlib import Path
 import anyio.to_thread
 from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
+from mcp.types import ToolAnnotations
 
 from robot_md.mcp.context import McpContext, load_context
 from robot_md.mcp.tools.doctor_summary import doctor_summary_tool
@@ -39,6 +40,44 @@ def find_manifest_via_cwd_walk(start: Path) -> Path | None:
         if current.parent == current:  # filesystem root
             return None
         current = current.parent
+
+
+def _tool_meta(
+    title: str,
+    *,
+    read_only: bool,
+    destructive: bool,
+    idempotent: bool,
+    open_world: bool,
+) -> dict:
+    """Keyword arguments for `server.tool()`: a title plus all four MCP hints.
+
+    Every tool states every hint, so a client never has to fall back on the
+    spec's defaults (which assume a destructive, open-world tool). Hints are
+    advisory: the gateway, not these flags, decides what moves. Choose them
+    from what the implementation does, not from the tool's name:
+
+    - read_only: cannot change any state. No file write (including logs and
+      the dashboard event file), no network write, no motion, no key or
+      registry change.
+    - destructive: may overwrite or remove something, or make the robot
+      movable or move it.
+    - idempotent: calling again with the same arguments has no further effect.
+    - open_world: reaches outside this process and the manifest: the robot,
+      a camera, the gateway, a model API or the registry.
+
+    tests/unit/test_mcp_tool_annotations.py pins the read-only set.
+    """
+    return {
+        "title": title,
+        "annotations": ToolAnnotations(
+            title=title,
+            readOnlyHint=read_only,
+            destructiveHint=destructive,
+            idempotentHint=idempotent,
+            openWorldHint=open_world,
+        ),
+    }
 
 
 def build_server(ctx: McpContext):
@@ -128,12 +167,30 @@ def build_server(ctx: McpContext):
     # drive emit() without spinning up the daemon side.
     server._span_registry = _an_registry  # type: ignore[attr-defined]
 
-    @server.tool()
+    # Read-only: formats the manifest loaded at startup.
+    @server.tool(
+        **_tool_meta(
+            "Render frontmatter as YAML",
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            open_world=False,
+        )
+    )
     def render() -> str:
         """Strip prose and return the frontmatter as canonical YAML."""
         return render_tool(ctx)
 
-    @server.tool()
+    # Read-only: checks the manifest loaded at startup.
+    @server.tool(
+        **_tool_meta(
+            "Validate ROBOT.md",
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            open_world=False,
+        )
+    )
     def validate() -> dict:
         """Validate the served ROBOT.md against the v1 schema and body rules."""
         return validate_tool(ctx)
@@ -143,7 +200,17 @@ def build_server(ctx: McpContext):
     # event loop itself, so a stop sent while a motion waited for the
     # gateway's answer would have waited for that answer first.
 
-    @server.tool()
+    # Writes: sets the local latch, audits, and sends the stop to the gateway.
+    # Not destructive: it stops motion. Repeating it stops a stopped robot.
+    @server.tool(
+        **_tool_meta(
+            "Stop the robot",
+            read_only=False,
+            destructive=False,
+            idempotent=True,
+            open_world=True,
+        )
+    )
     async def estop() -> dict:
         """Stop the robot through robot-md-gateway.
 
@@ -158,7 +225,16 @@ def build_server(ctx: McpContext):
             raise ToolError(json.dumps(result, default=str))
         return result
 
-    @server.tool()
+    # Destructive: a cleared stop makes the robot movable again.
+    @server.tool(
+        **_tool_meta(
+            "Clear the stop",
+            read_only=False,
+            destructive=True,
+            idempotent=True,
+            open_world=True,
+        )
+    )
     async def estop_clear() -> dict:
         """Ask robot-md-gateway to clear the stop, at the commission tier.
 
@@ -172,7 +248,17 @@ def build_server(ctx: McpContext):
             raise ToolError(json.dumps(result, default=str))
         return result
 
-    @server.tool()
+    # Destructive: moves the robot through the gateway. dry_run sends nothing,
+    # but hints describe the tool, not one call.
+    @server.tool(
+        **_tool_meta(
+            "Run one capability",
+            read_only=False,
+            destructive=True,
+            idempotent=False,
+            open_world=True,
+        )
+    )
     async def execute_capability(
         capability: str,
         args: dict | None = None,
@@ -200,7 +286,16 @@ def build_server(ctx: McpContext):
             )
         )
 
-    @server.tool()
+    # Destructive: every planned step is an execute_capability call.
+    @server.tool(
+        **_tool_meta(
+            "Run a task",
+            read_only=False,
+            destructive=True,
+            idempotent=False,
+            open_world=True,
+        )
+    )
     async def execute_task(
         prompt: str,
         context: dict | None = None,
@@ -223,14 +318,33 @@ def build_server(ctx: McpContext):
             )
         )
 
-    @server.tool()
+    # Read-only: grabs one camera frame and runs a detector. Open world: the camera.
+    @server.tool(
+        **_tool_meta(
+            "Find an object with the camera",
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            open_world=True,
+        )
+    )
     def vision_find(descriptor_id: str) -> dict:
         """Detect one declared object descriptor. Returns camera-frame XYZ (mm)."""
         from robot_md.mcp.tools.vision_find import vision_find_tool
 
         return vision_find_tool(ctx, descriptor_id=descriptor_id)
 
-    @server.tool()
+    # Destructive: rewrites ROBOT.md frontmatter with yaml.safe_dump (comments and
+    # formatting are lost) and replaces any entry with the same id.
+    @server.tool(
+        **_tool_meta(
+            "Record a learned skill",
+            read_only=False,
+            destructive=True,
+            idempotent=True,
+            open_world=False,
+        )
+    )
     def record_skill(
         skill_id: str,
         status: str = "ok",
@@ -250,7 +364,17 @@ def build_server(ctx: McpContext):
             notes=notes,
         )
 
-    @server.tool()
+    # Not read-only: each step publishes to the dashboard event file. probe_direction
+    # refuses, so nothing moves; capture and detect read the camera.
+    @server.tool(
+        **_tool_meta(
+            "Discover the scene",
+            read_only=False,
+            destructive=False,
+            idempotent=False,
+            open_world=True,
+        )
+    )
     async def discover(steps: list[dict], mcp_ctx: Context | None = None) -> dict:
         """Run the declarative discovery pipeline.
 
@@ -266,7 +390,16 @@ def build_server(ctx: McpContext):
 
         return await discover_tool(ctx, steps=steps, mcp_ctx=mcp_ctx)
 
-    @server.tool()
+    # Read-only: summarises the manifest loaded at startup.
+    @server.tool(
+        **_tool_meta(
+            "Manifest health summary",
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            open_world=False,
+        )
+    )
     def doctor_summary() -> dict:
         """Read-only manifest-only sanity check.
 
@@ -284,35 +417,81 @@ def build_server(ctx: McpContext):
     # shim only exposes JSON-serializable args; the underlying *_tool functions
     # have private `_*` injection kwargs for tests, kept off the FastMCP surface.
 
-    @server.tool()
+    # Read-only: reads the manifest and checks an environment variable.
+    @server.tool(
+        **_tool_meta(
+            "Spatial eval preflight",
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            open_world=False,
+        )
+    )
     def spatial_eval_dry_run() -> dict:
         """Preflight: spatial-eval section, ANTHROPIC_API_KEY, judge camera."""
         from robot_md.mcp.tools.spatial_eval.dry_run import dry_run_tool
 
         return dry_run_tool(ctx)
 
-    @server.tool()
+    # Writes ROBOT.md, but only inserts a block, and not twice.
+    @server.tool(
+        **_tool_meta(
+            "Add spatial eval section",
+            read_only=False,
+            destructive=False,
+            idempotent=True,
+            open_world=False,
+        )
+    )
     def spatial_eval_init(units: list[str]) -> dict:
         """Scaffold the spatial-eval: section into the served ROBOT.md."""
         from robot_md.mcp.tools.spatial_eval.init import init_tool
 
         return init_tool(ctx, units=units)
 
-    @server.tool()
+    # Read-only: reads a packaged fixture file.
+    @server.tool(
+        **_tool_meta(
+            "Spatial eval fixture kit",
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            open_world=False,
+        )
+    )
     def spatial_eval_kit() -> dict:
         """Return the v1 fixture-kit BOM and grid-mat path."""
         from robot_md.mcp.tools.spatial_eval.kit import kit_tool
 
         return kit_tool(ctx)
 
-    @server.tool()
+    # Not read-only: calls model APIs, which spends credits. Writes no files.
+    @server.tool(
+        **_tool_meta(
+            "Run spatial eval probe track",
+            read_only=False,
+            destructive=False,
+            idempotent=False,
+            open_world=True,
+        )
+    )
     def spatial_eval_run_probe(units: list[str] | None = None, baseline_only: bool = False) -> dict:
         """Run the probe track. Returns Score JSON probe section."""
         from robot_md.mcp.tools.spatial_eval.run_probe import run_probe_tool
 
         return run_probe_tool(ctx, units=units, baseline_only=baseline_only)
 
-    @server.tool()
+    # Destructive: writes an evidence packet and Score.json, overwriting them when
+    # run_dir names an existing run. Signs with the robot key.
+    @server.tool(
+        **_tool_meta(
+            "Run spatial eval execute track",
+            read_only=False,
+            destructive=True,
+            idempotent=False,
+            open_world=True,
+        )
+    )
     def spatial_eval_run_execute(
         units: list[str] | None = None,
         trials_per_unit: int = 10,
@@ -330,7 +509,16 @@ def build_server(ctx: McpContext):
             run_dir=_Path(run_dir) if run_dir else None,
         )
 
-    @server.tool()
+    # Destructive: probe track plus execute track; rewrites Score.json.
+    @server.tool(
+        **_tool_meta(
+            "Run full spatial eval",
+            read_only=False,
+            destructive=True,
+            idempotent=False,
+            open_world=True,
+        )
+    )
     def spatial_eval_run_full(
         units: list[str] | None = None,
         trials_per_unit: int = 10,
@@ -348,7 +536,16 @@ def build_server(ctx: McpContext):
             run_dir=_Path(run_dir) if run_dir else None,
         )
 
-    @server.tool()
+    # Read-only: reads an evidence packet and returns a recomputed score.
+    @server.tool(
+        **_tool_meta(
+            "Replay spatial eval score",
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            open_world=False,
+        )
+    )
     def spatial_eval_replay(run_dir: str) -> dict:
         """Recompute Score JSON from an existing evidence packet without re-running."""
         from pathlib import Path as _Path
@@ -357,7 +554,16 @@ def build_server(ctx: McpContext):
 
         return replay_tool(ctx, run_dir=_Path(run_dir))
 
-    @server.tool()
+    # Read-only: reads the keystore and may GET the RRF public key.
+    @server.tool(
+        **_tool_meta(
+            "Verify spatial eval signature",
+            read_only=True,
+            destructive=False,
+            idempotent=True,
+            open_world=True,
+        )
+    )
     def spatial_eval_verify(score_json: str) -> dict:
         """Verify a Score JSON's RCAN ML-DSA signature.
 
@@ -374,21 +580,53 @@ def build_server(ctx: McpContext):
 
         return verify_tool(ctx, score_json=score_json)
 
-    @server.tool()
+    # Network write: POSTs the signed score to RRF. Not idempotent: a resubmit is
+    # another submission.
+    @server.tool(
+        **_tool_meta(
+            "Submit spatial eval to RRF",
+            read_only=False,
+            destructive=False,
+            idempotent=False,
+            open_world=True,
+        )
+    )
     def spatial_eval_submit_to_rrf(run_dir: str) -> dict:
         """Submit signed evidence to RRF §27 (Phase 1 stub for now)."""
         from robot_md.mcp.tools.spatial_eval.submit_to_rrf import submit_to_rrf_tool
 
         return submit_to_rrf_tool(ctx, run_dir=run_dir)
 
-    @server.tool()
+    # Not read-only, despite the name: opening the queue creates
+    # ~/.robot-md/hotplug-events.jsonl if missing and appends a daemon_alert
+    # record whenever it finds malformed lines, on every call.
+    @server.tool(
+        **_tool_meta(
+            "Review pending hot-plug events",
+            read_only=False,
+            destructive=False,
+            idempotent=False,
+            open_world=False,
+        )
+    )
     def hotplug_review() -> dict:
         """Return all currently-pending (unresolved) hot-plug events for operator review."""
         from robot_md.mcp.tools.hotplug_review import hotplug_review_tool
 
         return hotplug_review_tool()
 
-    @server.tool()
+    # Destructive: bind rewrites ROBOT.md frontmatter with yaml.safe_dump. Not
+    # idempotent: a repeated bind merges the driver again before the queue
+    # reports already_resolved.
+    @server.tool(
+        **_tool_meta(
+            "Bind or reject a hot-plug event",
+            read_only=False,
+            destructive=True,
+            idempotent=False,
+            open_world=False,
+        )
+    )
     def hotplug_confirm(
         event_id: str,
         decision: str,

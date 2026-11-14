@@ -19,6 +19,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   auth. The driver is a new protocol name, `robotd_jsonrpc`, that no
   robot-md backend implements yet. Every number in the preset names its
   source in a comment, and the unmeasured ones say so.
+- **MCP tool annotations.** Every tool `robot-md mcp` serves (21 of them)
+  now carries a `title` and all four MCP hints: `readOnlyHint`,
+  `destructiveHint`, `idempotentHint` and `openWorldHint`. Before this, none
+  did, so a conservative client had to treat every tool as destructive and
+  open-world. The hints come from what each implementation does, not its
+  name. Eight tools are read-only: `render`, `validate`, `doctor_summary`,
+  `vision_find`, `spatial_eval_dry_run`, `spatial_eval_kit`,
+  `spatial_eval_replay` and `spatial_eval_verify`. `hotplug_review` is not:
+  opening the queue creates the queue file and can append a `daemon_alert`
+  record. `discover` is not either: it publishes to the dashboard event file.
+  The motion tools and `estop_clear` are marked destructive and open-world;
+  `estop` is open-world but not destructive. A new test fails for any tool
+  registered without explicit hints and pins the read-only set. The hints are
+  advisory: robot-md-gateway still decides what moves.
+
+### Changed
+
+- **`mcp` minimum is now 1.10** (was 1.0). 1.10 is the first release whose
+  FastMCP accepts `title` on tools and prompts; the prompts already passed
+  `title`, so the old floor no longer installed a working server.
 
 ## [2.0.0] - 2026-11-13
 
