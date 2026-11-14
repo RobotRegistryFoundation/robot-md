@@ -7,6 +7,19 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- **`microduck` preset** (`robot-md init --preset microduck`). Pollen
+  Robotics' bipedal duck robot; this preset is not affiliated with Pollen. It
+  declares the duck's 15 joints and their travel, its closed set of
+  capabilities (`move.walk`, `move.turn`, four `skill.*` names robotd
+  reports, `sound.play`, `status.report`) and the limits a caller keeps to:
+  0.3 m/s and 1.0 rad/s, from Microduck Studio's stick envelope, with the
+  per-axis numbers under `safety.envelope`. Move and skill scopes require
+  auth. The driver is a new protocol name, `robotd_jsonrpc`, that no
+  robot-md backend implements yet. Every number in the preset names its
+  source in a comment, and the unmeasured ones say so.
+
 ## [2.0.0] - 2026-11-13
 
 Major version because MCP callers break: motion tools now go through
