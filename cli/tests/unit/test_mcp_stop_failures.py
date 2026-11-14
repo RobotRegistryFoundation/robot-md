@@ -128,6 +128,36 @@ def test_a_gateway_that_never_answers_gives_up_after_the_stop_timeout(
     _assert_not_confirmed_with_advice(r)
 
 
+@pytest.mark.parametrize(
+    ("answer", "reason"),
+    [
+        ("stall", "gateway_no_answer"),
+        ((500, {"detail": "Internal Server Error"}), "gateway_unknown_outcome"),
+        ((200, {"no_ok_field": True}), "gateway_unknown_outcome"),
+        ((500, {"detail": {"actuator_error": "bus timeout"}}), "actuator_error"),
+    ],
+)
+def test_an_unconfirmed_stop_puts_the_hardware_stop_first(
+    fixtures_dir, gateway_env, fast_stop, answer, reason
+):
+    """For a motion whose outcome is unknown, the client says to check the
+    audit record "before anything else" and not to resend it. On a stop, that
+    text came before the hardware-stop advice. A stop's result now carries
+    neither instruction, and its first one is the hardware stop, in the MCP
+    error text too."""
+    if answer == "stall":
+        gateway_env.stall_after_headers(403, 10)
+    else:
+        gateway_env.respond(*answer)
+    r = estop_tool(_ctx(fixtures_dir))
+    _assert_not_confirmed_with_advice(r)
+    assert r["error"]["reason"] == reason
+    assert r["message"].startswith("STOP NOT CONFIRMED. Use the hardware stop at the machine now.")
+    said = json.dumps({"message": r["message"], "error": r["error"]}).lower()
+    assert "before anything else" not in said
+    assert "resend" not in said
+
+
 def test_an_unplanned_error_in_the_stop_path_still_gives_the_advice(
     fixtures_dir, gateway_env, monkeypatch
 ):
@@ -300,4 +330,7 @@ async def test_the_mcp_stop_names_the_hardware_stop_on_every_failure(
     server = build_server(_ctx(fixtures_dir))
     with pytest.raises(ToolError) as info:
         await _call(server, "estop", {})
-    assert ADVICE in str(info.value)
+    text = str(info.value)
+    assert ADVICE in text
+    # The advice leads: it comes before the envelope and the error details.
+    assert text.index(ADVICE) < text.index('"envelope"') < text.index('"error"')

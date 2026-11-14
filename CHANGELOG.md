@@ -58,7 +58,9 @@ compares the two on 0.5.0a9).
   a stop's signature), a malformed URL is `gateway_unreachable`, a stall is
   `gateway_no_answer`, and anything else is `stop_path_error`; each returns
   `stop: stop_not_confirmed` with "Use the hardware stop at the machine now."
-  The stop waits at most 2 s for the gateway, not the 30 s a motion may take.
+  as the first instruction, ahead of any reason, and without the motion
+  advice below ("do not resend"). The stop waits at most 2 s for the gateway,
+  not the 30 s a motion may take.
 - **An answer that doesn't say whether a call ran is no longer reported as a
   refusal.** A 200 without `ok: true`, or a 5xx without `actuator_error`, is
   `gateway_unknown_outcome` ("it may have run; do not resend"); 2.0.0 called

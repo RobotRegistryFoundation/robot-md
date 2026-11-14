@@ -614,6 +614,7 @@ def invoke(
             "status": "error",
             "error": {
                 "reason": "gateway_no_answer",
+                "cause": str(e),
                 "message": (
                     f"sent {tool_name} to the gateway at {config.url} and got no complete "
                     f"answer ({e}). It may have run, or may still be running. Check the "

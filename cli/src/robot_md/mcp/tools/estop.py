@@ -20,9 +20,9 @@ its own when heartbeats stop. robot-md's MCP motion needs a gateway release
 that includes #35.
 
 Whatever goes wrong on the stop's path, the result says the stop was not
-confirmed (`stop: stop_not_confirmed`) and tells the person to use the
-hardware stop, and the MCP wrapper raises, so no client is told a stop landed
-when it did not. There is no fallback that opens the serial port, for three
+confirmed (`stop: stop_not_confirmed`) and, before any reason, tells the
+person to use the hardware stop, and the MCP wrapper raises, so no client is
+told a stop landed when it did not. There is no fallback that opens the serial port, for three
 reasons:
 
 - where the gateway holds the port (so-arm101-actuator claims it with flock
@@ -91,6 +91,34 @@ def _reason_text(error: dict | None) -> str:
     return str(message or error.get("reason") or "no reason given")
 
 
+def for_a_stop(error: dict) -> dict:
+    """The gateway client's error, reworded where its words fit only a motion.
+
+    For a motion whose outcome is unknown, the client says to check the audit
+    record "before anything else" and not to resend it, and an actuator error
+    notes that part of the motion may have run. A stop's first instruction is
+    the hardware stop, so a stop's result carries none of those. The reason
+    codes stay as they are.
+    """
+    out = dict(error)
+    reason = out.get("reason")
+    if reason == "gateway_no_answer":
+        cause = out.get("cause")
+        out["message"] = (
+            "the gateway gave no complete answer"
+            + (f" ({cause})" if cause else "")
+            + ", so this server can't tell whether the stop landed"
+        )
+    elif reason == "gateway_unknown_outcome":
+        out["message"] = (
+            f"the gateway answered HTTP {out.get('http_status')} without a decision this "
+            "server can read, so it can't tell whether the stop landed"
+        )
+    elif reason == "actuator_error":
+        out["note"] = "The actuator raised while running the stop, so the arm may not be holding."
+    return out
+
+
 def not_confirmed(
     *,
     set_at: float | None,
@@ -100,22 +128,24 @@ def not_confirmed(
     envelope: dict | None = None,
     problems: tuple[str, ...] = (),
 ) -> dict:
-    """The one shape every unconfirmed stop takes, with the hardware-stop advice."""
+    """The one shape every unconfirmed stop takes. The hardware-stop advice is
+    the first thing its message says, and the message comes before the details,
+    so it leads the MCP error text too."""
     detail = f" ({' '.join(problems)})" if problems else ""
     return {
         "ok": False,
         "stop": "stop_not_confirmed",
+        "message": (
+            f"STOP NOT CONFIRMED. {HARDWARE_STOP_ADVICE} The gateway did not confirm "
+            f"{stop_tool} ({_reason_text(error)}){detail}. This server's own latch is set, "
+            "so it sends no further motion."
+        ),
         "set_at": set_at,
         "local_latch": True,
         "stop_tool": stop_tool,
         "gateway": gateway,
         "envelope": envelope,
         "error": error,
-        "message": (
-            f"STOP NOT CONFIRMED: the gateway did not confirm {stop_tool} "
-            f"({_reason_text(error)}){detail}. {HARDWARE_STOP_ADVICE} This server's "
-            "own latch is set, so it sends no further motion."
-        ),
     }
 
 
@@ -159,7 +189,7 @@ def estop_tool(ctx: McpContext) -> dict:
             result = not_confirmed(
                 set_at=set_at,
                 stop_tool=config.stop_tool,
-                error=outcome["error"] or {"reason": "not_confirmed"},
+                error=for_a_stop(outcome["error"] or {"reason": "not_confirmed"}),
                 gateway=outcome["gateway"],
                 envelope=outcome["envelope"],
                 problems=tuple(config.problems),
