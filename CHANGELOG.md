@@ -14,8 +14,10 @@ person does not stop MCP motion on robot-md's own presets.
 **Release checklist. Whether 2.0.1 waits for robot-md-gateway#35 is Craig's
 decision.** The proposal: none of these items blocks 2.0.1. 2.0.0 is already
 on PyPI and already sends MCP motion through robot-md-gateway 0.5.0a9, with
-the gate bug below; this release only tightens that path (robot-md#121
-compares the two on 0.5.0a9).
+the gate bug below; this release tightens that path. robot-md#121 compares
+the two on 0.5.0a9, including the one case where this release is less
+strict: a motion whose signing key can't sign goes out unsigned, as the stop
+does, where 2.0.0 sent nothing.
 
 - [ ] **First release after robot-md-gateway#35 is published:** raise the
   `robot-md-gateway` floor in `cli/pyproject.toml` to that release (TODO: no
