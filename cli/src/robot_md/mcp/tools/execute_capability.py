@@ -20,8 +20,9 @@ It refuses, and sends nothing, when:
 - a declared precondition fails (``precondition``);
 - another motion from this server is still in flight (``busy``). Reads are
   not held back by a motion in flight;
-- the signing key loads and can't sign (``signing_failed``). Only the stop
-  goes out unsigned then.
+- a signing key is configured and can't be loaded, or loads and can't sign
+  (``signing_failed``). Only the stop goes out unsigned then. With no key
+  configured, requests go out unsigned, as in 2.0.0.
 
 There is no confirmation token. The one this tool used to take was written by
 the model, and any non-empty string satisfied the gate; a token the model

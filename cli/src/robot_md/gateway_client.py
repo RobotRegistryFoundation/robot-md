@@ -321,8 +321,14 @@ def config_for_context(ctx: Any) -> GatewayConfig:
 
 
 class SigningFailed(Exception):
-    """A signing key loaded and could not sign. Carries the exception's type
-    only: a message from a damaged key could carry key bytes."""
+    """A configured signing key could not be loaded, or loaded and could not
+    sign. Carries what failed and the exception's type only: a message from a
+    damaged key could carry key bytes."""
+
+    def __init__(self, failed: str, error_type: str) -> None:
+        super().__init__(f"{failed} ({error_type})")
+        self.failed = failed
+        self.error_type = error_type
 
 
 def prepare_envelope(
@@ -343,11 +349,14 @@ def prepare_envelope(
     reads `delegation_chain`, and one written in the model's process would be
     the model approving itself.
 
-    A key that loads and can't sign raises `SigningFailed`, unless
-    `unsigned_if_signing_fails` is set, which only the stop sets: a stop has
-    to get out, and robot-md-gateway#35 never checks a stop's signature. A
-    motion sent unsigned would rely on the gateway requiring signatures,
-    which `install-gateway` sets and other setups may not.
+    A configured key, one whose file exists for ROBOT.md's RRN, that can't be
+    loaded (unreadable, corrupt, in the wrong format) or that loads and can't
+    sign raises `SigningFailed`, unless `unsigned_if_signing_fails` is set,
+    which only the stop sets: a stop has to get out, and robot-md-gateway#35
+    never checks a stop's signature. A motion sent unsigned would rely on the
+    gateway requiring signatures, which `install-gateway` sets and other
+    setups may not. With no key configured (no RRN, or no key file), the
+    envelope goes out unsigned, as in 2.0.0.
     """
     from robot_md.invoke import build_envelope, sign_envelope
 
@@ -370,18 +379,22 @@ def prepare_envelope(
 
         keypair = load_keypair(config.rrn)
     except Exception as e:
-        # Type only: a message from a broken keyfile could carry key bytes.
-        return envelope, f"unsigned: could not load the signing keypair ({type(e).__name__})"
+        # A key file that exists and can't be loaded, or a key directory that
+        # can't be read: a key is configured and unusable. Type only: a
+        # message from a broken keyfile could carry key bytes.
+        if unsigned_if_signing_fails:
+            return envelope, f"unsigned: could not load the signing keypair ({type(e).__name__})"
+        raise SigningFailed("can't be loaded", type(e).__name__) from e
     if keypair is None:
+        # No key configured for this RRN.
         return envelope, f"unsigned: no signing keypair for {config.rrn}"
     try:
         signed = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
     except Exception as e:
-        # A key that loads and cannot sign (a damaged secret). Only the stop
-        # goes out unsigned then; anything else is refused (see above).
+        # A key that loads and cannot sign (a damaged secret).
         if unsigned_if_signing_fails:
             return envelope, f"unsigned: signing failed ({type(e).__name__})"
-        raise SigningFailed(type(e).__name__) from e
+        raise SigningFailed("loads and can't sign", type(e).__name__) from e
     return signed, f"signed (kid {keypair.pq_kid})"
 
 
@@ -617,8 +630,8 @@ def invoke(
             "error": {
                 "reason": "signing_failed",
                 "message": (
-                    f"the signing key for {config.rrn} loads and can't sign ({e}). Nothing was "
-                    "sent: only a stop goes out unsigned. The person checks the key file "
+                    f"the signing key for {config.rrn} {e.failed} ({e.error_type}). Nothing "
+                    "was sent: only a stop goes out unsigned. The person checks the key file "
                     f"(~/.robot-md/keys/{config.rrn}.signing.json)."
                 ),
             },

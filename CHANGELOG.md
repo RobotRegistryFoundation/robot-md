@@ -62,11 +62,15 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   hardware stop at the machine now." as the first instruction, ahead of any
   reason, and without the motion advice below ("do not resend"). The stop
   waits at most 2 s for the gateway, not the 30 s a motion may take.
-- **A motion or read whose signing key can't sign is refused, and nothing is
-  sent** (`signing_failed`, with an audit entry). 2.0.0 raised there and sent
-  nothing; only the stop goes out unsigned. A motion sent unsigned would rely
-  on the gateway requiring signatures, which `install-gateway` sets and other
-  setups may not.
+- **A motion or read whose configured signing key can't be used is refused,
+  and nothing is sent** (`signing_failed`, with an audit entry). That covers a
+  key file that exists and can't be loaded (unreadable, corrupt, in the wrong
+  format), which 2.0.0 sent unsigned, and a key that loads and can't sign,
+  where 2.0.0 raised and sent nothing. Only the stop goes out unsigned then:
+  a stop has to get out. A motion sent unsigned would rely on the gateway
+  requiring signatures, which `install-gateway` sets and other setups may
+  not. With no key configured (no `metadata.rrn`, or no key file for it),
+  requests go out unsigned, as in 2.0.0.
 - **An answer that doesn't say whether a call ran is no longer reported as a
   refusal.** A 200 without `ok: true`, or a 5xx without `actuator_error`, is
   `gateway_unknown_outcome` ("it may have run; do not resend"); 2.0.0 called

@@ -204,14 +204,15 @@ def build_server(ctx: McpContext):
 
         Refuses, and sends nothing: with no configured gateway; while this
         server's stop latch is set; while another motion from this server is
-        in flight (busy; reads still go); when the signing key loads and can't
-        sign (signing_failed); and for every motion while ROBOT.md has a gate
-        that needs a person, which is any hitl_gates entry that doesn't say
-        require_auth: false, on any scope but `commission`. Such a gate covers
-        every motion, whatever scope it names (`destructive`, `system`, `arm`
-        or a capability's name). It needs a person's confirmation from outside
-        this conversation, and none can reach this server yet. dry_run=true
-        returns the envelope that would be sent, and sends nothing.
+        in flight (busy; reads still go); when a configured signing key can't
+        be loaded or can't sign (signing_failed); and for every motion while
+        ROBOT.md has a gate that needs a person, which is any hitl_gates entry
+        that doesn't say require_auth: false, on any scope but `commission`.
+        Such a gate covers every motion, whatever scope it names
+        (`destructive`, `system`, `arm` or a capability's name). It needs a
+        person's confirmation from outside this conversation, and none can
+        reach this server yet. dry_run=true returns the envelope that would be
+        sent, and sends nothing.
         """
         from robot_md.mcp.tools.execute_capability import execute_capability_tool
 

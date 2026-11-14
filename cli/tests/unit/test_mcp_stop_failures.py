@@ -289,6 +289,73 @@ def test_execute_task_with_a_broken_signing_key_sends_nothing(
     assert [e["error"]["reason"] for e in r["executions"]] == ["signing_failed"]
 
 
+def _write_unloadable_keyfile(home, how: str) -> None:
+    """A key file that exists for RRN and can't be loaded."""
+    keys = home / ".robot-md" / "keys"
+    keys.mkdir(parents=True, exist_ok=True)
+    path = keys / f"{RRN}.signing.json"
+    if how == "corrupt":
+        path.write_text("{not json")
+    elif how == "wrong_format":
+        path.write_text(json.dumps({"pq_kid": "deadbeef"}))
+    elif how == "unreadable":
+        # Something at the key path that reading fails on, even as root.
+        path.mkdir()
+    else:
+        raise AssertionError(how)
+
+
+UNLOADABLE = ["corrupt", "wrong_format", "unreadable"]
+
+
+@pytest.mark.parametrize("how", UNLOADABLE)
+def test_a_key_file_that_cannot_be_loaded_refuses_motion_and_reads(
+    fixtures_dir, gateway_env, tmp_path, how
+):
+    """A configured key that can't be loaded is treated like one that can't
+    sign. 2.0.0 sent these unsigned."""
+    _write_unloadable_keyfile(tmp_path, how)
+    ctx = _ctx(fixtures_dir, rrn=RRN, extra_caps=("status.report",))
+    for capability in ("arm.pick", "status.report"):
+        r = execute_capability_tool(ctx, capability=capability, args={}, dry_run=False)
+        assert r["status"] == "blocked", (capability, r)
+        assert r["error"]["reason"] == "signing_failed"
+        assert "can't be loaded" in r["error"]["message"]
+    assert gateway_env.bodies == []
+    _untouched(ctx)
+
+
+@pytest.mark.parametrize("how", UNLOADABLE)
+def test_the_stop_goes_out_unsigned_when_the_key_file_cannot_be_loaded(
+    fixtures_dir, gateway_env, tmp_path, how
+):
+    _write_unloadable_keyfile(tmp_path, how)
+    r = estop_tool(_ctx(fixtures_dir, rrn=RRN))
+    assert r["ok"] is True, r
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.estop"]
+    assert "envelope_signature" not in gateway_env.bodies[0]
+    assert "could not load the signing keypair" in r["envelope"]["signing"]
+
+
+@pytest.mark.parametrize(
+    ("rrn", "note"),
+    [(None, "no metadata.rrn"), (RRN, f"no signing keypair for {RRN}")],
+)
+def test_with_no_signing_key_configured_a_motion_goes_out_unsigned(
+    fixtures_dir, gateway_env, tmp_path, rrn, note
+):
+    """No RRN in ROBOT.md, or no key file for it: nothing is configured to
+    sign with, and the motion goes out unsigned, as in 2.0.0. The gateway's
+    own setting decides whether it accepts that."""
+    assert not (tmp_path / ".robot-md" / "keys").exists()
+    ctx = _ctx(fixtures_dir, rrn=rrn)
+    r = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=False)
+    assert r["status"] == "ok", r
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.pick"]
+    assert "envelope_signature" not in gateway_env.bodies[0]
+    assert note in r["envelope"]["signing"]
+
+
 def test_the_stop_with_a_broken_signing_key_still_goes_out_unsigned(
     fixtures_dir, gateway_env, tmp_path
 ):
