@@ -583,14 +583,21 @@ next steps:
   2. read the tokens with: sudo cat {BEARERS_PATH}
   3. give the actuate token to the agent's client, and the supervisor token to
      the supervising person's device: never the agent's host, never the robot.
-  4. the gateway starts held and moves nothing until 4 and 5 are done: from
-     that device, run `robot-md-gateway heartbeat`, which posts
-     /v1/safety/heartbeat every second. Without one at least every 3 s, the
-     gateway trips and stops the arm.
-  5. then, as the operator, run `robot-md-gateway clear` with the commission
-     token: it posts /v1/safety/clear once, as the signed ESTOP_CLEAR body
-     the gateway.env install-gateway writes requires.
-     `robot-md-gateway heartbeat --help` and `clear --help` give the flags."""
+  4. the gateway starts held and moves nothing until 4 and 5 are done. It
+     listens on 127.0.0.1 only, so give that device a route to it first (the
+     robot-md-gateway README's `tailscale serve` step), and install
+     robot-md-gateway 0.5.0a10 or later there. Then, from that device:
+       robot-md-gateway heartbeat --gateway <url> --token-file <supervisor token file>
+     It posts /v1/safety/heartbeat every second. Without a heartbeat at
+     least every 3 s, the gateway trips and stops the arm.
+  5. then, as the operator, with the heartbeats running:
+       robot-md-gateway clear --gateway <url> --token-file <commission token file> \\
+         --key ~/.robot-md/keys/<rrn>.signing.json
+     It posts /v1/safety/clear once, as a signed ESTOP_CLEAR: the gateway.env
+     install-gateway writes requires the signature, so without --key the
+     gateway answers 403. A first start finds no clean-shutdown marker and
+     sends every declared stop, so then clear the arm's latch too
+     (arm.estop.clear, at the commission tier)."""
 
 
 def _disable_unit_if_enabled(sudo: list[str]) -> None:

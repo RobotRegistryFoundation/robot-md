@@ -21,18 +21,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   without it, every start would send each declared stop, and so-arm101 would
   boot latched. Under `Type=notify` a gateway before 0.5.0a10 never sends
   `READY=1` and fails to start after 90 s, so `install-gateway` now installs
-  `robot-md-gateway>=0.5.0a10`. It still does nothing on a host whose gateway
-  is active: on an existing install, upgrade the gateway in
-  `/opt/robot-md-gateway/.venv` first, then add the four lines to the unit,
-  then `systemctl daemon-reload` and restart it.
-- **`install-gateway`'s next steps and its bearers.yaml comment** name the
-  gateway's own `heartbeat` and `clear` commands, and drop the caveats for
-  0.5.0a9, which served neither safety route.
+  `robot-md-gateway>=0.5.0a10`.
+- **Upgrading an existing install, such as bob's.** `install-gateway` does
+  nothing while the gateway is active, and nothing in robot-md installs the
+  actuators into the gateway's own environment, where the gateway loads them.
+  Stop the gateway, upgrade it there together with every actuator it loads,
+  then run `install-gateway` again: with the unit inactive, it writes the
+  whole unit, keeps bearers.yaml, gateway.env and the pinned ROBOT.md, and
+  starts the gateway. On bob:
+
+  ```bash
+  sudo systemctl stop robot-md-gateway
+  sudo /opt/robot-md-gateway/.venv/bin/pip install 'robot-md-gateway>=0.5.0a10' \
+    'so-arm101-actuator>=0.3.0' 'oak-d-actuator>=0.2.2'
+  robot-md install-gateway
+  ```
+
+  Beside so-arm101-actuator 0.2.2 or oak-d-actuator 0.2.1, 0.5.0a10 answers
+  every clear with 409. By hand instead, add the four lines to the unit after
+  the upgrade, never before it (an older gateway under `Type=notify` fails to
+  start), then `systemctl daemon-reload` and a restart. The old gateway never
+  left a clean-shutdown marker, so the first start sends every declared stop:
+  so-arm101 stays latched until `arm.estop.clear` follows the gateway's clear.
+- **`install-gateway`'s next steps and its bearers.yaml comment** give the
+  gateway's own `heartbeat` and `clear` commands with their flags, `clear`'s
+  `--key` included (the gateway.env install-gateway writes requires a signed
+  clear, and without `--key` the gateway answers 403), say that the
+  supervisor's device needs a route to a gateway that listens on 127.0.0.1
+  only, and drop the caveats for 0.5.0a9, which served neither safety route.
+  The MCP `estop_clear` refusal and the getting-started guide no longer call
+  the commands unmerged.
 - **`robot-md init` installs so-arm101-actuator 0.3.0 or later and
-  oak-d-actuator 0.2.2 or later.** The gateway refuses to be armed while a
-  configured actuator may move and declares no stop: so-arm101-actuator
-  declares its stop from 0.3.0, and oak-d-actuator declares from 0.2.2 that it
-  moves nothing.
+  oak-d-actuator 0.2.2 or later**, in robot-md's own environment, which is
+  not the environment `install-gateway`'s gateway runs from (see the upgrade
+  above for that one). The gateway refuses to be armed while a configured
+  actuator may move and declares no stop: so-arm101-actuator declares its stop
+  from 0.3.0, and oak-d-actuator declares from 0.2.2 that it moves nothing.
 
 ## [2.0.1] - 2026-11-14
 

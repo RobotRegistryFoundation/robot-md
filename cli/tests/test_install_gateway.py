@@ -157,9 +157,13 @@ def test_the_texts_install_gateway_writes_name_the_safety_commands():
     the gateway's own heartbeat and clear commands, with no version caveat."""
     from robot_md.install_gateway import NEXT_STEPS
 
-    assert "robot-md-gateway heartbeat" in NEXT_STEPS
-    assert "robot-md-gateway clear" in NEXT_STEPS
+    assert "robot-md-gateway heartbeat --gateway" in NEXT_STEPS
+    assert "robot-md-gateway clear --gateway" in NEXT_STEPS
     assert "ESTOP_CLEAR" in NEXT_STEPS
+    # The gateway.env install-gateway writes requires signatures, and `clear`
+    # signs only with --key; the unit listens on 127.0.0.1 only.
+    assert "--key" in NEXT_STEPS
+    assert "tailscale serve" in NEXT_STEPS
     assert "skip 4 and 5" not in NEXT_STEPS
     assert "#35 or later" not in NEXT_STEPS
     bearers = render_default_bearers()
