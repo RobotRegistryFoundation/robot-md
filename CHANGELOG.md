@@ -75,7 +75,10 @@ compares the two on 0.5.0a9).
   it. They now run in worker threads, like the motion tools.
 - **A read is no longer refused `busy` while a motion is in flight.** Only one
   motion at a time leaves this server; reads such as `status.report` are sent
-  (so-arm101-actuator may still answer its own `busy` while it moves).
+  (so-arm101-actuator may still answer its own `busy` while it moves). Every
+  request now shares one HTTP opener: building one per request cost about
+  15 ms of CPU, and a stop sent while eight reads were in flight waited behind
+  theirs.
 - **The MCP server finds the manifest `install-gateway` pins, and says how to
   hand it the token.** `install-gateway` keeps `gateway.env` and `bearers.yaml`
   0600 for the gateway's own user (robot-md#113), so the MCP server can't read

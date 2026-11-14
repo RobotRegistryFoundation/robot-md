@@ -55,6 +55,7 @@ from __future__ import annotations
 import http.client
 import json
 import os
+import threading
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -372,6 +373,26 @@ def prepare_envelope(
     return signed, f"signed (kid {keypair.pq_kid})"
 
 
+#: One opener for every request, built on first use. Building one loads the CA
+#: bundle for its HTTPS handler, about 15 ms of CPU, and every request used to
+#: build its own: a stop sent while reads were in flight during a motion waited
+#: behind theirs. An OpenerDirector is safe to share between threads (urllib's
+#: own `urlopen` shares one); each request still gets its own connection.
+_OPENER: urllib.request.OpenerDirector | None = None
+_OPENER_LOCK = threading.Lock()
+
+
+def _opener() -> urllib.request.OpenerDirector:
+    global _OPENER
+    if _OPENER is None:
+        with _OPENER_LOCK:
+            if _OPENER is None:
+                # No proxies: the bearer goes to the configured address and
+                # nowhere else.
+                _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    return _OPENER
+
+
 class _Unreachable(Exception):
     """The request could not be delivered (connect or send failed)."""
 
@@ -389,8 +410,7 @@ def _post(url: str, body: dict, bearer: str | None, timeout: float) -> tuple[int
     try:
         data = json.dumps(body).encode("utf-8")
         request = urllib.request.Request(url, data=data, method="POST", headers=headers)
-        # No proxies: the bearer goes to the configured address and nowhere else.
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        opener = _opener()
     except Exception as e:
         # A malformed gateway URL fails here, before anything is sent.
         raise _Unreachable(f"could not build the request ({type(e).__name__}: {e})") from e
@@ -656,8 +676,9 @@ def check_gateway_generation(config: GatewayConfig, *, timeout_s: float = 2.0) -
     url = config.url.rstrip("/") + "/openapi.json"
     try:
         request = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        with opener.open(request, timeout=timeout_s) as resp:
+        # The startup check's request also builds the shared opener, so the
+        # first stop doesn't pay for it.
+        with _opener().open(request, timeout=timeout_s) as resp:
             body = json.loads(resp.read().decode("utf-8", errors="replace"))
     except Exception as e:
         return {"result": "unknown", "detail": f"could not read {url} ({type(e).__name__})"}

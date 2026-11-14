@@ -71,6 +71,36 @@ def test_the_stop_has_its_own_short_timeout():
     assert gateway_client.STOP_TIMEOUT_S < gateway_client.DEFAULT_TIMEOUT_S
 
 
+def test_requests_share_one_opener(fixtures_dir, gateway_env, monkeypatch):
+    """Building a urllib opener loads the CA bundle for its HTTPS handler,
+    about 15 ms of CPU each time. Every request built one, so a stop sent
+    while reads were in flight during a motion waited behind theirs (0.94 s
+    median with eight reads, against 0.33 s for 2.0.0, which refused those
+    reads)."""
+    import urllib.request
+
+    built = []
+    real = urllib.request.build_opener
+
+    def counting(*handlers):
+        built.append(handlers)
+        return real(*handlers)
+
+    monkeypatch.setattr(gateway_client, "_OPENER", None, raising=False)
+    monkeypatch.setattr(urllib.request, "build_opener", counting)
+    ctx = _ctx(fixtures_dir, extra_caps=("status.report",))
+    for _ in range(2):
+        r = execute_capability_tool(ctx, capability="status.report", args={}, dry_run=False)
+        assert r["status"] == "ok", r
+    assert estop_tool(ctx)["ok"] is True
+    assert [b["tool_name"] for b in gateway_env.bodies] == [
+        "status.report",
+        "status.report",
+        "arm.estop",
+    ]
+    assert len(built) == 1
+
+
 # --------------------------------------------------------------------------
 # The stop
 # --------------------------------------------------------------------------
