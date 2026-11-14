@@ -7,41 +7,41 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-Fixes to 2.0.0's MCP motion path, from the review of robot-md#114 (which
-2.0.0 shipped as merged). Read "Fixed" first: in 2.0.0, a gate that needs a
-person does not stop MCP motion on robot-md's own presets.
+**Checklist for the first release after robot-md-gateway#35 is published.**
 
-**Release checklist. Whether 2.0.1 waits for robot-md-gateway#35 is Craig's
-decision.** The proposal: none of these items blocks 2.0.1. 2.0.0 is already
-on PyPI and already sends MCP motion through robot-md-gateway 0.5.0a9, with
-the gate bug below; this release tightens that path. robot-md#121 compares
-the two on 0.5.0a9 and found no case where this release is less strict than
-2.0.0.
-
-- [ ] **First release after robot-md-gateway#35 is published:** raise the
-  `robot-md-gateway` floor in `cli/pyproject.toml` to that release (TODO: no
-  version is named until it exists), and require so-arm101-actuator with
+- [ ] Raise the `robot-md-gateway` floor in `cli/pyproject.toml` to that
+  release, and require so-arm101-actuator with
   RobotRegistryFoundation/so-arm101-actuator#8 (0.2.2 on PyPI declares no
   stop, so `arm.estop` fails there). Until then, on 0.5.0a9, the MCP `estop`
   must pass every gate a motion does, so a manifest-pin mismatch, a missing
   signing key or a failed key lookup refuses it, and the gateway doesn't stop
   the arm when heartbeats stop. The MCP server warns at startup when it finds
-  such a gateway (below).
-  - [ ] **robot-md-gateway#37, the systemd watchdog (R2-18; open, not merged
-    yet):** `install-gateway`'s unit needs four lines, `Type=notify`,
+  such a gateway (2.0.1, Changed).
+  - [ ] **robot-md-gateway#37, the systemd watchdog (R2-18):**
+    `install-gateway`'s unit needs four lines, `Type=notify`,
     `NotifyAccess=main`, `WatchdogSec=5s` and `StateDirectory=` (for example
     `StateDirectory=robot-md-gateway`), but only once the gateway floor is a
     release that carries #37 and sends `READY=1`. An older gateway under
     `Type=notify` fails to start after 90 s, so the unit change and the floor
-    change ship together. #37 (at 24e28c3) keeps its clean-shutdown marker in
-    the state directory. Without one, every gateway start sends the declared
-    stops: that fails safe, but so-arm101 then boots latched every time. #37
-    does nothing for bob until robot-md adds those lines, and the gateway's
-    rollout says bob mustn't run unattended before then. robot-md#121 doesn't
-    change the unit.
-- [ ] **robot-md-mcp:** RobotRegistryFoundation/robot-md-mcp#19 raises the
-  plugin launcher's floor to robot-md 2.0.1, so it refuses 2.0.0 and its gate
-  bug.
+    change ship together. #37 keeps its clean-shutdown marker in the state
+    directory. Without one, every gateway start sends the declared stops: that
+    fails safe, but so-arm101 then boots latched every time. #37 does nothing
+    for bob until robot-md adds those lines, and the gateway's rollout says
+    bob mustn't run unattended before then. 2.0.1 doesn't change the unit.
+
+## [2.0.1] - 2026-11-14
+
+Fixes to 2.0.0's MCP motion path, from the review of robot-md#114 (which
+2.0.0 shipped as merged). Read "Fixed" first: in 2.0.0, a gate that needs a
+person does not stop MCP motion on robot-md's own presets.
+
+2.0.0 already sends MCP motion through robot-md-gateway 0.5.0a9, with that
+gate bug; this release tightens the path. robot-md#121 compares the two on
+0.5.0a9 and found no case where 2.0.1 is less strict than 2.0.0. It ships
+before robot-md-gateway#35, the gateway's own stop when heartbeats stop and
+its clear route; Unreleased lists what follows that release. The robot-md
+plugin's launcher (RobotRegistryFoundation/robot-md-mcp#19) refuses any
+robot-md older than 2.0.1.
 
 ### Fixed
 
