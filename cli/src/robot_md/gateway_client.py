@@ -320,6 +320,11 @@ def config_for_context(ctx: Any) -> GatewayConfig:
     return resolve_config(served_manifest_path=ctx.manifest_path, frontmatter=fm)
 
 
+class SigningFailed(Exception):
+    """A signing key loaded and could not sign. Carries the exception's type
+    only: a message from a damaged key could carry key bytes."""
+
+
 def prepare_envelope(
     config: GatewayConfig,
     *,
@@ -327,6 +332,7 @@ def prepare_envelope(
     tool_args: Mapping[str, Any],
     scope: str,
     sign: bool = True,
+    unsigned_if_signing_fails: bool = False,
 ) -> tuple[dict[str, Any], str]:
     """Build the envelope (and sign it when a keypair exists). Returns
     (envelope, signing note).
@@ -336,6 +342,12 @@ def prepare_envelope(
     `inference_confidence`, no confirmation token. The gateway's HiTL gate
     reads `delegation_chain`, and one written in the model's process would be
     the model approving itself.
+
+    A key that loads and can't sign raises `SigningFailed`, unless
+    `unsigned_if_signing_fails` is set, which only the stop sets: a stop has
+    to get out, and robot-md-gateway#35 never checks a stop's signature. A
+    motion sent unsigned would rely on the gateway requiring signatures,
+    which `install-gateway` sets and other setups may not.
     """
     from robot_md.invoke import build_envelope, sign_envelope
 
@@ -365,11 +377,11 @@ def prepare_envelope(
     try:
         signed = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
     except Exception as e:
-        # A key that loads and cannot sign (a damaged secret) must not keep
-        # the request, a stop above all, from going out. A gateway that
-        # requires signatures refuses it unsigned; robot-md-gateway#35 never
-        # checks a stop's signature.
-        return envelope, f"unsigned: signing failed ({type(e).__name__})"
+        # A key that loads and cannot sign (a damaged secret). Only the stop
+        # goes out unsigned then; anything else is refused (see above).
+        if unsigned_if_signing_fails:
+            return envelope, f"unsigned: signing failed ({type(e).__name__})"
+        raise SigningFailed(type(e).__name__) from e
     return signed, f"signed (kid {keypair.pq_kid})"
 
 
@@ -571,13 +583,15 @@ def invoke(
     scope: str,
     withhold: Callable[[], dict[str, Any] | None] | None = None,
     timeout_s: float | None = None,
+    unsigned_if_signing_fails: bool = False,
 ) -> dict[str, Any]:
     """Send one envelope to the gateway and report its decision.
 
     Returns {status, error, gateway, envelope}. `status` is "ok" (the gateway
     ran it), "denied" (the gateway or the actuator refused it), "blocked"
-    (`withhold` stopped it here) or "error". Never raises and never retries: a
-    request the gateway may already have acted on is not sent twice.
+    (`withhold` stopped it here, or the request could not be signed:
+    `signing_failed`) or "error". Never raises and never retries: a request
+    the gateway may already have acted on is not sent twice.
 
     `withhold`, when given, is called after the envelope is built and signed,
     immediately before it is sent. If it returns an error dict, nothing is
@@ -585,13 +599,32 @@ def invoke(
     another thread may have set while this envelope was being prepared.
 
     `timeout_s` overrides the configured timeout; the stop uses
-    `STOP_TIMEOUT_S`.
+    `STOP_TIMEOUT_S`. `unsigned_if_signing_fails` is for the stop only (see
+    `prepare_envelope`).
     """
     try:
         envelope, note = prepare_envelope(
-            config, tool_name=tool_name, tool_args=tool_args, scope=scope
+            config,
+            tool_name=tool_name,
+            tool_args=tool_args,
+            scope=scope,
+            unsigned_if_signing_fails=unsigned_if_signing_fails,
         )
         summary = _summary(envelope, note)
+    except SigningFailed as e:
+        return {
+            "status": "blocked",
+            "error": {
+                "reason": "signing_failed",
+                "message": (
+                    f"the signing key for {config.rrn} loads and can't sign ({e}). Nothing was "
+                    "sent: only a stop goes out unsigned. The person checks the key file "
+                    f"(~/.robot-md/keys/{config.rrn}.signing.json)."
+                ),
+            },
+            "gateway": None,
+            "envelope": None,
+        }
     except Exception as e:
         return {
             "status": "error",

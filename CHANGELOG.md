@@ -15,9 +15,8 @@ person does not stop MCP motion on robot-md's own presets.
 decision.** The proposal: none of these items blocks 2.0.1. 2.0.0 is already
 on PyPI and already sends MCP motion through robot-md-gateway 0.5.0a9, with
 the gate bug below; this release tightens that path. robot-md#121 compares
-the two on 0.5.0a9, including the one case where this release is less
-strict: a motion whose signing key can't sign goes out unsigned, as the stop
-does, where 2.0.0 sent nothing.
+the two on 0.5.0a9 and found no case where this release is less strict than
+2.0.0.
 
 - [ ] **First release after robot-md-gateway#35 is published:** raise the
   `robot-md-gateway` floor in `cli/pyproject.toml` to that release (TODO: no
@@ -56,13 +55,19 @@ does, where 2.0.0 sent nothing.
   advice and no audit entry: a signing key that loads and can't sign (no stop
   was sent at all), a malformed gateway URL, and a gateway that sends its
   headers and stalls. `estop` and `gateway_client.invoke` no longer raise: a
-  signing failure sends the envelope unsigned (robot-md-gateway#35 never checks
-  a stop's signature), a malformed URL is `gateway_unreachable`, a stall is
-  `gateway_no_answer`, and anything else is `stop_path_error`; each returns
+  signing failure sends the stop unsigned (a stop has to get out, and
+  robot-md-gateway#35 never checks a stop's signature), a malformed URL is
+  `gateway_unreachable`, a stall is `gateway_no_answer`, and anything else is
+  `stop_path_error`; each returns
   `stop: stop_not_confirmed` with "Use the hardware stop at the machine now."
   as the first instruction, ahead of any reason, and without the motion
   advice below ("do not resend"). The stop waits at most 2 s for the gateway,
   not the 30 s a motion may take.
+- **A motion or read whose signing key can't sign is refused, and nothing is
+  sent** (`signing_failed`, with an audit entry). 2.0.0 raised there and sent
+  nothing; only the stop goes out unsigned. A motion sent unsigned would rely
+  on the gateway requiring signatures, which `install-gateway` sets and other
+  setups may not.
 - **An answer that doesn't say whether a call ran is no longer reported as a
   refusal.** A 200 without `ok: true`, or a 5xx without `actuator_error`, is
   `gateway_unknown_outcome` ("it may have run; do not resend"); 2.0.0 called

@@ -167,6 +167,9 @@ def estop_tool(ctx: McpContext) -> dict:
             tool_args={},
             scope=gateway_client.STOP_SCOPE,
             timeout_s=gateway_client.STOP_TIMEOUT_S,
+            # The only request that goes out unsigned when the key can't
+            # sign: a stop has to get out.
+            unsigned_if_signing_fails=True,
         )
         confirmed = outcome["status"] == "ok"
         if confirmed:

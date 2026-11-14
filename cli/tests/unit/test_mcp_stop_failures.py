@@ -231,13 +231,76 @@ def test_motion_with_a_malformed_url_is_refused_not_raised(fixtures_dir, gateway
     _untouched(ctx)
 
 
-def test_motion_with_a_broken_signing_key_goes_out_unsigned(fixtures_dir, gateway_env, tmp_path):
-    """A gateway that requires signatures then refuses it; one that doesn't
-    treats it as it treats any unsigned envelope."""
+def test_motion_with_a_broken_signing_key_refuses_and_sends_nothing(
+    fixtures_dir, gateway_env, tmp_path, monkeypatch
+):
+    """Only the stop goes out unsigned: a stop has to get out, and
+    robot-md-gateway#35 never checks a stop's signature. A motion sent
+    unsigned would rely on the gateway requiring signatures, which
+    `install-gateway` sets and other setups may not. 2.0.0 raised here and
+    sent nothing; now the refusal has its own code and an audit entry."""
+    audited = []
+    monkeypatch.setattr(
+        "robot_md.audit.record_event",
+        lambda rrn, *, event, details: audited.append((rrn, event, details)),
+    )
     _write_broken_keyfile(tmp_path)
     ctx = _ctx(fixtures_dir, rrn=RRN)
     r = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=False)
-    assert r["status"] == "ok"
+    assert r["status"] == "blocked"
+    assert r["error"]["reason"] == "signing_failed"
+    assert "Nothing was sent" in r["error"]["message"]
+    assert gateway_env.bodies == []
+    assert [(rrn, d["status"], d["reason"]) for rrn, event, d in audited] == [
+        (RRN, "blocked", "signing_failed")
+    ]
+    assert ctx.exec_lock.acquire(blocking=False)
+    ctx.exec_lock.release()
+    _untouched(ctx)
+
+
+def test_a_read_with_a_broken_signing_key_refuses_too(fixtures_dir, gateway_env, tmp_path):
+    _write_broken_keyfile(tmp_path)
+    ctx = _ctx(fixtures_dir, rrn=RRN, extra_caps=("status.report",))
+    r = execute_capability_tool(ctx, capability="status.report", args={}, dry_run=False)
+    assert r["status"] == "blocked"
+    assert r["error"]["reason"] == "signing_failed"
+    assert gateway_env.bodies == []
+
+
+def test_execute_task_with_a_broken_signing_key_sends_nothing(
+    fixtures_dir, gateway_env, tmp_path, monkeypatch
+):
+    from robot_md.mcp.tools import execute_task as execute_task_module
+    from robot_md.planning.types import Plan, PlanStep
+
+    plan = Plan(
+        steps=(
+            PlanStep(capability="arm.pick", args={}, confidence=0.99),
+            PlanStep(capability="arm.place", args={}, confidence=0.99),
+        ),
+        raw_response={},
+    )
+    monkeypatch.setattr(execute_task_module, "decompose", lambda **kw: plan)
+    _write_broken_keyfile(tmp_path)
+    r = execute_task_tool(_ctx(fixtures_dir, rrn=RRN), prompt="pick and place")
+    assert gateway_env.bodies == []
+    assert r["status"] == "blocked"
+    assert [e["error"]["reason"] for e in r["executions"]] == ["signing_failed"]
+
+
+def test_the_stop_with_a_broken_signing_key_still_goes_out_unsigned(
+    fixtures_dir, gateway_env, tmp_path
+):
+    """The one path that keeps the unsigned fallback, with the same key that
+    refuses a motion."""
+    _write_broken_keyfile(tmp_path)
+    ctx = _ctx(fixtures_dir, rrn=RRN)
+    refused = execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=False)
+    assert refused["error"]["reason"] == "signing_failed"
+    r = estop_tool(ctx)
+    assert r["ok"] is True, r
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.estop"]
     assert "envelope_signature" not in gateway_env.bodies[0]
     assert "signing failed" in r["envelope"]["signing"]
 
