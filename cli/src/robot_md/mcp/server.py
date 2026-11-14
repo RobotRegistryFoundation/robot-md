@@ -13,6 +13,7 @@ queued behind them.
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import sys
@@ -165,8 +166,13 @@ def build_server(ctx: McpContext):
         except Exception as e:  # estop_tool never raises; this is a second net
             from robot_md.mcp.tools.estop import not_confirmed
 
+            # estop_tool sets this server's latch first. If it never ran, set
+            # it here, so no further motion leaves and `local_latch` is true.
+            set_at = None
+            with contextlib.suppress(Exception):  # the answer below still goes out
+                set_at = ctx.estop.set()
             result = not_confirmed(
-                set_at=None,
+                set_at=set_at,
                 stop_tool="the declared stop",
                 error={"reason": "stop_path_error", "message": type(e).__name__},
             )

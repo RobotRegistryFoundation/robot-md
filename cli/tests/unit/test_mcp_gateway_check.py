@@ -197,3 +197,38 @@ def test_the_bearer_never_appears_in_the_check_or_its_warning(fake_gateway):
     fake_gateway.routes = OLD_GATEWAY_ROUTES
     r = gateway_client.check_gateway_generation(_config(fake_gateway.url))
     assert TEST_BEARER not in json.dumps(r)
+
+
+# --------------------------------------------------------------------------
+# Decision 4: this server sends no heartbeat and no gateway clear
+# --------------------------------------------------------------------------
+
+
+async def test_nothing_in_this_server_sends_to_the_safety_routes(
+    fixtures_dir, gateway_env, monkeypatch
+):
+    """Heartbeats come from the supervising person's own device, and the
+    gateway's clear is the person's. Startup, and every motion, read, task,
+    stop and clear tool, run against the fake gateway; nothing reaches
+    /v1/safety/*."""
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    from robot_md.mcp.tools import execute_task as execute_task_module
+    from robot_md.planning.types import Plan, PlanStep
+
+    ctx = _ctx(fixtures_dir, extra_caps=("status.report",))
+    server_module.start_gateway_check(ctx).join(timeout=5)
+    plan = Plan(steps=(PlanStep(capability="arm.pick", args={}, confidence=0.99),), raw_response={})
+    monkeypatch.setattr(execute_task_module, "decompose", lambda **kw: plan)
+    server = server_module.build_server(ctx)
+    for capability in sorted(ctx.spec.capabilities):
+        await server.call_tool("execute_capability", {"capability": capability})
+    await server.call_tool("execute_task", {"prompt": "pick it up"})
+    await server.call_tool("estop", {})
+    with pytest.raises(ToolError):
+        await server.call_tool("estop_clear", {})
+    posted = [r["path"] for r in gateway_env.requests]
+    fetched = [r["path"] for r in gateway_env.get_requests]
+    assert "/v1/invoke" in posted
+    assert fetched == ["/openapi.json"]
+    assert not [path for path in posted + fetched if path.startswith("/v1/safety")]

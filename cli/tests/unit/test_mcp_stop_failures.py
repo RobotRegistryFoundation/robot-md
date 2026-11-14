@@ -202,6 +202,26 @@ def test_an_unplanned_error_in_the_stop_path_still_gives_the_advice(
     assert r["error"]["reason"] == "stop_path_error"
 
 
+async def test_the_mcp_stop_wrapper_has_a_net_of_its_own(fixtures_dir, gateway_env, monkeypatch):
+    """estop_tool never raises. If it ever did, or never ran, the MCP tool
+    still answers with the hardware-stop advice instead of FastMCP's generic
+    error text, and sets this server's latch so no further motion leaves."""
+    from robot_md.mcp import server as server_module
+
+    def _raises(ctx):
+        raise RuntimeError("estop_tool raised")
+
+    monkeypatch.setattr(server_module, "estop_tool", _raises)
+    ctx = _ctx(fixtures_dir)
+    server = build_server(ctx)
+    with pytest.raises(ToolError) as info:
+        await server.call_tool("estop", {})
+    text = str(info.value)
+    assert ADVICE in text
+    assert "stop_path_error" in text
+    assert ctx.estop.is_set()
+
+
 async def test_an_unplanned_error_is_an_mcp_error_with_the_advice(
     fixtures_dir, gateway_env, monkeypatch
 ):
