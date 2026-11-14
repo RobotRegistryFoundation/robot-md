@@ -27,6 +27,14 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   signing key or a failed key lookup refuses it, and the gateway doesn't stop
   the arm when heartbeats stop. The MCP server warns at startup when it finds
   such a gateway (below).
+  - [ ] **robot-md-gateway#37, the systemd watchdog (R2-18; open, not merged
+    yet):** `install-gateway`'s unit needs `Type=notify`, `NotifyAccess=main`
+    and `WatchdogSec=5s`, but only once the gateway floor is a release that
+    sends `READY=1` (#37 or later). An older gateway under `Type=notify`
+    fails to start after 90 s, so the unit change and the floor change ship
+    together. #37 does nothing for bob until robot-md adds those lines, and
+    the gateway's rollout says bob mustn't run unattended before then.
+    robot-md#121 doesn't change the unit.
 - [ ] **robot-md-mcp:** RobotRegistryFoundation/robot-md-mcp#19 raises the
   plugin launcher's floor to robot-md 2.0.1, so it refuses 2.0.0 and its gate
   bug.
@@ -162,13 +170,28 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   refused (`hitl_required`), and the arm stayed latched. The reads are the
   ones the MCP server treats as reads (`robot_md.invoke.READ_TOOLS`, now
   shared), plus the actuators' own names (`read_state`, `state`, `perceive`,
-  `read_rgb`, `read_depth`); a motion tool sent under `OBSERVE` is refused
-  (`tool_scope`). **One gap remains:** a manifest that gates `commission`
-  (`require_auth: true`) refuses the person's `COMMISSION` clear too, and
-  robot-md has no way to attach a person's approval. No shipped preset
-  declares one. Whether the gateway should exempt a declared clear from HiTL,
-  since its tier floor already holds the clear to the commission tier, is
-  Craig's call.
+  `read_rgb`, `read_depth`). None of them is a motion tool of a shipped
+  actuator, and robot-md sends `OBSERVE` only for reads, so it never sends a
+  motion as `OBSERVE` unless a person passes `--scope OBSERVE`. That matters
+  because the gateway refuses a tool sent under `OBSERVE` (`tool_scope`) only
+  when its actuator declares that tool as motion: so-arm101-actuator 0.2.2
+  declares nothing, and its `home` and `move` sent under `OBSERVE` ran on
+  0.5.0a9. **One gap remains:** a manifest that gates `commission`
+  (`require_auth: true`) refuses the person's `COMMISSION` clear too
+  (`hitl_required`), and robot-md has no way to attach a person's approval.
+  No shipped preset declares one. The getting-started guide gives the two
+  ways back and what each costs. One is to take the gate out of the pinned
+  copy and sign it again: later clears go ungated too, the gateway refuses
+  every request on a manifest whose signature doesn't match
+  (`manifest_provenance`, on 0.5.0a9 the stop included), robot-md has no
+  command that signs a ROBOT.md, and `install-gateway` doesn't re-pin a
+  running gateway. The other is to restart the gateway, which drops the arm's
+  latch with its process and leaves no record of who resumed the arm. Don't
+  relabel the clear's scope (`--scope SAFETY`, say) to get it past the gate:
+  that defeats the gate the manifest declares. Which way to recommend, and
+  whether the gateway should exempt a declared clear from HiTL, since its
+  tier floor already holds the clear to the commission tier, are Craig's
+  calls.
 - **`install-gateway`'s next steps and its bearers.yaml comment say what needs
   robot-md-gateway with #35.** Steps 4 and 5 (the heartbeat and the gateway's
   clear) are skipped on 0.5.0a9 and earlier, where neither route exists, and
