@@ -12,12 +12,12 @@ Read this before anything that can move the robot. These rules hold in every sec
 1. **Motion goes only through robot-md-gateway.** `execute_capability` and `execute_task` send each step to the gateway (`POST /v1/invoke`). The gateway checks the credential's tier, the tool allowlist, the scope, the manifest and its own safety state; the actuator behind it bounds and paces the motion; the gateway records each decision. Nothing in this session writes to the robot. Never write to the servo port (`/dev/ttyACM*`, `/dev/ttyUSB*`), never run a command or script that opens it, and never start, stop or restart the gateway or any other service that drives actuators. Never send to the gateway's `/v1/invoke` yourself, with `robot-md invoke`, `curl` or a script: those calls go around this server's stop latch, its one-motion-at-a-time rule and its gate check. If the motion tools say no gateway is configured or reachable, report that and stop; don't look for another route.
 2. **A person at the machine, with a hardware stop, comes before any motion.** Before the first motion of a session, ask the person to confirm all of these: they are at the machine and will watch every motion; nobody else is within its reach; a hardware stop that depends on no software (a relay on servo power, an e-stop button, the power plug) is within their reach. If they can't confirm all three, don't call a motion tool. The `estop` tool is a software stop, not that hardware stop.
 3. **A chat "yes" is never authorization for motion.** Asking "shall I?" and getting "yes" authorizes nothing. There is no token to pass: the motion tools no longer take a `confirm_token`, and nothing you write can stand in for a person's confirmation. The gateway decides, against credentials the person controls. The person's confirmation in rule 2 is a precondition you check, not a permission you hold; don't tell them their answer made a motion allowed or safe.
-4. **Gated scopes are refused.** A `hitl_gates[]` entry with `require_auth: true` needs a person's confirmation from outside this conversation, and robot-md has no such path yet. A gate on a scope that covers motion (the gateway's names, such as `destructive` and `system`, or a capability's prefix, such as `arm`) makes `execute_capability` refuse every capability that moves (`hitl_gate`). The so-arm101 preset gates `destructive` and `system`, so on a manifest made from it every motion is refused for now. Tell the person. Don't edit the manifest to remove or loosen the gate.
-5. **Refusals stand.** When the gateway refuses (`status: denied`), report its `deny` and `reason` as given. Don't relabel the scope, split the motion into smaller ones, retry, or reach for another tool to get past it. A call that ends `gateway_no_answer` may have run: tell the person, and don't resend it. `status: ok` means the gateway ran the call, not that the arm arrived: read the telemetry's `reached`, which is false when a stop interrupted the motion (`stopped_by_estop: true`).
-6. **Stops.** `estop` latches this MCP server and sends the gateway's declared stop (`arm.estop`). The arm then holds its pose in software; that is not a hardware e-stop. If `estop` returns an error, the stop was not confirmed: tell the person to use the hardware stop now. **Never call `estop_clear` to resume on your own.** Clearing a stop makes the robot movable again. It needs a commission-tier credential, which belongs to the person at the machine; the person clears it. After a robot-md-gateway trip, the gateway needs its own clear as well as the arm's. If the motion tools still refuse with a stop after the person cleared both, the person restarts this MCP server.
+4. **Gated motion is refused.** A `hitl_gates[]` entry needs a person's confirmation from outside this conversation unless it says `require_auth: false`, and robot-md has no path for that confirmation yet. So any such gate makes the motion tools refuse every capability that moves (`hitl_gate`), dry runs included, whatever scope it names: the gateway's names, such as `destructive` and `system`, a capability's prefix, such as `arm`, or a name the gateway doesn't know. The one exception is a gate on `commission`, which covers no motion. Reads still go. The so-arm101 preset gates `destructive` and `system`, so on a manifest made from it every motion is refused for now. Tell the person. Don't edit the manifest to remove or loosen the gate.
+5. **Refusals stand.** When the gateway refuses (`status: denied`), report its `deny` and `reason` as given. Don't relabel the scope, split the motion into smaller ones, retry, or reach for another tool to get past it. A call that ends `gateway_no_answer` or `gateway_unknown_outcome` may have run: tell the person, and don't resend it. `status: ok` means the gateway ran the call, not that the arm arrived: read the telemetry's `reached`, which is false when a stop interrupted the motion (`stopped_by_estop: true`). `execute_task` stops at a step that didn't reach (`status: not_reached`). Pass on any `warnings` a result carries, as given.
+6. **Stops.** `estop` latches this MCP server and sends the gateway's declared stop (`arm.estop`). The arm then holds its pose in software; that is not a hardware e-stop. If `estop` reports `stop_not_confirmed` or returns an error, the stop was not confirmed: tell the person to use the hardware stop now. **Never call `estop_clear` to resume on your own**; it refuses and sends nothing anyway. Clearing a stop makes the robot movable again. It needs a commission-tier credential, which belongs to the person at the machine; the person clears it. After a robot-md-gateway trip, the gateway needs its own clear as well as the arm's. This MCP server keeps refusing motion after any `estop` until it restarts: once the stop is cleared, the person restarts this MCP server (`/mcp` → `robot-md` → Reconnect).
 7. **Test runs are started by the person, never by you.** That covers Bounded Embodiment EV runs (`be run`, `be goto-start`, `be doctor --port`), `robot-md trial start` and every `robot-md trial iteration`, hardware-in-the-loop test suites, and calibration that moves the arm. You prepare the commands; the person runs them and types the confirmations.
 
-Never read or print `bearers.yaml` or a gateway token into this conversation. The MCP server reads its own credential; tool results name where it came from, never what it is.
+Never read or print `bearers.yaml` or a gateway token into this conversation, and don't print the environment (`env`, `printenv`): the person may have put the token there for the MCP server. The MCP server reads its own credential; tool results name where it came from, never what it is.
 
 ### How this skill relates to the bounded-embodiment skill
 
@@ -29,16 +29,16 @@ Its motion rule is stricter than this one. It says you never start motion on rea
 
 ## First-time setup recipe
 
-If you're seeing this on first plugin load, the operator has just installed the plugin and wants to wire up their robot. These are the commands, in order. Steps 1 and 4 touch no actuator. Step 2 opens every serial port to look for servos and, at a terminal, runs a calibration that moves each joint; step 3 installs and starts the gateway service, which takes the robot's servo port. So the person runs both at the machine:
+If you're seeing this on first plugin load, the operator has just installed the plugin and wants to wire up their robot. These are the commands, in order. Steps 1 and 4 touch no actuator. Step 2 opens every serial port to look for servos, opens the camera and, at a terminal, runs a calibration that moves each joint; step 3 installs and starts the gateway service, which takes the robot's servo port. So the person runs both at the machine:
 
 ```bash
 # 1) Install robot-md from PyPI. On Pi OS Bookworm+ you need --break-system-packages.
-#    The plugin's MCP server needs robot-md 2.0.0 or newer. If pip finds no
-#    2.0.0, it isn't released yet, and the MCP server can't start until it is.
-python3 -m pip install --user --break-system-packages 'robot-md>=2.0.0'
+#    The plugin's MCP server needs robot-md 2.0.1 or newer. If pip finds no
+#    2.0.1, it isn't released yet, and the MCP server can't start until it is.
+python3 -m pip install --user --break-system-packages 'robot-md>=2.0.1'
 
 # 2) Initialize a manifest (the person runs this: it opens the serial ports to
-#    find the servos and can move each joint to calibrate it). Replace <name> + email; the preset is so-arm101 by default.
+#    find the servos, opens the camera, and can move each joint to calibrate it). Replace <name> + email; the preset is so-arm101 by default.
 robot-md init <name> --preset so-arm101 --register --contact-email you@example.com
 
 # 3) Install the enforcement gateway (the person runs this). Motion goes only
@@ -51,7 +51,7 @@ robot-md doctor --path <name>/ROBOT.md --hardware off
 
 Each step should take ~30 s. Total cold-install time on a fresh Pi: under 2 minutes.
 
-The MCP server finds the gateway the way `robot-md install-gateway` sets it up: `http://127.0.0.1:8080` and the actuate-tier entry of `/etc/robot-md-gateway/bearers.yaml`. `ROBOT_MD_GATEWAY_URL` and `ROBOT_MD_GATEWAY_BEARER` in the MCP server's environment override both.
+The MCP server sends to `http://127.0.0.1:8080`, where `robot-md install-gateway` puts the gateway; `ROBOT_MD_GATEWAY_URL` in the MCP server's environment overrides it. The server also needs the gateway's actuate-tier token, and it can't read `/etc/robot-md-gateway/bearers.yaml`, which `install-gateway` keeps readable only by the gateway's own user. So the person starts Claude Code with the token in `ROBOT_MD_GATEWAY_BEARER`, or with `ROBOT_MD_BEARERS_FILE` naming a bearers file of their own. The token never goes in the chat.
 
 ### When something errors
 
@@ -105,14 +105,14 @@ digraph when_to_use {
 | "What's it called?" / "what's the RRN?" | Read `robot-md://<name>/identity` (MCP) |
 | "Brief me on this robot" / "give me the full context" | Read `robot-md://<name>/context` (MCP) |
 | "What are the safety gates?" / "is it safe to X?" | Read `robot-md://<name>/safety` (MCP). **Before any motion, always.** |
-| "Pick up X" / "move to Y" / any physical motion | Follow the motion rules at the top. If the bounded-embodiment skill is in your session, or a `require_auth` gate covers motion, prepare the steps and hand them to the person. Otherwise read `safety`, confirm the person is at the machine with a hardware stop in reach, then call `execute_capability`, which sends it to the gateway. Report the gateway's answer as given. |
-| "Stop!" / "e-stop" | Call `estop` at once. If it returns an error, tell the person to use the hardware stop now. |
-| "Resume" / "clear the stop" | The person clears it with their own commission-tier credential (`robot-md invoke` with a commission bearer for `arm.estop.clear`). Don't call `estop_clear` on your own. |
+| "Pick up X" / "move to Y" / any physical motion | Follow the motion rules at the top. If the bounded-embodiment skill is in your session, or the manifest has a gate that refuses motion (rule 4), prepare the steps and hand them to the person. Otherwise read `safety`, confirm the person is at the machine with a hardware stop in reach, then call `execute_capability`, which sends it to the gateway. Report the gateway's answer as given. |
+| "Stop!" / "e-stop" | Call `estop` at once. If it reports `stop_not_confirmed` or returns an error, tell the person to use the hardware stop now. |
+| "Resume" / "clear the stop" | The person clears it with their own commission-tier credential: `arm.estop.clear` at the commission tier, plus the gateway's own clear after a gateway trip. Then they reconnect this MCP server (`/mcp` → `robot-md` → Reconnect). Don't call `estop_clear`: it refuses and sends nothing. |
 | "Something's wrong" / "it won't respond" | Run `robot-md doctor --path ROBOT.md --hardware off` from Bash. Keep `--hardware off`: with `--path` and no flag, doctor opens the servo port and reads every servo when one is connected. |
 | "Is the manifest valid?" / "did I break it?" | Call MCP tool `validate`, or run `robot-md validate ROBOT.md` |
 | "Quick-check" / "is everything OK" | Call MCP tool `doctor_summary` (manifest-only, fast) |
 | "Give me just the YAML" / "dump config" | Call MCP tool `render`, or `robot-md render ROBOT.md` |
-| "Set up a new ROBOT.md" (none exists) | Give the person `robot-md init <name> --preset <guess> --register --manufacturer <...> --contact-email <...>` to run at the machine: it opens every serial port to look for servos, and at a terminal it can move each joint to calibrate it. See `docs/getting-started-claude-code.md` in the robot-md repo. |
+| "Set up a new ROBOT.md" (none exists) | Give the person `robot-md init <name> --preset <guess> --register --manufacturer <...> --contact-email <...>` to run at the machine: it opens every serial port to look for servos and opens the camera, and at a terminal it can move each joint to calibrate it. See `docs/getting-started-claude-code.md` in the robot-md repo. |
 | "Pose the arm at zero" / "calibrate zero" | Give the person `robot-md calibrate --zero ROBOT.md` to run at the machine. It opens the servo port directly, so it's theirs to run, not yours. |
 | "Calibrate the hand-eye" / "solve the camera extrinsic" | Give the person `robot-md calibrate --extrinsic ROBOT.md` (`--hand-eye` is its deprecated name). It moves the arm through calibration poses directly on the servo bus: the person runs it at the machine. |
 | "Teach a pose" / "record where the arm is" | Give the person the `robot-md pose teach` command to run at the machine. It releases the servos' torque, so the arm goes limp. |
@@ -166,7 +166,8 @@ If the operator requests physical motion or perception (any of `arm.*`, `nav.*`,
 > "Motion on this robot goes only through robot-md-gateway, and this session can't reach one. To set it up:
 >
 > 1. On the robot, run `robot-md install-gateway` yourself (it installs the gateway and starts its service, which takes the servo port).
-> 2. In Claude Code: `/mcp` → arrow to `robot-md` → Reconnect.
+> 2. Give the MCP server the gateway's actuate token. It can't read the gateway's own `bearers.yaml`, so start Claude Code with the token in `ROBOT_MD_GATEWAY_BEARER`, or with `ROBOT_MD_BEARERS_FILE` naming a bearers file of your own. Don't paste the token into this chat.
+> 3. If Claude Code already started that way, `/mcp` → arrow to `robot-md` → Reconnect is enough.
 >
 > Then ask me again."
 
@@ -180,7 +181,7 @@ Wait for the operator to confirm. Do NOT attempt manifest reads as a substitute 
 
 1. Read `robot-md://<name>/safety` (MCP) or parse `safety:` from the manifest.
 2. Confirm with the person that they are at the machine, watching, with nobody else in reach and a hardware stop within their reach.
-3. Scan `hitl_gates[]`. If a gate with `require_auth: true` covers motion (`destructive`, `system`, or the capability's prefix), `execute_capability` refuses it: name the gate and tell the person the confirmation has to come from outside this conversation. A reply in chat is not that confirmation.
+3. Scan `hitl_gates[]`. A gate that doesn't say `require_auth: false`, on any scope but `commission`, makes the motion tools refuse every motion (rule 4): name the gate and tell the person the confirmation has to come from outside this conversation. A reply in chat is not that confirmation.
 4. If no gate matches and the motion could cause harm (grasping unknown objects, high velocity, near the workspace boundary): **surface the gap to the operator**. Don't silently proceed; don't silently decline. Say: "Your manifest doesn't declare a gate for this scope. Adding one to ROBOT.md is your decision."
 5. Know the stops: `estop` is the software stop through the gateway; the person's hardware stop is the one that depends on no software.
 
@@ -327,7 +328,7 @@ The plugin also auto-registers the `robot-md` MCP server, so the `robot-md://<na
 ## Integration
 
 **Pairs with:**
-- **`robot-md`** (MCP server) — provides `robot-md://<name>/*` resources, `validate` / `render` / `doctor_summary` tools, and the motion tools (`execute_capability`, `execute_task`, `estop`, `estop_clear`), which send to robot-md-gateway. Announces its own routing table via the MCP `instructions` field.
+- **`robot-md`** (MCP server) — provides `robot-md://<name>/*` resources, `validate` / `render` / `doctor_summary` tools, the motion tools (`execute_capability`, `execute_task`, `estop`), which send to robot-md-gateway, and `estop_clear`, which refuses and sends nothing. Announces its own routing table via the MCP `instructions` field.
 - **robot-md-gateway** — the bounded layer every motion goes through. It enforces the limits; this skill does not.
 - **bounded-embodiment** (skill) — test runs and gate work; see "How this skill relates to the bounded-embodiment skill" at the top.
 - **`CLAUDE.md` in the project root** — generated by `robot-md claude-md ROBOT.md`; encodes the same intent→action table as a plain text file the harness reads at session start.
@@ -340,7 +341,7 @@ A pick-place trial is a test run, so the person starts it and every iteration (`
 
 1. Locate the brick and the bowl with the read-only perception tools (`vision_find` with the manifest's object descriptors). If they report that no camera is open in this server, ask the person; don't open the camera yourself.
 2. Plan the steps from capabilities the manifest declares. Whether you send them depends on two things:
-   - If the bounded-embodiment skill is in your session, or a `require_auth` gate covers motion (the so-arm101 preset's gates do), you don't send them: hand the steps to the person. A trial with you driving the arm can't run while either holds.
+   - If the bounded-embodiment skill is in your session, or the manifest has a gate that refuses motion (rule 4; the so-arm101 preset's gates do), you don't send them: hand the steps to the person. A trial with you driving the arm can't run while either holds.
    - Otherwise, send each step with `execute_capability`, one at a time. Wait for `status: ok` with `reached: true` before sending the next. A refusal, or a step that didn't reach, ends the iteration: report it as given.
 3. Report completion to the person. They run `robot-md trial iteration --capture-post-and-verdict` to score it.
 
