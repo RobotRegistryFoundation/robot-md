@@ -35,10 +35,9 @@ dependencies = [
     "fastapi>=0.110",
     "jinja2>=3.1",
     "rcan[pq,crypto]>=3.3,<4",
-    # TODO(first release after robot-md-gateway#35 is published): raise this
-    # floor to that robot-md-gateway release. None exists yet (0.5.0a9 predates
-    # #35), so no version is named. See CHANGELOG [Unreleased].
-    "robot-md-gateway>=0.5.0a3",
+    # 0.5.0a10: the first release with robot-md-gateway#35 to #37 (the trip
+    # stop, the safety routes, the systemd watchdog install-gateway's unit uses).
+    "robot-md-gateway>=0.5.0a10",
     "websockets>=12",
     "watchdog>=3.0",
     "tomli>=2.0;python_version<'3.11'",

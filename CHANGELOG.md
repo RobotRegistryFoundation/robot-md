@@ -7,27 +7,32 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-**Checklist for the first release after robot-md-gateway#35 is published.**
+### Changed
 
-- [ ] Raise the `robot-md-gateway` floor in `cli/pyproject.toml` to that
-  release, and require so-arm101-actuator with
-  RobotRegistryFoundation/so-arm101-actuator#8 (0.2.2 on PyPI declares no
-  stop, so `arm.estop` fails there). Until then, on 0.5.0a9, the MCP `estop`
-  must pass every gate a motion does, so a manifest-pin mismatch, a missing
-  signing key or a failed key lookup refuses it, and the gateway doesn't stop
-  the arm when heartbeats stop. The MCP server warns at startup when it finds
-  such a gateway (2.0.1, Changed).
-  - [ ] **robot-md-gateway#37, the systemd watchdog (R2-18):**
-    `install-gateway`'s unit needs four lines, `Type=notify`,
-    `NotifyAccess=main`, `WatchdogSec=5s` and `StateDirectory=` (for example
-    `StateDirectory=robot-md-gateway`), but only once the gateway floor is a
-    release that carries #37 and sends `READY=1`. An older gateway under
-    `Type=notify` fails to start after 90 s, so the unit change and the floor
-    change ship together. #37 keeps its clean-shutdown marker in the state
-    directory. Without one, every gateway start sends the declared stops: that
-    fails safe, but so-arm101 then boots latched every time. #37 does nothing
-    for bob until robot-md adds those lines, and the gateway's rollout says
-    bob mustn't run unattended before then. 2.0.1 doesn't change the unit.
+- **robot-md-gateway 0.5.0a10 or later is required** (was 0.5.0a3). It is
+  the first release with robot-md-gateway#35 to #37: a served gateway starts
+  held, stops every actuator that declares a stop when the supervisor's
+  heartbeats stop, lets an allowlisted stop from a known bearer through, and
+  tells systemd when its safety watchdog runs.
+- **`install-gateway`'s unit uses the gateway's watchdog**: `Type=notify`,
+  `NotifyAccess=main`, `WatchdogSec=5s` and `StateDirectory=robot-md-gateway`.
+  When the watchdog's ticks stop, systemd stops the gateway and starts it
+  again, held. The state directory keeps the gateway's clean-shutdown marker;
+  without it, every start would send each declared stop, and so-arm101 would
+  boot latched. Under `Type=notify` a gateway before 0.5.0a10 never sends
+  `READY=1` and fails to start after 90 s, so `install-gateway` now installs
+  `robot-md-gateway>=0.5.0a10`. It still does nothing on a host whose gateway
+  is active: on an existing install, upgrade the gateway in
+  `/opt/robot-md-gateway/.venv` first, then add the four lines to the unit,
+  then `systemctl daemon-reload` and restart it.
+- **`install-gateway`'s next steps and its bearers.yaml comment** name the
+  gateway's own `heartbeat` and `clear` commands, and drop the caveats for
+  0.5.0a9, which served neither safety route.
+- **`robot-md init` installs so-arm101-actuator 0.3.0 or later and
+  oak-d-actuator 0.2.2 or later.** The gateway refuses to be armed while a
+  configured actuator may move and declares no stop: so-arm101-actuator
+  declares its stop from 0.3.0, and oak-d-actuator declares from 0.2.2 that it
+  moves nothing.
 
 ## [2.0.1] - 2026-11-14
 

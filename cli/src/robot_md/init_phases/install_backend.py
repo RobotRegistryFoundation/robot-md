@@ -34,6 +34,9 @@ _RULES: list = [
         PackageMatch(
             package="so-arm101-actuator",
             reason="Feetech servo bus detected — the SO-ARM101 driver is the supported backend.",
+            # 0.3.0 declares the arm's stop; robot-md-gateway refuses to be
+            # armed beside a motion actuator that declares none.
+            min_version="0.3.0",
             rpn="RPN-000000000002",
         ),
     ),
@@ -45,6 +48,9 @@ _RULES: list = [
         PackageMatch(
             package="oak-d-actuator",
             reason="Luxonis OAK-D camera detected — installing the depth+RGB driver.",
+            # 0.2.2 speaks the gateway's Actuator Protocol and declares that the
+            # camera moves nothing, so the gateway can be armed beside it.
+            min_version="0.2.2",
             rpn="RPN-000000000003",
         ),
     ),
