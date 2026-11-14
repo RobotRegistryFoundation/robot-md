@@ -28,13 +28,17 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   the arm when heartbeats stop. The MCP server warns at startup when it finds
   such a gateway (below).
   - [ ] **robot-md-gateway#37, the systemd watchdog (R2-18; open, not merged
-    yet):** `install-gateway`'s unit needs `Type=notify`, `NotifyAccess=main`
-    and `WatchdogSec=5s`, but only once the gateway floor is a release that
-    sends `READY=1` (#37 or later). An older gateway under `Type=notify`
-    fails to start after 90 s, so the unit change and the floor change ship
-    together. #37 does nothing for bob until robot-md adds those lines, and
-    the gateway's rollout says bob mustn't run unattended before then.
-    robot-md#121 doesn't change the unit.
+    yet):** `install-gateway`'s unit needs four lines, `Type=notify`,
+    `NotifyAccess=main`, `WatchdogSec=5s` and `StateDirectory=` (for example
+    `StateDirectory=robot-md-gateway`), but only once the gateway floor is a
+    release that carries #37 and sends `READY=1`. An older gateway under
+    `Type=notify` fails to start after 90 s, so the unit change and the floor
+    change ship together. #37 (at 24e28c3) keeps its clean-shutdown marker in
+    the state directory. Without one, every gateway start sends the declared
+    stops: that fails safe, but so-arm101 then boots latched every time. #37
+    does nothing for bob until robot-md adds those lines, and the gateway's
+    rollout says bob mustn't run unattended before then. robot-md#121 doesn't
+    change the unit.
 - [ ] **robot-md-mcp:** RobotRegistryFoundation/robot-md-mcp#19 raises the
   plugin launcher's floor to robot-md 2.0.1, so it refuses 2.0.0 and its gate
   bug.
