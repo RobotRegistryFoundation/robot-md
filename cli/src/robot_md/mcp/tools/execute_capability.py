@@ -13,14 +13,21 @@ It refuses, and sends nothing, when:
 - this server's own stop latch is set (``estop_set``), except for read-only
   capabilities;
 - no gateway is configured (``gateway_not_configured``);
-- the capability's scope matches a ``hitl_gates[]`` entry that requires
-  authorization (``hitl_gate``);
+- ROBOT.md has a ``hitl_gates[]`` entry that needs a person (``hitl_gate``).
+  Such a gate covers every motion (see ``robot_md.motion_gates``), so on
+  robot-md's presets and examples/bob.ROBOT.md, which gate `destructive`
+  and `system`, every motion is refused;
 - a declared precondition fails (``precondition``);
-- another call from this server is still in flight (``busy``).
+- another motion from this server is still in flight (``busy``). Reads are
+  not held back by a motion in flight.
 
 There is no confirmation token. The one this tool used to take was written by
 the model, and any non-empty string satisfied the gate; a token the model
 writes is not a person's confirmation.
+
+``status: ok`` means the gateway ran the call. A stop can interrupt a motion
+the gateway ran, so the result carries the actuator's ``reached`` and
+``stopped_by_estop`` when it reports them.
 """
 
 from __future__ import annotations
@@ -29,7 +36,7 @@ import contextlib
 import time
 from typing import Any
 
-from robot_md import gateway_client
+from robot_md import gateway_client, motion_gates
 from robot_md.mcp.context import McpContext
 
 #: Capabilities that read and never move, whatever the backend declares. They
@@ -65,6 +72,9 @@ def execute_capability_tool(
         )
 
     def _finish(result: dict) -> dict:
+        warnings = list(getattr(ctx, "gateway_warnings", None) or ())
+        if warnings:
+            result["warnings"] = warnings
         _publish_result(ctx, request_id, capability, result)
         return result
 
@@ -94,23 +104,26 @@ def execute_capability_tool(
         result["gateway_config"] = config.describe()
         return _finish(result)
 
-    gate = _match_hitl_gate(ctx, capability)
-    if gate is not None and gate.get("require_auth") is not False:
+    gate = None if is_read else _match_hitl_gate(ctx, capability)
+    if gate is not None:
         # TODO(out-of-band confirmation): a person's confirmation for a gated
-        # scope has to reach the gateway by a path the model cannot write,
-        # such as the pendant, or a confirmation the gateway asks for and
-        # verifies itself. When one exists, this check defers to it. Until
-        # then a gated capability does not run from MCP. (The gateway's own
-        # HiTL check reads a `delegation_chain` from the envelope, which this
-        # server never writes for the same reason.)
+        # motion has to reach the gateway by a path the model cannot write:
+        # the plan is that the gateway holds the gated request until the
+        # pendant signs an approval bound to that exact request, and that the
+        # gateway stops trusting a caller-written `delegation_chain`. When that
+        # exists, this check defers to it. Until then a gated motion does not
+        # run from MCP, and on a manifest whose gates cover every motion (bob)
+        # no motion runs from MCP at all.
+        scope = gate.get("scope")
         result = _blocked(
             "hitl_gate",
-            f"ROBOT.md gates scope '{gate.get('scope')}' with require_auth. That needs "
-            "a person's confirmation from outside this conversation, and robot-md "
-            "has no such path yet, so this server refuses it. A reply in chat is not "
-            "that confirmation.",
+            f"ROBOT.md's gate '{scope}' needs a person's confirmation, and a gate that "
+            "needs one covers every motion on this robot. That confirmation has to come "
+            "from outside this conversation, and robot-md has no such path yet, so this "
+            "server refuses every motion while the gate stands. Reads still work. A reply "
+            "in chat is not that confirmation.",
         )
-        result["error"]["scope"] = gate.get("scope")
+        result["error"]["scope"] = scope
         return _finish(result)
 
     # Preconditions are manifest checks (taught pose, extrinsic, ...). Read-only
@@ -139,7 +152,7 @@ def execute_capability_tool(
                     }
                 )
 
-    scope = gateway_client.OBSERVE_SCOPE if is_read else gateway_client.MOTION_SCOPE
+    scope = gateway_client.OBSERVE_SCOPE if is_read else motion_gates.motion_scope_for(capability)
 
     if dry_run:
         # Built exactly as it would be sent, and not sent: no request leaves
@@ -157,8 +170,14 @@ def execute_capability_tool(
             }
         )
 
+    if is_read:
+        # Reads are not held back by a motion in flight: the state stays
+        # readable while the arm moves.
+        outcome = gateway_client.invoke(config, tool_name=capability, tool_args=args, scope=scope)
+        return _finish(_from_outcome(outcome))
+
     if not ctx.exec_lock.acquire(blocking=False):
-        return _finish(_blocked("busy", "another call from this server is in flight"))
+        return _finish(_blocked("busy", "another motion from this server is in flight"))
     try:
         # The latch is checked again after the envelope is signed, just before
         # it is sent. A stop set during the send itself can reach the gateway
@@ -170,26 +189,38 @@ def execute_capability_tool(
             tool_name=capability,
             tool_args=args,
             scope=scope,
-            withhold=None if is_read else lambda: _latch_error(ctx),
+            withhold=lambda: _latch_error(ctx),
         )
     finally:
         ctx.exec_lock.release()
-    return _finish(
-        {
-            "status": outcome["status"],
-            "trajectory": None,
-            "events": [],
-            "error": outcome["error"],
-            "gateway": outcome["gateway"],
-            "envelope": outcome["envelope"],
-        }
-    )
+    return _finish(_from_outcome(outcome))
+
+
+def _from_outcome(outcome: dict) -> dict:
+    result = {
+        "status": outcome["status"],
+        "trajectory": None,
+        "events": [],
+        "error": outcome["error"],
+        "gateway": outcome["gateway"],
+        "envelope": outcome["envelope"],
+    }
+    if outcome["status"] == "ok":
+        report = gateway_client.motion_report(outcome["gateway"])
+        result.update(report)
+        if report.get("reached") is False:
+            result["message"] = (
+                "The gateway ran it, and the arm did not reach the target"
+                + (" because a stop interrupted it." if report.get("stopped_by_estop") else ".")
+                + " Don't send the next step as if it had."
+            )
+    return result
 
 
 _LATCH_MESSAGE = (
-    "this MCP server's stop latch is set, so it sends no motion. It is released "
-    "only when the gateway accepts estop_clear (commission tier) or the server "
-    "restarts."
+    "this MCP server's stop latch is set, so it sends no motion. Only a restart of "
+    "this server releases it (/mcp, robot-md, Reconnect), after the person has "
+    "cleared the stop at the gateway with their own credential."
 )
 
 
@@ -225,17 +256,12 @@ def _blocked(reason: str, message: str) -> dict:
 
 
 def _match_hitl_gate(ctx: McpContext, capability: str) -> dict | None:
-    """The `hitl_gates[]` entry whose scope is the capability's prefix
-    (`arm` for `arm.pick`) or the capability itself, if any."""
+    """The `hitl_gates[]` entry that refuses this motion, if any. A gate that
+    needs a person covers every motion: see `robot_md.motion_gates`."""
     spec = ctx.spec
     if spec is None:
         return None
-    cap_scope = capability.split(".", 1)[0]
-    for gate in spec.safety.hitl_gates:
-        scope = gate.get("scope") if isinstance(gate, dict) else None
-        if scope in (cap_scope, capability):
-            return gate if isinstance(gate, dict) else None
-    return None
+    return motion_gates.gate_for_motion(spec.safety.hitl_gates)
 
 
 def _publish_result(ctx: McpContext, request_id: str, capability: str, result: dict) -> None:

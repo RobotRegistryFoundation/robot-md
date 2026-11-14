@@ -127,6 +127,18 @@ async def test_check_safety_never_offers_chat_authorization(server_and_name):
     assert "hardware stop" in text
 
 
+async def test_check_safety_says_a_gate_covers_every_motion(server_and_name):
+    """The MCP server refuses every motion while a gate that needs a person
+    stands (robot_md.motion_gates); the prompt must not suggest that only a
+    matching scope is refused."""
+    server, _ = server_and_name
+    result = await server.get_prompt("check-safety", {"action": "move to the shelf"})
+    text = result.messages[0].content.text
+    assert "covers every motion" in text
+    assert "other than `commission`" in text
+    assert "scope match" not in text
+
+
 async def test_explain_capability_returns_non_empty_content(server_and_name):
     server, _ = server_and_name
     result = await server.get_prompt("explain-capability", {"capability": "arm.pick"})

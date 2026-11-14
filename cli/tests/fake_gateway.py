@@ -4,6 +4,14 @@ It listens on 127.0.0.1 (the suite refuses any other host), records every
 request it receives, and answers from a queue of scripted responses. With an
 empty queue it answers the way a gateway that allowed and ran the call does:
 200 with `ok: true`. It never touches hardware; there is nothing behind it.
+
+It can also misbehave the way a real gateway or network can: answer only
+after a delay (`hang`), or send a status line and headers and then stall
+before the body (`stall_after_headers`).
+
+GET /openapi.json lists `routes`, the way FastAPI does: by default the routes
+of a gateway with robot-md-gateway#35 (the safety routes included). Set
+`routes` to OLD_GATEWAY_ROUTES for one that predates it.
 """
 
 from __future__ import annotations
@@ -13,11 +21,20 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+#: What robot-md-gateway 0.5.0a9 serves.
+OLD_GATEWAY_ROUTES = ("/v1/invoke", "/v1/audit/last")
+#: What a gateway with robot-md-gateway#35 serves.
+PR35_GATEWAY_ROUTES = (*OLD_GATEWAY_ROUTES, "/v1/safety/heartbeat", "/v1/safety/clear")
+
 
 class FakeGateway:
     def __init__(self) -> None:
         self.requests: list[dict[str, Any]] = []
-        self._queue: list[tuple[int, dict]] = []
+        self.get_requests: list[dict[str, Any]] = []
+        self.routes: tuple[str, ...] = PR35_GATEWAY_ROUTES
+        # (status, body, delay before answering, stall after the headers)
+        self._queue: list[tuple[int, dict, float, float]] = []
+        self._release = threading.Event()
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
@@ -25,7 +42,16 @@ class FakeGateway:
 
     def respond(self, status: int, body: dict) -> None:
         """Queue one answer. Answers are used in order, one per request."""
-        self._queue.append((status, body))
+        self._queue.append((status, body, 0.0, 0.0))
+
+    def hang(self, seconds: float, status: int = 200, body: dict | None = None) -> None:
+        """Queue an answer sent only after `seconds` (released early by stop())."""
+        self._queue.append((status, body if body is not None else {}, seconds, 0.0))
+
+    def stall_after_headers(self, status: int, seconds: float) -> None:
+        """Queue an answer whose status line and headers are sent, and whose body
+        is not, for `seconds`."""
+        self._queue.append((status, {"detail": "stalled"}, 0.0, seconds))
 
     def deny(self, deny: str, reason: str, **extra: Any) -> None:
         """Queue a signed-deny shaped 403, as the gateway sends one."""
@@ -72,10 +98,43 @@ class FakeGateway:
                         "body": body,
                     }
                 )
+                delay = stall = 0.0
                 if gateway._queue:
-                    status, answer = gateway._queue.pop(0)
+                    status, answer, delay, stall = gateway._queue.pop(0)
+                    if status == 200 and not answer:
+                        answer = gateway.allowed(body if isinstance(body, dict) else {})
                 else:
                     status, answer = 200, gateway.allowed(body if isinstance(body, dict) else {})
+                if delay:
+                    gateway._release.wait(delay)
+                data = json.dumps(answer).encode("utf-8")
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data) + (64 if stall else 0)))
+                self.end_headers()
+                if stall:
+                    self.wfile.flush()
+                    gateway._release.wait(stall)
+                    return
+                self.wfile.write(data)
+
+            def do_GET(self) -> None:
+                gateway.get_requests.append(
+                    {
+                        "method": "GET",
+                        "path": self.path,
+                        "headers": {k.lower(): v for k, v in self.headers.items()},
+                    }
+                )
+                if self.path == "/openapi.json":
+                    status = 200
+                    answer: Any = {
+                        "openapi": "3.1.0",
+                        "info": {"title": "robot-md-gateway", "version": "0.4.0a1"},
+                        "paths": {route: {} for route in gateway.routes},
+                    }
+                else:
+                    status, answer = 404, {"detail": "Not Found"}
                 data = json.dumps(answer).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
@@ -93,6 +152,7 @@ class FakeGateway:
         self._thread.start()
 
     def stop(self) -> None:
+        self._release.set()
         if self._server is not None:
             self._server.shutdown()
             self._server.server_close()

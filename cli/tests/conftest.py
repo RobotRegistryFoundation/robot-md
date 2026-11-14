@@ -163,6 +163,9 @@ def _no_host_gateway_config(monkeypatch):
     monkeypatch.setattr(
         gateway_client, "INSTALL_GATEWAY_BEARERS_FILE", _NO_GATEWAY_DIR / "bearers.yaml"
     )
+    monkeypatch.setattr(
+        gateway_client, "INSTALL_GATEWAY_MANIFEST_FILE", _NO_GATEWAY_DIR / "ROBOT.md"
+    )
 
 
 @pytest.fixture

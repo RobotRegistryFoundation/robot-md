@@ -60,39 +60,21 @@ def test_command_watcher_estop_set_latches_and_sends_the_gateway_stop(
             ctx.publisher.stop()
 
 
-def test_command_watcher_estop_clear_asks_the_gateway(
+def test_command_watcher_estop_clear_is_refused_and_sends_nothing(
     fixtures_dir, tmp_path, monkeypatch, gateway_env
 ):
-    """The dashboard's clear is not an in-process clear: it asks the gateway at
-    the commission tier, and the latch follows the gateway's answer."""
+    """The dashboard's clear takes the MCP tool's path, which refuses: clearing
+    a stop is the person's, with their own commission credential, and this
+    server's latch is released only by a restart."""
     monkeypatch.delenv("ROBOT_MD_DASHBOARD_DISABLED", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
     ctx = load_context(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
     try:
         ctx.estop.set()
         _write_cmd(tmp_path, "estop.clear")
-        _wait_for(lambda: not ctx.estop.is_set())
-        assert not ctx.estop.is_set()
-        assert gateway_env.bodies[-1]["tool_name"] == "arm.estop.clear"
-        assert gateway_env.bodies[-1]["scope"] == "COMMISSION"
-    finally:
-        if ctx.publisher:
-            ctx.publisher.stop()
-
-
-def test_command_watcher_estop_clear_refused_keeps_the_latch(
-    fixtures_dir, tmp_path, monkeypatch, gateway_env
-):
-    monkeypatch.delenv("ROBOT_MD_DASHBOARD_DISABLED", raising=False)
-    monkeypatch.setenv("HOME", str(tmp_path))
-    ctx = load_context(fixtures_dir / "robot_md_oak_d_factory_cal.yaml")
-    try:
-        ctx.estop.set()
-        gateway_env.deny("tier_policy", "scope COMMISSION requires the 'commission' tier")
-        _write_cmd(tmp_path, "estop.clear")
-        _wait_for(lambda: bool(gateway_env.requests))
-        time.sleep(0.3)
+        time.sleep(0.6)
         assert ctx.estop.is_set()
+        assert gateway_env.requests == []
     finally:
         if ctx.publisher:
             ctx.publisher.stop()

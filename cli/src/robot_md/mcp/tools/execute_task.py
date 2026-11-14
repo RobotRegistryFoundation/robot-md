@@ -3,7 +3,9 @@
 The planner proposes a sequence of declared capabilities. Each step goes
 through `execute_capability`, which sends it to the gateway; nothing here
 touches the robot. The first step that does not come back `ok` (`dry_run` on
-a dry run) ends the task, so nothing is sent after a refusal.
+a dry run) ends the task, so nothing is sent after a refusal. So does a step
+the gateway ran whose motion did not reach its target (`reached: false`, for
+example because a stop interrupted it): the task ends `not_reached`.
 """
 
 from __future__ import annotations
@@ -64,11 +66,13 @@ def execute_task_tool(
             dry_run=dry_run,
         )
         executions.append(result)
-        if result["status"] != proceed:
+        if result["status"] != proceed or result.get("reached") is False:
             break
 
     overall = executions[-1]["status"] if executions else "error"
-    return {
+    if executions and executions[-1].get("reached") is False:
+        overall = "not_reached"
+    result: dict[str, Any] = {
         "status": overall,
         "plan": [
             {"capability": s.capability, "args": s.args, "confidence": s.confidence}
@@ -77,6 +81,10 @@ def execute_task_tool(
         "executions": executions,
         "events": [],
     }
+    warnings = list(getattr(ctx, "gateway_warnings", None) or ())
+    if warnings:
+        result["warnings"] = warnings
+    return result
 
 
 def _error(reason: str, message: str) -> dict:

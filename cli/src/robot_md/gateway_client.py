@@ -1,9 +1,10 @@
 """Client for robot-md-gateway, the bounded layer the MCP motion tools go through.
 
 robot-md's MCP server does not write to the servo bus. ``execute_capability``,
-``execute_task``, ``estop`` and ``estop_clear`` are clients of
-robot-md-gateway: each sends an RCAN INVOKE envelope to the gateway's
-``POST /v1/invoke`` and reports what the gateway decided. The gateway checks
+``execute_task`` and ``estop`` are clients of robot-md-gateway: each sends an
+RCAN INVOKE envelope to the gateway's ``POST /v1/invoke`` and reports what the
+gateway decided. (``estop_clear`` sends nothing: clearing a stop is the
+person's, with their own credential.) The gateway checks
 the bearer's tier, the tool allowlist, the envelope's scope, the manifest and
 its own safety state; the actuator behind it bounds and paces the motion; the
 gateway records each decision in its audit trail.
@@ -27,13 +28,22 @@ first source that is set wins:
                  and it belongs to the person at the machine.
     manifest     $ROBOT_MD_MANIFEST_PATH, else the ROBOT_MD_PATH line of
                  gateway.env when it is an absolute path (the manifest the
-                 gateway pins), else the served ROBOT.md
+                 gateway pins), else /etc/robot-md-gateway/ROBOT.md when it
+                 exists (the copy install-gateway pins), else the served
+                 ROBOT.md
     ruri         $ROBOT_MD_RURI, else ``metadata.ruri`` in the served ROBOT.md
     actuator     $ROBOT_MD_GATEWAY_ACTUATOR, optional; unset lets the gateway
                  route by tool name
     stop tools   $ROBOT_MD_GATEWAY_STOP_TOOL (default ``arm.estop``) and
                  $ROBOT_MD_GATEWAY_STOP_CLEAR_TOOL (default
                  ``arm.estop.clear``), the names so-arm101-actuator declares
+
+Since robot-md#113, install-gateway makes gateway.env and bearers.yaml mode
+0600, owned by the gateway's own user, so the MCP server, which runs as the
+person's user, cannot read them. There the person gives this server its
+actuate token: $ROBOT_MD_GATEWAY_BEARER in the MCP server's environment, or
+$ROBOT_MD_BEARERS_FILE naming a file of their own that holds only the actuate
+entry.
 
 The bearer never appears in a tool result: results say where it came from,
 not what it is. Requests ignore any HTTP proxy in the environment, so the
@@ -55,6 +65,9 @@ from typing import Any
 DEFAULT_GATEWAY_URL = "http://127.0.0.1:8080"
 INSTALL_GATEWAY_ENV_FILE = Path("/etc/robot-md-gateway/gateway.env")
 INSTALL_GATEWAY_BEARERS_FILE = Path("/etc/robot-md-gateway/bearers.yaml")
+#: The manifest install-gateway copies for the gateway and pins
+#: (ROBOT_MD_PATH in its gateway.env).
+INSTALL_GATEWAY_MANIFEST_FILE = Path("/etc/robot-md-gateway/ROBOT.md")
 
 #: The tier read from a bearers file. The same tier `robot-md invoke
 #: --bearer-from-bearers` reads. Never `commission`.
@@ -64,16 +77,23 @@ BEARER_TIER = "actuate"
 #: seconds, and the gateway answers after the actuator returns.
 DEFAULT_TIMEOUT_S = 30.0
 
+#: Seconds a stop waits for the gateway. A stop answers quickly or not at all
+#: (so-arm101-actuator gives its bus at most 5 s, and the gateway runs stops on
+#: lanes of their own), and every second spent waiting is a second before the
+#: person is told to use the hardware stop.
+STOP_TIMEOUT_S = 2.0
+
 #: Envelope scopes. The gateway refuses a motion tool under a scope that is not
 #: an actuation scope (`tool_scope`), so a wrong label here cannot move
-#: anything; it can only be refused.
+#: anything; it can only be refused. Motion scopes per capability family are
+#: in `robot_md.motion_gates.motion_scope_for`; this is the fallback.
 MOTION_SCOPE = "ACTUATE"
 OBSERVE_SCOPE = "OBSERVE"
 #: The scope the gateway itself uses when it sends a stop.
 STOP_SCOPE = "SAFETY"
-#: Clearing a stop makes the robot movable again. COMMISSION makes the gateway
-#: require the `commission` tier for it (check_tier), on top of the actuator's
-#: own tier table.
+#: The scope a person's clear goes under. COMMISSION makes the gateway require
+#: the `commission` tier for it (check_tier). This server never sends one; the
+#: name appears in the instructions estop_clear gives the person.
 CLEAR_SCOPE = "COMMISSION"
 
 DEFAULT_STOP_TOOL = "arm.estop"
@@ -185,6 +205,13 @@ def _bearer_from_file(path: Path) -> tuple[str | None, str | None]:
         return None, f"could not read a bearer from {path} ({type(e).__name__})"
 
 
+def _is_file(path: Path) -> bool:
+    try:
+        return path.is_file()
+    except OSError:
+        return False
+
+
 def _timeout_from(environ: Mapping[str, str]) -> float:
     raw = (environ.get(ENV_TIMEOUT) or "").strip()
     if not raw:
@@ -235,9 +262,11 @@ def resolve_config(
         else:
             bearer_source = "none"
             problems.append(
-                f"no gateway bearer: ${ENV_BEARER} is not set and {problem}. "
-                "Run `robot-md install-gateway` on the robot, or set "
-                f"${ENV_BEARER} in the MCP server's environment."
+                f"no gateway bearer: ${ENV_BEARER} is not set and {problem}. The person "
+                "gives this server the gateway's actuate token: they set "
+                f"${ENV_BEARER} in the MCP server's environment, or ${ENV_BEARERS_FILE} "
+                "to a file of their own holding only the actuate entry. (install-gateway "
+                "keeps bearers.yaml readable by the gateway's user only.)"
             )
 
     env_manifest = (env.get(ENV_MANIFEST_PATH) or "").strip()
@@ -246,6 +275,9 @@ def resolve_config(
         manifest_path, manifest_source = env_manifest, f"${ENV_MANIFEST_PATH}"
     elif gw_manifest and os.path.isabs(gw_manifest):
         manifest_path, manifest_source = gw_manifest, "ROBOT_MD_PATH in gateway.env"
+    elif _is_file(INSTALL_GATEWAY_MANIFEST_FILE):
+        manifest_path = str(INSTALL_GATEWAY_MANIFEST_FILE)
+        manifest_source = "the copy install-gateway pins"
     else:
         manifest_path = str(Path(served_manifest_path).resolve())
         manifest_source = "served ROBOT.md"
@@ -329,7 +361,14 @@ def prepare_envelope(
         return envelope, f"unsigned: could not load the signing keypair ({type(e).__name__})"
     if keypair is None:
         return envelope, f"unsigned: no signing keypair for {config.rrn}"
-    signed = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
+    try:
+        signed = sign_envelope(envelope, keypair, kid=keypair.pq_kid)
+    except Exception as e:
+        # A key that loads and cannot sign (a damaged secret) must not keep
+        # the request, a stop above all, from going out. A gateway that
+        # requires signatures refuses it unsigned; robot-md-gateway#35 never
+        # checks a stop's signature.
+        return envelope, f"unsigned: signing failed ({type(e).__name__})"
     return signed, f"signed (kid {keypair.pq_kid})"
 
 
@@ -342,28 +381,44 @@ class _NoAnswer(Exception):
 
 
 def _post(url: str, body: dict, bearer: str | None, timeout: float) -> tuple[int, Any]:
-    data = json.dumps(body).encode("utf-8")
+    """POST `body`; return (status, parsed answer). Raises only `_Unreachable`
+    (nothing was delivered) or `_NoAnswer` (it may have been)."""
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if bearer:
         headers["Authorization"] = f"Bearer {bearer}"
-    request = urllib.request.Request(url, data=data, method="POST", headers=headers)
-    # No proxies: the bearer goes to the configured address and nowhere else.
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        data = json.dumps(body).encode("utf-8")
+        request = urllib.request.Request(url, data=data, method="POST", headers=headers)
+        # No proxies: the bearer goes to the configured address and nowhere else.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    except Exception as e:
+        # A malformed gateway URL fails here, before anything is sent.
+        raise _Unreachable(f"could not build the request ({type(e).__name__}: {e})") from e
     try:
         with opener.open(request, timeout=timeout) as resp:
             return resp.status, _parse(resp.read())
     except urllib.error.HTTPError as e:
-        return e.code, _parse(e.read())
+        try:
+            raw = e.read()
+        except Exception as read_error:
+            # A status line and headers, then no complete body.
+            raise _NoAnswer(
+                f"HTTP {e.code} with no complete body ({type(read_error).__name__}: {read_error})"
+            ) from read_error
+        return e.code, _parse(raw)
     except urllib.error.URLError as e:
         # urllib wraps failures while connecting or sending in URLError.
         raise _Unreachable(f"{type(e.reason).__name__}: {e.reason}") from e
     except (TimeoutError, OSError, http.client.HTTPException) as e:
         # Raised after the request went out: the gateway may have acted on it.
         raise _NoAnswer(f"{type(e).__name__}: {e}") from e
+    except Exception as e:
+        # Anything else, after the request may have gone out.
+        raise _NoAnswer(f"{type(e).__name__}: {e}") from e
 
 
 def _parse(raw: bytes) -> Any:
-    text = raw.decode("utf-8", errors="replace")
+    text = (raw or b"").decode("utf-8", errors="replace")
     try:
         return json.loads(text)
     except ValueError:
@@ -381,12 +436,34 @@ def _summary(envelope: dict, note: str) -> dict[str, Any]:
     }
 
 
+def _unknown_outcome(status_code: int, body: Any) -> dict[str, Any]:
+    return {
+        "status": "error",
+        "error": {
+            "reason": "gateway_unknown_outcome",
+            "http_status": status_code,
+            "message": (
+                f"the gateway answered HTTP {status_code} without a decision this client "
+                "can read. The call may have run. Check the gateway's audit record "
+                "(GET /v1/audit/last) before anything else, and do not resend it."
+            ),
+            "answer": body if isinstance(body, dict) else str(body)[:500],
+        },
+        "gateway": body if isinstance(body, dict) else None,
+    }
+
+
 def interpret(status_code: int, body: Any) -> dict[str, Any]:
     """Map a /v1/invoke answer to {status, error, gateway}.
 
-    The gateway answers 200 (allowed and executed), 403 (denied, by a gate or
-    by the actuator's own policy) or 500 (the actuator raised); 401, 404 and
-    422 are request problems.
+    The gateway answers 200 with `ok: true` when it allowed and ran the call,
+    403 when a gate or the actuator's own policy refused it, and 500 with
+    `actuator_error` when the actuator raised. 401 and the other 4xx answers
+    are request problems: nothing ran. Anything else (a 200 without
+    `ok: true`, a 5xx without `actuator_error`, any other status) says
+    nothing reliable about whether the call ran, so it is reported as an
+    unknown outcome, never as a refusal: a plain 500 can come after the
+    actuator ran.
     """
     detail = body.get("detail") if isinstance(body, dict) else None
     if status_code == 200 and isinstance(body, dict) and body.get("ok") is True:
@@ -422,18 +499,48 @@ def interpret(status_code: int, body: Any) -> dict[str, Any]:
                 "reason": "actuator_error",
                 "message": detail.get("actuator_error"),
                 "kind": detail.get("actuator_error_kind"),
+                "note": (
+                    "The actuator raised while running the call, so part of the "
+                    "motion may have run. Do not resend it before the person has "
+                    "looked at the robot."
+                ),
             },
             "gateway": detail,
         }
-    return {
-        "status": "error",
-        "error": {
-            "reason": "gateway_rejected",
-            "http_status": status_code,
-            "message": detail if detail is not None else body,
-        },
-        "gateway": body if isinstance(body, dict) else None,
-    }
+    if 400 <= status_code < 500:
+        return {
+            "status": "error",
+            "error": {
+                "reason": "gateway_rejected",
+                "http_status": status_code,
+                "message": detail if detail is not None else body,
+            },
+            "gateway": body if isinstance(body, dict) else None,
+        }
+    return _unknown_outcome(status_code, body)
+
+
+def motion_report(gateway_answer: Any) -> dict[str, Any]:
+    """`reached` and `stopped_by_estop` from an executed call's telemetry, when
+    the actuator reports them (so-arm101-actuator does for every paced move).
+
+    A stop that interrupts a motion does not make the gateway's answer a
+    failure: the gateway ran the call, and the actuator returns success with
+    `reached: false` and `stopped_by_estop: true`. `status: ok` therefore
+    means "the gateway ran it", not "the arm arrived".
+    """
+    if not isinstance(gateway_answer, dict):
+        return {}
+    telemetry = gateway_answer.get("telemetry")
+    if not isinstance(telemetry, dict):
+        return {}
+    out: dict[str, Any] = {}
+    if isinstance(telemetry.get("reached"), bool):
+        out["reached"] = telemetry["reached"]
+    motion = telemetry.get("motion")
+    if isinstance(motion, dict) and isinstance(motion.get("stopped_by_estop"), bool):
+        out["stopped_by_estop"] = motion["stopped_by_estop"]
+    return out
 
 
 def invoke(
@@ -443,6 +550,7 @@ def invoke(
     tool_args: Mapping[str, Any],
     scope: str,
     withhold: Callable[[], dict[str, Any] | None] | None = None,
+    timeout_s: float | None = None,
 ) -> dict[str, Any]:
     """Send one envelope to the gateway and report its decision.
 
@@ -455,16 +563,39 @@ def invoke(
     immediately before it is sent. If it returns an error dict, nothing is
     sent. The motion tools use it to re-check the stop latch, which a stop in
     another thread may have set while this envelope was being prepared.
+
+    `timeout_s` overrides the configured timeout; the stop uses
+    `STOP_TIMEOUT_S`.
     """
-    envelope, note = prepare_envelope(config, tool_name=tool_name, tool_args=tool_args, scope=scope)
-    summary = _summary(envelope, note)
+    try:
+        envelope, note = prepare_envelope(
+            config, tool_name=tool_name, tool_args=tool_args, scope=scope
+        )
+        summary = _summary(envelope, note)
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": {
+                "reason": "envelope_error",
+                "message": f"could not build the envelope ({type(e).__name__}); nothing was sent",
+            },
+            "gateway": None,
+            "envelope": None,
+        }
     if withhold is not None:
-        withheld = withhold()
+        try:
+            withheld = withhold()
+        except Exception as e:
+            withheld = {
+                "reason": "withhold_check_failed",
+                "message": f"the check before sending failed ({type(e).__name__}); not sent",
+            }
         if withheld is not None:
             return {"status": "blocked", "error": withheld, "gateway": None, "envelope": summary}
     url = config.url.rstrip("/") + "/v1/invoke"
+    timeout = config.timeout_s if timeout_s is None else timeout_s
     try:
-        status_code, body = _post(url, envelope, config.bearer, config.timeout_s)
+        status_code, body = _post(url, envelope, config.bearer, timeout)
     except _Unreachable as e:
         return {
             "status": "error",
@@ -498,6 +629,50 @@ def invoke(
     return out
 
 
+#: The route robot-md-gateway#35 added. A gateway that serves /v1/invoke and
+#: not this predates #35.
+SAFETY_ROUTE = "/v1/safety/heartbeat"
+
+OLD_GATEWAY_WARNING = (
+    "robot-md-gateway at {url} serves no {route} route, so it predates "
+    "robot-md-gateway#35 (0.5.0a9 and earlier). On it a stop must pass every gate a "
+    "motion does, so a manifest-pin mismatch, a missing signing key or a failed key "
+    "lookup refuses the MCP estop, and the gateway does not stop the arm when "
+    "heartbeats stop. robot-md 2.0 needs a robot-md-gateway release that includes #35."
+)
+
+
+def check_gateway_generation(config: GatewayConfig, *, timeout_s: float = 2.0) -> dict[str, str]:
+    """Whether the gateway at `config.url` has robot-md-gateway#35's safety
+    routes. Returns {"result", "detail"}, with result "has_safety_routes",
+    "lacks_safety_routes" or "unknown". Never raises.
+
+    The gateway exposes no version that tells releases apart (its OpenAPI
+    `info.version` is the constant "0.4.0a1" in 0.5.0a9 and in #35 alike), so
+    this reads the routes it serves from GET /openapi.json, sent without the
+    bearer. A gateway that answers nothing readable is "unknown".
+    """
+    url = config.url.rstrip("/") + "/openapi.json"
+    try:
+        request = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=timeout_s) as resp:
+            body = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception as e:
+        return {"result": "unknown", "detail": f"could not read {url} ({type(e).__name__})"}
+    paths = body.get("paths") if isinstance(body, dict) else None
+    if not isinstance(paths, dict):
+        return {"result": "unknown", "detail": f"{url} lists no routes"}
+    if SAFETY_ROUTE in paths:
+        return {"result": "has_safety_routes", "detail": f"{url} lists {SAFETY_ROUTE}"}
+    if "/v1/invoke" in paths:
+        return {
+            "result": "lacks_safety_routes",
+            "detail": OLD_GATEWAY_WARNING.format(url=config.url, route=SAFETY_ROUTE),
+        }
+    return {"result": "unknown", "detail": f"{url} does not list robot-md-gateway's routes"}
+
+
 def envelope_preview(config: GatewayConfig, envelope: dict) -> dict[str, Any]:
     """A dry run's answer: what would be sent, to where. Sends nothing."""
     return {
@@ -517,14 +692,20 @@ __all__ = [
     "ENV_VARS",
     "INSTALL_GATEWAY_BEARERS_FILE",
     "INSTALL_GATEWAY_ENV_FILE",
+    "INSTALL_GATEWAY_MANIFEST_FILE",
     "MOTION_SCOPE",
     "OBSERVE_SCOPE",
+    "OLD_GATEWAY_WARNING",
+    "SAFETY_ROUTE",
     "STOP_SCOPE",
+    "STOP_TIMEOUT_S",
     "GatewayConfig",
+    "check_gateway_generation",
     "config_for_context",
     "envelope_preview",
     "interpret",
     "invoke",
+    "motion_report",
     "prepare_envelope",
     "resolve_config",
 ]

@@ -392,7 +392,7 @@ def test_motion_is_one_envelope_to_v1_invoke(fixtures_dir, gateway_env):
     assert body["type"] == "rcan/v1/invoke"
     assert body["tool_name"] == "arm.pick"
     assert body["tool_args"] == {"target": "red_lego"}
-    assert body["scope"] == "ACTUATE"
+    assert body["scope"] == "MANIPULATE"
     assert body["ruri"] == TEST_RURI
     assert body["manifest_path"] == str((fixtures_dir / MANIFEST).resolve())
     assert body["msg_id"] and body["nonce"]
@@ -538,7 +538,7 @@ def test_a_dry_run_sends_nothing_and_shows_the_envelope(fixtures_dir, gateway_en
     assert r["status"] == "dry_run"
     assert r["dry_run"]["sent"] is False
     assert r["dry_run"]["envelope"]["tool_name"] == "arm.pick"
-    assert r["dry_run"]["envelope"]["scope"] == "ACTUATE"
+    assert r["dry_run"]["envelope"]["scope"] == "MANIPULATE"
     assert gateway_env.requests == []
     _untouched(ctx)
 
@@ -550,7 +550,6 @@ def test_the_bearer_never_appears_in_a_result(fixtures_dir, gateway_env):
     gateway_env.deny("tier_policy", "nope")
     results.append(execute_capability_tool(ctx, capability="arm.pick", args={}, dry_run=False))
     results.append(estop_tool(ctx))
-    gateway_env.deny("tier_policy", "scope COMMISSION requires the 'commission' tier")
     results.append(estop_clear_tool(ctx))
     for result in results:
         assert TEST_BEARER not in json.dumps(result, default=str)
@@ -601,35 +600,17 @@ def test_estop_with_no_gateway_is_not_confirmed_and_touches_no_bus(fixtures_dir,
     _untouched(ctx)
 
 
-def test_estop_clear_goes_to_the_gateway_at_commission(fixtures_dir, gateway_env):
+def test_estop_clear_never_asks_the_gateway(fixtures_dir, gateway_env):
+    """Clearing a stop is the person's, with their own commission credential;
+    see test_estop_clear.py."""
     ctx = _ctx(fixtures_dir)
     estop_tool(ctx)
-    gateway_env.deny(
-        "tier_policy", "scope COMMISSION requires the 'commission' tier, not 'actuate'"
-    )
     r = estop_clear_tool(ctx)
     assert r["ok"] is False
-    assert r["stop"] == "clear_not_confirmed"
-    assert ctx.estop.is_set(), "a refused clear must leave this server latched"
-    clear = gateway_env.bodies[-1]
-    assert clear["tool_name"] == "arm.estop.clear"
-    assert clear["scope"] == "COMMISSION"
-    assert not set(clear) & HUMAN_CLAIM_KEYS
-    # A commission-tier credential the operator chose to give this server:
-    r = estop_clear_tool(ctx)
-    assert r["ok"] is True
-    assert r["stop"] == "cleared"
-    assert not ctx.estop.is_set()
-    _untouched(ctx)
-
-
-def test_estop_clear_with_no_gateway_refuses_and_keeps_the_latch(fixtures_dir):
-    ctx = _ctx(fixtures_dir)
-    ctx.estop.set()
-    r = estop_clear_tool(ctx)
-    assert r["ok"] is False
-    assert r["error"]["reason"] == "gateway_not_configured"
+    assert r["error"]["reason"] == "person_clears_stops"
     assert ctx.estop.is_set()
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.estop"]
+    _untouched(ctx)
 
 
 # --------------------------------------------------------------------------
@@ -698,14 +679,10 @@ async def test_a_token_in_the_mcp_call_does_not_clear_a_stop(fixtures_dir, gatew
     ctx = _ctx(fixtures_dir)
     server = build_server(ctx)
     await _call(server, "estop", {})
-    gateway_env.deny(
-        "tier_policy", "scope COMMISSION requires the 'commission' tier, not 'actuate'"
-    )
     with pytest.raises(ToolError):
         await server.call_tool("estop_clear", {"confirm_token": "yes, clear it"})
     assert ctx.estop.is_set()
-    assert gateway_env.bodies[-1]["scope"] == "COMMISSION"
-    assert "clear it" not in json.dumps(gateway_env.bodies[-1])
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.estop"]
 
 
 async def test_an_unconfirmed_stop_is_an_mcp_error(fixtures_dir, gateway_env):
@@ -816,3 +793,128 @@ async def test_a_second_motion_sent_while_one_is_in_flight_is_refused(fixtures_d
         release.set()
     assert (await first)["status"] == "ok"
     assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.pick"]
+
+
+async def test_a_read_sent_while_a_motion_is_in_flight_goes_through(fixtures_dir, gateway_env):
+    """Only motion is one at a time. A read such as status.report is sent
+    while a motion waits on the gateway."""
+    import asyncio
+
+    release = threading.Event()
+    original_allowed = gateway_env.allowed
+
+    def _slow_motion(body):
+        if body.get("tool_name") == "arm.pick":
+            release.wait(10)
+        return original_allowed(body)
+
+    gateway_env.allowed = _slow_motion
+    server = build_server(_ctx(fixtures_dir, extra_caps=("status.report",)))
+    motion = asyncio.create_task(_call(server, "execute_capability", {"capability": "arm.pick"}))
+    try:
+        for _ in range(100):
+            if gateway_env.requests:
+                break
+            await asyncio.sleep(0.02)
+        read = await asyncio.wait_for(
+            _call(server, "execute_capability", {"capability": "status.report"}), timeout=5
+        )
+        assert read["status"] == "ok", read
+        assert not motion.done()
+    finally:
+        release.set()
+    assert (await motion)["status"] == "ok"
+    assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.pick", "status.report"]
+
+
+async def _stop_while_blocked(server, start_blocking, started: threading.Event):
+    """Start a tool that blocks, then send a stop; return (stop result, blocked
+    tool still running when the stop came back)."""
+    import asyncio
+
+    task = asyncio.create_task(start_blocking())
+    for _ in range(200):
+        if started.is_set():
+            break
+        await asyncio.sleep(0.02)
+    assert started.is_set(), "the blocking tool never started"
+    stop = await asyncio.wait_for(_call(server, "estop", {}), timeout=5)
+    return stop, task
+
+
+async def test_a_stop_is_not_queued_behind_vision_find(fixtures_dir, gateway_env, monkeypatch):
+    """vision_find reads the camera, which can take seconds. It runs in a
+    worker thread, so a stop sent meanwhile is not queued behind it."""
+    from robot_md.mcp.tools import vision_find as vision_find_module
+
+    started, release = threading.Event(), threading.Event()
+
+    def _slow_find(ctx, *, descriptor_id):
+        started.set()
+        release.wait(10)
+        return {"status": "ok", "descriptor_id": descriptor_id}
+
+    monkeypatch.setattr(vision_find_module, "vision_find_tool", _slow_find)
+    server = build_server(_ctx(fixtures_dir))
+    try:
+        stop, task = await _stop_while_blocked(
+            server,
+            lambda: _call(server, "vision_find", {"descriptor_id": "red_lego"}),
+            started,
+        )
+        assert stop["stop"] == "stopped"
+        assert not task.done(), "vision_find finished first; the test proves nothing"
+    finally:
+        release.set()
+    await task
+
+
+async def test_a_stop_is_not_queued_behind_a_discover_capture(
+    fixtures_dir, gateway_env, monkeypatch
+):
+    from robot_md.mcp.tools import discover as discover_module
+
+    started, release = threading.Event(), threading.Event()
+
+    def _slow_capture(ctx):
+        started.set()
+        release.wait(10)
+        return None
+
+    monkeypatch.setattr(discover_module, "_do_capture", _slow_capture)
+    server = build_server(_ctx(fixtures_dir))
+    try:
+        stop, task = await _stop_while_blocked(
+            server, lambda: _call(server, "discover", {"steps": [{"capture": {}}]}), started
+        )
+        assert stop["stop"] == "stopped"
+        assert not task.done(), "the capture finished first; the test proves nothing"
+    finally:
+        release.set()
+    await task
+
+
+async def test_a_stop_is_not_queued_behind_a_spatial_eval_probe(
+    fixtures_dir, gateway_env, monkeypatch
+):
+    """The probe track calls a model for every probe; it can run for minutes."""
+    from robot_md.mcp.tools.spatial_eval import run_probe as run_probe_module
+
+    started, release = threading.Event(), threading.Event()
+
+    def _slow_probe(ctx, *, units=None, baseline_only=False):
+        started.set()
+        release.wait(10)
+        return {"ok": True}
+
+    monkeypatch.setattr(run_probe_module, "run_probe_tool", _slow_probe)
+    server = build_server(_ctx(fixtures_dir))
+    try:
+        stop, task = await _stop_while_blocked(
+            server, lambda: _call(server, "spatial_eval_run_probe", {}), started
+        )
+        assert stop["stop"] == "stopped"
+        assert not task.done()
+    finally:
+        release.set()
+    await task
