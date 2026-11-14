@@ -143,10 +143,12 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   `spatial_eval_replay` and `spatial_eval_verify`. `hotplug_review` is not:
   opening the queue creates the queue file and can append a `daemon_alert`
   record. `discover` is not either: it publishes to the dashboard event file.
-  The motion tools and `estop_clear` are marked destructive and open-world;
-  `estop` is open-world but not destructive. A new test fails for any tool
-  registered without explicit hints and pins the read-only set. The hints are
-  advisory: robot-md-gateway still decides what moves.
+  `execute_capability` and `execute_task` are marked destructive and
+  open-world, and `estop` open-world but not destructive. `estop_clear`,
+  which now refuses and sends nothing (below), is neither, and it isn't
+  read-only either, because it audits the refusal. A new test fails for any
+  tool registered without explicit hints and pins the read-only set. The
+  hints are advisory: robot-md-gateway still decides what moves.
 
 ### Changed
 

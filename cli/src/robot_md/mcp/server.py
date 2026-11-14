@@ -247,14 +247,16 @@ def build_server(ctx: McpContext):
             raise ToolError(json.dumps(result, default=str))
         return result
 
-    # Destructive: a cleared stop makes the robot movable again.
+    # Writes: audits the refusal and publishes it to the dashboard event file.
+    # Neither destructive nor open-world: it refuses, sends nothing and leaves
+    # the latch set. Repeating it refuses again.
     @server.tool(
         **_tool_meta(
-            "Clear the stop",
+            "Clear the stop (always refused)",
             read_only=False,
-            destructive=True,
+            destructive=False,
             idempotent=True,
-            open_world=True,
+            open_world=False,
         )
     )
     async def estop_clear() -> dict:

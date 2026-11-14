@@ -31,10 +31,10 @@ EXPECTED: dict[str, tuple[bool, bool, bool, bool]] = {
     "spatial_eval_verify": (True, False, True, True),
     # motion and the gateway
     "estop": (False, False, True, True),
-    "estop_clear": (False, True, True, True),
     "execute_capability": (False, True, False, True),
     "execute_task": (False, True, False, True),
     # local writes
+    "estop_clear": (False, False, True, False),
     "record_skill": (False, True, True, False),
     "discover": (False, False, False, True),
     "spatial_eval_init": (False, False, True, False),
@@ -97,9 +97,19 @@ def test_read_only_set_is_pinned():
 
 async def test_motion_tools_are_never_read_only(tools):
     for name in ("estop", "estop_clear", "execute_capability", "execute_task"):
-        ann = tools[name].annotations
-        assert ann.readOnlyHint is False, name
-        assert ann.openWorldHint is True, name
+        assert tools[name].annotations.readOnlyHint is False, name
+    for name in ("estop", "execute_capability", "execute_task"):
+        assert tools[name].annotations.openWorldHint is True, name
+
+
+async def test_estop_clear_is_marked_as_the_refusal_it_is(tools):
+    """estop_clear refuses and sends nothing: the person clears a stop with
+    their own credential. It audits the refusal, so it isn't read-only, but it
+    reaches nothing outside this process and makes nothing movable."""
+    ann = tools["estop_clear"].annotations
+    assert ann.destructiveHint is False
+    assert ann.openWorldHint is False
+    assert "refused" in tools["estop_clear"].title
 
 
 async def test_a_bare_tool_fails_the_check(fixtures_dir):
