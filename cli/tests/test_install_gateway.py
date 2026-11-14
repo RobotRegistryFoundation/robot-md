@@ -150,6 +150,20 @@ def test_a_commission_gate_refuses_the_clear_too():
         assert all(g.get("scope") != "commission" for g in gates), preset
 
 
+def test_the_texts_install_gateway_writes_qualify_the_safety_routes():
+    """Every install today gets robot-md-gateway 0.5.0a9, which serves neither
+    /v1/safety route, and a gateway with #35 that requires signatures refuses
+    an unsigned clear. The next steps and the bearers.yaml comment say both."""
+    from robot_md.install_gateway import NEXT_STEPS
+
+    assert "skip 4 and 5" in NEXT_STEPS
+    assert "#35 or later" in NEXT_STEPS
+    assert "ESTOP_CLEAR" in NEXT_STEPS
+    bearers = render_default_bearers()
+    assert "#35 or later" in bearers
+    assert "ESTOP_CLEAR" in bearers
+
+
 def _allowlist() -> list[str]:
     env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
     [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_TOOL_ALLOWLIST=")]

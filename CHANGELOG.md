@@ -163,6 +163,13 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   declares one. Whether the gateway should exempt a declared clear from HiTL,
   since its tier floor already holds the clear to the commission tier, is
   Craig's call.
+- **`install-gateway`'s next steps and its bearers.yaml comment say what needs
+  robot-md-gateway with #35.** Steps 4 and 5 (the heartbeat and the gateway's
+  clear) are skipped on 0.5.0a9 and earlier, where neither route exists, and
+  the gateway's clear is a signed `ESTOP_CLEAR` body where the gateway
+  requires signatures; robot-md-gateway's own `heartbeat` and `clear` commands
+  send both (robot-md-gateway#36, not merged yet). The getting-started guide,
+  the README and `docs/mcp-server-options.md` describe both gateways.
 - Two opt-in hardware tests that drove the arm through the removed in-process
   path, skipped since 2.0.0, are deleted. A person-run pose-teach round trip
   belongs with the gateway's hardware tests (not written yet).

@@ -182,8 +182,11 @@ bearers:
     tier: read
     role: supervisor
     caller: supervisor-default
-  # Clearing a stop (POST /v1/safety/clear, then arm.estop.clear) needs a
-  # commission entry. Add the operator's by hand, with a token of its own:
+  # Clearing a stop needs a commission entry: for the arm's clear
+  # (arm.estop.clear) and, on robot-md-gateway with #35 or later, the
+  # gateway's own (POST /v1/safety/clear, a signed ESTOP_CLEAR body where the
+  # gateway requires signatures). Add the operator's by hand, with a token of
+  # its own:
   #   python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
   # - token: "<that token>"
   #   tier: commission
@@ -564,10 +567,15 @@ next steps:
   2. read the tokens with: sudo cat {BEARERS_PATH}
   3. give the actuate token to the agent's client, and the supervisor token to
      the supervising person's device: never the agent's host, never the robot.
-  4. from that device, POST /v1/safety/heartbeat at least every 3 s.
-  5. then, as the operator, POST /v1/safety/clear with the commission token.
-     A gateway that has these routes (robot-md-gateway#35 and later) starts
-     held and moves nothing until then; 0.5.0a9 has neither route."""
+  4. robot-md-gateway with #35 or later only, which starts held and moves
+     nothing until 4 and 5 are done: from that device, POST
+     /v1/safety/heartbeat at least every 3 s.
+  5. then, as the operator, POST /v1/safety/clear with the commission token,
+     as a signed ESTOP_CLEAR body where the gateway requires signatures (a
+     gateway.env install-gateway writes does). robot-md-gateway's own
+     `heartbeat` and `clear` commands send both (robot-md-gateway#36, not
+     merged yet).
+     On 0.5.0a9 and earlier, skip 4 and 5: neither route exists."""
 
 
 def _disable_unit_if_enabled(sudo: list[str]) -> None:
