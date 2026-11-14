@@ -55,6 +55,10 @@ class McpContext:
     invocation_log: InvocationLog = field(default_factory=lambda: InvocationLog(maxlen=100))
     _pending_calls: dict[str, dict] = field(default_factory=dict)
     _pending_lock: threading.Lock = field(default_factory=threading.Lock)
+    #: Warnings about the configured gateway, found at startup
+    #: (`robot_md.mcp.server.start_gateway_check`) and repeated in every motion
+    #: and stop result while they hold.
+    gateway_warnings: list[str] = field(default_factory=list)
 
 
 _PENDING_TTL_S = 60.0
@@ -279,10 +283,11 @@ def _start_command_watcher(ctx, cmd_path: Path):
                         cmd = obj.get("cmd")
                         # The dashboard's stop and clear take the same path as
                         # the MCP tools: the stop goes to robot-md-gateway's
-                        # declared stop, and a clear is asked of the gateway at
-                        # the commission tier. Anyone who can write this file
-                        # can send these, so neither is trusted any further
-                        # than the MCP tools are.
+                        # declared stop, and a clear is refused here (the
+                        # person clears with their own commission credential,
+                        # then restarts this server). Anyone who can write this
+                        # file can send these, so neither is trusted any
+                        # further than the MCP tools are.
                         if cmd == "estop.set":
                             from robot_md.mcp.tools.estop import estop_tool
 

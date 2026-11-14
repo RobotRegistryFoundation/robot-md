@@ -1,16 +1,23 @@
 """robot-md MCP server (stdio).
 
 Manifest tools and resources, read-only perception, and the motion tools.
-The motion tools (`execute_capability`, `execute_task`, `estop`,
-`estop_clear`) are clients of robot-md-gateway: nothing in this process
-writes to the robot. See `robot_md.gateway_client`.
+The motion tools (`execute_capability`, `execute_task`, `estop`) are clients
+of robot-md-gateway: nothing in this process writes to the robot. See
+`robot_md.gateway_client`. `estop_clear` refuses: clearing a stop is the
+person's, with their own credential.
+
+Tools that can block (the gateway calls, camera reads, the spatial-eval runs)
+are async and do their blocking work in a worker thread, so a stop is never
+queued behind them.
 """
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import json
 import sys
+import threading
 from pathlib import Path
 
 import anyio.to_thread
@@ -18,6 +25,7 @@ from mcp.server.fastmcp import Context
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
+from robot_md import gateway_client
 from robot_md.mcp.context import McpContext, load_context
 from robot_md.mcp.tools.doctor_summary import doctor_summary_tool
 from robot_md.mcp.tools.estop import estop_clear_tool, estop_tool
@@ -195,10 +203,9 @@ def build_server(ctx: McpContext):
         """Validate the served ROBOT.md against the v1 schema and body rules."""
         return validate_tool(ctx)
 
-    # The four tools that talk to robot-md-gateway are async and do their
-    # blocking HTTP call in a worker thread. FastMCP runs a sync tool on the
-    # event loop itself, so a stop sent while a motion waited for the
-    # gateway's answer would have waited for that answer first.
+    # Tools that can block are async and do the blocking work in a worker
+    # thread. FastMCP runs a sync tool on the event loop itself, so a stop sent
+    # while such a tool ran would have waited for it to finish.
 
     # Writes: sets the local latch, audits, and sends the stop to the gateway.
     # Not destructive: it stops motion. Repeating it stops a stopped robot.
@@ -215,33 +222,51 @@ def build_server(ctx: McpContext):
         """Stop the robot through robot-md-gateway.
 
         Sets this server's own latch, so no further motion leaves it, then sends
-        the gateway's declared stop (arm.estop by default). The actuator holds
-        its pose in software; this is not a hardware e-stop. Returns an error
-        when the gateway does not confirm the stop: then the person must use the
-        hardware stop. Runs even while a motion call is waiting on the gateway.
+        the gateway's declared stop (arm.estop by default) and waits at most
+        2 s. The actuator holds its pose in software; this is not a hardware
+        e-stop. Returns an error, telling the person to use the hardware stop,
+        whenever the gateway does not confirm the stop. Runs even while another
+        call is waiting on the gateway.
         """
-        result = await anyio.to_thread.run_sync(functools.partial(estop_tool, ctx))
+        try:
+            result = await anyio.to_thread.run_sync(functools.partial(estop_tool, ctx))
+        except Exception as e:  # estop_tool never raises; this is a second net
+            from robot_md.mcp.tools.estop import not_confirmed
+
+            # estop_tool sets this server's latch first. If it never ran, set
+            # it here, so no further motion leaves and `local_latch` is true.
+            set_at = None
+            with contextlib.suppress(Exception):  # the answer below still goes out
+                set_at = ctx.estop.set()
+            result = not_confirmed(
+                set_at=set_at,
+                stop_tool="the declared stop",
+                error={"reason": "stop_path_error", "message": type(e).__name__},
+            )
         if not result.get("ok"):
             raise ToolError(json.dumps(result, default=str))
         return result
 
-    # Destructive: a cleared stop makes the robot movable again.
+    # Writes: audits the refusal and publishes it to the dashboard event file.
+    # Neither destructive nor open-world: it refuses, sends nothing and leaves
+    # the latch set. Repeating it refuses again.
     @server.tool(
         **_tool_meta(
-            "Clear the stop",
+            "Clear the stop (always refused)",
             read_only=False,
-            destructive=True,
+            destructive=False,
             idempotent=True,
-            open_world=True,
+            open_world=False,
         )
     )
     async def estop_clear() -> dict:
-        """Ask robot-md-gateway to clear the stop, at the commission tier.
+        """Refused: clearing a stop is the person's, with their own credential.
 
-        Clearing a stop makes the robot movable again. The gateway refuses it
-        below the commission tier, and this server normally holds an
-        actuate-tier credential, so the person at the machine clears stops with
-        their own. Returns an error unless the gateway confirms the clear.
+        Clearing a stop makes the robot movable again. This server never holds
+        the commission-tier credential it takes and sends nothing; the result
+        says how the person clears the gateway and the actuator, and that
+        reconnecting this MCP server releases its own latch. Always returns an
+        error.
         """
         result = await anyio.to_thread.run_sync(functools.partial(estop_clear_tool, ctx))
         if not result.get("ok"):
@@ -267,12 +292,21 @@ def build_server(ctx: McpContext):
         """Send one declared capability to robot-md-gateway (POST /v1/invoke).
 
         The gateway decides and its actuator bounds the motion; this returns the
-        gateway's answer (status ok, denied or error) as given. Nothing in this
-        server writes to the robot. Refuses with no configured gateway, while
-        this server's stop latch is set, and for a capability whose scope
-        ROBOT.md gates with require_auth: that needs a person's confirmation
-        from outside this conversation. dry_run=true returns the envelope that
-        would be sent, and sends nothing.
+        gateway's answer (status ok, denied or error) as given. status ok means
+        the gateway ran it, not that the arm arrived: check `reached` and
+        `stopped_by_estop`. Nothing in this server writes to the robot.
+
+        Refuses, and sends nothing: with no configured gateway; while this
+        server's stop latch is set; while another motion from this server is
+        in flight (busy; reads still go); when a configured signing key can't
+        be loaded or can't sign (signing_failed); and for every motion while
+        ROBOT.md has a gate that needs a person, which is any hitl_gates entry
+        that doesn't say require_auth: false, on any scope but `commission`.
+        Such a gate covers every motion, whatever scope it names
+        (`destructive`, `system`, `arm` or a capability's name). It needs a
+        person's confirmation from outside this conversation, and none can
+        reach this server yet. dry_run=true returns the envelope that would be
+        sent, and sends nothing.
         """
         from robot_md.mcp.tools.execute_capability import execute_capability_tool
 
@@ -328,11 +362,13 @@ def build_server(ctx: McpContext):
             open_world=True,
         )
     )
-    def vision_find(descriptor_id: str) -> dict:
+    async def vision_find(descriptor_id: str) -> dict:
         """Detect one declared object descriptor. Returns camera-frame XYZ (mm)."""
-        from robot_md.mcp.tools.vision_find import vision_find_tool
+        from robot_md.mcp.tools import vision_find as vision_find_module
 
-        return vision_find_tool(ctx, descriptor_id=descriptor_id)
+        return await anyio.to_thread.run_sync(
+            functools.partial(vision_find_module.vision_find_tool, ctx, descriptor_id=descriptor_id)
+        )
 
     # Destructive: rewrites ROBOT.md frontmatter with yaml.safe_dump (comments and
     # formatting are lost) and replaces any entry with the same id.
@@ -475,11 +511,17 @@ def build_server(ctx: McpContext):
             open_world=True,
         )
     )
-    def spatial_eval_run_probe(units: list[str] | None = None, baseline_only: bool = False) -> dict:
+    async def spatial_eval_run_probe(
+        units: list[str] | None = None, baseline_only: bool = False
+    ) -> dict:
         """Run the probe track. Returns Score JSON probe section."""
-        from robot_md.mcp.tools.spatial_eval.run_probe import run_probe_tool
+        from robot_md.mcp.tools.spatial_eval import run_probe as run_probe_module
 
-        return run_probe_tool(ctx, units=units, baseline_only=baseline_only)
+        return await anyio.to_thread.run_sync(
+            functools.partial(
+                run_probe_module.run_probe_tool, ctx, units=units, baseline_only=baseline_only
+            )
+        )
 
     # Destructive: writes an evidence packet and Score.json, overwriting them when
     # run_dir names an existing run. Signs with the robot key.
@@ -492,7 +534,7 @@ def build_server(ctx: McpContext):
             open_world=True,
         )
     )
-    def spatial_eval_run_execute(
+    async def spatial_eval_run_execute(
         units: list[str] | None = None,
         trials_per_unit: int = 10,
         run_dir: str | None = None,
@@ -502,11 +544,14 @@ def build_server(ctx: McpContext):
 
         from robot_md.mcp.tools.spatial_eval.run_execute import run_execute_tool
 
-        return run_execute_tool(
-            ctx,
-            units=units,
-            trials_per_unit=trials_per_unit,
-            run_dir=_Path(run_dir) if run_dir else None,
+        return await anyio.to_thread.run_sync(
+            functools.partial(
+                run_execute_tool,
+                ctx,
+                units=units,
+                trials_per_unit=trials_per_unit,
+                run_dir=_Path(run_dir) if run_dir else None,
+            )
         )
 
     # Destructive: probe track plus execute track; rewrites Score.json.
@@ -519,7 +564,7 @@ def build_server(ctx: McpContext):
             open_world=True,
         )
     )
-    def spatial_eval_run_full(
+    async def spatial_eval_run_full(
         units: list[str] | None = None,
         trials_per_unit: int = 10,
         run_dir: str | None = None,
@@ -529,11 +574,14 @@ def build_server(ctx: McpContext):
 
         from robot_md.mcp.tools.spatial_eval.run_full import run_full_tool
 
-        return run_full_tool(
-            ctx,
-            units=units,
-            trials_per_unit=trials_per_unit,
-            run_dir=_Path(run_dir) if run_dir else None,
+        return await anyio.to_thread.run_sync(
+            functools.partial(
+                run_full_tool,
+                ctx,
+                units=units,
+                trials_per_unit=trials_per_unit,
+                run_dir=_Path(run_dir) if run_dir else None,
+            )
         )
 
     # Read-only: reads an evidence packet and returns a recomputed score.
@@ -591,11 +639,13 @@ def build_server(ctx: McpContext):
             open_world=True,
         )
     )
-    def spatial_eval_submit_to_rrf(run_dir: str) -> dict:
+    async def spatial_eval_submit_to_rrf(run_dir: str) -> dict:
         """Submit signed evidence to RRF §27 (Phase 1 stub for now)."""
         from robot_md.mcp.tools.spatial_eval.submit_to_rrf import submit_to_rrf_tool
 
-        return submit_to_rrf_tool(ctx, run_dir=run_dir)
+        return await anyio.to_thread.run_sync(
+            functools.partial(submit_to_rrf_tool, ctx, run_dir=run_dir)
+        )
 
     # Not read-only, despite the name: opening the queue creates
     # ~/.robot-md/hotplug-events.jsonl if missing and appends a daemon_alert
@@ -748,11 +798,14 @@ def build_server(ctx: McpContext):
                     f"The operator wants {_raw_robot_name} to do: **{action}**\n\n"
                     f"Read `robot-md://{robot_name}/safety` and answer only from the "
                     "declared manifest:\n\n"
-                    "1. Does this action's scope match a declared `hitl_gates[]` entry with "
-                    "`require_auth: true`? If yes, name the gate. robot-md's MCP server "
-                    "refuses gated motion: the confirmation has to come from a person "
-                    "outside this conversation, and a reply in chat is not that "
-                    "confirmation. Never treat one as authorization.\n"
+                    "1. If the action moves the robot, does the manifest declare a "
+                    "`hitl_gates[]` entry that needs a person (`require_auth: true`, or not "
+                    "set), other than `commission`? If yes, name it. Such a gate covers "
+                    "every motion, whatever scope it names, so robot-md's MCP server "
+                    "refuses this action and every other motion while the gate stands. The "
+                    "confirmation it needs has to come from a person outside this "
+                    "conversation, and a reply in chat is not that confirmation. Never "
+                    "treat one as authorization.\n"
                     "2. Does the action stay within `payload_kg`, `max_joint_velocity_dps`, "
                     "and `workspace_bounds_m` (if declared)? This is a preview. The limits are "
                     "enforced by robot-md-gateway and its actuator, not by this check.\n"
@@ -829,6 +882,32 @@ def build_server(ctx: McpContext):
     return server
 
 
+def start_gateway_check(ctx: McpContext, *, timeout_s: float = 2.0) -> threading.Thread:
+    """Check once, in the background, whether the configured robot-md-gateway
+    has robot-md-gateway#35's safety routes (`check_gateway_generation`).
+
+    When it doesn't, warn on stderr and put the warning in every motion and
+    stop result from then on, where Claude, and so the person, sees it.
+    Nothing else changes: this server still sends to an older gateway, and
+    that gateway still decides. When the check can't tell (no gateway
+    answering, or one that lists no routes), it says nothing.
+    """
+
+    def _run() -> None:
+        try:
+            config = gateway_client.config_for_context(ctx)
+            result = gateway_client.check_gateway_generation(config, timeout_s=timeout_s)
+        except Exception:  # a check must never take the server down
+            return
+        if result["result"] == "lacks_safety_routes":
+            ctx.gateway_warnings.append(result["detail"])
+            print(f"robot-md-mcp: warning: {result['detail']}", file=sys.stderr)
+
+    thread = threading.Thread(target=_run, name="robot-md-gateway-check", daemon=True)
+    thread.start()
+    return thread
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print("usage: robot-md-mcp <ROBOT.md>", file=sys.stderr)
@@ -840,6 +919,7 @@ def main() -> int:
         print(f"robot-md-mcp: fatal: {e}", file=sys.stderr)
         return 1
     server = build_server(ctx)
+    start_gateway_check(ctx)
     server.run()
     return 0
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
+from robot_md import motion_gates
 from robot_md.parser import ParsedRobotMd, parse_file
 from robot_md.robot_spec import RobotSpec
 
@@ -37,11 +38,12 @@ When the operator asks any of the following, **you should act** — not ask clar
 |---|---|
 | "What can this robot do?" / "What are its capabilities?" | Read `robot-md://{{ROBOT_NAME}}/capabilities` (MCP) or run `robot-md render ROBOT.md` and extract `capabilities[]`. |
 | "What are its safety gates?" / "What's dangerous?" | Read `robot-md://{{ROBOT_NAME}}/safety` (MCP) or `robot-md render ROBOT.md` and extract `safety.hitl_gates`, `safety.estop`. |
-| "Something's wrong" / "It's not responding" / "Why is X broken" | Run `robot-md doctor --path ROBOT.md`. Report each non-pass check. |
+| "Something's wrong" / "It's not responding" / "Why is X broken" | Run `robot-md doctor --path ROBOT.md --hardware off`. Report each non-pass check. Keep `--hardware off`: without it, doctor opens the servo port and reads every servo when one is plugged in. A hardware check (`--hardware on`) is the person's to run. |
 | "Is the manifest valid?" / "Did I break something?" | Run `robot-md validate ROBOT.md`. |
 | "Pose the arm at zero" / "Calibrate" | Give the person `robot-md calibrate --zero ROBOT.md` to run at the machine. Calibration opens the servo port directly (and `--extrinsic` moves the arm), so you don't run it. |
+| "Teach a pose" / "record this position" | Give the person `robot-md pose teach` to run at the machine. It opens the servo port and releases torque, so the arm goes limp. |
 | "Publish my robot" / "Give it a public URL" | `robot-md publish-discovery ROBOT.md --url <URL>` writes `.well-known/robot-md.json`. |
-| "Pick up the X" / any physical motion | Call `mcp__robot-md-{{ROBOT_NAME}}__execute_capability`. It sends the capability to robot-md-gateway, which decides and enforces the limits. Only with the person at the machine, hand on a hardware stop. A chat "yes" is not authorization; a capability under a `require_auth: true` gate is refused. Report the gateway's answer as given. |
+| "Pick up the X" / any physical motion | {{MOTION_ROW}} |
 
 ## Tooling available in this workspace
 
@@ -61,15 +63,17 @@ If `robot-md-mcp` is registered in this session (check with `/mcp`), prefer the 
 - `robot-md://{{ROBOT_NAME}}/safety` — safety block
 - `robot-md://{{ROBOT_NAME}}/body` — prose
 
-MCP tools (also available): `validate`, `render`, `estop` (sends robot-md-gateway's stop), `estop_clear` (needs a commission-tier credential, which the person holds), `execute_capability` and `execute_task` (sent to robot-md-gateway).
+MCP tools (also available): `validate`, `render`, `estop` (sends robot-md-gateway's stop), `estop_clear` (always refused: the person clears a stop with their own commission-tier credential, then reconnects the MCP server, which releases its own latch), `execute_capability` and `execute_task` (sent to robot-md-gateway; `status: ok` means the gateway ran the call, so check `reached` before treating a move as done).
 
 ## Safety posture
 
-**Motion goes only through robot-md-gateway, and only with a person at the machine.** Read `ROBOT.md:safety` before the first motion. Before any motion, the person confirms they are at the machine, watching, with a hand on a hardware stop that does not depend on software; the `estop` tool is a software stop and is not that. A reply in chat is never authorization for motion: the gateway decides, and a gate with `require_auth: true` needs a person's confirmation from outside this conversation, so robot-md refuses gated motion. Never clear a stop yourself, never write to the servo port or run a command that opens it, and never start a test run (Bounded Embodiment EV runs, `robot-md trial`): the person does.
+**Motion goes only through robot-md-gateway, and only with a person at the machine.** Read `ROBOT.md:safety` before the first motion. Before any motion, the person confirms they are at the machine, watching, with a hand on a hardware stop that does not depend on software; the `estop` tool is a software stop and is not that. A reply in chat is never authorization for motion: the gateway decides. A gate that needs a person (`require_auth: true`, or not set) needs their confirmation from outside this conversation, robot-md has no path for one yet, and such a gate covers every motion, so robot-md's MCP server refuses every motion while one stands. Never drive the gateway yourself (`robot-md invoke`, `curl`, a script): that goes around this server's stop latch and gate checks. Never clear a stop yourself, never write to the servo port or run a command that opens it, and never start a test run (Bounded Embodiment EV runs, `robot-md trial`): the person does. If the bounded-embodiment plugin is in your session, its rule applies too, and the stricter rule wins: it has you call no motion tool on real hardware at all.
 
 Declared gates for this robot:
 
 {{HITL_GATES_LIST}}
+
+{{MOTION_GATE_SUMMARY}}
 
 ## What this robot is running on
 
@@ -84,7 +88,7 @@ Declared gates for this robot:
 
 ## Escalation
 
-If the operator asks for something that *could* harm the robot, a human, or the workspace — and no matching HITL gate is declared — surface that gap explicitly. Don't silently proceed; don't silently decline. Tell the operator: "Your manifest doesn't have a gate for this scope. Adding one to ROBOT.md is your decision."
+If no gate is declared and the motion could cause harm (grasping unknown objects, high velocity, near the workspace boundary), **surface the gap to the operator**. Don't silently proceed; don't silently decline. Say: "Your manifest doesn't declare a gate for this scope. Adding one to ROBOT.md is your decision." Adding a gate that needs a person stops all MCP motion until robot-md can take that person's confirmation from outside the chat; never ask for it in chat.
 
 ---
 
@@ -125,17 +129,54 @@ def render_claude_md(source: Path | str | ParsedRobotMd) -> str:
         f" (resolves at `https://rcan.dev/r/{rrn}`)" if rrn and rrn != "(unregistered)" else ""
     )
 
-    gates = safety.get("hitl_gates") or []
+    gates = [g for g in (safety.get("hitl_gates") or []) if isinstance(g, dict)]
     if gates:
         lines = []
         for g in gates:
             scope = g.get("scope", "?")
-            require = g.get("require_auth", False)
-            suffix = " — requires a person's confirmation from outside this chat" if require else ""
+            if motion_gates.coverage(g) == "all_motion":
+                suffix = (
+                    " — needs a person's confirmation from outside this chat, so "
+                    "robot-md refuses every motion while it stands"
+                )
+            elif motion_gates.requires_person(g):
+                suffix = " — needs a person's confirmation from outside this chat; covers no motion"
+            else:
+                suffix = " — `require_auth: false`: informational"
             lines.append(f"- `{scope}`{suffix}")
         gates_block = "\n".join(lines)
     else:
         gates_block = "*No HITL gates declared.* Flag this to the operator."
+
+    covering = motion_gates.gates_covering_motion(gates)
+    if covering:
+        scopes = [f"`{g.get('scope')}`" for g in covering]
+        names = scopes[0] if len(scopes) == 1 else ", ".join(scopes[:-1]) + " and " + scopes[-1]
+        motion_summary = (
+            "**On this robot, robot-md's MCP server refuses every motion.** "
+            f"{names} {'needs' if len(covering) == 1 else 'need'} a person's confirmation "
+            "from outside this conversation, robot-md has no path for one yet, and a gate "
+            "that needs one covers every motion. `execute_capability` and `execute_task` "
+            "answer `hitl_gate`; reads such as `status.report` still work. Tell the person, "
+            "and don't look for another route to move the robot."
+        )
+        motion_row = (
+            "robot-md's MCP server refuses every motion on this robot (see Safety posture): "
+            "tell the person, and hand them the steps if they want to run them at the "
+            "machine. Don't look for another route."
+        )
+    else:
+        motion_summary = (
+            "No declared gate needs a person, so robot-md-gateway decides every motion."
+        )
+        motion_row = (
+            "If the bounded-embodiment plugin is in your session, hand the steps to the "
+            "person. Otherwise call `mcp__robot-md-{{ROBOT_NAME}}__execute_capability`, "
+            "which sends the capability to robot-md-gateway; the gateway decides and "
+            "enforces the limits. Only with the person at the machine and a hand on a "
+            'hardware stop. A chat "yes" is not authorization. Report the gateway\'s '
+            "answer as given, including `reached`."
+        )
 
     if drivers:
         primary = drivers[0]
@@ -146,6 +187,8 @@ def render_claude_md(source: Path | str | ParsedRobotMd) -> str:
         driver_line = "(none declared)"
 
     text = _load_template()
+    text = text.replace("{{MOTION_ROW}}", motion_row)
+    text = text.replace("{{MOTION_GATE_SUMMARY}}", motion_summary)
     text = text.replace("{{ROBOT_NAME}}", robot_name)
     text = text.replace("{{RRN}}", rrn)
     text = text.replace("{{PUBLIC_RESOLVER_LINE}}", public_resolver_line)

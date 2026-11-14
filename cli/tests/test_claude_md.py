@@ -86,7 +86,71 @@ def test_render_lists_declared_hitl_gates(tmp_path):
     text = render_claude_md(p)
     assert "`destructive`" in text
     assert "`system`" in text
-    assert "requires a person's confirmation from outside this chat" in text
+    assert "needs a person's confirmation from outside this chat" in text
+
+
+def test_render_says_a_gated_manifest_refuses_every_motion(tmp_path):
+    """bob's gates (destructive, system) make robot-md's MCP server refuse
+    every motion; the generated CLAUDE.md says so and offers no motion tool."""
+    text = render_claude_md(_write(tmp_path, BOB))
+    assert "On this robot, robot-md's MCP server refuses every motion." in text
+    assert "`destructive` and `system` need a person's confirmation" in text
+    row = next(line for line in text.splitlines() if line.startswith('| "Pick up the X"'))
+    assert "refuses every motion on this robot" in row
+    assert "execute_capability" not in row
+
+
+def test_render_commission_and_informational_gates_cover_no_motion(tmp_path):
+    content = BOB.replace(
+        """    - scope: destructive
+      require_auth: true
+    - scope: system
+      require_auth: true
+""",
+        """    - scope: commission
+      require_auth: true
+    - scope: teleop_record
+      require_auth: false
+""",
+    )
+    text = render_claude_md(_write(tmp_path, content))
+    assert (
+        "`commission` — needs a person's confirmation from outside this chat; covers no motion"
+        in text
+    )
+    assert "`teleop_record` — `require_auth: false`: informational" in text
+    assert (
+        "refuses every motion"
+        not in text.split("## Safety posture")[1].split("## What")[0].split("Declared gates")[1]
+    )
+
+
+def test_render_never_has_claude_ask_for_authorization(tmp_path):
+    """The skill: a chat "yes" is never authorization, and a gated motion is
+    refused, not paused for approval. The generated CLAUDE.md says the same."""
+    for content in (BOB, BOB.replace("require_auth: true", "require_auth: false")):
+        lowered = render_claude_md(_write(tmp_path, content)).lower()
+        for phrase in (
+            "request explicit",
+            "explicit authorization",
+            "explicit operator approval",
+            "ask the operator to authorize",
+            "pause for",
+            "authorize the",
+        ):
+            assert phrase not in lowered, phrase
+        assert "a reply in chat is never authorization for motion" in lowered
+        assert "never ask for it in chat" in lowered
+
+
+def test_render_keeps_claude_off_the_servo_port(tmp_path):
+    """doctor with --path opens the servo port unless --hardware off; pose teach
+    releases torque. Neither is Claude's to run."""
+    text = render_claude_md(_write(tmp_path, BOB))
+    assert "robot-md doctor --path ROBOT.md --hardware off" in text
+    assert "Give the person `robot-md pose teach`" in text
+    assert "Never drive the gateway yourself" in text
+    assert "estop_clear` (always refused" in text
 
 
 def test_render_never_offers_chat_authorization_for_motion(tmp_path):
@@ -275,9 +339,12 @@ def test_template_motion_row_points_at_execute_capability(tmp_path):
     )
 
     text = render_claude_md(manifest)
-    # The "Pick up the X" row should mention execute_capability so Claude
-    # knows which tool to call for physical motion.
-    assert "execute_capability" in text
+    # With no gate that needs a person, the "Pick up the X" row names
+    # execute_capability, and says the bounded-embodiment plugin comes first.
+    row = next(line for line in text.splitlines() if line.startswith('| "Pick up the X"'))
+    assert "execute_capability" in row
+    assert "bounded-embodiment" in row
+    assert "No declared gate needs a person" in text
 
 
 def test_claude_md_lists_ready_pose():

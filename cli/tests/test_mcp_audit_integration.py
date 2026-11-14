@@ -223,7 +223,8 @@ def test_estop_set_records_audit_entry(ctx, home, gateway_env):
 
 
 def test_estop_clear_records_audit_entry(ctx, home, gateway_env):
-    """Clearing the e-stop is also recorded — and denied clears too."""
+    """A refused clear is recorded too. estop_clear never clears: the person
+    clears the stop with their own credential."""
     import time
 
     class _RealEstop:
@@ -243,22 +244,16 @@ def test_estop_clear_records_audit_entry(ctx, home, gateway_env):
     ctx.estop = _RealEstop()
     from robot_md.mcp.tools.estop import estop_clear_tool
 
-    # The gateway refuses the clear below the commission tier → denied + audited
-    gateway_env.deny("tier_policy", "scope COMMISSION requires the 'commission' tier")
-    r1 = estop_clear_tool(ctx)
-    assert r1["ok"] is False
-    assert r1["error"]["deny"] == "tier_policy"
-
-    # The gateway accepts it (a commission credential) → cleared, also audited
-    r2 = estop_clear_tool(ctx)
-    assert r2["ok"] is True
+    r = estop_clear_tool(ctx)
+    assert r["ok"] is False
+    assert r["error"]["reason"] == "person_clears_stops"
+    assert ctx.estop.is_set()
+    assert gateway_env.requests == []
 
     entries = load_entries("RRN-000000000099")
-    assert len(entries) == 2
-    assert entries[0]["event"] == "estop_clear_denied"
-    assert entries[0]["details"]["reason"] == "gateway_denied"
-    assert entries[0]["details"]["deny"] == "tier_policy"
-    assert entries[1]["event"] == "estop_cleared"
+    assert len(entries) == 1
+    assert entries[0]["event"] == "estop_clear_refused"
+    assert entries[0]["details"]["reason"] == "person_clears_stops"
 
 
 def test_audit_failure_never_crashes_capability_call(ctx, home, monkeypatch, gateway_env):

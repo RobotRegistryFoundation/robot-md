@@ -48,6 +48,37 @@ def test_dashboard_estop_clear_button_writes_command(dashboard_app):
     assert any(json.loads(line).get("cmd") == "estop.clear" for line in lines)
 
 
+def test_dashboard_estop_clear_answers_with_the_refusal(dashboard_app, monkeypatch):
+    """It answered {"ok": true}, and the page showed nothing. Now it answers
+    with estop_clear's refusal and its instructions."""
+    monkeypatch.setenv("ROBOT_MD_MANIFEST_PATH", "/etc/robot-md-gateway/ROBOT.md")
+    app, _ = dashboard_app
+    with TestClient(app) as client:
+        body = client.post("/api/estop/clear").json()
+    assert body["ok"] is False
+    assert body["stop"] == "not_cleared"
+    assert body["error"]["reason"] == "person_clears_stops"
+    assert (
+        "robot-md invoke /etc/robot-md-gateway/ROBOT.md --tool arm.estop.clear "
+        "--scope COMMISSION" in body["message"]
+    )
+
+
+def test_dashboard_estop_clear_button_shows_the_refusal(dashboard_app):
+    """The button swaps the answer into the page, escaped."""
+    app, _ = dashboard_app
+    with TestClient(app) as client:
+        page = client.get("/").text
+        r = client.post("/api/estop/clear", headers={"HX-Request": "true"})
+    assert 'hx-target="#estop-clear-result"' in page
+    assert 'id="estop-clear-result"' in page
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    assert "Not cleared." in r.text
+    assert "&lt;their commission token&gt;" in r.text
+    assert "<their commission token>" not in r.text
+
+
 def test_dashboard_snapshot_button_writes_command(dashboard_app):
     app, tmp_path = dashboard_app
     with TestClient(app) as client:

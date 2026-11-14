@@ -16,7 +16,10 @@ step if reporting itself fails.
 from __future__ import annotations
 
 import contextlib
+import functools
 from typing import Any
+
+import anyio.to_thread
 
 from robot_md.detectors.hsv import DETECTORS
 
@@ -38,16 +41,18 @@ async def discover_tool(
         _publish_step(ctx, "begin", name, i, total)
         await _report_progress(mcp_ctx, i, total, name)
 
+        # Camera reads and detection block, so they run in a worker thread:
+        # a stop sent meanwhile is not queued behind them.
         if name == "capture":
-            frame = _do_capture(ctx)
+            frame = await _in_thread(_do_capture, ctx)
             if frame is not None:
                 results["capture"] = {"status": "ok", "shape": list(frame[0].shape)}
             else:
                 results["capture"] = {"status": "no_frame"}
         elif name == "detect":
             if frame is None:
-                frame = _do_capture(ctx)
-            results["detect"] = _do_detect(ctx, frame, payload)
+                frame = await _in_thread(_do_capture, ctx)
+            results["detect"] = await _in_thread(_do_detect, ctx, frame, payload)
         elif name == "probe_direction":
             results["probe_direction"] = _do_probe(ctx, payload)
         else:
@@ -56,6 +61,11 @@ async def discover_tool(
         _publish_step(ctx, "end", name, i, total, status=results.get(name, {}).get("status"))
 
     return {"status": "ok", "results": results}
+
+
+async def _in_thread(fn, *args):
+    # Looked up at call time, so tests can replace the step functions.
+    return await anyio.to_thread.run_sync(functools.partial(fn, *args))
 
 
 async def _report_progress(mcp_ctx: Any | None, i: int, total: int, name: str) -> None:

@@ -17,6 +17,7 @@ img { max-width:100%; height:auto; background:#000; }
 .estop-panel .state { font-size:32px; text-align:center; padding:16px; border-radius:6px; }
 .estop-panel .state.set { background:var(--danger); color:#fff; }
 .estop-panel .state.clear { background:var(--ok); color:#fff; }
+.refusal { margin-top:8px; padding:8px 12px; background:#3d2e00; border:1px solid #b08800; border-radius:4px; }
 ol { margin:0; padding-left:20px; max-height:200px; overflow:auto; }
 .ts { color:var(--muted); margin-right:8px; }
 code { background:#161b22; padding:1px 4px; border-radius:3px; }

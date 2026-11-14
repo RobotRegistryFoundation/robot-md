@@ -1870,7 +1870,10 @@ def invoke(
     scope: str | None = typer.Option(
         None,
         "--scope",
-        help="Envelope scope (default 'SAFETY' for a stop such as arm.estop, else 'actuate').",
+        help=(
+            "Envelope scope (default: SAFETY for a stop such as arm.estop, COMMISSION for "
+            "its clear, OBSERVE for a read such as read_state or status.report, else actuate)."
+        ),
     ),
     sign: bool = typer.Option(
         True,

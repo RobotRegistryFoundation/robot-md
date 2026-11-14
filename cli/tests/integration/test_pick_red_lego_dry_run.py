@@ -1,4 +1,4 @@
-"""Integration: discover → vision.find → execute_capability(arm.home) chain, all dry.
+"""Integration: discover → vision.find → execute_capability(arm.home) chain.
 
 Uses a faked perception + servo bus and a fake robot-md-gateway. Validates the
 plumbing (manifest → context → MCP tools), not the hardware: perception is
@@ -90,13 +90,25 @@ async def test_discover_then_vision_find_then_execute(tmp_path, gateway_env):
     assert vf["depth_mm"] == 500
     assert len(vf["camera_xyz_mm"]) == 3
 
-    # --- Step C: execute_capability(arm.home) — dry-run: the envelope, unsent ---
+    # --- Step C: the preset gates `destructive` and `system` with require_auth,
+    # so robot-md's MCP server refuses every motion, dry runs included ---
+    for dry_run in (True, False):
+        exe = execute_capability_tool(ctx, capability="arm.home", args={}, dry_run=dry_run)
+        assert exe["error"]["reason"] == "hitl_gate", exe
+    assert gateway_env.requests == []
+
+    # --- Step D: the same manifest with gates that need no person ---
+    from robot_md.robot_spec import RobotSpec
+
+    for gate in ctx.parsed.frontmatter["safety"]["hitl_gates"]:
+        gate["require_auth"] = False
+    ctx.spec = RobotSpec.from_parsed(ctx.parsed)
     exe = execute_capability_tool(ctx, capability="arm.home", args={}, dry_run=True)
     assert exe["status"] == "dry_run", f"execute_capability blocked: {exe}"
     assert exe["dry_run"]["envelope"]["tool_name"] == "arm.home"
     assert gateway_env.requests == []
 
-    # --- Step D: execute_capability(arm.home) — sent to the gateway ---
+    # --- Step E: execute_capability(arm.home) — sent to the gateway ---
     exe = execute_capability_tool(ctx, capability="arm.home", args={}, dry_run=False)
     assert exe["status"] == "ok", f"execute_capability failed: {exe}"
     assert [b["tool_name"] for b in gateway_env.bodies] == ["arm.home"]

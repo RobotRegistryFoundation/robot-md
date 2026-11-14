@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import json
 import os
 import time
@@ -24,6 +25,21 @@ def _write_command(cmd: str) -> None:
     path = d / "commands.jsonl"
     with path.open("a") as f:
         f.write(json.dumps({"cmd": cmd, "ts": time.time(), "from": "dashboard"}) + "\n")
+
+
+def _clear_refusal() -> dict:
+    """The refusal the MCP server's `estop_clear` answers with: clearing a stop
+    is the person's, and this says how. The dashboard can't clear a stop
+    either."""
+    from robot_md import gateway_client
+    from robot_md.mcp.tools.estop import clear_refusal
+
+    tool = (
+        os.environ.get(gateway_client.ENV_STOP_CLEAR_TOOL, "").strip()
+        or gateway_client.DEFAULT_STOP_CLEAR_TOOL
+    )
+    manifest = os.environ.get(gateway_client.ENV_MANIFEST_PATH, "").strip() or None
+    return clear_refusal(tool, manifest)
 
 
 def build_app(*, manifest: Path | None = None) -> FastAPI:
@@ -74,9 +90,19 @@ def build_app(*, manifest: Path | None = None) -> FastAPI:
         return {"ok": True}
 
     @app.post("/api/estop/clear")
-    async def api_estop_clear():
+    async def api_estop_clear(request: Request):
+        # The MCP server reads this command, refuses the clear and records the
+        # refusal. This answer is that same refusal, so the page shows it: it
+        # used to answer {"ok": true} and show nothing.
         _write_command("estop.clear")
-        return {"ok": True}
+        refusal = _clear_refusal()
+        if request.headers.get("HX-Request") == "true":
+            return HTMLResponse(
+                '<div class="refusal"><strong>Not cleared.</strong> '
+                + html.escape(refusal["message"])
+                + "</div>"
+            )
+        return refusal
 
     @app.post("/api/snapshot")
     async def api_snapshot():

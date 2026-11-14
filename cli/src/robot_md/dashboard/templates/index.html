@@ -11,7 +11,7 @@
     <h1>{{ robot_name }}</h1>
     <div class="actions">
       <button hx-post="/api/estop" hx-swap="none" class="btn-danger">🔴 E-STOP</button>
-      <button hx-post="/api/estop/clear" hx-swap="none">↻ Clear E-stop</button>
+      <button hx-post="/api/estop/clear" hx-target="#estop-clear-result" hx-swap="innerHTML">↻ Clear E-stop</button>
       <button hx-post="/api/snapshot" hx-swap="none">📸 Snapshot</button>
     </div>
   </header>
@@ -46,6 +46,7 @@
       <div class="state {% if estop_set %}set{% else %}clear{% endif %}">
         {{ "🛑 SET" if estop_set else "✅ clear" }}
       </div>
+      <div id="estop-clear-result" aria-live="polite"></div>
     </section>
 
     <section id="toolcall-log">

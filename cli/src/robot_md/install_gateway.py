@@ -126,6 +126,14 @@ def render_env_file(*, manifest_path: str) -> str:
     with no record of who resumed it. The gateway refuses the clear while it is
     itself tripped, because the clear is not a stop, so the order stays: the
     gateway's clear (`POST /v1/safety/clear`) first, then the arm's.
+
+    `ROBOT_MD_HITL_FROM_MANIFEST=1` makes the gateway read the pinned
+    ROBOT.md's `safety.hitl_gates` itself: a gate with `require_auth: true` on
+    a scope it maps to motion (`destructive`, `system`) then refuses every
+    motion that carries no human `delegation_chain` (`hitl_required`). That is
+    a second layer under robot-md's MCP server, which refuses gated motion
+    before it is sent; without it, the gateway applies its built-in default
+    and lets a gated motion from any other client through.
     """
     return f"""\
 ROBOT_MD_PATH={manifest_path}
@@ -136,6 +144,8 @@ ROBOT_MD_LOG_LEVEL=INFO
 ROBOT_MD_TOOL_ALLOWLIST=mcp__robot__execute_capability,mcp__robot__render,mcp__robot__validate,move,home,read_state,perceive,arm.estop,arm.estop.clear
 ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission
 ROBOT_MD_REQUIRE_ENVELOPE_SIGNATURE=1
+# The gateway enforces ROBOT.md's safety.hitl_gates itself (hitl_required).
+ROBOT_MD_HITL_FROM_MANIFEST=1
 """
 
 
@@ -172,8 +182,11 @@ bearers:
     tier: read
     role: supervisor
     caller: supervisor-default
-  # Clearing a stop (POST /v1/safety/clear, then arm.estop.clear) needs a
-  # commission entry. Add the operator's by hand, with a token of its own:
+  # Clearing a stop needs a commission entry: for the arm's clear
+  # (arm.estop.clear) and, on robot-md-gateway with #35 or later, the
+  # gateway's own (POST /v1/safety/clear, a signed ESTOP_CLEAR body where the
+  # gateway requires signatures). Add the operator's by hand, with a token of
+  # its own:
   #   python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
   # - token: "<that token>"
   #   tier: commission
@@ -182,6 +195,8 @@ bearers:
 
 
 _TIERS = ("read", "actuate", "commission")
+#: The values robot-md-gateway reads as on (robot_md_gateway.__main__._TRUTHY).
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
 _SUPERVISOR = "supervisor"
 
 
@@ -305,6 +320,12 @@ def env_warnings(text: str) -> list[str]:
             "gateway.env allowlists arm.estop.clear without "
             "ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission, so the gateway does not hold "
             "the arm's unlatch to the commission tier itself"
+        )
+    if values.get("ROBOT_MD_HITL_FROM_MANIFEST", "").strip().lower() not in _TRUTHY:
+        warnings.append(
+            "gateway.env has no ROBOT_MD_HITL_FROM_MANIFEST=1, so the gateway does not "
+            "enforce ROBOT.md's hitl_gates itself, and a gated motion from a client other "
+            "than robot-md's MCP server is not refused there; add it"
         )
     manifest = values.get("ROBOT_MD_PATH", "")
     if manifest.startswith(("/home/", "/root/")):
@@ -546,10 +567,15 @@ next steps:
   2. read the tokens with: sudo cat {BEARERS_PATH}
   3. give the actuate token to the agent's client, and the supervisor token to
      the supervising person's device: never the agent's host, never the robot.
-  4. from that device, POST /v1/safety/heartbeat at least every 3 s.
-  5. then, as the operator, POST /v1/safety/clear with the commission token.
-     A gateway that has these routes (robot-md-gateway#35 and later) starts
-     held and moves nothing until then; 0.5.0a9 has neither route."""
+  4. robot-md-gateway with #35 or later only, which starts held and moves
+     nothing until 4 and 5 are done: from that device, POST
+     /v1/safety/heartbeat at least every 3 s.
+  5. then, as the operator, POST /v1/safety/clear with the commission token,
+     as a signed ESTOP_CLEAR body where the gateway requires signatures (a
+     gateway.env install-gateway writes does). robot-md-gateway's own
+     `heartbeat` and `clear` commands send both (robot-md-gateway#36, not
+     merged yet).
+     On 0.5.0a9 and earlier, skip 4 and 5: neither route exists."""
 
 
 def _disable_unit_if_enabled(sudo: list[str]) -> None:

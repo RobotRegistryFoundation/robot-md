@@ -3,6 +3,7 @@ import os
 import stat
 import subprocess
 from importlib.metadata import version
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -61,6 +62,106 @@ def test_render_env_file_contains_required_keys():
     assert "ROBOT_MD_BEARERS_FILE=/etc/robot-md-gateway/bearers.yaml" in env
     assert "ROBOT_MD_LOG_LEVEL=INFO" in env
     assert "ROBOT_MD_REQUIRE_ENVELOPE_SIGNATURE=1" in env
+
+
+def test_render_env_file_makes_the_gateway_enforce_the_manifests_gates():
+    """The gateway reads ROBOT.md's hitl_gates itself only with this set; without
+    it a gated motion sent by any client other than robot-md's MCP server runs."""
+    env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
+    assert "ROBOT_MD_HITL_FROM_MANIFEST=1" in env.splitlines()
+
+
+def test_the_gateway_reads_the_rendered_hitl_setting_as_on():
+    """Cross-checked with the gateway's own reader of the variable."""
+    read = _gateway_module("robot_md_gateway.__main__")._hitl_from_manifest_from_env
+    env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
+    [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_HITL_FROM_MANIFEST=")]
+    with patch.dict("os.environ", {"ROBOT_MD_HITL_FROM_MANIFEST": line.split("=", 1)[1]}):
+        assert read() is True
+
+
+def test_the_hitl_setting_never_refuses_the_mcp_stop():
+    """With ROBOT_MD_HITL_FROM_MANIFEST=1 the gateway applies the pinned
+    manifest's gates. robot-md's MCP stop goes out as arm.estop under scope
+    SAFETY, and so-arm101-actuator declares arm.estop a stop, not a motion
+    (0.2.2 declares neither), so the gateway judges it with motion=False and
+    no gate reaches it. A motion under the same gates is refused.
+    Cross-checked with the gateway's own HiTL policy."""
+    from pathlib import Path
+
+    from robot_md.gateway_client import STOP_SCOPE
+
+    gates_module = _gateway_module("robot_md_gateway.cert.gates")
+    preset = Path(__file__).resolve().parents[1] / "src" / "robot_md" / "presets"
+    gates = yaml.safe_load((preset / "so_arm101.yaml").read_text())["safety"]["hitl_gates"]
+    policy = gates_module.HiTLPolicy.from_manifest_gates(gates)
+    assert STOP_SCOPE == "SAFETY"
+    assert policy.requires(STOP_SCOPE, motion=False) is False
+    assert policy.requires("MANIPULATE", motion=True) is True
+
+
+_PRESETS = Path(__file__).resolve().parents[1] / "src" / "robot_md" / "presets"
+#: Every shipped preset that declares hitl_gates.
+_GATED_PRESETS = sorted(
+    p.stem
+    for p in _PRESETS.glob("*.yaml")
+    if (yaml.safe_load(p.read_text()).get("safety") or {}).get("hitl_gates")
+)
+
+
+def test_the_gated_presets_include_ones_with_a_system_gate():
+    assert {"so_arm101", "ur5e", "franka_panda"} <= set(_GATED_PRESETS)
+
+
+@pytest.mark.parametrize("preset", _GATED_PRESETS)
+def test_the_hitl_setting_never_refuses_the_persons_clear_or_reads(preset):
+    """With ROBOT_MD_HITL_FROM_MANIFEST=1 the gateway judges a request its
+    actuator doesn't declare as motion by the scope label on it. The person's
+    `robot-md invoke` clear and reads, with no --scope, carry COMMISSION and
+    OBSERVE, which no shipped preset's gates cover. Under `actuate`, the
+    earlier default, a `system` gate refuses the clear (hitl_required), and the
+    arm stays latched. Cross-checked with the gateway's own HiTL policy."""
+    from robot_md.invoke import CLEAR_TOOLS, READ_TOOLS, STOP_TOOLS, default_scope
+
+    gates_module = _gateway_module("robot_md_gateway.cert.gates")
+    gates = yaml.safe_load((_PRESETS / f"{preset}.yaml").read_text())["safety"]["hitl_gates"]
+    policy = gates_module.HiTLPolicy.from_manifest_gates(gates)
+    for tool in sorted(CLEAR_TOOLS | READ_TOOLS | STOP_TOOLS):
+        assert policy.requires(default_scope(tool), motion=False) is False, tool
+    if any(g.get("scope") == "system" and g.get("require_auth") is not False for g in gates):
+        assert policy.requires("actuate", motion=False) is True
+
+
+def test_a_commission_gate_refuses_the_clear_too():
+    """The gap the CHANGELOG names: a manifest that gates `commission` with
+    require_auth: true refuses the person's COMMISSION clear (hitl_required),
+    and robot-md has no way to attach a person's approval. No shipped preset
+    declares one. If the gateway comes to exempt a declared clear, this test
+    fails and the CHANGELOG's note goes."""
+    from robot_md.invoke import default_scope
+
+    gates_module = _gateway_module("robot_md_gateway.cert.gates")
+    policy = gates_module.HiTLPolicy.from_manifest_gates(
+        [{"scope": "commission", "require_auth": True}]
+    )
+    assert policy.requires(default_scope("arm.estop.clear"), motion=False) is True
+    for preset in _GATED_PRESETS:
+        gates = yaml.safe_load((_PRESETS / f"{preset}.yaml").read_text())["safety"]["hitl_gates"]
+        assert all(g.get("scope") != "commission" for g in gates), preset
+
+
+def test_the_texts_install_gateway_writes_qualify_the_safety_routes():
+    """Every install today gets robot-md-gateway 0.5.0a9, which serves neither
+    /v1/safety route, and a gateway with #35 that requires signatures refuses
+    an unsigned clear. The next steps and the bearers.yaml comment say both."""
+    from robot_md.install_gateway import NEXT_STEPS
+
+    assert "skip 4 and 5" in NEXT_STEPS
+    assert "#35 or later" in NEXT_STEPS
+    assert "ESTOP_CLEAR" in NEXT_STEPS
+    bearers = render_default_bearers()
+    assert "#35 or later" in bearers
+    assert "ESTOP_CLEAR" in bearers
 
 
 def _allowlist() -> list[str]:
@@ -312,10 +413,21 @@ def test_bearer_warnings_name_a_missing_supervisor_and_commission_entry():
             "ROBOT_MD_PATH=/home/craig/ROBOT.md\nROBOT_MD_TOOL_ALLOWLIST=arm.estop\n",
             "ProtectHome=yes hides",
         ),
+        ("ROBOT_MD_TOOL_ALLOWLIST=arm.estop\n", "has no ROBOT_MD_HITL_FROM_MANIFEST=1"),
+        (
+            "ROBOT_MD_TOOL_ALLOWLIST=arm.estop\nROBOT_MD_HITL_FROM_MANIFEST=0\n",
+            "has no ROBOT_MD_HITL_FROM_MANIFEST=1",
+        ),
     ],
 )
 def test_env_warnings_name_what_an_old_gateway_env_lacks(env, expected):
     assert any(expected in w for w in env_warnings(env)), env_warnings(env)
+
+
+@pytest.mark.parametrize("value", ["1", "true", "YES", "on", '"1"'])
+def test_any_value_the_gateway_reads_as_on_raises_no_hitl_warning(value):
+    env = f"ROBOT_MD_TOOL_ALLOWLIST=arm.estop\nROBOT_MD_HITL_FROM_MANIFEST={value}\n"
+    assert not any("HITL" in w for w in env_warnings(env))
 
 
 def test_the_rendered_files_raise_no_warning_but_the_missing_commission_entry():
