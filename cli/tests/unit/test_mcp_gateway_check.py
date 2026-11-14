@@ -53,6 +53,10 @@ def test_an_older_gateway_is_recognized(fake_gateway):
     assert r["result"] == "lacks_safety_routes"
     assert "robot-md-gateway#35" in r["detail"]
     assert "does not stop the arm when heartbeats stop" in r["detail"]
+    # Right on this gateway and on one with #35: it describes, it doesn't
+    # say robot-md needs a release that isn't published.
+    assert "needs" not in r["detail"]
+    assert "#35 or later lets a declared stop through" in r["detail"]
 
 
 def test_nothing_listening_is_unknown():

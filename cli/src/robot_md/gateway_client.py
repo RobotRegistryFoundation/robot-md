@@ -705,7 +705,8 @@ OLD_GATEWAY_WARNING = (
     "robot-md-gateway#35 (0.5.0a9 and earlier). On it a stop must pass every gate a "
     "motion does, so a manifest-pin mismatch, a missing signing key or a failed key "
     "lookup refuses the MCP estop, and the gateway does not stop the arm when "
-    "heartbeats stop. robot-md 2.0 needs a robot-md-gateway release that includes #35."
+    "heartbeats stop. A gateway with #35 or later lets a declared stop through in "
+    "every state and stops the arm when heartbeats stop."
 )
 
 

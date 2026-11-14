@@ -132,12 +132,13 @@ claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 > **Upgrading from 1.10.x: MCP motion now goes through robot-md-gateway.**
 > `execute_capability`, `execute_task` and `estop` no longer open or write
 > the servo bus; they send RCAN INVOKE envelopes to the gateway, and with no
-> configured or reachable gateway the motion tools refuse. It needs a
-> robot-md-gateway release that includes
+> configured or reachable gateway the motion tools refuse. On a gateway with
 > [robot-md-gateway#35](https://github.com/RobotRegistryFoundation/robot-md-gateway/pull/35)
-> (none is published yet; 0.5.0a9 predates it), and the MCP server warns
-> when it finds an older one. The person at the robot hands the MCP server
-> the gateway's actuate token (`ROBOT_MD_GATEWAY_BEARER`): since
+> or later, a declared stop passes every gate and the gateway stops the arm
+> when heartbeats stop. On an older one (0.5.0a9 and earlier) the MCP stop
+> has to pass every gate a motion does and there is no heartbeat safe-stop;
+> the MCP server warns when it finds one. The person at the robot hands the
+> MCP server the gateway's actuate token (`ROBOT_MD_GATEWAY_BEARER`): since
 > `install-gateway` keeps `bearers.yaml` readable by the gateway only, the
 > server can't read it. While ROBOT.md has a gate that needs a person (the
 > so-arm101 preset's `destructive` and `system` gates do), the MCP server

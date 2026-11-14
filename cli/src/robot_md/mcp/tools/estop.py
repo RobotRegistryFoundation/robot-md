@@ -15,9 +15,9 @@ not a hardware e-stop.
 
 On a gateway without robot-md-gateway#35 (0.5.0a9 and earlier) a stop has to
 pass every gate a motion does, so a manifest-pin mismatch, a missing signing
-key or a failed key lookup refuses it, and the gateway never stops the arm on
-its own when heartbeats stop. robot-md's MCP motion needs a gateway release
-that includes #35.
+key or a failed key lookup refuses it, and the gateway does not stop the arm
+when heartbeats stop. The MCP server warns at startup when it finds such a
+gateway, and works with either.
 
 Whatever goes wrong on the stop's path, the result says the stop was not
 confirmed (`stop: stop_not_confirmed`) and, before any reason, tells the
