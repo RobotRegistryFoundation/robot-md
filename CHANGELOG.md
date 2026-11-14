@@ -29,6 +29,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     for bob until robot-md adds those lines, and the gateway's rollout says
     bob mustn't run unattended before then. 2.0.1 doesn't change the unit.
 
+### Fixed
+
+- **`hotplug_confirm` bind is idempotent.** Repeating a bind on the same
+  event merged the driver into ROBOT.md a second time and only then reported
+  `already_resolved`, so the manifest ended up with the driver twice. The tool
+  now checks whether the event is already resolved before any write, and the
+  manifest merge leaves ROBOT.md byte-identical when a driver with the same
+  id and fields is already declared (a bind whose queue resolution never
+  landed can be retried safely). A driver with the same id but different
+  fields is refused as `driver_id_conflict` instead of being added twice.
+  The tool now carries `idempotentHint: true`.
+- **`hotplug_review` is read-only.** It opened an `EventQueue`, whose
+  constructor creates `~/.robot-md/hotplug-events.jsonl` when missing and
+  appends a `daemon_alert` record when it finds malformed lines. It now reads
+  the file directly: a missing queue reads as empty, and malformed lines are
+  reported as `malformed_lines` in the reply instead of written to the file.
+  The `robot-md://hotplug/pending` resource reads the same way. The tool now
+  carries `readOnlyHint: true` and `idempotentHint: true`.
+
 ## [2.0.1] - 2026-11-14
 
 Fixes to 2.0.0's MCP motion path, from the review of robot-md#114 (which
