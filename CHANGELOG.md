@@ -58,11 +58,10 @@ the two on 0.5.0a9 and found no case where this release is less strict than
   signing failure sends the stop unsigned (a stop has to get out, and
   robot-md-gateway#35 never checks a stop's signature), a malformed URL is
   `gateway_unreachable`, a stall is `gateway_no_answer`, and anything else is
-  `stop_path_error`; each returns
-  `stop: stop_not_confirmed` with "Use the hardware stop at the machine now."
-  as the first instruction, ahead of any reason, and without the motion
-  advice below ("do not resend"). The stop waits at most 2 s for the gateway,
-  not the 30 s a motion may take.
+  `stop_path_error`. Each returns `stop: stop_not_confirmed` with "Use the
+  hardware stop at the machine now." as the first instruction, ahead of any
+  reason, and without the motion advice below ("do not resend"). The stop
+  waits at most 2 s for the gateway, not the 30 s a motion may take.
 - **A motion or read whose signing key can't sign is refused, and nothing is
   sent** (`signing_failed`, with an audit entry). 2.0.0 raised there and sent
   nothing; only the stop goes out unsigned. A motion sent unsigned would rely
