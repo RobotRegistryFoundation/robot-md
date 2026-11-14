@@ -121,22 +121,30 @@ claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
 > same CLI is bundled with the pip package — replace the line above
 > with `claude mcp add robot-md -- robot-md-mcp "$(pwd)/ROBOT.md"`.
 > The TS version exposes `render` + `validate`; the Python version adds
-> `estop`, `estop_clear`, `execute_capability`, and `execute_task`, which
-> send every motion and stop to
+> `estop_clear`, which always refuses (the person clears a stop), and
+> `estop`, `execute_capability`, and `execute_task`, which send every motion
+> and stop to
 > [robot-md-gateway](https://github.com/RobotRegistryFoundation/robot-md-gateway)
 > (`POST /v1/invoke`) and refuse when no gateway is configured. Nothing in
 > the MCP server writes to the robot. See `docs/mcp-server-options.md` for
 > the full comparison.
 
 > **Upgrading from 1.10.x: MCP motion now goes through robot-md-gateway.**
-> `execute_capability`, `execute_task`, `estop` and `estop_clear` no longer
-> open or write the servo bus; they send RCAN INVOKE envelopes to the
-> gateway, and with no configured or reachable gateway the motion tools
-> refuse. The server reads the gateway's address and an actuate-tier bearer
-> from what `robot-md install-gateway` writes under `/etc/robot-md-gateway/`,
-> or from `ROBOT_MD_GATEWAY_URL` and `ROBOT_MD_GATEWAY_BEARER`.
-> `confirm_token` is gone: it was written by the model and never was a
-> person's confirmation. The full list is in the
+> `execute_capability`, `execute_task` and `estop` no longer open or write
+> the servo bus; they send RCAN INVOKE envelopes to the gateway, and with no
+> configured or reachable gateway the motion tools refuse. It needs a
+> robot-md-gateway release that includes
+> [robot-md-gateway#35](https://github.com/RobotRegistryFoundation/robot-md-gateway/pull/35)
+> (none is published yet; 0.5.0a9 predates it), and the MCP server warns
+> when it finds an older one. The person at the robot hands the MCP server
+> the gateway's actuate token (`ROBOT_MD_GATEWAY_BEARER`): since
+> `install-gateway` keeps `bearers.yaml` readable by the gateway only, the
+> server can't read it. While ROBOT.md has a gate that needs a person (the
+> so-arm101 preset's `destructive` and `system` gates do), the MCP server
+> refuses every motion: that confirmation can't reach it from outside the
+> chat yet. `estop_clear` always refuses; the person clears stops with their
+> own commission credential. `confirm_token` is gone: it was written by the
+> model and never was a person's confirmation. The full list is in the
 > [CHANGELOG](https://github.com/RobotRegistryFoundation/robot-md/blob/main/CHANGELOG.md).
 
 6. (Optional) Drop the agent skill into `~/.claude/skills/` so superpowers-aware harnesses auto-invoke robot-md on the operator's first robot-related message:
@@ -184,7 +192,7 @@ contact email me@acme.com. Then add the robot-md MCP server to this
 session.
 ```
 
-Claude will use its `Bash` tool to run the same one-liner from Option A, show you the result, and wire up the MCP server for you. See the full walkthrough (including what to paste for custom robots, how to calibrate interactively, and what Claude is allowed to do) in **[`docs/getting-started-claude-code.md`](https://github.com/RobotRegistryFoundation/robot-md/blob/main/docs/getting-started-claude-code.md)**.
+Claude installs the CLI and gives you the same one-liner from Option A to run at the robot (`robot-md init` opens the serial ports and the camera, and at a terminal it can move each joint to calibrate it), then reads back the result and wires up the MCP server for you. See the full walkthrough (including what to paste for custom robots, how to calibrate interactively, and what Claude is allowed to do) in **[`docs/getting-started-claude-code.md`](https://github.com/RobotRegistryFoundation/robot-md/blob/main/docs/getting-started-claude-code.md)**.
 
 ---
 

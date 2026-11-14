@@ -40,7 +40,7 @@ have resources pointing at the file.
 **Step 3.** Claude will, in order:
 
 1. Run `pip install robot-md` (or `pipx install` — whichever your environment prefers).
-2. Run `robot-md init my-bob --preset so-arm101 --register --manufacturer acme --contact-email me@acme.com`.
+2. Give you `robot-md init my-bob --preset so-arm101 --register --manufacturer acme --contact-email me@acme.com` to run in a terminal at the robot. `init` opens every serial port to look for servos and opens the camera, and at a terminal it can move each joint to calibrate it, so it is yours to run, not Claude's. (`ROBOT_MD_SKIP_BUS_PROBE=1` skips only the servo probe; the camera is still opened, so it doesn't make `init` safe to hand to Claude.)
 3. Read back the resulting `ROBOT.md` to confirm the manifest is self-consistent.
 4. Print the assigned `RRN-NNNNNNNNNNNN` and its `https://rcan.dev/r/<rrn>` resolver URL.
 5. Run `claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"` — now `robot-md://` resources are live for this session.
@@ -65,14 +65,20 @@ You: Set up a ROBOT.md for this robot. Use the so-arm101 preset.
      with contact email me@acme.com. Then add the robot-md MCP
      server to this session.
 
-Claude: I'll do this in four steps — install the CLI, init the
-        manifest with registration, wire up MCP, then verify.
+Claude: I'll install the CLI, then hand you the init command: it
+        opens the robot's serial ports and camera, so you run it
+        at the robot.
 
         [runs: pip install robot-md]
-        ✓ robot-md 0.6.3 installed
+        ✓ robot-md installed
 
-        [runs: robot-md init my-bob --preset so-arm101 --register \
-               --manufacturer acme --contact-email me@acme.com]
+        Run this in a terminal at the robot:
+          robot-md init my-bob --preset so-arm101 --register \
+              --manufacturer acme --contact-email me@acme.com
+
+You: [runs it] done.
+
+Claude: [reads ROBOT.md]
         ✓ wrote ROBOT.md  preset: so-arm101
         ✓ my-bob (arm, 6 DoF, 5 capabilities)
         ✓ registered on rcan.dev
@@ -94,10 +100,12 @@ Claude: I'll do this in four steps — install the CLI, init the
 You: What can this robot do?
 
 Claude: my-bob is a 6-DOF SO-ARM101 arm. Five capabilities:
-        arm.pick, arm.place, arm.reach, vision.describe,
-        status.report. Max payload 0.5 kg. Software E-stop at 100
-        ms. Destructive actions and unknown-surface placements gate
-        on human-in-the-loop approval.
+        arm.pick, arm.place, arm.reach, arm.home, status.report.
+        Max payload 0.5 kg. Software E-stop at 100 ms. The manifest
+        gates `destructive` and `system` with require_auth: true,
+        so robot-md's MCP server refuses every motion until a
+        person's confirmation can reach it from outside this chat.
+        I can read the robot's state.
 ```
 
 ---
@@ -113,7 +121,7 @@ ask me the questions — I'll fill in the physics and capabilities. Don't
 register yet; I want to review the draft first.
 ```
 
-Claude will run `robot-md init my-bob --wizard`, relay each prompt to you, and produce a validated draft. Review it, then ask:
+Claude gives you `robot-md init my-bob --wizard` to run at the robot (it opens the serial ports, like any `init`), helps you answer its prompts, and validates the draft. Review it, then ask:
 
 ```
 Looks good. Now register it under manufacturer "acme", contact me@acme.com.
@@ -138,11 +146,17 @@ Claude gives you `robot-md calibrate --zero ROBOT.md` to run in a terminal at th
 
 ### After init on a TTY with the arm plugged in
 
-Once `robot-md init` finishes (either via the shell or the Claude-Code-driven one-liner), install the gateway on the robot. Motion goes only through it, and without it the MCP motion tools refuse. You run this yourself: it installs a service that takes the robot's servo port.
+Once `robot-md init` finishes, install the gateway on the robot. Motion goes only through it, and without it the MCP motion tools refuse. You run this yourself: it installs a service that takes the robot's servo port.
 
 ```bash
 robot-md install-gateway
 ```
+
+Then, still as the person at the robot:
+
+1. **Give the MCP server its token.** `install-gateway` keeps `/etc/robot-md-gateway/bearers.yaml` readable by the gateway only, so the MCP server can't read it. Set `ROBOT_MD_GATEWAY_BEARER` to the actuate token in the MCP server's environment, or `ROBOT_MD_BEARERS_FILE` to a file of your own holding only that entry.
+2. **Arm the gateway.** It starts held. Send its heartbeat from your own device with the supervisor token (never from the robot or the machine Claude runs on), then send `POST /v1/safety/clear` with your commission token. The MCP server never sends heartbeats.
+3. **Use a gateway that includes robot-md-gateway#35.** On an older one (0.5.0a9) the MCP stop can be refused and the gateway doesn't stop the arm when heartbeats stop; the MCP server warns when it finds one.
 
 Then, with you at the arm and a hand on a hardware stop (the power switch or plug):
 
@@ -154,12 +168,18 @@ claude
 Inside Claude Code, say:
 
 ```
-Dry-run pick the red lego and put it in the bowl.
+Pick the red lego and put it in the bowl.
 ```
+
+**On a manifest made from the so-arm101 preset, Claude moves nothing.** The preset gates `destructive` and `system` with `require_auth: true`. A gate that needs a person covers every motion, and that person's confirmation has to reach the gateway from outside the conversation, which robot-md can't take yet. So `execute_capability` refuses every motion, dry runs included (`hitl_gate`), and Claude says so and offers you the steps to run yourself. Reads such as `status.report` still work. If the bounded-embodiment plugin is installed, Claude calls no motion tool on real hardware at all.
+
+On a manifest with no gate that needs a person:
 
 Claude reads `CLAUDE.md`, asks you to confirm you are at the machine with a hand on the hardware stop, and calls `mcp__robot-md-<your_robot_name>__execute_capability(arm.pick, dry_run=true)` to show you the exact envelope it would send to robot-md-gateway; a dry run sends nothing. When you ask for the real thing, the same call without `dry_run` goes to the gateway, which checks it against the credential's tier, its tool allowlist and the actuator's limits, and runs it or refuses it. Claude reports the gateway's answer as given.
 
-Your "yes" in the chat is not what allows the motion: the gateway decides. A capability whose scope your manifest gates with `require_auth: true` needs a confirmation from outside the conversation, which robot-md does not have yet, so the MCP server refuses it.
+Your "yes" in the chat is not what allows the motion: the gateway decides. `status: ok` means the gateway ran the call; Claude checks `reached` before treating a move as done, since a stop that interrupts a move still gets `ok` with `reached: false`.
+
+**Stopping and resuming.** Claude calls `estop` when you ask it to stop; if the stop isn't confirmed within 2 s, it tells you to use the hardware stop. Claude never clears a stop: `estop_clear` always refuses. You clear it yourself: after a gateway trip, `POST /v1/safety/clear`, then `robot-md invoke ROBOT.md --tool arm.estop.clear --bearer <your commission token>`. Then reconnect the MCP server (`/mcp` → robot-md → Reconnect): it keeps its own latch until it restarts.
 
 ### For scripted / CI callers
 
@@ -167,7 +187,7 @@ Your "yes" in the chat is not what allows the motion: the gateway decides. A cap
 robot-md init bob --preset so-arm101 --non-interactive
 ```
 
-Manifest-only; no prompts, no MCP or skill install, no hardware touched. Identical behavior to the pre-v0.5.0 `quick()` path.
+Manifest-only: no prompts, no MCP or skill install, no calibration. It still scans the machine first: it opens each serial port to look for servos (`ROBOT_MD_SKIP_BUS_PROBE=1` skips that) and opens any OAK-D camera, so on the robot it is the person's to run.
 
 ---
 
@@ -176,9 +196,9 @@ Manifest-only; no prompts, no MCP or skill install, no hardware touched. Identic
 Claude Code honors your permission mode. In the default *accept edits* mode, it will:
 
 - ✅ Run `pip install robot-md`, `npx robot-md-mcp`, `claude mcp add` — installation + wiring.
-- ✅ Run `robot-md init / register / validate / render` — manifest lifecycle.
-- ✅ Call the MCP motion tools, which send to robot-md-gateway, once you have confirmed you are at the machine with a hardware stop in reach.
-- ✋ **Leaves to you:** anything that opens the servo port or starts a service that drives the robot (`robot-md calibrate`, `robot-md install-gateway`), clearing a stop, and starting a test run (`robot-md trial`, Bounded Embodiment runs).
+- ✅ Run `robot-md register / validate / render`, and `robot-md doctor --path ROBOT.md --hardware off` — manifest lifecycle and diagnosis.
+- ✅ Call the MCP motion tools, which send to robot-md-gateway, once you have confirmed you are at the machine with a hardware stop in reach, on a manifest with no gate that needs a person, and only when the bounded-embodiment plugin isn't installed.
+- ✋ **Leaves to you:** anything that opens the servo port or the camera, or starts a service that drives the robot (`robot-md init`, `robot-md calibrate`, `robot-md pose teach`, `robot-md doctor` without `--hardware off`, `robot-md install-gateway`), clearing a stop, and starting a test run (`robot-md trial`, Bounded Embodiment runs).
 - ✅ Read and edit files under your project directory.
 - ⚠ **Ask before:** destructive operations (deleting registrations, `robot-md unregister <rrn>`), writing files outside the project, publishing to external registries with non-default endpoints.
 
@@ -194,7 +214,7 @@ Ask Claude directly:
 Something broke — run robot-md doctor and tell me what's wrong.
 ```
 
-Claude runs the diagnostic verb and reports (servo port reachable, RRF/rcan.dev reachable, schema valid, keystore integrity, claude CLI present). Most issues come down to a missing permission on `/dev/ttyACM0` or an unplugged robot — `doctor` flags both.
+Claude runs `robot-md doctor --path ROBOT.md --hardware off` and reports (RRF/rcan.dev reachable, schema valid, keystore integrity, claude CLI present, declared driver devices present). `--hardware off` keeps it off the servo port: without it, `doctor --path` opens the port and reads every servo whenever one is plugged in, so a hardware check (`--hardware on`) is yours to run.
 
 ---
 
@@ -207,13 +227,13 @@ Your robot now has:
 - ✅ A public identity: `RRN-NNNNNNNNNNNN`, resolvable at `https://rcan.dev/r/<rrn>`.
 - ✅ A live MCP server in this Claude Code session — six `robot-md://` resources, three tools (`validate`, `render`, `doctor_summary`), four slash commands (`/brief-me`, `/check-safety`, `/explain-capability`, `/manifest-status`).
 
-From here, Claude Code is the planner *and* executor. Ask it to pick-and-place, describe the scene, report status — every ask routes through the safety gates declared in the manifest. No separate runtime to stand up.
+From here, Claude Code plans, and robot-md-gateway decides every motion it proposes. A manifest gate that needs a person stops MCP motion altogether until robot-md can take that person's confirmation from outside the chat.
 
 **Try these next:**
 
 - `/brief-me` — get a concise briefing on the robot.
 - `/check-safety action="pick up the red cup"` — before issuing any motion, cross-check the action against declared HITL gates.
-- Ask Claude: *"Run `robot-md doctor --path ROBOT.md` and tell me what's wrong."* — diagnostic across install, manifest, network, drivers, keystore.
+- Ask Claude: *"Run `robot-md doctor --path ROBOT.md --hardware off` and tell me what's wrong."* — diagnostic across install, manifest, network, drivers, keystore, without opening the servo port.
 
 **Want Claude on more surfaces?**
 
