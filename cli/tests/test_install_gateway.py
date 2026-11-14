@@ -63,6 +63,22 @@ def test_render_env_file_contains_required_keys():
     assert "ROBOT_MD_REQUIRE_ENVELOPE_SIGNATURE=1" in env
 
 
+def test_render_env_file_makes_the_gateway_enforce_the_manifests_gates():
+    """The gateway reads ROBOT.md's hitl_gates itself only with this set; without
+    it a gated motion sent by any client other than robot-md's MCP server runs."""
+    env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
+    assert "ROBOT_MD_HITL_FROM_MANIFEST=1" in env.splitlines()
+
+
+def test_the_gateway_reads_the_rendered_hitl_setting_as_on():
+    """Cross-checked with the gateway's own reader of the variable."""
+    read = _gateway_module("robot_md_gateway.__main__")._hitl_from_manifest_from_env
+    env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
+    [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_HITL_FROM_MANIFEST=")]
+    with patch.dict("os.environ", {"ROBOT_MD_HITL_FROM_MANIFEST": line.split("=", 1)[1]}):
+        assert read() is True
+
+
 def _allowlist() -> list[str]:
     env = render_env_file(manifest_path="/etc/robot-md-gateway/ROBOT.md")
     [line] = [x for x in env.splitlines() if x.startswith("ROBOT_MD_TOOL_ALLOWLIST=")]
@@ -312,10 +328,21 @@ def test_bearer_warnings_name_a_missing_supervisor_and_commission_entry():
             "ROBOT_MD_PATH=/home/craig/ROBOT.md\nROBOT_MD_TOOL_ALLOWLIST=arm.estop\n",
             "ProtectHome=yes hides",
         ),
+        ("ROBOT_MD_TOOL_ALLOWLIST=arm.estop\n", "has no ROBOT_MD_HITL_FROM_MANIFEST=1"),
+        (
+            "ROBOT_MD_TOOL_ALLOWLIST=arm.estop\nROBOT_MD_HITL_FROM_MANIFEST=0\n",
+            "has no ROBOT_MD_HITL_FROM_MANIFEST=1",
+        ),
     ],
 )
 def test_env_warnings_name_what_an_old_gateway_env_lacks(env, expected):
     assert any(expected in w for w in env_warnings(env)), env_warnings(env)
+
+
+@pytest.mark.parametrize("value", ["1", "true", "YES", "on", '"1"'])
+def test_any_value_the_gateway_reads_as_on_raises_no_hitl_warning(value):
+    env = f"ROBOT_MD_TOOL_ALLOWLIST=arm.estop\nROBOT_MD_HITL_FROM_MANIFEST={value}\n"
+    assert not any("HITL" in w for w in env_warnings(env))
 
 
 def test_the_rendered_files_raise_no_warning_but_the_missing_commission_entry():

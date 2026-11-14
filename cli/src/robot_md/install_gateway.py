@@ -126,6 +126,14 @@ def render_env_file(*, manifest_path: str) -> str:
     with no record of who resumed it. The gateway refuses the clear while it is
     itself tripped, because the clear is not a stop, so the order stays: the
     gateway's clear (`POST /v1/safety/clear`) first, then the arm's.
+
+    `ROBOT_MD_HITL_FROM_MANIFEST=1` makes the gateway read the pinned
+    ROBOT.md's `safety.hitl_gates` itself: a gate with `require_auth: true` on
+    a scope it maps to motion (`destructive`, `system`) then refuses every
+    motion that carries no human `delegation_chain` (`hitl_required`). That is
+    a second layer under robot-md's MCP server, which refuses gated motion
+    before it is sent; without it, the gateway applies its built-in default
+    and lets a gated motion from any other client through.
     """
     return f"""\
 ROBOT_MD_PATH={manifest_path}
@@ -136,6 +144,8 @@ ROBOT_MD_LOG_LEVEL=INFO
 ROBOT_MD_TOOL_ALLOWLIST=mcp__robot__execute_capability,mcp__robot__render,mcp__robot__validate,move,home,read_state,perceive,arm.estop,arm.estop.clear
 ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission
 ROBOT_MD_REQUIRE_ENVELOPE_SIGNATURE=1
+# The gateway enforces ROBOT.md's safety.hitl_gates itself (hitl_required).
+ROBOT_MD_HITL_FROM_MANIFEST=1
 """
 
 
@@ -182,6 +192,8 @@ bearers:
 
 
 _TIERS = ("read", "actuate", "commission")
+#: The values robot-md-gateway reads as on (robot_md_gateway.__main__._TRUTHY).
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
 _SUPERVISOR = "supervisor"
 
 
@@ -305,6 +317,12 @@ def env_warnings(text: str) -> list[str]:
             "gateway.env allowlists arm.estop.clear without "
             "ROBOT_MD_TOOL_MIN_TIER=arm.estop.clear:commission, so the gateway does not hold "
             "the arm's unlatch to the commission tier itself"
+        )
+    if values.get("ROBOT_MD_HITL_FROM_MANIFEST", "").strip().lower() not in _TRUTHY:
+        warnings.append(
+            "gateway.env has no ROBOT_MD_HITL_FROM_MANIFEST=1, so the gateway does not "
+            "enforce ROBOT.md's hitl_gates itself, and a gated motion from a client other "
+            "than robot-md's MCP server is not refused there; add it"
         )
     manifest = values.get("ROBOT_MD_PATH", "")
     if manifest.startswith(("/home/", "/root/")):
