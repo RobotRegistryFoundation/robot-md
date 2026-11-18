@@ -96,7 +96,7 @@ Two on-ramps, same destination — Claude Code as the planner, robot-md-gateway 
 
 **For:** operators at a shell prompt on the robot (or a dev laptop with the robot plugged in).
 
-One command does everything — install, scan, draft, register, generate a project-root `CLAUDE.md`, print the MCP add line:
+One command does most of it — install, scan, draft, register, and generate a project-root `CLAUDE.md`. Then add the MCP server:
 
 ```bash
 pip install robot-md && robot-md init my-bob --preset so-arm101 --register \
@@ -109,25 +109,28 @@ What it does:
 2. Scans PCI/USB/`/dev/tty*`, matches an SO-ARM101, pre-fills ~85% of the manifest (DH kinematics, servo IDs, safety defaults, capabilities).
 3. Mints a public RRN on [rcan.dev](https://rcan.dev) and writes it back into the manifest.
 4. **Writes `CLAUDE.md`** next to `ROBOT.md` — an intent→action table that teaches Claude Code which operator phrases should dispatch which `robot-md` verb, what to do before any physical motion, and where to read the safety gates. Existing `CLAUDE.md` content is preserved (append/update-in-place, never overwrite).
-5. Prints the MCP add line for Claude Code:
+5. Then add the robot-md MCP server to Claude Code (robot-md 2.0.1 or newer):
 
 ```bash
-claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"
+claude mcp add robot-md -- robot-md mcp "$(pwd)/ROBOT.md"
 ```
 
-> **Two MCP implementations, same protocol.** The default `npx -y
-> robot-md-mcp` pulls the TypeScript server from npm (published from
-> this repo's TS source). If you'd rather keep everything Python, the
-> same CLI is bundled with the pip package — replace the line above
-> with `claude mcp add robot-md -- robot-md-mcp "$(pwd)/ROBOT.md"`.
-> The TS version exposes `render` + `validate`; the Python version adds
-> `estop_clear`, which always refuses (the person clears a stop), and
-> `estop`, `execute_capability`, and `execute_task`, which send every motion
-> and stop to
+Or install the [Claude Code plugin](https://github.com/RobotRegistryFoundation/claude-code-plugins), which starts this server for you and refuses a robot-md older than 2.0.1.
+
+> **Two MCP servers.** The one above is the robot-md CLI's server (Python,
+> from this package). It serves the manifest, read-only perception
+> (`vision_find`), and the motion tools `estop`, `execute_capability` and
+> `execute_task`, which send every motion and stop to
 > [robot-md-gateway](https://github.com/RobotRegistryFoundation/robot-md-gateway)
-> (`POST /v1/invoke`) and refuse when no gateway is configured. Nothing in
-> the MCP server writes to the robot. See `docs/mcp-server-options.md` for
-> the full comparison.
+> (`POST /v1/invoke`), refuse when no gateway is configured, and refuse a
+> motion under a gate that needs a person; `estop_clear` always refuses (the
+> person clears a stop). Use robot-md 2.0.1 or newer: earlier versions move
+> the arm from inside the server (1.x) or send a gated motion anyway (2.0.0).
+> Nothing in the MCP server writes to the robot. For a read-only server
+> with no Python, `claude mcp add robot-md -- npx -y robot-md-mcp "$(pwd)/ROBOT.md"`
+> runs the TypeScript server from npm, which has only `render` and
+> `validate`. See [docs.robotmd.dev/mcp](https://docs.robotmd.dev/mcp/#two-servers)
+> and `docs/mcp-server-options.md` for the full comparison.
 
 > **Upgrading from 1.10.x: MCP motion now goes through robot-md-gateway.**
 > `execute_capability`, `execute_task` and `estop` no longer open or write
@@ -226,23 +229,23 @@ robot-md context examples/bob.ROBOT.md | head -10
 Beyond the initial setup, the rest of the package is designed so that **Claude Code and other agent harnesses can recognize when to invoke it**, without the operator naming specific tools. Three surfaces work together:
 
 - **`CLAUDE.md` in the project root** — generate with `robot-md claude-md ROBOT.md`. Teaches Claude which operator intents should dispatch which verb (safety → check HITL gates, "broken" → `doctor`, motion → robot-md-gateway, with a person at the machine). Read at session start.
-- **MCP server descriptions** — `robot-md-mcp` v0.2+ advertises a server-level `instructions` field plus intent-matchable descriptions on every resource and tool. Any MCP client routes to the right resource by description alone.
-- **Claude Code plugin** at [`RobotRegistryFoundation/robot-md-mcp`](https://github.com/RobotRegistryFoundation/robot-md-mcp) — ships the `using-robot-md` skill (intent → action routing, safety protocol, registration flow) and auto-registers the MCP server. Install via `/plugin marketplace add RobotRegistryFoundation/claude-code-plugins` + `/plugin install robot-md`.
+- **MCP server descriptions** — both MCP servers advertise a server-level `instructions` field plus intent-matchable descriptions on every resource and tool. Any MCP client routes to the right resource by description alone.
+- **Claude Code plugin** at [`RobotRegistryFoundation/claude-code-plugins`](https://github.com/RobotRegistryFoundation/claude-code-plugins) — ships the `using-robot-md`, `bounded-embodiment` and `rrf-registry` skills and starts the CLI's MCP server. Install via `/plugin marketplace add RobotRegistryFoundation/claude-code-plugins` + `/plugin install robot-md@robotregistryfoundation`. The version in the Claude plugin directory has the same skills without the server; add the server yourself with the line above.
 
 ## Claude integration
 
 | Surface | Status | Mechanism |
 |---|---|---|
-| **Claude Code** (CLI) | ✅ shipped | `claude mcp add robot-md -- npx -y robot-md-mcp ./ROBOT.md` — printed automatically by `robot-md init` |
+| **Claude Code** (CLI) | ✅ shipped | `claude mcp add robot-md -- robot-md mcp ./ROBOT.md` (robot-md 2.0.1+), or the Claude Code plugin, which starts it for you |
 | **Claude Desktop** (macOS / Windows) | ✅ shipped | One command: `robot-md install-desktop ROBOT.md` merges into `claude_desktop_config.json`. Full MCP — resources + tools + slash commands (`/brief-me`, `/check-safety`, `/explain-capability`, `/manifest-status`). See [`integrations/claude-desktop/`](https://github.com/RobotRegistryFoundation/robot-md/tree/main/integrations/claude-desktop). |
 | **Claude Mobile** (iOS / Android) | ✅ shipped (URL-fetch) | Host `ROBOT.md` + `.well-known/robot-md.json` at any public HTTPS URL, paste into the chat. `robot-md publish-discovery` generates the discovery doc. See [`integrations/claude-mobile/`](https://github.com/RobotRegistryFoundation/robot-md/tree/main/integrations/claude-mobile). |
-| **OpenAI** (Codex CLI, ChatGPT Desktop) | ✅ shipped | Same MCP server — register `npx -y robot-md-mcp /path/to/ROBOT.md` in the tool's MCP config |
+| **OpenAI** (Codex CLI, ChatGPT Desktop) | ✅ shipped | Same MCP server — register `robot-md mcp /path/to/ROBOT.md` in the tool's MCP config |
 | **Google Gemini CLI** | ✅ shipped | Same MCP server — add to `~/.gemini/settings.json` under `mcpServers` |
-| **Cursor / Zed / Cline / Continue.dev / any MCP-aware harness** | ✅ shipped | Same MCP server — register the `npx` command in the tool's MCP settings |
+| **Cursor / Zed / Cline / Continue.dev / any MCP-aware harness** | ✅ shipped | Same MCP server — register `robot-md mcp /path/to/ROBOT.md` in the tool's MCP settings (or `npx -y robot-md-mcp /path/to/ROBOT.md` for the read-only server) |
 
 **ROBOT.md is planner-agnostic by design.** MCP is an [open standard](https://modelcontextprotocol.io). The file you write is the file every provider reads. No per-vendor rewrites, no parallel manifests.
 
-For Claude Code specifically, the [`robot-md` plugin](https://github.com/RobotRegistryFoundation/claude-code-plugins) is the easiest install — it bundles the skill and auto-registers the MCP server. Use the `claude mcp add` one-liner (or your harness's equivalent) above if you want to pin a specific path or run outside Claude Code.
+For Claude Code specifically, the [`robot-md` plugin](https://github.com/RobotRegistryFoundation/claude-code-plugins) is the easiest install — it bundles the skills and starts the CLI's MCP server. Use the `claude mcp add` one-liner (or your harness's equivalent) above if you want to pin a specific path or run outside Claude Code.
 
 ## The broader ecosystem
 
