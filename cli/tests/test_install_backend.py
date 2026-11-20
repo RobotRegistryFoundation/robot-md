@@ -222,3 +222,14 @@ def test_phase_install_backend_ok_when_no_matches():
     result = phase_install_backend(scan)
     assert result.status == "ok"
     assert result.detail == {"installed": []}
+
+
+def test_the_actuators_are_releases_the_gateway_can_be_armed_beside():
+    """robot-md-gateway 0.5.0a10 refuses to be armed while a configured actuator
+    may move and declares no stop. so-arm101-actuator declares its stop from
+    0.3.0, and oak-d-actuator declares that it moves nothing from 0.2.2."""
+    from robot_md.init_phases.install_backend import _RULES
+
+    floors = {match.package: match.min_version for _, match in _RULES}
+    assert floors["so-arm101-actuator"] == "0.3.0"
+    assert floors["oak-d-actuator"] == "0.2.2"
